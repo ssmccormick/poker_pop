@@ -2,15 +2,19 @@
 
 A grid puzzle game about building poker hands, made in Godot 4.7.
 
-A 7×5 board of playing cards is dealt from a shuffled deck. Chain up to
-5 **adjacent** cards (diagonals count) to build the best poker hand you
+A board of playing cards is dealt from a shuffled deck. Chain up to 5
+**adjacent** cards (diagonals count) to build the best poker hand you
 can, play it, and the cards pop — everything above falls down and fresh
 cards deal in from the top. You get **20 hands** per run; chase the
 highest score. If the board ever has no playable hand left, that's a
 loss.
 
-The deck reshuffles when it runs out, so late in a run duplicate cards
-appear — which is why **Five of a Kind** is a legal hand here.
+Three board sizes: **Small 5×5**, **Medium 7×7**, **Large 10×10**
+(buttons in the panel or keys 1/2/3; switching starts a fresh run).
+
+The deck reshuffles when it runs out, so duplicate cards appear —
+which is why **Five of a Kind** is a legal hand here. Large deals 100
+cards from the start, so it always has duplicates in play.
 
 ## Rules
 
@@ -37,9 +41,10 @@ appear — which is why **Five of a Kind** is a legal hand here.
 | --- | --- |
 | Left click / drag | Chain adjacent cards (up to 5) |
 | Enter / Space / PLAY HAND | Play the selected hand |
-| Esc / Right click / CLEAR | Clear selection |
+| C / Right click / CLEAR | Clear selection |
 | R | Restart |
 | T | Cycle visual theme |
+| 1 / 2 / 3 | Board size: Small / Medium / Large |
 
 ## Payouts
 

@@ -11,15 +11,13 @@ signal selection_changed
 signal hand_played(result: Dictionary)
 signal dead_board
 
-const COLS := 7
-const ROWS := 5
 const GAP := 8
 const CELL_W := PlayingCard.W + GAP
 const CELL_H := PlayingCard.H + GAP
 const MAX_SELECT := 5
 
-const BOARD_W := COLS * CELL_W - GAP
-const BOARD_H := ROWS * CELL_H - GAP
+var cols := 5
+var rows := 5
 
 var grid := {}  # Vector2i -> PlayingCard
 var deck: Array = []
@@ -69,6 +67,11 @@ func cell_center(p: Vector2i) -> Vector2:
 	return Vector2(p.x * CELL_W + PlayingCard.W / 2.0, p.y * CELL_H + PlayingCard.H / 2.0)
 
 
+## Unscaled pixel size of the full grid.
+func board_px_size() -> Vector2:
+	return Vector2(cols * CELL_W - GAP, rows * CELL_H - GAP)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton \
 			and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
@@ -93,7 +96,7 @@ func _card_under_mouse(strict: bool) -> PlayingCard:
 	var local := to_local(get_global_mouse_position())
 	var cx := floori(local.x / CELL_W)
 	var cy := floori(local.y / CELL_H)
-	if cx < 0 or cx >= COLS or cy < 0 or cy >= ROWS:
+	if cx < 0 or cx >= cols or cy < 0 or cy >= rows:
 		return null
 	if strict and (local.x - cx * CELL_W > PlayingCard.W or local.y - cy * CELL_H > PlayingCard.H):
 		return null
@@ -206,14 +209,14 @@ func play_hand() -> void:
 func _fall_and_fill(initial_deal: bool) -> void:
 	var tw := create_tween().set_parallel(true)
 	var moved := false
-	for x in COLS:
+	for x in cols:
 		var col_cards: Array = []
-		for y in ROWS:
+		for y in rows:
 			var p := Vector2i(x, y)
 			if grid.has(p):
 				col_cards.append(grid[p])
 				grid.erase(p)
-		var target_y := ROWS - 1
+		var target_y := rows - 1
 		# Existing cards settle to the bottom, keeping their order.
 		for i in range(col_cards.size() - 1, -1, -1):
 			var card: PlayingCard = col_cards[i]

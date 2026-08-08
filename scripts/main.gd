@@ -11,10 +11,22 @@ const DIM := Color("8a836e")
 const START_HANDS := 20
 const PANEL_X := 672.0
 
+# Play area the board scales into.
+const BOARD_AREA_POS := Vector2(40, 56)
+const BOARD_AREA_SIZE := Vector2(620, 600)
+
+const SIZES := [
+	{"name": "SMALL", "cols": 5, "rows": 5},
+	{"name": "MEDIUM", "cols": 7, "rows": 7},
+	{"name": "LARGE", "cols": 10, "rows": 10},
+]
+
 var board: Board
 var score := 0
 var hands_left := START_HANDS
 var game_over := false
+var size_index := 0
+var size_buttons: Array[Button] = []
 
 var score_label: Label
 var hands_label: Label
@@ -32,15 +44,21 @@ func _ready() -> void:
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
 		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
+	var size_env := OS.get_environment("POKERPOP_SIZE")
+	if size_env != "":
+		size_index = clampi(int(size_env), 0, SIZES.size() - 1)
 	RenderingServer.set_default_clear_color(Themes.current().bg)
 
 	board = Board.new()
-	board.position = Vector2(40, 56)
+	board.cols = SIZES[size_index].cols
+	board.rows = SIZES[size_index].rows
 	board.hand_played.connect(_on_hand_played)
 	board.dead_board.connect(_on_dead_board)
 	add_child(board)
+	_apply_board_layout()
 
 	_build_ui()
+	_highlight_size_button()
 
 	if OS.get_environment("POKERPOP_SHOT") != "":
 		_take_screenshot(OS.get_environment("POKERPOP_SHOT"))
@@ -59,9 +77,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				if not game_over:
 					board.play_hand()
-			KEY_ESCAPE:
+			KEY_C:
 				if not game_over:
 					board.clear_selection()
+			KEY_1:
+				_set_size(0)
+			KEY_2:
+				_set_size(1)
+			KEY_3:
+				_set_size(2)
 			KEY_R:
 				_restart()
 			KEY_T:
@@ -131,6 +155,32 @@ func _restart() -> void:
 	board.reset()
 
 
+## Scales and centers the board inside the play area for its grid size.
+func _apply_board_layout() -> void:
+	var px := board.board_px_size()
+	var s: float = minf(1.0, minf(BOARD_AREA_SIZE.x / px.x, BOARD_AREA_SIZE.y / px.y))
+	board.scale = Vector2(s, s)
+	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0
+
+
+## Switches grid size and starts a fresh run.
+func _set_size(i: int) -> void:
+	if board.busy or i == size_index:
+		return
+	size_index = i
+	board.cols = SIZES[i].cols
+	board.rows = SIZES[i].rows
+	_apply_board_layout()
+	_highlight_size_button()
+	_restart()
+
+
+func _highlight_size_button() -> void:
+	for i in size_buttons.size():
+		var col: Color = GOLD if i == size_index else DIM
+		size_buttons[i].add_theme_color_override("font_color", col)
+
+
 func _announce(text: String) -> void:
 	announcer.text = text
 	announcer.modulate = Color(1, 1, 1, 1)
@@ -167,17 +217,25 @@ func _build_ui() -> void:
 		if not game_over:
 			board.clear_selection())
 
-	_label(root, "PAYOUTS", Vector2(PANEL_X, 282), 16, DIM)
+	for i in SIZES.size():
+		var b := _button(root, SIZES[i].name, Vector2(PANEL_X + i * 90, 266), Vector2(84, 28))
+		b.add_theme_font_size_override("font_size", 13)
+		var idx := i
+		b.pressed.connect(func() -> void:
+			_set_size(idx))
+		size_buttons.append(b)
+
+	_label(root, "PAYOUTS", Vector2(PANEL_X, 306), 16, DIM)
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
-	var payouts := _label(root, "\n".join(lines), Vector2(PANEL_X, 312), 14, OFFWHITE)
-	payouts.add_theme_constant_override("line_spacing", 6)
+	var payouts := _label(root, "\n".join(lines), Vector2(PANEL_X, 334), 13, OFFWHITE)
+	payouts.add_theme_constant_override("line_spacing", 4)
 
-	_label(root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nStraights: pick in rank order\nEnter / Space — play    Esc — clear\nR — restart    T — theme",
-			Vector2(PANEL_X, 604), 13, DIM)
+	_label(root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nStraights: pick in rank order\nEnter / Space — play    C / Right click — clear\nR — restart    T — theme    1 / 2 / 3 — size",
+			Vector2(PANEL_X, 596), 12, DIM)
 
 	preview_label = _label(root, "", Vector2(40, 668), 20, DIM)
 
