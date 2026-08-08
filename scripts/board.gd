@@ -83,8 +83,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			var card := _card_under_mouse(true)
 			if card:
+				# Only arm dragging when the press SELECTED the card —
+				# otherwise mouse jitter during a deselect click would
+				# drag-reselect it in the same click.
+				var was_selected := card.selected
 				_toggle_select(card)
-			dragging = true
+				dragging = not was_selected
+			else:
+				dragging = true
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			clear_selection()
 	elif event is InputEventMouseMotion and dragging:
