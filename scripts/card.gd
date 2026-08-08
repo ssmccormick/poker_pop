@@ -7,11 +7,8 @@ extends Node2D
 const W := 80
 const H := 112
 
-const FACE_COLOR := Color("e8e0c8")
-const EDGE_COLOR := Color("a89c7d")
-const RED := Color("c23b3b")
-const BLACK := Color("1a1a1a")
 const GOLD := Color("e8c547")
+const BLACK := Color("1a1a1a")
 
 # suit ids: 0 = spades, 1 = hearts, 2 = diamonds, 3 = clubs
 const SUIT_NAMES := ["Spades", "Hearts", "Diamonds", "Clubs"]
@@ -67,13 +64,23 @@ var selected := false:
 	set(value):
 		selected = value
 		queue_redraw()
+var chain_index := 0:
+	set(value):
+		chain_index = value
+		queue_redraw()
+
+
+## Invalidates the cached styleboxes; call after a theme change.
+static func rebuild_theme() -> void:
+	_face_box = null
 
 
 static func _make_boxes() -> void:
+	var t := Themes.current()
 	_face_box = StyleBoxFlat.new()
-	_face_box.bg_color = FACE_COLOR
+	_face_box.bg_color = t.face
 	_face_box.set_corner_radius_all(6)
-	_face_box.border_color = EDGE_COLOR
+	_face_box.border_color = t.edge
 	_face_box.set_border_width_all(2)
 
 	_selected_box = _face_box.duplicate()
@@ -95,7 +102,8 @@ func rank_text() -> String:
 
 
 func suit_color() -> Color:
-	return RED if suit == 1 or suit == 2 else BLACK
+	var t := Themes.current()
+	return t.red if suit == 1 or suit == 2 else t.black
 
 
 func _draw() -> void:
@@ -118,6 +126,14 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 24, col)
 	_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	_draw_suit(Vector2(0, 6), 5.0)
+
+	if selected and chain_index > 0:
+		# Chain-order badge: straights must be picked in rank order, so the
+		# order needs to be visible.
+		var badge_center := Vector2(W / 2.0 - 13, -H / 2.0 + 13)
+		draw_circle(badge_center, 10, GOLD)
+		draw_string(font, badge_center + Vector2(-10, 5.5), str(chain_index),
+				HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
 
 
 ## Draws the suit pixel map centered on `center`, one pixel = `px`.

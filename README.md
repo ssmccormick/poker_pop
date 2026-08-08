@@ -2,30 +2,40 @@
 
 A grid puzzle game about building poker hands, made in Godot 4.7.
 
-A 7×5 board of playing cards is dealt from a shuffled deck. Click up to
-5 cards anywhere on the board to build the best poker hand you can, play
-it, and the cards pop — everything above falls down and fresh cards deal
-in from the top. You get **20 hands** per run; chase the highest score.
+A 7×5 board of playing cards is dealt from a shuffled deck. Chain up to
+5 **adjacent** cards (diagonals count) to build the best poker hand you
+can, play it, and the cards pop — everything above falls down and fresh
+cards deal in from the top. You get **20 hands** per run; chase the
+highest score. If the board ever has no playable hand left, that's a
+loss.
 
 The deck reshuffles when it runs out, so late in a run duplicate cards
 appear — which is why **Five of a Kind** is a legal hand here.
+
+## Rules
+
+- A selection is an ordered chain: each card after the first must be
+  adjacent (8 directions) to the previous pick. Clicking a selected card
+  removes it and everything picked after it.
+- **Pair minimum** — High Card can't be submitted.
+- Hands with fewer than 5 cards are legal (two kings are a Pair).
+  Straights and flushes require exactly 5 cards.
+- **Straights must be picked in rank order**, ascending or descending
+  (the ace can go low: A-2-3-4-5 or 5-4-3-2-A).
+- Score for a hand = base payout + the pip total of the cards played
+  (J=11, Q=12, K=13, A=14).
 
 ## Controls
 
 | Input | Action |
 | --- | --- |
-| Left click | Select / deselect a card (up to 5) |
+| Left click | Chain / unchain a card (up to 5) |
 | Enter / Space / PLAY HAND | Play the selected hand |
 | Esc / Right click / CLEAR | Clear selection |
 | R | Restart |
+| T | Cycle visual theme |
 
-## Hands & payouts
-
-Hands with fewer than 5 cards are legal (a lone ace is a High Card, two
-kings are a Pair). Straights and flushes require exactly 5 cards.
-
-Score for a hand = base payout + the pip total of the cards played
-(J=11, Q=12, K=13, A=14).
+## Payouts
 
 | Hand | Base |
 | --- | --- |
@@ -39,13 +49,22 @@ Score for a hand = base payout + the pip total of the cards played
 | Three of a Kind | 100 |
 | Two Pair | 60 |
 | Pair | 25 |
-| High Card | 5 |
+
+## Themes
+
+Four visual themes (Classic, Felt Table, Sketchbook, Crosshatch Noir),
+cycled with T. The pattern textures in `assets/patterns/` come from the
+UltimateToon shader pack; its 3D toon shader doesn't apply to a 2D game,
+so `shaders/card_pattern.gdshader` is a small canvas_item adaptation
+that overlays the patterns on the code-drawn cards.
 
 ## Development
 
-Open the project folder in Godot 4.7+. Everything is drawn in code — no
-art assets. Run the evaluator tests headless with:
+Open the project folder in Godot 4.7+. Apart from the pattern textures,
+everything is drawn and synthesized in code (including the pop sound).
+Run the headless tests with:
 
 ```
 godot --headless --path . --script res://tests/test_poker.gd
+godot --headless --path . --script res://tests/test_board.gd
 ```

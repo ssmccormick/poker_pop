@@ -19,6 +19,7 @@ var game_over := false
 var score_label: Label
 var hands_label: Label
 var deck_label: Label
+var theme_label: Label
 var preview_label: Label
 var announcer: Label
 var over_layer: ColorRect
@@ -28,11 +29,15 @@ var _announce_tween: Tween
 
 func _ready() -> void:
 	get_window().title = "Poker Pop"
-	RenderingServer.set_default_clear_color(BG)
+	var theme_env := OS.get_environment("POKERPOP_THEME")
+	if theme_env != "":
+		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
+	RenderingServer.set_default_clear_color(Themes.current().bg)
 
 	board = Board.new()
 	board.position = Vector2(40, 56)
 	board.hand_played.connect(_on_hand_played)
+	board.dead_board.connect(_on_dead_board)
 	add_child(board)
 
 	_build_ui()
@@ -59,6 +64,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					board.clear_selection()
 			KEY_R:
 				_restart()
+			KEY_T:
+				Themes.cycle()
+				RenderingServer.set_default_clear_color(Themes.current().bg)
+				board.apply_theme()
+				theme_label.text = "Theme: %s   (T to cycle)" % Themes.current().name
 
 
 func _update_preview() -> void:
@@ -68,13 +78,17 @@ func _update_preview() -> void:
 		return
 	var data := board.get_selected_data()
 	if data.is_empty():
-		preview_label.text = "Select up to 5 cards to build a poker hand."
+		preview_label.text = "Chain up to 5 adjacent cards to build a poker hand."
 		preview_label.add_theme_color_override("font_color", DIM)
 	else:
 		var result := Poker.evaluate(data)
-		preview_label.text = "%s  —  %d pts   (base %d + pips %d)" % \
-				[result.name, result.score, result.base, result.pips]
-		preview_label.add_theme_color_override("font_color", GOLD)
+		if result.name == "High Card":
+			preview_label.text = "High Card — not playable, you need at least a Pair."
+			preview_label.add_theme_color_override("font_color", RED)
+		else:
+			preview_label.text = "%s  —  %d pts   (base %d + pips %d)" % \
+					[result.name, result.score, result.base, result.pips]
+			preview_label.add_theme_color_override("font_color", GOLD)
 
 
 func _on_hand_played(result: Dictionary) -> void:
@@ -84,15 +98,23 @@ func _on_hand_played(result: Dictionary) -> void:
 	if hands_left <= 0:
 		game_over = true
 		board.locked = true
-		_show_game_over()
+		_show_game_over("GAME OVER\n\nFinal score: %d\n\nPress R to play again" % score)
 
 
-func _show_game_over() -> void:
+func _on_dead_board() -> void:
+	if game_over:
+		return
+	game_over = true
+	board.locked = true
+	_show_game_over("DEAD BOARD\n\nNo playable hands left — that's a loss.\nFinal score: %d\n\nPress R to try again" % score)
+
+
+func _show_game_over(message: String) -> void:
 	# Let the last pop/refill animation play out before covering the board.
 	await get_tree().create_timer(1.4).timeout
 	if not game_over:
 		return
-	over_label.text = "GAME OVER\n\nFinal score: %d\n\nPress R to play again" % score
+	over_label.text = message
 	over_layer.visible = true
 
 
@@ -130,12 +152,14 @@ func _build_ui() -> void:
 	score_label = _label(root, "", Vector2(PANEL_X, 92), 26, GOLD)
 	hands_label = _label(root, "", Vector2(PANEL_X, 132), 20, OFFWHITE)
 	deck_label = _label(root, "", Vector2(PANEL_X, 162), 20, OFFWHITE)
+	theme_label = _label(root, "Theme: %s   (T to cycle)" % Themes.current().name,
+			Vector2(PANEL_X, 190), 13, DIM)
 
-	var play_btn := _button(root, "PLAY HAND", Vector2(PANEL_X, 208), Vector2(158, 44))
+	var play_btn := _button(root, "PLAY HAND", Vector2(PANEL_X, 214), Vector2(158, 44))
 	play_btn.pressed.connect(func() -> void:
 		if not game_over:
 			board.play_hand())
-	var clear_btn := _button(root, "CLEAR", Vector2(PANEL_X + 166, 208), Vector2(96, 44))
+	var clear_btn := _button(root, "CLEAR", Vector2(PANEL_X + 166, 214), Vector2(96, 44))
 	clear_btn.pressed.connect(func() -> void:
 		if not game_over:
 			board.clear_selection())
@@ -145,11 +169,13 @@ func _build_ui() -> void:
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
+		if hand_name == "High Card":
+			continue  # pair minimum — High Card can't be submitted
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
 	var payouts := _label(root, "\n".join(lines), Vector2(PANEL_X, 312), 14, OFFWHITE)
 	payouts.add_theme_constant_override("line_spacing", 6)
 
-	_label(root, "Click cards to select (up to 5)\nEnter / Space — play hand\nEsc / Right click — clear\nR — restart",
+	_label(root, "Chain adjacent cards (up to 5)\nStraights: pick in rank order\nEnter / Space — play    Esc — clear\nR — restart    T — theme",
 			Vector2(PANEL_X, 616), 13, DIM)
 
 	preview_label = _label(root, "", Vector2(40, 668), 20, DIM)
@@ -224,7 +250,8 @@ func _take_screenshot(path: String) -> void:
 	for cell in [Vector2i(0, 4), Vector2i(1, 4), Vector2i(2, 4)]:
 		if board.grid.has(cell):
 			board._toggle_select(board.grid[cell])
-	await get_tree().create_timer(0.6).timeout
+	board._spawn_float_text("+59", board.cell_center(Vector2i(3, 2)))
+	await get_tree().create_timer(0.45).timeout
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(path)
 	get_tree().quit()
