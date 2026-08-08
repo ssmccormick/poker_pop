@@ -52,8 +52,8 @@ cards from the start, so it always has duplicates in play.
 | --- | --- |
 | Flushed Five | 3000 |
 | Royal Flush | 2000 |
+| Five of a Kind | 1500 |
 | Straight Flush | 1200 |
-| Five of a Kind | 900 |
 | Four of a Kind | 600 |
 | Full House | 350 |
 | Flush | 250 |

@@ -18,8 +18,8 @@ const BASE_SCORES := {
 	"Flush": 250,
 	"Full House": 350,
 	"Four of a Kind": 600,
-	"Five of a Kind": 900,
 	"Straight Flush": 1200,
+	"Five of a Kind": 1500,
 	"Royal Flush": 2000,
 	"Flushed Five": 3000,
 }
