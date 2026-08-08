@@ -13,13 +13,18 @@ func _init() -> void:
 	failures += _check(true, "adjacent pair", [
 		[13, 0, 0, 0], [13, 1, 1, 0],
 	])
-	# Two kings 4 king-moves apart: reachable in a 5-chain.
-	failures += _check(true, "pair at chebyshev 4", [
-		[13, 0, 0, 0], [13, 1, 4, 0],
+	# Separated kings can't be played: the filler card between them would
+	# not participate in the hand.
+	failures += _check(false, "pair split by a filler card", [
+		[13, 0, 0, 0], [11, 2, 1, 0], [13, 1, 2, 0],
 	])
-	# Two kings 5 king-moves apart: out of chain range.
-	failures += _check(false, "pair at chebyshev 5", [
-		[13, 0, 0, 0], [13, 1, 5, 0],
+	# ...but K-Q-K-Q is Two Pair: every chained card participates.
+	failures += _check(true, "interleaved two pair chain", [
+		[13, 0, 0, 0], [12, 2, 1, 0], [13, 1, 2, 0], [12, 3, 3, 0],
+	])
+	# K-Q-K-Q-K full house chain.
+	failures += _check(true, "interleaved full house chain", [
+		[13, 0, 0, 0], [12, 2, 1, 0], [13, 1, 2, 0], [12, 3, 3, 0], [13, 2, 4, 0],
 	])
 	# Five connected same-suit cards: playable flush chain.
 	failures += _check(true, "flush chain", [

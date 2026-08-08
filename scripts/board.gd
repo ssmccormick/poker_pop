@@ -26,6 +26,7 @@ var deck: Array = []
 var selected: Array[PlayingCard] = []
 var busy := false    # animations in flight, input ignored
 var locked := false  # game over, input ignored
+var dragging := false
 
 var _pop_wav: AudioStreamWAV
 
@@ -69,23 +70,50 @@ func cell_center(p: Vector2i) -> Vector2:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton \
+			and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		dragging = false
 	if busy or locked:
 		return
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			var local := to_local(get_global_mouse_position())
-			var cx := floori(local.x / CELL_W)
-			var cy := floori(local.y / CELL_H)
-			if cx < 0 or cx >= COLS or cy < 0 or cy >= ROWS:
-				return
-			# Ignore clicks in the gap between cards.
-			if local.x - cx * CELL_W > PlayingCard.W or local.y - cy * CELL_H > PlayingCard.H:
-				return
-			var p := Vector2i(cx, cy)
-			if grid.has(p):
-				_toggle_select(grid[p])
+			var card := _card_under_mouse(true)
+			if card:
+				_toggle_select(card)
+			dragging = true
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			clear_selection()
+	elif event is InputEventMouseMotion and dragging:
+		_drag_over(_card_under_mouse(false))
+
+
+## strict = true rejects the gap between cards (for clicks); dragging uses
+## the whole cell so chains flow smoothly.
+func _card_under_mouse(strict: bool) -> PlayingCard:
+	var local := to_local(get_global_mouse_position())
+	var cx := floori(local.x / CELL_W)
+	var cy := floori(local.y / CELL_H)
+	if cx < 0 or cx >= COLS or cy < 0 or cy >= ROWS:
+		return null
+	if strict and (local.x - cx * CELL_W > PlayingCard.W or local.y - cy * CELL_H > PlayingCard.H):
+		return null
+	return grid.get(Vector2i(cx, cy))
+
+
+func _drag_over(card: PlayingCard) -> void:
+	if card == null:
+		return
+	if selected.is_empty():
+		_toggle_select(card)
+		return
+	if card == selected.back():
+		return
+	if selected.size() >= 2 and card == selected[-2]:
+		# Dragging back over the previous card undoes the last step.
+		_toggle_select(selected.back())
+	elif not card.selected:
+		if selected.size() < MAX_SELECT and _is_adjacent(card.grid_pos, selected.back().grid_pos):
+			_toggle_select(card)
 
 
 static func _is_adjacent(a: Vector2i, b: Vector2i) -> bool:
@@ -136,8 +164,8 @@ func play_hand() -> void:
 	if busy or locked or selected.is_empty():
 		return
 	var result := Poker.evaluate(get_selected_data())
-	if result.name == "High Card":
-		return  # pair minimum — not submittable
+	if not result.playable:
+		return  # every selected card must be part of a real hand
 	result["count"] = selected.size()
 	busy = true
 	hand_played.emit(result)
@@ -226,34 +254,58 @@ func _fall_and_fill(initial_deal: bool) -> void:
 
 # --- Dead-board detection -------------------------------------------------
 
-## True if any submittable hand (pair or better) can be chained on the
-## current full board.
+## True if any submittable hand can be chained on the current board.
+## Every card in a chain must participate in the hand (no kickers), so a
+## hand is playable only if its exact cards form an adjacent chain.
 func has_playable_hand() -> bool:
-	# A pair is chainable iff two same-rank cards sit within MAX_SELECT - 1
-	# king-moves of each other: the board is full, so a connecting path of
-	# cards always exists inside a chain of MAX_SELECT.
-	var by_rank := {}
+	# Rank-group hands (pair, trips, quads, five, two pair, full house):
+	# chains using at most two distinct ranks.
 	for p in grid:
-		var r: int = grid[p].rank
-		if not by_rank.has(r):
-			by_rank[r] = []
-		by_rank[r].append(p)
-	for r in by_rank:
-		var cells: Array = by_rank[r]
-		for i in cells.size():
-			for j in range(i + 1, cells.size()):
-				var d: Vector2i = (cells[i] - cells[j]).abs()
-				if maxi(d.x, d.y) <= MAX_SELECT - 1:
-					return true
-	# No pair in reach: a 5-card flush or ordered straight chain could
-	# still be playable.
+		var card: PlayingCard = grid[p]
+		if _group_chain_exists(p, {p: true}, {card.rank: 1}):
+			return true
+	# 5-card flush chains.
 	for p in grid:
 		if _suit_chain_exists(p, {p: true}, 1):
 			return true
+	# 5-card ordered straight chains.
 	for p in grid:
 		if _straight_chain_exists(p, {p: true}, 1, 1) \
 				or _straight_chain_exists(p, {p: true}, 1, -1):
 			return true
+	return false
+
+
+## rank_counts holds the ranks used by the chain so far. A chain qualifies
+## the moment its rank multiset is an exact hand: all one rank (2-5 cards),
+## two pairs (2+2), or a full house (3+2).
+func _group_chain_exists(p: Vector2i, visited: Dictionary, rank_counts: Dictionary) -> bool:
+	var counts: Array = rank_counts.values()
+	counts.sort()
+	if counts == [2] or counts == [3] or counts == [4] or counts == [5] \
+			or counts == [2, 2] or counts == [2, 3]:
+		return true
+	if visited.size() == MAX_SELECT:
+		return false
+	for dx in [-1, 0, 1]:
+		for dy in [-1, 0, 1]:
+			if dx == 0 and dy == 0:
+				continue
+			var q := p + Vector2i(dx, dy)
+			if not grid.has(q) or visited.has(q):
+				continue
+			var r: int = grid[q].rank
+			# A third distinct rank can never resolve into an exact hand.
+			if not rank_counts.has(r) and rank_counts.size() >= 2:
+				continue
+			rank_counts[r] = rank_counts.get(r, 0) + 1
+			visited[q] = true
+			if _group_chain_exists(q, visited, rank_counts):
+				return true
+			visited.erase(q)
+			rank_counts[r] -= 1
+			if rank_counts[r] == 0:
+				rank_counts.erase(r)
 	return false
 
 

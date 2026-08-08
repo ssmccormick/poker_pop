@@ -15,9 +15,15 @@ appear — which is why **Five of a Kind** is a legal hand here.
 ## Rules
 
 - A selection is an ordered chain: each card after the first must be
-  adjacent (8 directions) to the previous pick. Clicking a selected card
-  removes it and everything picked after it.
-- **Pair minimum** — High Card can't be submitted.
+  adjacent (8 directions) to the previous pick. Click cards one by one
+  or hold and drag across them; dragging back over the previous card
+  undoes a step, and clicking a selected card removes it and everything
+  picked after it.
+- **Every selected card must be part of the hand.** Two kings and two
+  queens plus a jack is not Two Pair — the jack is a kicker, and kickers
+  make the selection unplayable. This also means separated pairs can't
+  be bridged: the cards in between would not participate.
+- **Pair minimum** — a single High Card can't be submitted.
 - Hands with fewer than 5 cards are legal (two kings are a Pair).
   Straights and flushes require exactly 5 cards.
 - **Straights must be picked in rank order**, ascending or descending
@@ -29,7 +35,7 @@ appear — which is why **Five of a Kind** is a legal hand here.
 
 | Input | Action |
 | --- | --- |
-| Left click | Chain / unchain a card (up to 5) |
+| Left click / drag | Chain adjacent cards (up to 5) |
 | Enter / Space / PLAY HAND | Play the selected hand |
 | Esc / Right click / CLEAR | Clear selection |
 | R | Restart |
@@ -39,6 +45,7 @@ appear — which is why **Five of a Kind** is a legal hand here.
 
 | Hand | Base |
 | --- | --- |
+| Flushed Five | 3000 |
 | Royal Flush | 2000 |
 | Straight Flush | 1200 |
 | Five of a Kind | 900 |
@@ -49,6 +56,10 @@ appear — which is why **Five of a Kind** is a legal hand here.
 | Three of a Kind | 100 |
 | Two Pair | 60 |
 | Pair | 25 |
+
+Flushed Five is five cards of the same rank **and** suit — only
+possible once the deck has reshuffled enough for identical duplicates
+to meet on the board.
 
 ## Themes
 

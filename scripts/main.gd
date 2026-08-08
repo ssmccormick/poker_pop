@@ -82,13 +82,16 @@ func _update_preview() -> void:
 		preview_label.add_theme_color_override("font_color", DIM)
 	else:
 		var result := Poker.evaluate(data)
-		if result.name == "High Card":
-			preview_label.text = "High Card — not playable, you need at least a Pair."
-			preview_label.add_theme_color_override("font_color", RED)
-		else:
+		if result.playable:
 			preview_label.text = "%s  —  %d pts   (base %d + pips %d)" % \
 					[result.name, result.score, result.base, result.pips]
 			preview_label.add_theme_color_override("font_color", GOLD)
+		elif result.name == "High Card":
+			preview_label.text = "High Card — not playable, you need at least a Pair."
+			preview_label.add_theme_color_override("font_color", RED)
+		else:
+			preview_label.text = "Not a hand — every card must be part of the hand."
+			preview_label.add_theme_color_override("font_color", RED)
 
 
 func _on_hand_played(result: Dictionary) -> void:
@@ -169,14 +172,12 @@ func _build_ui() -> void:
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
-		if hand_name == "High Card":
-			continue  # pair minimum — High Card can't be submitted
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
 	var payouts := _label(root, "\n".join(lines), Vector2(PANEL_X, 312), 14, OFFWHITE)
 	payouts.add_theme_constant_override("line_spacing", 6)
 
-	_label(root, "Chain adjacent cards (up to 5)\nStraights: pick in rank order\nEnter / Space — play    Esc — clear\nR — restart    T — theme",
-			Vector2(PANEL_X, 616), 13, DIM)
+	_label(root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nStraights: pick in rank order\nEnter / Space — play    Esc — clear\nR — restart    T — theme",
+			Vector2(PANEL_X, 604), 13, DIM)
 
 	preview_label = _label(root, "", Vector2(40, 668), 20, DIM)
 
