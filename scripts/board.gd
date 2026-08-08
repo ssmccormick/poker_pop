@@ -18,6 +18,7 @@ const MAX_SELECT := 5
 
 var cols := 5
 var rows := 5
+var single_deck := false  # deck never reshuffles; the board runs dry
 
 var grid := {}  # Vector2i -> PlayingCard
 var deck: Array = []
@@ -27,10 +28,6 @@ var locked := false  # game over, input ignored
 var dragging := false
 
 var _pop_wav: AudioStreamWAV
-
-
-func _ready() -> void:
-	reset()
 
 
 func reset() -> void:
@@ -43,6 +40,7 @@ func reset() -> void:
 	grid.clear()
 	selected.clear()
 	deck.clear()
+	_refill_deck()
 	selection_changed.emit()
 	await _fall_and_fill(true)
 	busy = false
@@ -57,8 +55,11 @@ func _refill_deck() -> void:
 	deck.shuffle()
 
 
+## Returns {} when a single deck runs out.
 func draw_card() -> Dictionary:
 	if deck.is_empty():
+		if single_deck:
+			return {}
 		_refill_deck()
 	return deck.pop_back()
 
@@ -229,10 +230,13 @@ func _fall_and_fill(initial_deal: bool) -> void:
 						.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 				moved = true
 			target_y -= 1
-		# New cards fall in from above to fill the rest.
+		# New cards fall in from above to fill the rest (a spent single
+		# deck stops mid-column and leaves the top cells empty).
 		var missing := target_y + 1
 		for row in range(target_y, -1, -1):
 			var data := draw_card()
+			if data.is_empty():
+				break
 			var card := PlayingCard.new()
 			card.material = Themes.current_material()
 			card.rank = data.rank

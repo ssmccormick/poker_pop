@@ -2,19 +2,27 @@
 
 A grid puzzle game about building poker hands, made in Godot 4.7.
 
-A board of playing cards is dealt from a shuffled deck. Chain up to 5
-**adjacent** cards (diagonals count) to build the best poker hand you
+A 5×5 board of playing cards is dealt from a shuffled deck. Chain up to
+5 **adjacent** cards (diagonals count) to build the best poker hand you
 can, play it, and the cards pop — everything above falls down and fresh
-cards deal in from the top. You get **20 hands** per run; chase the
-highest score. If the board ever has no playable hand left, that's a
-loss.
+cards deal in from the top.
 
-Three board sizes: **Small 5×5**, **Medium 7×7**, **Large 10×10**
-(buttons in the panel or keys 1/2/3; switching starts a fresh run).
+When the deck reshuffles, duplicate cards appear — which is why **Five
+of a Kind** is a legal hand here.
 
-The deck reshuffles when it runs out, so duplicate cards appear —
-which is why **Five of a Kind** is a legal hand here. Large deals 100
-cards from the start, so it always has duplicates in play.
+## Modes
+
+| Mode | Hands | Timer | Deck |
+| --- | --- | --- | --- |
+| **Time Trial** | Unlimited | 1:00 / 3:00 / 5:00 | Reshuffles |
+| **Single Deck** | Unlimited | None | One 52-card deck — play until no hands remain |
+| **Limited** | 20 | None | Reshuffles |
+| **Zen** | Unlimited | None | Reshuffles |
+
+In Single Deck the board stops refilling when the deck is spent and the
+run ends when no playable hand remains — clearing the entire board is a
+Perfect Clear. In any reshuffling mode, a board with no playable hand
+is a loss (rare, but the exact-hand rule makes it possible).
 
 ## Rules
 
@@ -42,16 +50,16 @@ cards from the start, so it always has duplicates in play.
 | Left click / drag | Chain adjacent cards (up to 5) |
 | Enter / Space / PLAY HAND | Play the selected hand |
 | C / Right click / CLEAR | Clear selection |
-| R | Restart |
+| R | Restart current mode |
+| M | Back to the main menu |
 | T | Cycle visual theme |
-| 1 / 2 / 3 | Board size: Small / Medium / Large |
 
 ## Payouts
 
 | Hand | Base |
 | --- | --- |
 | Flushed Five | 3000 |
-| Royal Flush | 2000 |
+| Royal Flush | 2500 |
 | Five of a Kind | 1500 |
 | Straight Flush | 1200 |
 | Four of a Kind | 600 |

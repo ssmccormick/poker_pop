@@ -1,6 +1,6 @@
 extends Node2D
 
-## Game flow and UI for Poker Pop.
+## Game flow, main menu, modes, and UI for Poker Pop.
 
 const BG := Color("1a1a1a")
 const GOLD := Color("e8c547")
@@ -9,33 +9,37 @@ const RED := Color("c23b3b")
 const DIM := Color("8a836e")
 
 const START_HANDS := 20
-const PANEL_X := 672.0
 
-# Play area the board scales into.
+const PANEL_X := 672.0
+# Play area the board is centered into.
 const BOARD_AREA_POS := Vector2(40, 56)
 const BOARD_AREA_SIZE := Vector2(620, 600)
-
-const SIZES := [
-	{"name": "SMALL", "cols": 5, "rows": 5},
-	{"name": "MEDIUM", "cols": 7, "rows": 7},
-	{"name": "LARGE", "cols": 10, "rows": 10},
-]
 
 var board: Board
 var score := 0
 var hands_left := START_HANDS
+var hands_played := 0
 var game_over := false
-var size_index := 0
-var size_buttons: Array[Button] = []
+var game_started := false
+var menu_open := true
 
+# Mode: "time" (countdown, reshuffles), "single" (one deck, no timer),
+# "limited" (START_HANDS hands, reshuffles), "zen" (no limits, reshuffles).
+var mode_kind := ""
+var mode_time := 0.0
+var mode_label_text := ""
+var time_left := 0.0
+
+var ui_root: Control
 var score_label: Label
-var hands_label: Label
+var status_label: Label
 var deck_label: Label
-var theme_label: Label
+var meta_label: Label
 var preview_label: Label
 var announcer: Label
 var over_layer: ColorRect
 var over_label: Label
+var menu_layer: ColorRect
 var _announce_tween: Tween
 
 
@@ -44,35 +48,71 @@ func _ready() -> void:
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
 		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
-	var size_env := OS.get_environment("POKERPOP_SIZE")
-	if size_env != "":
-		size_index = clampi(int(size_env), 0, SIZES.size() - 1)
 	RenderingServer.set_default_clear_color(Themes.current().bg)
 
 	board = Board.new()
-	board.cols = SIZES[size_index].cols
-	board.rows = SIZES[size_index].rows
+	board.locked = true
 	board.hand_played.connect(_on_hand_played)
 	board.dead_board.connect(_on_dead_board)
 	add_child(board)
 	_apply_board_layout()
 
 	_build_ui()
-	_highlight_size_button()
+	_build_menu()
 
-	if OS.get_environment("POKERPOP_SHOT") != "":
-		_take_screenshot(OS.get_environment("POKERPOP_SHOT"))
+	var shot := OS.get_environment("POKERPOP_SHOT")
+	if shot != "":
+		var m := OS.get_environment("POKERPOP_MODE")
+		match m:
+			"menu":
+				pass
+			"time":
+				_start_mode("time", 60.0)
+			"single":
+				_start_mode("single")
+			"zen":
+				_start_mode("zen")
+			"over":
+				_start_mode("time", 0.6)
+			_:
+				_start_mode("limited")
+		_take_screenshot(shot)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if game_started and not menu_open and not game_over and mode_kind == "time":
+		time_left -= delta
+		if time_left <= 0.0:
+			time_left = 0.0
+			game_over = true
+			board.locked = true
+			_show_game_over("TIME'S UP\n\nFinal score: %d\n\nR — play again    M — menu" % score)
+	_update_labels()
+
+
+func _update_labels() -> void:
 	score_label.text = "SCORE  %d" % score
-	hands_label.text = "HANDS LEFT  %d" % hands_left
 	deck_label.text = "DECK  %d" % board.deck.size()
+	meta_label.text = "%s  ·  Theme: %s (T)" % [mode_label_text, Themes.current().name]
+	match mode_kind:
+		"time":
+			var secs := ceili(time_left)
+			status_label.text = "TIME  %d:%02d" % [secs / 60, secs % 60]
+			status_label.add_theme_color_override("font_color",
+					RED if time_left < 15.0 else OFFWHITE)
+		"limited":
+			status_label.text = "HANDS LEFT  %d" % hands_left
+			status_label.add_theme_color_override("font_color", OFFWHITE)
+		_:
+			status_label.text = "HANDS PLAYED  %d" % hands_played
+			status_label.add_theme_color_override("font_color", OFFWHITE)
 	_update_preview()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if menu_open:
+			return
 		match event.keycode:
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				if not game_over:
@@ -80,25 +120,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_C:
 				if not game_over:
 					board.clear_selection()
-			KEY_1:
-				_set_size(0)
-			KEY_2:
-				_set_size(1)
-			KEY_3:
-				_set_size(2)
 			KEY_R:
 				_restart()
+			KEY_M:
+				_open_menu()
 			KEY_T:
 				Themes.cycle()
 				RenderingServer.set_default_clear_color(Themes.current().bg)
 				board.apply_theme()
-				theme_label.text = "Theme: %s   (T to cycle)" % Themes.current().name
 
 
 func _update_preview() -> void:
+	if menu_open or not game_started:
+		preview_label.text = ""
+		return
 	if game_over:
-		preview_label.text = "Game over — press R to deal a new run."
-		preview_label.add_theme_color_override("font_color", RED)
+		preview_label.text = "R — play again    M — menu"
+		preview_label.add_theme_color_override("font_color", DIM)
 		return
 	var data := board.get_selected_data()
 	if data.is_empty():
@@ -120,65 +158,81 @@ func _update_preview() -> void:
 
 func _on_hand_played(result: Dictionary) -> void:
 	score += result.score
-	hands_left -= 1
+	hands_played += 1
 	_announce("%s  +%d" % [String(result.name).to_upper(), result.score])
-	if hands_left <= 0:
-		game_over = true
-		board.locked = true
-		_show_game_over("GAME OVER\n\nFinal score: %d\n\nPress R to play again" % score)
+	if mode_kind == "limited":
+		hands_left -= 1
+		if hands_left <= 0:
+			game_over = true
+			board.locked = true
+			_show_game_over("GAME OVER\n\nFinal score: %d\n\nR — play again    M — menu" % score)
 
 
 func _on_dead_board() -> void:
-	if game_over:
+	if game_over or not game_started:
 		return
 	game_over = true
 	board.locked = true
-	_show_game_over("DEAD BOARD\n\nNo playable hands left — that's a loss.\nFinal score: %d\n\nPress R to try again" % score)
+	var msg: String
+	if mode_kind == "single":
+		if board.grid.is_empty():
+			msg = "PERFECT CLEAR\n\nYou played out the entire deck!\nFinal score: %d" % score
+		else:
+			msg = "OUT OF HANDS\n\nThe deck is spent — that's the run.\nFinal score: %d" % score
+	else:
+		msg = "DEAD BOARD\n\nNo playable hands left — that's a loss.\nFinal score: %d" % score
+	_show_game_over(msg + "\n\nR — play again    M — menu")
 
 
 func _show_game_over(message: String) -> void:
 	# Let the last pop/refill animation play out before covering the board.
 	await get_tree().create_timer(1.4).timeout
-	if not game_over:
+	if not game_over or menu_open:
 		return
 	over_label.text = message
 	over_layer.visible = true
 
 
 func _restart() -> void:
-	if board.busy:
+	if not game_started or board.busy:
 		return
 	score = 0
+	hands_played = 0
 	hands_left = START_HANDS
+	time_left = mode_time
 	game_over = false
 	over_layer.visible = false
 	board.reset()
 
 
-## Scales and centers the board inside the play area for its grid size.
-func _apply_board_layout() -> void:
-	var px := board.board_px_size()
-	var s: float = minf(1.0, minf(BOARD_AREA_SIZE.x / px.x, BOARD_AREA_SIZE.y / px.y))
-	board.scale = Vector2(s, s)
-	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0
+func _open_menu() -> void:
+	menu_open = true
+	game_started = false
+	game_over = false
+	over_layer.visible = false
+	board.locked = true
+	menu_layer.visible = true
 
 
-## Switches grid size and starts a fresh run.
-func _set_size(i: int) -> void:
-	if board.busy or i == size_index:
-		return
-	size_index = i
-	board.cols = SIZES[i].cols
-	board.rows = SIZES[i].rows
-	_apply_board_layout()
-	_highlight_size_button()
+func _start_mode(kind: String, seconds: float = 0.0) -> void:
+	mode_kind = kind
+	mode_time = seconds
+	match kind:
+		"time":
+			mode_label_text = "Time Trial %d:00" % int(seconds / 60.0)
+		"single":
+			mode_label_text = "Single Deck"
+		"limited":
+			mode_label_text = "Limited"
+		"zen":
+			mode_label_text = "Zen"
+	board.single_deck = kind == "single"
+	menu_open = false
+	menu_layer.visible = false
+	game_started = true
+	while board.busy:
+		await get_tree().process_frame
 	_restart()
-
-
-func _highlight_size_button() -> void:
-	for i in size_buttons.size():
-		var col: Color = GOLD if i == size_index else DIM
-		size_buttons[i].add_theme_color_override("font_color", col)
 
 
 func _announce(text: String) -> void:
@@ -191,53 +245,59 @@ func _announce(text: String) -> void:
 	_announce_tween.tween_property(announcer, "modulate:a", 0.0, 0.5)
 
 
+## Centers the board inside the play area (scales down if it ever outgrows it).
+func _apply_board_layout() -> void:
+	var px := board.board_px_size()
+	var s: float = minf(1.0, minf(BOARD_AREA_SIZE.x / px.x, BOARD_AREA_SIZE.y / px.y))
+	board.scale = Vector2(s, s)
+	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0
+
+
+# --- UI construction ------------------------------------------------------
+
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	var root := Control.new()
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(root)
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui_root = Control.new()
+	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(ui_root)
+	# A Control under a CanvasLayer doesn't inherit the viewport rect, so
+	# size everything explicitly to the fixed 960x720 design resolution.
+	ui_root.size = Vector2(960, 720)
 
-	_label(root, "POKER", Vector2(PANEL_X, 20), 40, RED)
-	_label(root, "POP", Vector2(PANEL_X + 158, 20), 40, OFFWHITE)
+	_label(ui_root, "POKER", Vector2(PANEL_X, 20), 40, RED)
+	_label(ui_root, "POP", Vector2(PANEL_X + 158, 20), 40, OFFWHITE)
 
-	score_label = _label(root, "", Vector2(PANEL_X, 92), 26, GOLD)
-	hands_label = _label(root, "", Vector2(PANEL_X, 132), 20, OFFWHITE)
-	deck_label = _label(root, "", Vector2(PANEL_X, 162), 20, OFFWHITE)
-	theme_label = _label(root, "Theme: %s   (T to cycle)" % Themes.current().name,
-			Vector2(PANEL_X, 190), 13, DIM)
+	score_label = _label(ui_root, "", Vector2(PANEL_X, 92), 26, GOLD)
+	status_label = _label(ui_root, "", Vector2(PANEL_X, 132), 20, OFFWHITE)
+	deck_label = _label(ui_root, "", Vector2(PANEL_X, 162), 20, OFFWHITE)
+	meta_label = _label(ui_root, "", Vector2(PANEL_X, 190), 13, DIM)
 
-	var play_btn := _button(root, "PLAY HAND", Vector2(PANEL_X, 214), Vector2(158, 44))
+	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 214), Vector2(158, 44))
 	play_btn.pressed.connect(func() -> void:
-		if not game_over:
+		if game_started and not game_over:
 			board.play_hand())
-	var clear_btn := _button(root, "CLEAR", Vector2(PANEL_X + 166, 214), Vector2(96, 44))
+	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X + 166, 214), Vector2(96, 44))
 	clear_btn.pressed.connect(func() -> void:
-		if not game_over:
+		if game_started and not game_over:
 			board.clear_selection())
+	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X, 266), Vector2(96, 28))
+	menu_btn.add_theme_font_size_override("font_size", 13)
+	menu_btn.pressed.connect(_open_menu)
 
-	for i in SIZES.size():
-		var b := _button(root, SIZES[i].name, Vector2(PANEL_X + i * 90, 266), Vector2(84, 28))
-		b.add_theme_font_size_override("font_size", 13)
-		var idx := i
-		b.pressed.connect(func() -> void:
-			_set_size(idx))
-		size_buttons.append(b)
-
-	_label(root, "PAYOUTS", Vector2(PANEL_X, 306), 16, DIM)
+	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 306), 16, DIM)
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
-	var payouts := _label(root, "\n".join(lines), Vector2(PANEL_X, 334), 13, OFFWHITE)
+	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_X, 334), 13, OFFWHITE)
 	payouts.add_theme_constant_override("line_spacing", 4)
 
-	_label(root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nStraights: pick in rank order\nEnter / Space — play    C / Right click — clear\nR — restart    T — theme    1 / 2 / 3 — size",
+	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nStraights: pick in rank order\nEnter / Space — play    C / Right click — clear\nR — restart    T — theme    M — menu",
 			Vector2(PANEL_X, 596), 12, DIM)
 
-	preview_label = _label(root, "", Vector2(40, 668), 20, DIM)
+	preview_label = _label(ui_root, "", Vector2(40, 668), 20, DIM)
 
 	announcer = Label.new()
 	announcer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -248,22 +308,64 @@ func _build_ui() -> void:
 	announcer.add_theme_constant_override("shadow_offset_x", 3)
 	announcer.add_theme_constant_override("shadow_offset_y", 3)
 	announcer.modulate = Color(1, 1, 1, 0)
-	root.add_child(announcer)
-	announcer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	announcer.offset_right = -290  # center over the board, not the panel
+	ui_root.add_child(announcer)
+	announcer.size = Vector2(670, 720)  # centered over the board, not the panel
 
 	over_layer = ColorRect.new()
 	over_layer.color = Color(0, 0, 0, 0.78)
 	over_layer.visible = false
-	root.add_child(over_layer)
-	over_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	over_layer.size = Vector2(960, 720)
+	ui_root.add_child(over_layer)
 	over_label = Label.new()
 	over_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	over_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	over_label.add_theme_font_size_override("font_size", 34)
 	over_label.add_theme_color_override("font_color", OFFWHITE)
+	over_label.size = Vector2(960, 720)
 	over_layer.add_child(over_label)
-	over_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+
+func _build_menu() -> void:
+	menu_layer = ColorRect.new()
+	menu_layer.color = BG
+	menu_layer.size = Vector2(960, 720)
+	ui_root.add_child(menu_layer)
+
+	_label(menu_layer, "POKER", Vector2(262, 90), 72, RED)
+	_label(menu_layer, "POP", Vector2(548, 90), 72, OFFWHITE)
+	_menu_center("Chain adjacent cards into poker hands", 196, 16, DIM)
+
+	_menu_center("TIME TRIAL", 258, 16, GOLD)
+	var times := [60.0, 180.0, 300.0]
+	var time_names := ["1:00", "3:00", "5:00"]
+	for i in 3:
+		var b := _button(menu_layer, time_names[i], Vector2(285 + i * 135, 284), Vector2(120, 40))
+		var secs: float = times[i]
+		b.pressed.connect(func() -> void:
+			_start_mode("time", secs))
+	_menu_center("Unlimited hands · reshuffling deck · beat the clock", 330, 13, DIM)
+
+	var single_btn := _button(menu_layer, "SINGLE DECK", Vector2(320, 372), Vector2(320, 44))
+	single_btn.pressed.connect(func() -> void:
+		_start_mode("single"))
+	_menu_center("One 52-card deck · no timer · play until no hands remain", 422, 13, DIM)
+
+	var limited_btn := _button(menu_layer, "LIMITED", Vector2(320, 460), Vector2(320, 44))
+	limited_btn.pressed.connect(func() -> void:
+		_start_mode("limited"))
+	_menu_center("%d hands · reshuffling deck" % START_HANDS, 510, 13, DIM)
+
+	var zen_btn := _button(menu_layer, "ZEN", Vector2(320, 548), Vector2(320, 44))
+	zen_btn.pressed.connect(func() -> void:
+		_start_mode("zen"))
+	_menu_center("No timer · no hand limit · deck reshuffles forever", 598, 13, DIM)
+
+
+func _menu_center(text: String, y: float, font_size: int, color: Color) -> Label:
+	var l := _label(menu_layer, text, Vector2(0, y), font_size, color)
+	l.size = Vector2(960, font_size * 2.0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return l
 
 
 func _label(parent: Control, text: String, pos: Vector2, size: int, color: Color) -> Label:
@@ -302,14 +404,20 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 	return b
 
 
-## Debug helper: POKERPOP_SHOT=<path> captures the board after the deal
-## settles, then quits. Used for automated visual checks.
+## Debug helper: POKERPOP_SHOT=<png path> captures a frame after the deal
+## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
+	if OS.get_environment("POKERPOP_MODE") == "over":
+		await get_tree().create_timer(3.5).timeout
+		get_viewport().get_texture().get_image().save_png(path)
+		get_tree().quit()
+		return
 	await get_tree().create_timer(1.6).timeout
 	for cell in [Vector2i(0, 4), Vector2i(1, 4), Vector2i(2, 4)]:
 		if board.grid.has(cell):
 			board._toggle_select(board.grid[cell])
-	board._spawn_float_text("+59", board.cell_center(Vector2i(3, 2)))
+	if not menu_open:
+		board._spawn_float_text("+59", board.cell_center(Vector2i(3, 2)))
 	await get_tree().create_timer(0.45).timeout
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(path)
