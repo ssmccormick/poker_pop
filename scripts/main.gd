@@ -8,7 +8,15 @@ const OFFWHITE := Color("e8e0c8")
 const RED := Color("c23b3b")
 const DIM := Color("8a836e")
 
-const START_HANDS := 20
+# Arcade mode difficulty curve.
+const ARCADE_BASE_TARGET := 200   # level 1 score target
+const ARCADE_TARGET_STEP := 100   # extra target per level
+const ARCADE_BASE_HANDS := 16     # level 1 hand budget
+const ARCADE_MIN_HANDS := 8
+const ARCADE_BASE_DRAIN := 2.5    # meter % lost per second at level 1
+const ARCADE_DRAIN_STEP := 0.6
+const ARCADE_MAX_DRAIN := 8.0
+const ARCADE_METER_GAIN := 0.4    # meter % gained per point scored
 
 const PANEL_X := 672.0
 # Play area the board is centered into.
@@ -17,24 +25,33 @@ const BOARD_AREA_SIZE := Vector2(620, 600)
 
 var board: Board
 var score := 0
-var hands_left := START_HANDS
+var hands_left := 0
 var hands_played := 0
 var game_over := false
 var game_started := false
 var menu_open := true
 
 # Mode: "time" (countdown, reshuffles), "single" (one deck, no timer),
-# "limited" (START_HANDS hands, reshuffles), "zen" (no limits, reshuffles).
+# "arcade" (leveled score targets, draining meter), "zen" (no limits).
 var mode_kind := ""
 var mode_time := 0.0
 var mode_label_text := ""
 var time_left := 0.0
 
+# Arcade state.
+var level := 1
+var level_score := 0
+var meter := 100.0
+var level_transition := false
+
 var ui_root: Control
 var score_label: Label
 var status_label: Label
+var progress_label: Label
 var deck_label: Label
 var meta_label: Label
+var meter_back: ColorRect
+var meter_fill: ColorRect
 var preview_label: Label
 var announcer: Label
 var over_layer: ColorRect
@@ -75,37 +92,69 @@ func _ready() -> void:
 			"over":
 				_start_mode("time", 0.6)
 			_:
-				_start_mode("limited")
+				_start_mode("arcade")
 		_take_screenshot(shot)
 
 
 func _process(delta: float) -> void:
-	if game_started and not menu_open and not game_over and mode_kind == "time":
-		time_left -= delta
-		if time_left <= 0.0:
-			time_left = 0.0
-			game_over = true
-			board.locked = true
-			_show_game_over("TIME'S UP\n\nFinal score: %d\n\nR — play again    M — menu" % score)
+	if game_started and not menu_open and not game_over:
+		if mode_kind == "time":
+			time_left -= delta
+			if time_left <= 0.0:
+				time_left = 0.0
+				game_over = true
+				board.locked = true
+				_show_game_over("TIME'S UP\n\nFinal score: %d\n\nR — play again    M — menu" % score)
+		elif mode_kind == "arcade" and not level_transition:
+			meter -= _arcade_drain() * delta
+			if meter <= 0.0:
+				meter = 0.0
+				game_over = true
+				board.locked = true
+				_show_game_over("THE BAR HIT BOTTOM\n\nYou made it to level %d.\nTotal score: %d\n\nR — play again    M — menu" % [level, score])
 	_update_labels()
+
+
+func _arcade_target() -> int:
+	return ARCADE_BASE_TARGET + ARCADE_TARGET_STEP * (level - 1)
+
+
+func _arcade_hands() -> int:
+	return maxi(ARCADE_MIN_HANDS, ARCADE_BASE_HANDS - (level - 1))
+
+
+func _arcade_drain() -> float:
+	return minf(ARCADE_MAX_DRAIN, ARCADE_BASE_DRAIN + ARCADE_DRAIN_STEP * (level - 1))
 
 
 func _update_labels() -> void:
 	score_label.text = "SCORE  %d" % score
 	deck_label.text = "DECK  %d" % board.deck.size()
 	meta_label.text = "%s  ·  Theme: %s (T)" % [mode_label_text, Themes.current().name]
+	progress_label.text = ""
 	match mode_kind:
 		"time":
 			var secs := ceili(time_left)
 			status_label.text = "TIME  %d:%02d" % [secs / 60, secs % 60]
 			status_label.add_theme_color_override("font_color",
 					RED if time_left < 15.0 else OFFWHITE)
-		"limited":
-			status_label.text = "HANDS LEFT  %d" % hands_left
-			status_label.add_theme_color_override("font_color", OFFWHITE)
+		"arcade":
+			status_label.text = "LEVEL %d    HANDS %d" % [level, hands_left]
+			status_label.add_theme_color_override("font_color",
+					RED if hands_left <= 2 else OFFWHITE)
+			progress_label.text = "TARGET  %d / %d" % [level_score, _arcade_target()]
 		_:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
+
+	var show_meter := mode_kind == "arcade" and game_started and not menu_open
+	meter_back.visible = show_meter
+	meter_fill.visible = show_meter
+	if show_meter:
+		var h := 596.0 * meter / 100.0
+		meter_fill.position.y = 58.0 + (596.0 - h)
+		meter_fill.size.y = h
+		meter_fill.color = GOLD if meter > 25.0 else RED
 	_update_preview()
 
 
@@ -160,12 +209,38 @@ func _on_hand_played(result: Dictionary) -> void:
 	score += result.score
 	hands_played += 1
 	_announce("%s  +%d" % [String(result.name).to_upper(), result.score])
-	if mode_kind == "limited":
+	if mode_kind == "arcade":
+		level_score += result.score
+		meter = clampf(meter + result.score * ARCADE_METER_GAIN, 0.0, 100.0)
 		hands_left -= 1
-		if hands_left <= 0:
+		if level_score >= _arcade_target():
+			_level_up()
+		elif hands_left <= 0:
 			game_over = true
 			board.locked = true
-			_show_game_over("GAME OVER\n\nFinal score: %d\n\nR — play again    M — menu" % score)
+			_show_game_over("OUT OF HANDS\n\nLevel %d needed %d more points.\nTotal score: %d\n\nR — play again    M — menu" % \
+					[level, _arcade_target() - level_score, score])
+
+
+## Advances arcade to the next level: fresh board, fewer hands, faster drain.
+func _level_up() -> void:
+	level_transition = true
+	board.locked = true
+	_announce("LEVEL %d CLEAR!" % level)
+	while board.busy:
+		await get_tree().process_frame
+	if not game_started or mode_kind != "arcade":
+		level_transition = false
+		return
+	level += 1
+	level_score = 0
+	hands_left = _arcade_hands()
+	meter = 100.0
+	board.reset()
+	while board.busy:
+		await get_tree().process_frame
+	_announce("LEVEL %d" % level)
+	level_transition = false
 
 
 func _on_dead_board() -> void:
@@ -179,6 +254,8 @@ func _on_dead_board() -> void:
 			msg = "PERFECT CLEAR\n\nYou played out the entire deck!\nFinal score: %d" % score
 		else:
 			msg = "OUT OF HANDS\n\nThe deck is spent — that's the run.\nFinal score: %d" % score
+	elif mode_kind == "arcade":
+		msg = "DEAD BOARD\n\nNo playable hands left on level %d — that's a loss.\nTotal score: %d" % [level, score]
 	else:
 		msg = "DEAD BOARD\n\nNo playable hands left — that's a loss.\nFinal score: %d" % score
 	_show_game_over(msg + "\n\nR — play again    M — menu")
@@ -194,12 +271,15 @@ func _show_game_over(message: String) -> void:
 
 
 func _restart() -> void:
-	if not game_started or board.busy:
+	if not game_started or board.busy or level_transition:
 		return
 	score = 0
 	hands_played = 0
-	hands_left = START_HANDS
 	time_left = mode_time
+	level = 1
+	level_score = 0
+	meter = 100.0
+	hands_left = _arcade_hands()
 	game_over = false
 	over_layer.visible = false
 	board.reset()
@@ -222,8 +302,8 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 			mode_label_text = "Time Trial %d:00" % int(seconds / 60.0)
 		"single":
 			mode_label_text = "Single Deck"
-		"limited":
-			mode_label_text = "Limited"
+		"arcade":
+			mode_label_text = "Arcade"
 		"zen":
 			mode_label_text = "Zen"
 	board.single_deck = kind == "single"
@@ -268,24 +348,39 @@ func _build_ui() -> void:
 	_label(ui_root, "POKER", Vector2(PANEL_X, 20), 40, RED)
 	_label(ui_root, "POP", Vector2(PANEL_X + 158, 20), 40, OFFWHITE)
 
-	score_label = _label(ui_root, "", Vector2(PANEL_X, 92), 26, GOLD)
-	status_label = _label(ui_root, "", Vector2(PANEL_X, 132), 20, OFFWHITE)
-	deck_label = _label(ui_root, "", Vector2(PANEL_X, 162), 20, OFFWHITE)
-	meta_label = _label(ui_root, "", Vector2(PANEL_X, 190), 13, DIM)
+	score_label = _label(ui_root, "", Vector2(PANEL_X, 90), 26, GOLD)
+	status_label = _label(ui_root, "", Vector2(PANEL_X, 130), 18, OFFWHITE)
+	progress_label = _label(ui_root, "", Vector2(PANEL_X, 156), 18, GOLD)
+	deck_label = _label(ui_root, "", Vector2(PANEL_X, 182), 14, OFFWHITE)
+	meta_label = _label(ui_root, "", Vector2(PANEL_X, 200), 12, DIM)
 
-	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 214), Vector2(158, 44))
+	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 220), Vector2(158, 44))
 	play_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.play_hand())
-	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X + 166, 214), Vector2(96, 44))
+	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X + 166, 220), Vector2(96, 44))
 	clear_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.clear_selection())
-	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X, 266), Vector2(96, 28))
+	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X, 272), Vector2(96, 28))
 	menu_btn.add_theme_font_size_override("font_size", 13)
 	menu_btn.pressed.connect(_open_menu)
 
-	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 306), 16, DIM)
+	# Arcade meter: a vertical bar beside the board that drains constantly.
+	meter_back = ColorRect.new()
+	meter_back.color = Color("2a2a2a")
+	meter_back.position = Vector2(8, 56)
+	meter_back.size = Vector2(22, 600)
+	meter_back.visible = false
+	ui_root.add_child(meter_back)
+	meter_fill = ColorRect.new()
+	meter_fill.color = GOLD
+	meter_fill.position = Vector2(11, 58)
+	meter_fill.size = Vector2(16, 596)
+	meter_fill.visible = false
+	ui_root.add_child(meter_fill)
+
+	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 308), 16, DIM)
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
 	var lines := PackedStringArray()
@@ -350,10 +445,10 @@ func _build_menu() -> void:
 		_start_mode("single"))
 	_menu_center("One 52-card deck · no timer · play until no hands remain", 422, 13, DIM)
 
-	var limited_btn := _button(menu_layer, "LIMITED", Vector2(320, 460), Vector2(320, 44))
-	limited_btn.pressed.connect(func() -> void:
-		_start_mode("limited"))
-	_menu_center("%d hands · reshuffling deck" % START_HANDS, 510, 13, DIM)
+	var arcade_btn := _button(menu_layer, "ARCADE", Vector2(320, 460), Vector2(320, 44))
+	arcade_btn.pressed.connect(func() -> void:
+		_start_mode("arcade"))
+	_menu_center("Rising score targets · shrinking hand budget · an always-draining bar", 510, 13, DIM)
 
 	var zen_btn := _button(menu_layer, "ZEN", Vector2(320, 548), Vector2(320, 44))
 	zen_btn.pressed.connect(func() -> void:
