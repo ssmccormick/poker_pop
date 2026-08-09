@@ -56,6 +56,7 @@ var target_bar_back: ColorRect
 var target_bar_fill: ColorRect
 var hand_display: Node2D
 var splash_layer: ColorRect
+var countdown_overlay: ColorRect
 var music: AudioStreamPlayer
 var menu_music: AudioStreamPlayer
 var countdown_active := false
@@ -101,6 +102,8 @@ func _ready() -> void:
 		match m:
 			"splash", "menu":
 				pass
+			"ready":
+				_start_mode("arcade")
 			"time":
 				_start_mode("time", 60.0)
 			"single":
@@ -313,33 +316,40 @@ func _restart() -> void:
 	_begin_countdown()
 
 
-## "3, 2, 1, Pop!" before play begins — on run start and on every arcade
-## level. Timers and the arcade meter are frozen (countdown_active) and
-## the board stays locked until the "POP!". A newer countdown or a menu
-## exit cancels an older one via countdown_id.
+## "Ready... POP!" before play begins — on run start and on every arcade
+## level. Timers and the arcade meter are frozen (countdown_active), the
+## board stays locked, and a dark overlay covers the play area until the
+## "POP!". A newer countdown or a menu exit cancels an older one via
+## countdown_id.
 func _begin_countdown() -> void:
 	countdown_id += 1
 	var my_id := countdown_id
 	countdown_active = true
 	board.locked = true
-	if OS.get_environment("POKERPOP_SHOT") != "":
+	countdown_overlay.visible = true
+	if OS.get_environment("POKERPOP_SHOT") != "" and OS.get_environment("POKERPOP_MODE") != "ready":
 		board.locked = false
 		countdown_active = false
+		countdown_overlay.visible = false
 		return
 	while board.busy:
 		await get_tree().process_frame
 		if my_id != countdown_id:
 			return
-	for step in ["3", "2", "1"]:
-		if my_id != countdown_id or menu_open or not game_started:
-			return
-		_announce(step)
-		await get_tree().create_timer(0.7).timeout
+	if my_id != countdown_id or menu_open or not game_started:
+		return
+	# READY holds at full opacity until the POP replaces it.
+	if _announce_tween and _announce_tween.is_valid():
+		_announce_tween.kill()
+	announcer.text = "READY..."
+	announcer.modulate = Color(1, 1, 1, 1)
+	await get_tree().create_timer(1.5).timeout
 	if my_id != countdown_id or menu_open or not game_started:
 		return
 	_announce("POP!")
 	board.locked = false
 	countdown_active = false
+	countdown_overlay.visible = false
 
 
 func _make_music_player(path: String) -> AudioStreamPlayer:
@@ -355,6 +365,7 @@ func _make_music_player(path: String) -> AudioStreamPlayer:
 func _open_menu() -> void:
 	countdown_id += 1  # cancel any running countdown
 	countdown_active = false
+	countdown_overlay.visible = false
 	music.stop()
 	_fade_in(menu_music)
 	menu_open = true
@@ -514,6 +525,13 @@ func _build_ui() -> void:
 
 	preview_label = _label(ui_root, "", Vector2(40, 668), 20, DIM)
 
+	# Darkens the play area during the Ready countdown — a clear "not yet".
+	countdown_overlay = ColorRect.new()
+	countdown_overlay.color = Color(0, 0, 0, 0.55)
+	countdown_overlay.size = Vector2(662, 720)
+	countdown_overlay.visible = false
+	ui_root.add_child(countdown_overlay)
+
 	announcer = Label.new()
 	announcer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	announcer.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -650,11 +668,17 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 ## Debug helper: POKERPOP_SHOT=<png path> captures a frame after the deal
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
-	if OS.get_environment("POKERPOP_MODE") == "over":
-		await get_tree().create_timer(3.5).timeout
-		get_viewport().get_texture().get_image().save_png(path)
-		get_tree().quit()
-		return
+	match OS.get_environment("POKERPOP_MODE"):
+		"over":
+			await get_tree().create_timer(3.5).timeout
+			get_viewport().get_texture().get_image().save_png(path)
+			get_tree().quit()
+			return
+		"ready":
+			await get_tree().create_timer(2.0).timeout
+			get_viewport().get_texture().get_image().save_png(path)
+			get_tree().quit()
+			return
 	await get_tree().create_timer(1.6).timeout
 	for cell in [Vector2i(0, 4), Vector2i(1, 4), Vector2i(2, 4)]:
 		if board.grid.has(cell):
