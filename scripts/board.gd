@@ -97,16 +97,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		_drag_over(_card_under_mouse(false))
 
 
-## strict = true rejects the gap between cards (for clicks); dragging uses
-## the whole cell so chains flow smoothly.
+## strict = true rejects the gap between cards (for clicks). Drags use a
+## smaller central hitbox per card, leaving dead corridors between cards
+## so a diagonal drag doesn't clip an orthogonal neighbor on the way.
+const DRAG_HIT := 0.30  # half-extent of the drag hitbox, as a card fraction
+
 func _card_under_mouse(strict: bool) -> PlayingCard:
 	var local := to_local(get_global_mouse_position())
 	var cx := floori(local.x / CELL_W)
 	var cy := floori(local.y / CELL_H)
 	if cx < 0 or cx >= cols or cy < 0 or cy >= rows:
 		return null
-	if strict and (local.x - cx * CELL_W > PlayingCard.W or local.y - cy * CELL_H > PlayingCard.H):
-		return null
+	if strict:
+		if local.x - cx * CELL_W > PlayingCard.W or local.y - cy * CELL_H > PlayingCard.H:
+			return null
+	else:
+		var center := cell_center(Vector2i(cx, cy))
+		if absf(local.x - center.x) > PlayingCard.W * DRAG_HIT \
+				or absf(local.y - center.y) > PlayingCard.H * DRAG_HIT:
+			return null
 	return grid.get(Vector2i(cx, cy))
 
 
