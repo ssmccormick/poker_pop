@@ -4,3 +4,6 @@
 
 # Logs
 *.log
+
+# Export builds
+build/
