@@ -249,6 +249,11 @@ func _level_up() -> void:
 func _on_dead_board() -> void:
 	if game_over or not game_started:
 		return
+	if mode_kind == "arcade":
+		# Arcade never dead-ends: reshuffle the board and keep going.
+		_announce("NO MOVES — RESHUFFLE")
+		board.shuffle_board()
+		return
 	game_over = true
 	board.locked = true
 	var msg: String
@@ -257,8 +262,6 @@ func _on_dead_board() -> void:
 			msg = "PERFECT CLEAR\n\nYou played out the entire deck!\nFinal score: %d" % score
 		else:
 			msg = "OUT OF HANDS\n\nThe deck is spent — that's the run.\nFinal score: %d" % score
-	elif mode_kind == "arcade":
-		msg = "DEAD BOARD\n\nNo playable hands left on level %d — that's a loss.\nTotal score: %d" % [level, score]
 	else:
 		msg = "DEAD BOARD\n\nNo playable hands left — that's a loss.\nFinal score: %d" % score
 	_show_game_over(msg + "\n\nR — play again    M — menu")

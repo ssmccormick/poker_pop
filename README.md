@@ -23,7 +23,9 @@ of a Kind** is a legal hand here.
 +100 per level) on a hand budget that shrinks each level (16 down to a
 floor of 8), while a meter beside the board drains constantly — faster
 every level. Scoring hands refills the meter. Hit the target to advance
-to a fresh board; run out of meter or hands and the run is over.
+to a fresh board; run out of meter or hands and the run is over. If
+the board ever has no playable hand, Arcade reshuffles it and play
+continues (the bar keeps draining, though).
 
 In Single Deck the board stops refilling when the deck is spent and the
 run ends when no playable hand remains — clearing the entire board is a

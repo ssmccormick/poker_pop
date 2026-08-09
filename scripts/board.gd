@@ -378,6 +378,32 @@ func _straight_possible(ranks: Dictionary) -> bool:
 	return true
 
 
+## Rearranges the existing cards into a new layout that has a playable
+## hand, with a slide animation. With 14+ cards a duplicate rank always
+## exists, so a playable arrangement is always reachable.
+func shuffle_board() -> void:
+	if busy or grid.is_empty():
+		return
+	busy = true
+	clear_selection()
+	var cards: Array = grid.values()
+	var cells: Array = grid.keys()
+	for attempt in 100:
+		cells.shuffle()
+		grid.clear()
+		for i in cards.size():
+			grid[cells[i]] = cards[i]
+			cards[i].grid_pos = cells[i]
+		if has_playable_hand():
+			break
+	var tw := create_tween().set_parallel(true)
+	for p in grid:
+		tw.tween_property(grid[p], "position", cell_center(p), 0.5) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	await tw.finished
+	busy = false
+
+
 ## Restyles every card on the board for the current theme.
 func apply_theme() -> void:
 	PlayingCard.rebuild_theme()
