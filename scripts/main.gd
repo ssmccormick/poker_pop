@@ -53,6 +53,7 @@ var meta_label: Label
 var meter_back: ColorRect
 var meter_fill: ColorRect
 var hand_display: Node2D
+var music: AudioStreamPlayer
 var preview_label: Label
 var announcer: Label
 var over_layer: ColorRect
@@ -78,6 +79,14 @@ func _ready() -> void:
 
 	_build_ui()
 	_build_menu()
+
+	# Gameplay music: "Crimson Sparks" (Echoes Below pack), looped.
+	music = AudioStreamPlayer.new()
+	var track: AudioStreamMP3 = load("res://assets/music/crimson_sparks.mp3")
+	track.loop = true
+	music.stream = track
+	music.volume_db = -12.0
+	add_child(music)
 
 	var shot := OS.get_environment("POKERPOP_SHOT")
 	if shot != "":
@@ -292,6 +301,7 @@ func _restart() -> void:
 
 
 func _open_menu() -> void:
+	music.stop()
 	menu_open = true
 	game_started = false
 	game_over = false
@@ -316,6 +326,8 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 	menu_open = false
 	menu_layer.visible = false
 	game_started = true
+	if not music.playing:
+		music.play()
 	while board.busy:
 		await get_tree().process_frame
 	_restart()
