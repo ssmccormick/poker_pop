@@ -47,14 +47,19 @@ var level_transition := false
 var ui_root: Control
 var score_label: Label
 var status_label: Label
-var progress_label: Label
 var deck_label: Label
 var meta_label: Label
 var meter_back: ColorRect
 var meter_fill: ColorRect
+var target_label: Label
+var target_bar_back: ColorRect
+var target_bar_fill: ColorRect
 var hand_display: Node2D
+var splash_layer: ColorRect
 var music: AudioStreamPlayer
 var menu_music: AudioStreamPlayer
+var countdown_active := false
+var countdown_id := 0
 var preview_label: Label
 var announcer: Label
 var over_layer: ColorRect
@@ -80,18 +85,21 @@ func _ready() -> void:
 
 	_build_ui()
 	_build_menu()
+	_build_splash()
 
 	# Music (Echoes Below pack): "Crimson Sparks" in-game, "Tiny
-	# Troublemaker" on the menu, both looped.
+	# Troublemaker" on the menu, both looped. Nothing plays until the
+	# splash is clicked — that first gesture also unblocks web audio.
 	music = _make_music_player("res://assets/music/crimson_sparks.mp3")
 	menu_music = _make_music_player("res://assets/music/tiny_troublemaker.mp3")
-	menu_music.play()
 
 	var shot := OS.get_environment("POKERPOP_SHOT")
 	if shot != "":
 		var m := OS.get_environment("POKERPOP_MODE")
+		if m != "splash":
+			_dismiss_splash()
 		match m:
-			"menu":
+			"splash", "menu":
 				pass
 			"time":
 				_start_mode("time", 60.0)
@@ -107,7 +115,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if game_started and not menu_open and not game_over:
+	if game_started and not menu_open and not game_over and not countdown_active:
 		if mode_kind == "time":
 			time_left -= delta
 			if time_left <= 0.0:
@@ -141,7 +149,6 @@ func _update_labels() -> void:
 	score_label.text = "SCORE  %d" % score
 	deck_label.text = "DECK  %d" % board.deck.size()
 	meta_label.text = "%s  ·  Theme: %s (T)" % [mode_label_text, Themes.current().name]
-	progress_label.text = ""
 	match mode_kind:
 		"time":
 			var secs := ceili(time_left)
@@ -152,24 +159,32 @@ func _update_labels() -> void:
 			status_label.text = "LEVEL %d    HANDS %d" % [level, hands_left]
 			status_label.add_theme_color_override("font_color",
 					RED if hands_left <= 2 else OFFWHITE)
-			progress_label.text = "TARGET  %d / %d" % [level_score, _arcade_target()]
 		_:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 
-	var show_meter := mode_kind == "arcade" and game_started and not menu_open
-	meter_back.visible = show_meter
-	meter_fill.visible = show_meter
-	if show_meter:
+	var show_arcade := mode_kind == "arcade" and game_started and not menu_open
+	meter_back.visible = show_arcade
+	meter_fill.visible = show_arcade
+	target_label.visible = show_arcade
+	target_bar_back.visible = show_arcade
+	target_bar_fill.visible = show_arcade
+	if show_arcade:
 		var h := 596.0 * meter / 100.0
 		meter_fill.position.y = 58.0 + (596.0 - h)
 		meter_fill.size.y = h
 		meter_fill.color = GOLD if meter > 25.0 else RED
+		var target := _arcade_target()
+		target_label.text = "LEVEL %d      %d / %d" % [level, level_score, target]
+		target_bar_fill.size.x = 616.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
 	_update_preview()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if splash_layer.visible:
+			_dismiss_splash()
+			return
 		if menu_open:
 			return
 		match event.keycode:
@@ -248,10 +263,8 @@ func _level_up() -> void:
 	hands_left = _arcade_hands()
 	meter = 100.0
 	board.reset()
-	while board.busy:
-		await get_tree().process_frame
-	_announce("LEVEL %d" % level)
 	level_transition = false
+	_begin_countdown()
 
 
 func _on_dead_board() -> void:
@@ -297,6 +310,36 @@ func _restart() -> void:
 	game_over = false
 	over_layer.visible = false
 	board.reset()
+	_begin_countdown()
+
+
+## "3, 2, 1, Pop!" before play begins — on run start and on every arcade
+## level. Timers and the arcade meter are frozen (countdown_active) and
+## the board stays locked until the "POP!". A newer countdown or a menu
+## exit cancels an older one via countdown_id.
+func _begin_countdown() -> void:
+	countdown_id += 1
+	var my_id := countdown_id
+	countdown_active = true
+	board.locked = true
+	if OS.get_environment("POKERPOP_SHOT") != "":
+		board.locked = false
+		countdown_active = false
+		return
+	while board.busy:
+		await get_tree().process_frame
+		if my_id != countdown_id:
+			return
+	for step in ["3", "2", "1"]:
+		if my_id != countdown_id or menu_open or not game_started:
+			return
+		_announce(step)
+		await get_tree().create_timer(0.7).timeout
+	if my_id != countdown_id or menu_open or not game_started:
+		return
+	_announce("POP!")
+	board.locked = false
+	countdown_active = false
 
 
 func _make_music_player(path: String) -> AudioStreamPlayer:
@@ -310,8 +353,10 @@ func _make_music_player(path: String) -> AudioStreamPlayer:
 
 
 func _open_menu() -> void:
+	countdown_id += 1  # cancel any running countdown
+	countdown_active = false
 	music.stop()
-	menu_music.play()
+	_fade_in(menu_music)
 	menu_open = true
 	game_started = false
 	game_over = false
@@ -338,10 +383,17 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 	game_started = true
 	menu_music.stop()
 	if not music.playing:
-		music.play()
+		_fade_in(music)
 	while board.busy:
 		await get_tree().process_frame
 	_restart()
+
+
+## Starts a music player from silence and eases it up to full volume.
+func _fade_in(p: AudioStreamPlayer) -> void:
+	p.volume_db = -40.0
+	p.play()
+	create_tween().tween_property(p, "volume_db", -12.0, 1.5)
 
 
 ## Rebuilds the mini-card row showing the current selection in rank order.
@@ -397,9 +449,24 @@ func _build_ui() -> void:
 
 	score_label = _label(ui_root, "", Vector2(PANEL_X, 90), 26, GOLD)
 	status_label = _label(ui_root, "", Vector2(PANEL_X, 130), 18, OFFWHITE)
-	progress_label = _label(ui_root, "", Vector2(PANEL_X, 156), 18, GOLD)
-	deck_label = _label(ui_root, "", Vector2(PANEL_X, 182), 14, OFFWHITE)
-	meta_label = _label(ui_root, "", Vector2(PANEL_X, 200), 12, DIM)
+	deck_label = _label(ui_root, "", Vector2(PANEL_X, 158), 14, OFFWHITE)
+	meta_label = _label(ui_root, "", Vector2(PANEL_X, 178), 12, DIM)
+
+	# Arcade banner: level target and progress, big across the board top.
+	target_label = _label(ui_root, "", Vector2(40, 2), 28, GOLD)
+	target_bar_back = ColorRect.new()
+	target_bar_back.color = Color("2a2a2a")
+	target_bar_back.position = Vector2(40, 42)
+	target_bar_back.size = Vector2(620, 10)
+	ui_root.add_child(target_bar_back)
+	target_bar_fill = ColorRect.new()
+	target_bar_fill.color = GOLD
+	target_bar_fill.position = Vector2(42, 44)
+	target_bar_fill.size = Vector2(0, 6)
+	ui_root.add_child(target_bar_fill)
+	target_label.visible = false
+	target_bar_back.visible = false
+	target_bar_fill.visible = false
 
 	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 220), Vector2(158, 44))
 	play_btn.pressed.connect(func() -> void:
@@ -507,6 +574,34 @@ func _build_menu() -> void:
 	zen_btn.pressed.connect(func() -> void:
 		_start_mode("zen"))
 	_menu_center("No timer · no hand limit · deck reshuffles forever", 598, 13, DIM)
+
+
+func _build_splash() -> void:
+	splash_layer = ColorRect.new()
+	splash_layer.color = BG
+	splash_layer.size = Vector2(960, 720)
+	ui_root.add_child(splash_layer)
+	_label(splash_layer, "POKER", Vector2(262, 240), 72, RED)
+	_label(splash_layer, "POP", Vector2(548, 240), 72, OFFWHITE)
+	var prompt := _label(splash_layer, "CLICK TO START", Vector2(0, 420), 24, GOLD)
+	prompt.size = Vector2(960, 48)
+	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var pulse := create_tween().set_loops()
+	pulse.tween_property(prompt, "modulate:a", 0.35, 0.8)
+	pulse.tween_property(prompt, "modulate:a", 1.0, 0.8)
+	splash_layer.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			_dismiss_splash())
+
+
+## First user gesture: closes the splash and starts the menu music —
+## this same click is what unblocks audio in web builds.
+func _dismiss_splash() -> void:
+	if not splash_layer.visible:
+		return
+	splash_layer.visible = false
+	if OS.get_environment("POKERPOP_SHOT") == "":
+		_fade_in(menu_music)
 
 
 func _menu_center(text: String, y: float, font_size: int, color: Color) -> Label:
