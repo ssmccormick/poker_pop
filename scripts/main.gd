@@ -54,6 +54,7 @@ var meter_back: ColorRect
 var meter_fill: ColorRect
 var hand_display: Node2D
 var music: AudioStreamPlayer
+var menu_music: AudioStreamPlayer
 var preview_label: Label
 var announcer: Label
 var over_layer: ColorRect
@@ -80,13 +81,11 @@ func _ready() -> void:
 	_build_ui()
 	_build_menu()
 
-	# Gameplay music: "Crimson Sparks" (Echoes Below pack), looped.
-	music = AudioStreamPlayer.new()
-	var track: AudioStreamMP3 = load("res://assets/music/crimson_sparks.mp3")
-	track.loop = true
-	music.stream = track
-	music.volume_db = -12.0
-	add_child(music)
+	# Music (Echoes Below pack): "Crimson Sparks" in-game, "Tiny
+	# Troublemaker" on the menu, both looped.
+	music = _make_music_player("res://assets/music/crimson_sparks.mp3")
+	menu_music = _make_music_player("res://assets/music/tiny_troublemaker.mp3")
+	menu_music.play()
 
 	var shot := OS.get_environment("POKERPOP_SHOT")
 	if shot != "":
@@ -300,8 +299,19 @@ func _restart() -> void:
 	board.reset()
 
 
+func _make_music_player(path: String) -> AudioStreamPlayer:
+	var p := AudioStreamPlayer.new()
+	var track: AudioStreamMP3 = load(path)
+	track.loop = true
+	p.stream = track
+	p.volume_db = -12.0
+	add_child(p)
+	return p
+
+
 func _open_menu() -> void:
 	music.stop()
+	menu_music.play()
 	menu_open = true
 	game_started = false
 	game_over = false
@@ -326,6 +336,7 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 	menu_open = false
 	menu_layer.visible = false
 	game_started = true
+	menu_music.stop()
 	if not music.playing:
 		music.play()
 	while board.busy:
