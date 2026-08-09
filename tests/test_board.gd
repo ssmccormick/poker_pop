@@ -38,6 +38,10 @@ func _init() -> void:
 	failures += _check(true, "straight chain", [
 		[5, 0, 0, 0], [6, 1, 1, 0], [7, 2, 2, 0], [8, 3, 3, 0], [9, 0, 4, 0],
 	])
+	# Scrambled run in a row: still a straight chain (order-free straights).
+	failures += _check(true, "scrambled straight chain", [
+		[7, 0, 0, 0], [5, 1, 1, 0], [9, 2, 2, 0], [6, 3, 3, 0], [8, 0, 4, 0],
+	])
 	# Ascending run along a diagonal: still chainable.
 	failures += _check(true, "diagonal straight chain", [
 		[5, 0, 0, 0], [6, 1, 1, 1], [7, 2, 2, 2], [8, 3, 3, 3], [9, 0, 4, 4],

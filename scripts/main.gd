@@ -52,6 +52,7 @@ var deck_label: Label
 var meta_label: Label
 var meter_back: ColorRect
 var meter_fill: ColorRect
+var hand_display: Node2D
 var preview_label: Label
 var announcer: Label
 var over_layer: ColorRect
@@ -71,6 +72,7 @@ func _ready() -> void:
 	board.locked = true
 	board.hand_played.connect(_on_hand_played)
 	board.dead_board.connect(_on_dead_board)
+	board.selection_changed.connect(_refresh_hand_display)
 	add_child(board)
 	_apply_board_layout()
 
@@ -177,6 +179,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				Themes.cycle()
 				RenderingServer.set_default_clear_color(Themes.current().bg)
 				board.apply_theme()
+				_refresh_hand_display()
 
 
 func _update_preview() -> void:
@@ -315,6 +318,24 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 	_restart()
 
 
+## Rebuilds the mini-card row showing the current selection in rank order.
+func _refresh_hand_display() -> void:
+	for child in hand_display.get_children():
+		child.queue_free()
+	var cards: Array = []
+	for card in board.selected:
+		cards.append({"rank": card.rank, "suit": card.suit})
+	cards.sort_custom(func(a, b): return a.rank < b.rank)
+	for i in cards.size():
+		var mc := PlayingCard.new()
+		mc.rank = cards[i].rank
+		mc.suit = cards[i].suit
+		mc.scale = Vector2(0.45, 0.45)
+		mc.position = Vector2(i * 46.0, 0)
+		mc.material = Themes.current_material()
+		hand_display.add_child(mc)
+
+
 func _announce(text: String) -> void:
 	announcer.text = text
 	announcer.modulate = Color(1, 1, 1, 1)
@@ -366,6 +387,12 @@ func _build_ui() -> void:
 	menu_btn.add_theme_font_size_override("font_size", 13)
 	menu_btn.pressed.connect(_open_menu)
 
+	# Selected cards, shown sorted by rank so straights are easy to read.
+	_label(ui_root, "YOUR HAND", Vector2(PANEL_X, 306), 13, DIM)
+	hand_display = Node2D.new()
+	hand_display.position = Vector2(PANEL_X + 22, 356)
+	ui_root.add_child(hand_display)
+
 	# Arcade meter: a vertical bar beside the board that drains constantly.
 	meter_back = ColorRect.new()
 	meter_back.color = Color("2a2a2a")
@@ -380,17 +407,17 @@ func _build_ui() -> void:
 	meter_fill.visible = false
 	ui_root.add_child(meter_fill)
 
-	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 308), 16, DIM)
+	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 392), 16, DIM)
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
-	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_X, 334), 13, OFFWHITE)
-	payouts.add_theme_constant_override("line_spacing", 4)
+	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_X, 418), 12, OFFWHITE)
+	payouts.add_theme_constant_override("line_spacing", 3)
 
-	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nStraights: pick in rank order\nEnter / Space — play    C / Right click — clear\nR — restart    T — theme    M — menu",
-			Vector2(PANEL_X, 596), 12, DIM)
+	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nEnter / Space — play    C / Right click — clear\nR — restart    T — theme    M — menu",
+			Vector2(PANEL_X, 642), 12, DIM)
 
 	preview_label = _label(ui_root, "", Vector2(40, 668), 20, DIM)
 

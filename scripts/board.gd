@@ -281,10 +281,9 @@ func has_playable_hand() -> bool:
 	for p in grid:
 		if _suit_chain_exists(p, {p: true}, 1):
 			return true
-	# 5-card ordered straight chains.
+	# 5-card straight chains (any pick order along the chain).
 	for p in grid:
-		if _straight_chain_exists(p, {p: true}, 1, 1) \
-				or _straight_chain_exists(p, {p: true}, 1, -1):
+		if _straight_chain_exists(p, {p: true}, {grid[p].rank: true}):
 			return true
 	return false
 
@@ -339,36 +338,44 @@ func _suit_chain_exists(p: Vector2i, visited: Dictionary, depth: int) -> bool:
 	return false
 
 
-## dir = 1 for ascending picks, -1 for descending. The ace may start an
-## ascending wheel (A-2-3-4-5) or end a descending one (5-4-3-2-A).
-func _straight_chain_exists(p: Vector2i, visited: Dictionary, depth: int, dir: int) -> bool:
-	if depth == MAX_SELECT:
-		return true
-	var r: int = grid[p].rank
-	var targets: Array = []
-	if dir == 1:
-		if r < 14:
-			targets.append(r + 1)
-		if r == 14 and depth == 1:
-			targets.append(2)
-	else:
-		if r > 2:
-			targets.append(r - 1)
-		if r == 2 and depth == MAX_SELECT - 1:
-			targets.append(14)
-	if targets.is_empty():
-		return false
+## Searches for a 5-card chain whose distinct ranks form a consecutive run
+## (or the wheel A-2-3-4-5) — pick order along the chain doesn't matter.
+func _straight_chain_exists(p: Vector2i, visited: Dictionary, ranks: Dictionary) -> bool:
+	if visited.size() == MAX_SELECT:
+		var arr: Array = ranks.keys()
+		arr.sort()
+		return arr[4] - arr[0] == 4 or arr == [2, 3, 4, 5, 14]
 	for dx in [-1, 0, 1]:
 		for dy in [-1, 0, 1]:
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if grid.has(q) and not visited.has(q) and grid[q].rank in targets:
+			if not grid.has(q) or visited.has(q):
+				continue
+			var r: int = grid[q].rank
+			if ranks.has(r):
+				continue
+			ranks[r] = true
+			if _straight_possible(ranks):
 				visited[q] = true
-				if _straight_chain_exists(q, visited, depth + 1, dir):
+				if _straight_chain_exists(q, visited, ranks):
 					return true
 				visited.erase(q)
+			ranks.erase(r)
 	return false
+
+
+## Can this rank set still grow into a straight? Either the span fits a
+## 5-run, or it's a subset of the wheel {2,3,4,5,A}.
+func _straight_possible(ranks: Dictionary) -> bool:
+	var arr: Array = ranks.keys()
+	arr.sort()
+	if arr.back() - arr[0] <= 4:
+		return true
+	for r in arr:
+		if r != 14 and r > 5:
+			return false
+	return true
 
 
 ## Restyles every card on the board for the current theme.

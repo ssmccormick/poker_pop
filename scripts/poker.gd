@@ -25,11 +25,11 @@ const BASE_SCORES := {
 }
 
 
-## cards: Array of {"rank": int (2..14, ace = 14), "suit": int (0..3)},
-## in the order the player selected them. Order matters: straights only
-## count when the cards were picked in ascending or descending rank order.
-## Selections whose cards don't ALL participate in one hand (e.g. a pair
-## plus an unrelated kicker) come back as "No Hand" with playable = false.
+## cards: Array of {"rank": int (2..14, ace = 14), "suit": int (0..3)}.
+## Selection order does not matter — five consecutive ranks are a straight
+## however they were picked. Selections whose cards don't ALL participate
+## in one hand (e.g. a pair plus an unrelated kicker) come back as
+## "No Hand" with playable = false.
 ## Returns {"name", "base", "pips", "score", "playable"} or {} for an
 ## empty selection.
 static func evaluate(cards: Array) -> Dictionary:
@@ -50,10 +50,12 @@ static func evaluate(cards: Array) -> Dictionary:
 	var is_flush := n == 5 and suit_set.size() == 1
 	var straight_high := 0
 	if n == 5 and rank_counts.size() == 5:
-		var ordered_ranks: Array = []
-		for c in cards:
-			ordered_ranks.append(c.rank)
-		straight_high = _ordered_straight_high(ordered_ranks)
+		var ranks: Array = rank_counts.keys()
+		ranks.sort()
+		if ranks[4] - ranks[0] == 4:
+			straight_high = ranks[4]
+		elif ranks == [2, 3, 4, 5, 14]:
+			straight_high = 5  # wheel: A-2-3-4-5
 	var is_straight := straight_high > 0
 
 	# Exact composition matches only — no kickers allowed.
@@ -87,28 +89,3 @@ static func evaluate(cards: Array) -> Dictionary:
 	var base: int = BASE_SCORES.get(hand_name, 0)
 	return {"name": hand_name, "base": base, "pips": pips,
 			"score": (base + pips) if playable else 0, "playable": playable}
-
-
-## Returns the high card of the run if `ranks` (in selection order) form a
-## strictly ascending or strictly descending sequence, else 0. The ace can
-## play low for the wheel (A-2-3-4-5 picked in either direction).
-static func _ordered_straight_high(ranks: Array) -> int:
-	if ranks.size() != 5:
-		return 0
-	var variants := [ranks]
-	if ranks.has(14):
-		var low: Array = []
-		for r in ranks:
-			low.append(1 if r == 14 else r)
-		variants.append(low)
-	for v in variants:
-		var asc := true
-		var desc := true
-		for i in 4:
-			if v[i + 1] != v[i] + 1:
-				asc = false
-			if v[i + 1] != v[i] - 1:
-				desc = false
-		if asc or desc:
-			return v.max()
-	return 0

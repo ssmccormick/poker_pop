@@ -44,8 +44,10 @@ is a loss (rare, but the exact-hand rule makes it possible).
 - **Pair minimum** — a single High Card can't be submitted.
 - Hands with fewer than 5 cards are legal (two kings are a Pair).
   Straights and flushes require exactly 5 cards.
-- **Straights must be picked in rank order**, ascending or descending
-  (the ace can go low: A-2-3-4-5 or 5-4-3-2-A).
+- Straights just need the five consecutive ranks — pick them in any
+  order (the ace can go low for A-2-3-4-5). The **YOUR HAND** panel
+  shows your current selection sorted by rank, so runs are easy to
+  spot.
 - Score for a hand = base payout + the pip total of the cards played
   (J=11, Q=12, K=13, A=14).
 

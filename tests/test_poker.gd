@@ -19,13 +19,15 @@ func _init() -> void:
 	failures += _check("Straight", [c(10, 0), c(11, 1), c(12, 2), c(13, 3), c(14, 0)])
 	failures += _check("Straight", [c(14, 0), c(2, 1), c(3, 2), c(4, 3), c(5, 0)])
 	failures += _check("Straight", [c(6, 0), c(7, 1), c(8, 2), c(9, 3), c(10, 0)])
-	# Straights count in descending selection order too, including the wheel.
+	# K-A-2-3-4 never wraps around.
+	failures += _check("No Hand", [c(13, 0), c(14, 1), c(2, 2), c(3, 3), c(4, 0)])
+	# Selection order doesn't matter for straights.
 	failures += _check("Straight", [c(13, 0), c(12, 1), c(11, 2), c(10, 3), c(9, 0)])
 	failures += _check("Straight", [c(5, 0), c(4, 1), c(3, 2), c(2, 3), c(14, 0)])
+	failures += _check("Straight", [c(10, 0), c(12, 1), c(11, 2), c(13, 3), c(14, 0)])
+	failures += _check("Straight", [c(3, 0), c(14, 1), c(5, 2), c(2, 3), c(4, 0)])
 	failures += _check("Royal Flush", [c(14, 2), c(13, 2), c(12, 2), c(11, 2), c(10, 2)])
-	# Out-of-order runs are NOT straights.
-	failures += _check("No Hand", [c(10, 0), c(12, 1), c(11, 2), c(13, 3), c(14, 0)])
-	failures += _check("Flush", [c(2, 2), c(4, 2), c(3, 2), c(5, 2), c(6, 2)])
+	failures += _check("Straight Flush", [c(4, 3), c(6, 3), c(3, 3), c(7, 3), c(5, 3)])
 	# A suited hand with duplicate ranks (reshuffled deck) is still a Flush.
 	failures += _check("Flush", [c(4, 1), c(4, 1), c(9, 1), c(11, 1), c(13, 1)])
 	failures += _check("Three of a Kind", [c(8, 0), c(8, 1), c(8, 2)])
