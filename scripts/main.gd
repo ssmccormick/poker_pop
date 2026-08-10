@@ -18,10 +18,12 @@ const ARCADE_DRAIN_STEP := 0.6
 const ARCADE_MAX_DRAIN := 8.0
 const ARCADE_METER_GAIN := 0.4    # meter % gained per point scored
 
-const PANEL_X := 672.0
-# Play area the board is centered into.
-const BOARD_AREA_POS := Vector2(40, 56)
-const BOARD_AREA_SIZE := Vector2(620, 600)
+const VIEW := Vector2(1920, 1080)
+const PANEL_X := 1420.0
+# Play area the board is centered into (right edge leaves the panel free).
+const BOARD_AREA_POS := Vector2(60, 100)
+const BOARD_AREA_SIZE := Vector2(1320, 900)
+const PLAY_WIDTH := 1400.0  # everything left of the panel
 
 var board: Board
 var score := 0
@@ -57,6 +59,8 @@ var target_bar_fill: ColorRect
 var hand_display: Node2D
 var splash_layer: ColorRect
 var countdown_overlay: ColorRect
+var bg_rect: TextureRect
+var backgrounds: Array = []
 var music: AudioStreamPlayer
 var menu_music: AudioStreamPlayer
 var countdown_active := false
@@ -75,6 +79,21 @@ func _ready() -> void:
 	if theme_env != "":
 		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
 	RenderingServer.set_default_clear_color(Themes.current().bg)
+
+	# Background image behind the (transparent) play area. Drop images
+	# into assets/backgrounds/ to replace the generated placeholders;
+	# arcade rotates them every level.
+	backgrounds = _load_backgrounds()
+	bg_rect = TextureRect.new()
+	bg_rect.position = Vector2.ZERO
+	bg_rect.size = Vector2(PLAY_WIDTH, VIEW.y)
+	bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bg_rect.modulate = Color(0.55, 0.55, 0.55)  # dimmed so cards stay readable
+	bg_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not backgrounds.is_empty():
+		bg_rect.texture = backgrounds[0]
+	add_child(bg_rect)
 
 	board = Board.new()
 	board.locked = true
@@ -173,13 +192,13 @@ func _update_labels() -> void:
 	target_bar_back.visible = show_arcade
 	target_bar_fill.visible = show_arcade
 	if show_arcade:
-		var h := 596.0 * meter / 100.0
-		meter_fill.position.y = 58.0 + (596.0 - h)
+		var h := 892.0 * meter / 100.0
+		meter_fill.position.y = 104.0 + (892.0 - h)
 		meter_fill.size.y = h
 		meter_fill.color = GOLD if meter > 25.0 else RED
 		var target := _arcade_target()
 		target_label.text = "LEVEL %d      %d / %d" % [level, level_score, target]
-		target_bar_fill.size.x = 616.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
+		target_bar_fill.size.x = 1314.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
 	_update_preview()
 
 
@@ -265,6 +284,7 @@ func _level_up() -> void:
 	level_score = 0
 	hands_left = _arcade_hands()
 	meter = 100.0
+	_set_level_background()
 	board.reset()
 	level_transition = false
 	_begin_countdown()
@@ -312,8 +332,68 @@ func _restart() -> void:
 	hands_left = _arcade_hands()
 	game_over = false
 	over_layer.visible = false
+	if mode_kind == "arcade":
+		_set_level_background()
+	elif not backgrounds.is_empty():
+		bg_rect.texture = backgrounds.pick_random()
 	board.reset()
 	_begin_countdown()
+
+
+## Loads background images from assets/backgrounds (any the user drops
+## in), falling back to generated gradient placeholders. Export builds
+## list imported files with .import/.remap suffixes — strip them.
+func _load_backgrounds() -> Array:
+	var out: Array = []
+	var seen := {}
+	var dir := DirAccess.open("res://assets/backgrounds")
+	if dir:
+		for f in dir.get_files():
+			var fname := f.trim_suffix(".import").trim_suffix(".remap")
+			var lower := fname.to_lower()
+			if not (lower.ends_with(".png") or lower.ends_with(".jpg")
+					or lower.ends_with(".jpeg") or lower.ends_with(".webp")):
+				continue
+			if seen.has(fname):
+				continue
+			seen[fname] = true
+			var tex := load("res://assets/backgrounds/" + fname)
+			if tex is Texture2D:
+				out.append(tex)
+	if out.is_empty():
+		out = _generate_placeholder_backgrounds()
+	return out
+
+
+func _generate_placeholder_backgrounds() -> Array:
+	var palettes := [
+		[Color("14532d"), Color("052014")],  # felt green
+		[Color("1e3a5f"), Color("0a1220")],  # midnight blue
+		[Color("5f1e2e"), Color("200a10")],  # wine red
+		[Color("4a3a1e"), Color("1d1408")],  # tobacco brown
+		[Color("3a1e5f"), Color("140a20")],  # violet
+		[Color("1e5f5a"), Color("0a201e")],  # teal
+	]
+	var out: Array = []
+	for p in palettes:
+		var g := Gradient.new()
+		g.colors = PackedColorArray([p[0], p[1]])
+		g.offsets = PackedFloat32Array([0.0, 1.0])
+		var tex := GradientTexture2D.new()
+		tex.gradient = g
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.35)
+		tex.fill_to = Vector2(0.5, 1.2)
+		tex.width = 480
+		tex.height = 270
+		out.append(tex)
+	return out
+
+
+func _set_level_background() -> void:
+	if backgrounds.is_empty():
+		return
+	bg_rect.texture = backgrounds[(level - 1) % backgrounds.size()]
 
 
 ## "Ready... POP!" before play begins — on run start and on every arcade
@@ -419,8 +499,8 @@ func _refresh_hand_display() -> void:
 		var mc := PlayingCard.new()
 		mc.rank = cards[i].rank
 		mc.suit = cards[i].suit
-		mc.scale = Vector2(0.45, 0.45)
-		mc.position = Vector2(i * 46.0, 0)
+		mc.scale = Vector2(0.72, 0.72)
+		mc.position = Vector2(i * 74.0, 0)
 		mc.material = Themes.current_material()
 		hand_display.add_child(mc)
 
@@ -435,10 +515,10 @@ func _announce(text: String) -> void:
 	_announce_tween.tween_property(announcer, "modulate:a", 0.0, 0.5)
 
 
-## Centers the board inside the play area (scales down if it ever outgrows it).
+## Centers the board inside the play area, scaling up or down to fit.
 func _apply_board_layout() -> void:
 	var px := board.board_px_size()
-	var s: float = minf(1.0, minf(BOARD_AREA_SIZE.x / px.x, BOARD_AREA_SIZE.y / px.y))
+	var s: float = minf(BOARD_AREA_SIZE.x / px.x, BOARD_AREA_SIZE.y / px.y)
 	board.scale = Vector2(s, s)
 	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0
 
@@ -452,157 +532,163 @@ func _build_ui() -> void:
 	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(ui_root)
 	# A Control under a CanvasLayer doesn't inherit the viewport rect, so
-	# size everything explicitly to the fixed 960x720 design resolution.
-	ui_root.size = Vector2(960, 720)
+	# size everything explicitly to the fixed design resolution.
+	ui_root.size = VIEW
 
-	_label(ui_root, "POKER", Vector2(PANEL_X, 20), 40, RED)
-	_label(ui_root, "POP", Vector2(PANEL_X + 158, 20), 40, OFFWHITE)
+	_label(ui_root, "POKER", Vector2(PANEL_X, 28), 64, RED)
+	_label(ui_root, "POP", Vector2(PANEL_X + 254, 28), 64, OFFWHITE)
 
-	score_label = _label(ui_root, "", Vector2(PANEL_X, 90), 26, GOLD)
-	status_label = _label(ui_root, "", Vector2(PANEL_X, 130), 18, OFFWHITE)
-	deck_label = _label(ui_root, "", Vector2(PANEL_X, 158), 14, OFFWHITE)
-	meta_label = _label(ui_root, "", Vector2(PANEL_X, 178), 12, DIM)
+	score_label = _label(ui_root, "", Vector2(PANEL_X, 140), 40, GOLD)
+	status_label = _label(ui_root, "", Vector2(PANEL_X, 204), 28, OFFWHITE)
+	deck_label = _label(ui_root, "", Vector2(PANEL_X, 246), 20, OFFWHITE)
+	meta_label = _label(ui_root, "", Vector2(PANEL_X, 276), 16, DIM)
 
 	# Arcade banner: level target and progress, big across the board top.
-	target_label = _label(ui_root, "", Vector2(40, 2), 28, GOLD)
+	target_label = _label(ui_root, "", Vector2(60, 8), 44, GOLD)
 	target_bar_back = ColorRect.new()
 	target_bar_back.color = Color("2a2a2a")
-	target_bar_back.position = Vector2(40, 42)
-	target_bar_back.size = Vector2(620, 10)
+	target_bar_back.position = Vector2(60, 74)
+	target_bar_back.size = Vector2(1320, 16)
 	ui_root.add_child(target_bar_back)
 	target_bar_fill = ColorRect.new()
 	target_bar_fill.color = GOLD
-	target_bar_fill.position = Vector2(42, 44)
-	target_bar_fill.size = Vector2(0, 6)
+	target_bar_fill.position = Vector2(63, 77)
+	target_bar_fill.size = Vector2(0, 10)
 	ui_root.add_child(target_bar_fill)
 	target_label.visible = false
 	target_bar_back.visible = false
 	target_bar_fill.visible = false
 
-	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 220), Vector2(158, 44))
+	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(250, 64))
+	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.play_hand())
-	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X + 166, 220), Vector2(96, 44))
+	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X + 262, 316), Vector2(150, 64))
+	clear_btn.add_theme_font_size_override("font_size", 24)
 	clear_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.clear_selection())
-	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X, 272), Vector2(96, 28))
-	menu_btn.add_theme_font_size_override("font_size", 13)
+	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X, 392), Vector2(150, 42))
+	menu_btn.add_theme_font_size_override("font_size", 18)
 	menu_btn.pressed.connect(_open_menu)
 
 	# Selected cards, shown sorted by rank so straights are easy to read.
-	_label(ui_root, "YOUR HAND", Vector2(PANEL_X, 306), 13, DIM)
+	_label(ui_root, "YOUR HAND", Vector2(PANEL_X, 452), 18, DIM)
 	hand_display = Node2D.new()
-	hand_display.position = Vector2(PANEL_X + 22, 356)
+	hand_display.position = Vector2(PANEL_X + 32, 528)
 	ui_root.add_child(hand_display)
 
 	# Arcade meter: a vertical bar beside the board that drains constantly.
 	meter_back = ColorRect.new()
 	meter_back.color = Color("2a2a2a")
-	meter_back.position = Vector2(8, 56)
-	meter_back.size = Vector2(22, 600)
+	meter_back.position = Vector2(14, 100)
+	meter_back.size = Vector2(32, 900)
 	meter_back.visible = false
 	ui_root.add_child(meter_back)
 	meter_fill = ColorRect.new()
 	meter_fill.color = GOLD
-	meter_fill.position = Vector2(11, 58)
-	meter_fill.size = Vector2(16, 596)
+	meter_fill.position = Vector2(18, 104)
+	meter_fill.size = Vector2(24, 892)
 	meter_fill.visible = false
 	ui_root.add_child(meter_fill)
 
-	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 392), 16, DIM)
+	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 602), 22, DIM)
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
-	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_X, 418), 12, OFFWHITE)
-	payouts.add_theme_constant_override("line_spacing", 3)
+	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_X, 636), 18, OFFWHITE)
+	payouts.add_theme_constant_override("line_spacing", 2)
 
 	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nEnter / Space — play    C / Right click — clear\nR — restart    T — theme    M — menu",
-			Vector2(PANEL_X, 642), 12, DIM)
+			Vector2(PANEL_X, 976), 16, DIM)
 
-	preview_label = _label(ui_root, "", Vector2(40, 668), 20, DIM)
+	preview_label = _label(ui_root, "", Vector2(60, 1026), 28, DIM)
 
 	# Darkens the play area during the Ready countdown — a clear "not yet".
 	countdown_overlay = ColorRect.new()
 	countdown_overlay.color = Color(0, 0, 0, 0.55)
-	countdown_overlay.size = Vector2(662, 720)
+	countdown_overlay.size = Vector2(PLAY_WIDTH, VIEW.y)
 	countdown_overlay.visible = false
 	ui_root.add_child(countdown_overlay)
 
 	announcer = Label.new()
 	announcer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	announcer.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	announcer.add_theme_font_size_override("font_size", 52)
+	announcer.add_theme_font_size_override("font_size", 92)
 	announcer.add_theme_color_override("font_color", GOLD)
 	announcer.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	announcer.add_theme_constant_override("shadow_offset_x", 3)
-	announcer.add_theme_constant_override("shadow_offset_y", 3)
+	announcer.add_theme_constant_override("shadow_offset_x", 5)
+	announcer.add_theme_constant_override("shadow_offset_y", 5)
 	announcer.modulate = Color(1, 1, 1, 0)
 	ui_root.add_child(announcer)
-	announcer.size = Vector2(670, 720)  # centered over the board, not the panel
+	announcer.size = Vector2(PLAY_WIDTH, VIEW.y)  # centered over the board
 
 	over_layer = ColorRect.new()
 	over_layer.color = Color(0, 0, 0, 0.78)
 	over_layer.visible = false
-	over_layer.size = Vector2(960, 720)
+	over_layer.size = VIEW
 	ui_root.add_child(over_layer)
 	over_label = Label.new()
 	over_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	over_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	over_label.add_theme_font_size_override("font_size", 34)
+	over_label.add_theme_font_size_override("font_size", 52)
 	over_label.add_theme_color_override("font_color", OFFWHITE)
-	over_label.size = Vector2(960, 720)
+	over_label.size = VIEW
 	over_layer.add_child(over_label)
 
 
 func _build_menu() -> void:
 	menu_layer = ColorRect.new()
 	menu_layer.color = BG
-	menu_layer.size = Vector2(960, 720)
+	menu_layer.size = VIEW
 	ui_root.add_child(menu_layer)
 
-	_label(menu_layer, "POKER", Vector2(262, 90), 72, RED)
-	_label(menu_layer, "POP", Vector2(548, 90), 72, OFFWHITE)
-	_menu_center("Chain adjacent cards into poker hands", 196, 16, DIM)
+	_label(menu_layer, "POKER", Vector2(600, 110), 110, RED)
+	_label(menu_layer, "POP", Vector2(1042, 110), 110, OFFWHITE)
+	_menu_center("Chain adjacent cards into poker hands", 280, 26, DIM)
 
-	_menu_center("TIME TRIAL", 258, 16, GOLD)
+	_menu_center("TIME TRIAL", 380, 26, GOLD)
 	var times := [60.0, 180.0, 300.0]
 	var time_names := ["1:00", "3:00", "5:00"]
 	for i in 3:
-		var b := _button(menu_layer, time_names[i], Vector2(285 + i * 135, 284), Vector2(120, 40))
+		var b := _button(menu_layer, time_names[i], Vector2(645 + i * 220, 424), Vector2(200, 62))
+		b.add_theme_font_size_override("font_size", 24)
 		var secs: float = times[i]
 		b.pressed.connect(func() -> void:
 			_start_mode("time", secs))
-	_menu_center("Unlimited hands · reshuffling deck · beat the clock", 330, 13, DIM)
+	_menu_center("Unlimited hands · reshuffling deck · beat the clock", 496, 20, DIM)
 
-	var single_btn := _button(menu_layer, "SINGLE DECK", Vector2(320, 372), Vector2(320, 44))
+	var single_btn := _button(menu_layer, "SINGLE DECK", Vector2(700, 566), Vector2(520, 66))
+	single_btn.add_theme_font_size_override("font_size", 26)
 	single_btn.pressed.connect(func() -> void:
 		_start_mode("single"))
-	_menu_center("One 52-card deck · no timer · play until no hands remain", 422, 13, DIM)
+	_menu_center("One 52-card deck · no timer · play until no hands remain", 642, 20, DIM)
 
-	var arcade_btn := _button(menu_layer, "ARCADE", Vector2(320, 460), Vector2(320, 44))
+	var arcade_btn := _button(menu_layer, "ARCADE", Vector2(700, 700), Vector2(520, 66))
+	arcade_btn.add_theme_font_size_override("font_size", 26)
 	arcade_btn.pressed.connect(func() -> void:
 		_start_mode("arcade"))
-	_menu_center("Rising score targets · shrinking hand budget · an always-draining bar", 510, 13, DIM)
+	_menu_center("Rising score targets · shrinking hand budget · an always-draining bar", 776, 20, DIM)
 
-	var zen_btn := _button(menu_layer, "ZEN", Vector2(320, 548), Vector2(320, 44))
+	var zen_btn := _button(menu_layer, "ZEN", Vector2(700, 834), Vector2(520, 66))
+	zen_btn.add_theme_font_size_override("font_size", 26)
 	zen_btn.pressed.connect(func() -> void:
 		_start_mode("zen"))
-	_menu_center("No timer · no hand limit · deck reshuffles forever", 598, 13, DIM)
+	_menu_center("No timer · no hand limit · deck reshuffles forever", 910, 20, DIM)
 
 
 func _build_splash() -> void:
 	splash_layer = ColorRect.new()
 	splash_layer.color = BG
-	splash_layer.size = Vector2(960, 720)
+	splash_layer.size = VIEW
 	ui_root.add_child(splash_layer)
-	_label(splash_layer, "POKER", Vector2(262, 240), 72, RED)
-	_label(splash_layer, "POP", Vector2(548, 240), 72, OFFWHITE)
-	var prompt := _label(splash_layer, "CLICK TO START", Vector2(0, 420), 24, GOLD)
-	prompt.size = Vector2(960, 48)
+	_label(splash_layer, "POKER", Vector2(600, 380), 110, RED)
+	_label(splash_layer, "POP", Vector2(1042, 380), 110, OFFWHITE)
+	var prompt := _label(splash_layer, "CLICK TO START", Vector2(0, 640), 36, GOLD)
+	prompt.size = Vector2(VIEW.x, 72)
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var pulse := create_tween().set_loops()
 	pulse.tween_property(prompt, "modulate:a", 0.35, 0.8)
@@ -624,7 +710,7 @@ func _dismiss_splash() -> void:
 
 func _menu_center(text: String, y: float, font_size: int, color: Color) -> Label:
 	var l := _label(menu_layer, text, Vector2(0, y), font_size, color)
-	l.size = Vector2(960, font_size * 2.0)
+	l.size = Vector2(VIEW.x, font_size * 2.0)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
 

@@ -84,6 +84,14 @@ Flushed Five is five cards of the same rank **and** suit — only
 possible once the deck has reshuffled enough for identical duplicates
 to meet on the board.
 
+## Backgrounds
+
+The play area sits on a background image that rotates every arcade
+level (random per run in other modes). Drop `.png`/`.jpg` images into
+`assets/backgrounds/` and they're auto-loaded; with none present the
+game generates gradient placeholders. See [POLISH.md](POLISH.md) for
+the full polish roadmap.
+
 ## Themes
 
 Four visual themes (Classic, Felt Table, Sketchbook, Crosshatch Noir),
