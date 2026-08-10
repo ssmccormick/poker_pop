@@ -61,6 +61,19 @@ var splash_layer: ColorRect
 var countdown_overlay: ColorRect
 var bg_rect: TextureRect
 var backgrounds: Array = []
+
+# Settings (persisted to user://settings.cfg).
+const RESOLUTIONS: Array[Vector2i] = [
+	Vector2i(1280, 720), Vector2i(1600, 900),
+	Vector2i(1920, 1080), Vector2i(2560, 1440),
+]
+var fullscreen_on := true
+var res_index := 2
+var music_vol := 0.8
+var sfx_vol := 0.8
+var options_layer: ColorRect
+var fullscreen_btn: Button
+var resolution_btn: Button
 var music: AudioStreamPlayer
 var menu_music: AudioStreamPlayer
 var countdown_active := false
@@ -75,6 +88,8 @@ var _announce_tween: Tween
 
 func _ready() -> void:
 	get_window().title = "Poker Pop"
+	_setup_audio_buses()
+	_load_settings()
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
 		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
@@ -121,6 +136,8 @@ func _ready() -> void:
 		match m:
 			"splash", "menu":
 				pass
+			"options":
+				_open_options()
 			"ready":
 				_start_mode("arcade")
 			"time":
@@ -438,8 +455,62 @@ func _make_music_player(path: String) -> AudioStreamPlayer:
 	track.loop = true
 	p.stream = track
 	p.volume_db = -12.0
+	p.bus = "Music"
 	add_child(p)
 	return p
+
+
+# --- Settings -------------------------------------------------------------
+
+func _setup_audio_buses() -> void:
+	for bus_name in ["Music", "SFX"]:
+		if AudioServer.get_bus_index(bus_name) == -1:
+			var i := AudioServer.bus_count
+			AudioServer.add_bus(i)
+			AudioServer.set_bus_name(i, bus_name)
+			AudioServer.set_bus_send(i, "Master")
+
+
+func _load_settings() -> void:
+	var cf := ConfigFile.new()
+	cf.load("user://settings.cfg")  # missing file is fine, defaults apply
+	fullscreen_on = cf.get_value("video", "fullscreen", true)
+	res_index = clampi(cf.get_value("video", "resolution", 2), 0, RESOLUTIONS.size() - 1)
+	music_vol = clampf(cf.get_value("audio", "music", 0.8), 0.0, 1.0)
+	sfx_vol = clampf(cf.get_value("audio", "sfx", 0.8), 0.0, 1.0)
+	_apply_video()
+	_apply_audio()
+
+
+func _save_settings() -> void:
+	var cf := ConfigFile.new()
+	cf.set_value("video", "fullscreen", fullscreen_on)
+	cf.set_value("video", "resolution", res_index)
+	cf.set_value("audio", "music", music_vol)
+	cf.set_value("audio", "sfx", sfx_vol)
+	cf.save("user://settings.cfg")
+
+
+func _apply_video() -> void:
+	# The browser owns the window on web; screenshots stay windowed.
+	if OS.has_feature("web") or OS.get_environment("POKERPOP_SHOT") != "":
+		return
+	if fullscreen_on:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		var size := RESOLUTIONS[res_index]
+		DisplayServer.window_set_size(size)
+		var screen := DisplayServer.screen_get_size()
+		DisplayServer.window_set_position(
+				DisplayServer.screen_get_position() + (screen - size) / 2)
+
+
+func _apply_audio() -> void:
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Music"),
+			linear_to_db(maxf(music_vol, 0.0001)))
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"),
+			linear_to_db(maxf(sfx_vol, 0.0001)))
 
 
 func _open_menu() -> void:
@@ -678,6 +749,110 @@ func _build_menu() -> void:
 	zen_btn.pressed.connect(func() -> void:
 		_start_mode("zen"))
 	_menu_center("No timer · no hand limit · deck reshuffles forever", 910, 20, DIM)
+
+	if OS.has_feature("web"):
+		var opt_btn := _button(menu_layer, "OPTIONS", Vector2(835, 972), Vector2(250, 54))
+		opt_btn.add_theme_font_size_override("font_size", 22)
+		opt_btn.pressed.connect(_open_options)
+	else:
+		var opt_btn := _button(menu_layer, "OPTIONS", Vector2(700, 972), Vector2(250, 54))
+		opt_btn.add_theme_font_size_override("font_size", 22)
+		opt_btn.pressed.connect(_open_options)
+		var quit_btn := _button(menu_layer, "QUIT", Vector2(970, 972), Vector2(250, 54))
+		quit_btn.add_theme_font_size_override("font_size", 22)
+		quit_btn.pressed.connect(func() -> void:
+			get_tree().quit())
+
+	_build_options()
+
+
+func _build_options() -> void:
+	options_layer = ColorRect.new()
+	options_layer.color = BG
+	options_layer.size = VIEW
+	options_layer.visible = false
+	ui_root.add_child(options_layer)
+
+	var title := _label(options_layer, "OPTIONS", Vector2(0, 110), 72, GOLD)
+	title.size = Vector2(VIEW.x, 100)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if not OS.has_feature("web"):
+		var vh := _label(options_layer, "VIDEO", Vector2(0, 280), 26, RED)
+		vh.size = Vector2(VIEW.x, 40)
+		vh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		fullscreen_btn = _button(options_layer, "", Vector2(700, 336), Vector2(520, 60))
+		fullscreen_btn.add_theme_font_size_override("font_size", 24)
+		fullscreen_btn.pressed.connect(func() -> void:
+			fullscreen_on = not fullscreen_on
+			_apply_video()
+			_save_settings()
+			_refresh_options_buttons())
+		resolution_btn = _button(options_layer, "", Vector2(700, 410), Vector2(520, 60))
+		resolution_btn.add_theme_font_size_override("font_size", 24)
+		resolution_btn.pressed.connect(func() -> void:
+			res_index = (res_index + 1) % RESOLUTIONS.size()
+			_apply_video()
+			_save_settings()
+			_refresh_options_buttons())
+		var hint := _label(options_layer, "Window size applies when fullscreen is off", Vector2(0, 478), 18, DIM)
+		hint.size = Vector2(VIEW.x, 30)
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_refresh_options_buttons()
+
+	var sh := _label(options_layer, "SOUND", Vector2(0, 560), 26, RED)
+	sh.size = Vector2(VIEW.x, 40)
+	sh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_label(options_layer, "MUSIC", Vector2(660, 626), 24, OFFWHITE)
+	var music_slider := HSlider.new()
+	music_slider.min_value = 0.0
+	music_slider.max_value = 1.0
+	music_slider.step = 0.05
+	music_slider.value = music_vol
+	music_slider.position = Vector2(830, 626)
+	music_slider.size = Vector2(430, 36)
+	options_layer.add_child(music_slider)
+	music_slider.value_changed.connect(func(v: float) -> void:
+		music_vol = v
+		_apply_audio()
+		_save_settings())
+
+	_label(options_layer, "SFX", Vector2(660, 700), 24, OFFWHITE)
+	var sfx_slider := HSlider.new()
+	sfx_slider.min_value = 0.0
+	sfx_slider.max_value = 1.0
+	sfx_slider.step = 0.05
+	sfx_slider.value = sfx_vol
+	sfx_slider.position = Vector2(830, 700)
+	sfx_slider.size = Vector2(430, 36)
+	options_layer.add_child(sfx_slider)
+	sfx_slider.value_changed.connect(func(v: float) -> void:
+		sfx_vol = v
+		_apply_audio()
+		_save_settings())
+
+	var back := _button(options_layer, "BACK", Vector2(835, 860), Vector2(250, 60))
+	back.add_theme_font_size_override("font_size", 24)
+	back.pressed.connect(_close_options)
+
+
+func _refresh_options_buttons() -> void:
+	if fullscreen_btn:
+		fullscreen_btn.text = "FULLSCREEN — %s" % ("ON" if fullscreen_on else "OFF")
+	if resolution_btn:
+		var r := RESOLUTIONS[res_index]
+		resolution_btn.text = "WINDOW SIZE — %d × %d" % [r.x, r.y]
+
+
+func _open_options() -> void:
+	menu_layer.visible = false
+	options_layer.visible = true
+
+
+func _close_options() -> void:
+	options_layer.visible = false
+	menu_layer.visible = true
 
 
 func _build_splash() -> void:

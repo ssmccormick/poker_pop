@@ -53,6 +53,10 @@ is a loss (rare, but the exact-hand rule makes it possible).
 - Score for a hand = base payout + the pip total of the cards played
   (J=11, Q=12, K=13, A=14).
 
+The game starts fullscreen; the menu's OPTIONS screen has a fullscreen
+toggle, window-size presets, and music/SFX volume sliders (persisted to
+`user://settings.cfg`).
+
 ## Controls
 
 | Input | Action |

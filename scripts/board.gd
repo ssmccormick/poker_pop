@@ -477,6 +477,7 @@ func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0
 	player.stream = stream
 	player.pitch_scale = pitch
 	player.volume_db = volume_db
+	player.bus = "SFX"
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
