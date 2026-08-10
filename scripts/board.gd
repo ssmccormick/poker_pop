@@ -9,6 +9,7 @@ extends Node2D
 
 signal selection_changed
 signal hand_played(result: Dictionary)
+signal hand_rejected
 signal dead_board
 
 const GAP := 8
@@ -35,6 +36,7 @@ const SFX_FLIP := preload("res://assets/sfx/card_flip.wav")
 const SFX_DEAL := preload("res://assets/sfx/deal_card.wav")
 const SFX_SWOOSH := preload("res://assets/sfx/deal_swoosh.wav")
 const SFX_SHUFFLE := preload("res://assets/sfx/shuffle.wav")
+const SFX_ERROR := preload("res://assets/sfx/error.wav")
 const SFX_POPS := [
 	preload("res://assets/sfx/pop_1.wav"),
 	preload("res://assets/sfx/pop_2.wav"),
@@ -171,6 +173,7 @@ func _toggle_select(card: PlayingCard) -> void:
 		_play_sound(SFX_SELECTS.pick_random(),
 				1.0 + 0.07 * (selected.size() - 1) + randf_range(-0.02, 0.02), -6.0)
 	_sync_chain_indices()
+	_update_hand_validity()
 	selection_changed.emit()
 
 
@@ -184,8 +187,18 @@ func clear_selection() -> void:
 		return
 	for card in selected:
 		card.selected = false
+		card.hand_valid = false
 	selected.clear()
 	selection_changed.emit()
+
+
+## Green borders whenever the current chain is a submittable hand.
+func _update_hand_validity() -> void:
+	var valid := false
+	if not selected.is_empty():
+		valid = Poker.evaluate(get_selected_data()).playable
+	for card in selected:
+		card.hand_valid = valid
 
 
 func get_selected_data() -> Array:
@@ -200,7 +213,8 @@ func play_hand() -> void:
 		return
 	var result := Poker.evaluate(get_selected_data())
 	if not result.playable:
-		return  # every selected card must be part of a real hand
+		_reject_hand()
+		return
 	result["count"] = selected.size()
 	busy = true
 	hand_played.emit(result)
@@ -234,6 +248,24 @@ func play_hand() -> void:
 	busy = false
 	if not has_playable_hand():
 		dead_board.emit()
+
+
+## Invalid submit: error sound, red flash, and a shake on the selected
+## cards. The selection stays so the player can fix it.
+func _reject_hand() -> void:
+	_play_sound(SFX_ERROR, 1.0, -6.0)
+	hand_rejected.emit()
+	for card in selected:
+		card.error_flash = true
+		var origin := cell_center(card.grid_pos)
+		var tw := create_tween()
+		for off in [7.0, -7.0, 5.0, -5.0, 0.0]:
+			tw.tween_property(card, "position:x", origin.x + off, 0.05)
+	var flashed := selected.duplicate()
+	await get_tree().create_timer(0.45).timeout
+	for card in flashed:
+		if is_instance_valid(card):
+			card.error_flash = false
 
 
 ## Drops surviving cards to the bottom of their column and deals new cards

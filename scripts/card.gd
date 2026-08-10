@@ -8,6 +8,8 @@ const W := 80
 const H := 112
 
 const GOLD := Color("e8c547")
+const GREEN := Color("90e07c")
+const ERROR_RED := Color("e05252")
 const BLACK := Color("1a1a1a")
 
 # suit ids: 0 = spades, 1 = hearts, 2 = diamonds, 3 = clubs
@@ -55,6 +57,8 @@ const SUIT_PIXELS := [SPADE_PX, HEART_PX, DIAMOND_PX, CLUB_PX]
 
 static var _face_box: StyleBoxFlat
 static var _selected_box: StyleBoxFlat
+static var _valid_box: StyleBoxFlat
+static var _error_box: StyleBoxFlat
 static var _shadow_box: StyleBoxFlat
 
 var rank := 2
@@ -67,6 +71,14 @@ var selected := false:
 var chain_index := 0:
 	set(value):
 		chain_index = value
+		queue_redraw()
+var hand_valid := false:  # selection currently forms a playable hand
+	set(value):
+		hand_valid = value
+		queue_redraw()
+var error_flash := false:  # brief red border after an invalid submit
+	set(value):
+		error_flash = value
 		queue_redraw()
 
 
@@ -86,6 +98,12 @@ static func _make_boxes() -> void:
 	_selected_box = _face_box.duplicate()
 	_selected_box.border_color = GOLD
 	_selected_box.set_border_width_all(4)
+
+	_valid_box = _selected_box.duplicate()
+	_valid_box.border_color = GREEN
+
+	_error_box = _selected_box.duplicate()
+	_error_box.border_color = ERROR_RED
 
 	_shadow_box = StyleBoxFlat.new()
 	_shadow_box.bg_color = Color(0, 0, 0, 0.35)
@@ -116,7 +134,12 @@ func _draw() -> void:
 	var rect := Rect2(-W / 2.0, -H / 2.0, W, H)
 	_shadow_box.draw(get_canvas_item(), rect.grow_individual(-2, -2, 4, 6))
 	if selected:
-		_selected_box.draw(get_canvas_item(), rect)
+		var box := _selected_box
+		if error_flash:
+			box = _error_box
+		elif hand_valid:
+			box = _valid_box
+		box.draw(get_canvas_item(), rect)
 	else:
 		_face_box.draw(get_canvas_item(), rect)
 
@@ -128,10 +151,14 @@ func _draw() -> void:
 	_draw_suit(Vector2(0, 6), 5.0)
 
 	if selected and chain_index > 0:
-		# Chain-order badge: straights must be picked in rank order, so the
-		# order needs to be visible.
+		# Chain-order badge, tinted to match the border state.
+		var badge_color := GOLD
+		if error_flash:
+			badge_color = ERROR_RED
+		elif hand_valid:
+			badge_color = GREEN
 		var badge_center := Vector2(W / 2.0 - 13, -H / 2.0 + 13)
-		draw_circle(badge_center, 10, GOLD)
+		draw_circle(badge_center, 10, badge_color)
 		draw_string(font, badge_center + Vector2(-10, 5.5), str(chain_index),
 				HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
 

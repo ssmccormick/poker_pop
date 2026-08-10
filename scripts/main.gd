@@ -113,6 +113,8 @@ func _ready() -> void:
 	board = Board.new()
 	board.locked = true
 	board.hand_played.connect(_on_hand_played)
+	board.hand_rejected.connect(func() -> void:
+		_announce("NOT A VALID HAND", RED))
 	board.dead_board.connect(_on_dead_board)
 	board.selection_changed.connect(_refresh_hand_display)
 	add_child(board)
@@ -576,8 +578,9 @@ func _refresh_hand_display() -> void:
 		hand_display.add_child(mc)
 
 
-func _announce(text: String) -> void:
+func _announce(text: String, color: Color = GOLD) -> void:
 	announcer.text = text
+	announcer.add_theme_color_override("font_color", color)
 	announcer.modulate = Color(1, 1, 1, 1)
 	if _announce_tween and _announce_tween.is_valid():
 		_announce_tween.kill()
@@ -941,9 +944,23 @@ func _take_screenshot(path: String) -> void:
 			get_tree().quit()
 			return
 	await get_tree().create_timer(1.6).timeout
-	for cell in [Vector2i(0, 4), Vector2i(1, 4), Vector2i(2, 4)]:
-		if board.grid.has(cell):
-			board._toggle_select(board.grid[cell])
+	# Prefer an adjacent same-rank pair so the valid-hand (green) border
+	# state is visible; fall back to three arbitrary cards.
+	var pair_found := false
+	for p: Vector2i in board.grid:
+		for q: Vector2i in board.grid:
+			if p != q and board.grid[p].rank == board.grid[q].rank \
+					and Board._is_adjacent(p, q):
+				board._toggle_select(board.grid[p])
+				board._toggle_select(board.grid[q])
+				pair_found = true
+				break
+		if pair_found:
+			break
+	if not pair_found:
+		for cell in [Vector2i(0, 4), Vector2i(1, 4), Vector2i(2, 4)]:
+			if board.grid.has(cell):
+				board._toggle_select(board.grid[cell])
 	if not menu_open:
 		board._spawn_float_text("+59", board.cell_center(Vector2i(3, 2)))
 	await get_tree().create_timer(0.45).timeout
