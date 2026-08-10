@@ -262,7 +262,7 @@ func _reject_hand() -> void:
 		for off in [7.0, -7.0, 5.0, -5.0, 0.0]:
 			tw.tween_property(card, "position:x", origin.x + off, 0.05)
 	var flashed := selected.duplicate()
-	await get_tree().create_timer(0.45).timeout
+	await get_tree().create_timer(0.45, false).timeout
 	for card in flashed:
 		if is_instance_valid(card):
 			card.error_flash = false
@@ -510,7 +510,7 @@ func _play_pop(pitch: float) -> void:
 ## Fire-and-forget one-shot player, with an optional delay.
 func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0.0) -> void:
 	if delay > 0.0:
-		await get_tree().create_timer(delay).timeout
+		await get_tree().create_timer(delay, false).timeout
 		if not is_inside_tree():
 			return
 	var player := AudioStreamPlayer.new()

@@ -74,6 +74,7 @@ var sfx_vol := 0.8
 var options_layer: ColorRect
 var fullscreen_btn: Button
 var resolution_btn: Button
+var pause_layer: ColorRect
 var music: AudioStreamPlayer
 var menu_music: AudioStreamPlayer
 var countdown_active := false
@@ -88,6 +89,9 @@ var _announce_tween: Tween
 
 func _ready() -> void:
 	get_window().title = "Poker Pop"
+	# Main must keep processing while the tree is paused so ESC can
+	# unpause; everything gameplay-related is gated on tree.paused.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_audio_buses()
 	_load_settings()
 	var theme_env := OS.get_environment("POKERPOP_THEME")
@@ -111,6 +115,7 @@ func _ready() -> void:
 	add_child(bg_rect)
 
 	board = Board.new()
+	board.process_mode = Node.PROCESS_MODE_PAUSABLE  # don't inherit ALWAYS
 	board.locked = true
 	board.hand_played.connect(_on_hand_played)
 	board.hand_rejected.connect(func() -> void:
@@ -156,6 +161,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if get_tree().paused:
+		return
 	if game_started and not menu_open and not game_over and not countdown_active:
 		if mode_kind == "time":
 			time_left -= delta
@@ -226,9 +233,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		if splash_layer.visible:
 			_dismiss_splash()
 			return
+		if get_tree().paused:
+			if event.keycode == KEY_ESCAPE:
+				_toggle_pause()
+			return
 		if menu_open:
 			return
 		match event.keycode:
+			KEY_ESCAPE:
+				_toggle_pause()
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				if not game_over:
 					board.play_hand()
@@ -332,7 +345,7 @@ func _on_dead_board() -> void:
 
 func _show_game_over(message: String) -> void:
 	# Let the last pop/refill animation play out before covering the board.
-	await get_tree().create_timer(1.4).timeout
+	await get_tree().create_timer(1.4, false).timeout
 	if not game_over or menu_open:
 		return
 	over_label.text = message
@@ -442,7 +455,7 @@ func _begin_countdown() -> void:
 		_announce_tween.kill()
 	announcer.text = "READY..."
 	announcer.modulate = Color(1, 1, 1, 1)
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	if my_id != countdown_id or menu_open or not game_started:
 		return
 	_announce("POP!")
@@ -676,7 +689,7 @@ func _build_ui() -> void:
 	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_X, 636), 18, OFFWHITE)
 	payouts.add_theme_constant_override("line_spacing", 2)
 
-	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nEnter / Space — play    C / Right click — clear\nR — restart    T — theme    M — menu",
+	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nEnter / Space — play    C / Right click — clear\nEsc — pause    R — restart    T — theme    M — menu",
 			Vector2(PANEL_X, 976), 16, DIM)
 
 	preview_label = _label(ui_root, "", Vector2(60, 1026), 28, DIM)
@@ -712,6 +725,49 @@ func _build_ui() -> void:
 	over_label.add_theme_color_override("font_color", OFFWHITE)
 	over_label.size = VIEW
 	over_layer.add_child(over_label)
+
+	_build_pause()
+
+
+func _build_pause() -> void:
+	pause_layer = ColorRect.new()
+	pause_layer.color = Color(0, 0, 0, 0.72)
+	pause_layer.size = VIEW
+	pause_layer.visible = false
+	pause_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	ui_root.add_child(pause_layer)
+
+	var title := _label(pause_layer, "PAUSED", Vector2(0, 250), 84, GOLD)
+	title.size = Vector2(VIEW.x, 110)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	var resume := _button(pause_layer, "RESUME", Vector2(810, 470), Vector2(300, 64))
+	resume.add_theme_font_size_override("font_size", 26)
+	resume.pressed.connect(_toggle_pause)
+	var restart := _button(pause_layer, "RESTART", Vector2(810, 552), Vector2(300, 64))
+	restart.add_theme_font_size_override("font_size", 26)
+	restart.pressed.connect(func() -> void:
+		_toggle_pause()
+		_restart())
+	var to_menu := _button(pause_layer, "MENU", Vector2(810, 634), Vector2(300, 64))
+	to_menu.add_theme_font_size_override("font_size", 26)
+	to_menu.pressed.connect(func() -> void:
+		_toggle_pause()
+		_open_menu())
+	if not OS.has_feature("web"):
+		var quit := _button(pause_layer, "QUIT", Vector2(810, 716), Vector2(300, 64))
+		quit.add_theme_font_size_override("font_size", 26)
+		quit.pressed.connect(func() -> void:
+			get_tree().quit())
+
+
+func _toggle_pause() -> void:
+	if get_tree().paused:
+		get_tree().paused = false
+		pause_layer.visible = false
+	elif game_started and not menu_open and not game_over:
+		get_tree().paused = true
+		pause_layer.visible = true
 
 
 func _build_menu() -> void:
