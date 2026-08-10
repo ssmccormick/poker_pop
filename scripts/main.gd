@@ -477,6 +477,9 @@ func _make_music_player(path: String) -> AudioStreamPlayer:
 
 # --- Settings -------------------------------------------------------------
 
+## The buses live in default_bus_layout.tres — runtime-created buses
+## don't work on the web sample-playback audio path. This is only a
+## fallback for odd situations (e.g. the layout failing to load).
 func _setup_audio_buses() -> void:
 	for bus_name in ["Music", "SFX"]:
 		if AudioServer.get_bus_index(bus_name) == -1:

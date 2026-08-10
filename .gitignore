@@ -7,3 +7,6 @@
 
 # Export builds
 build/
+
+# Local tooling
+.claude/
