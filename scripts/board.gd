@@ -29,6 +29,10 @@ var dragging := false
 
 var _pop_wav: AudioStreamWAV
 
+const SFX_FLIP := preload("res://assets/sfx/card_flip.wav")
+const SFX_DEAL := preload("res://assets/sfx/deal_card.wav")
+const SFX_SWOOSH := preload("res://assets/sfx/deal_swoosh.wav")
+
 
 func reset() -> void:
 	if busy:
@@ -147,6 +151,7 @@ func _toggle_select(card: PlayingCard) -> void:
 		for i in range(selected.size() - 1, idx - 1, -1):
 			selected[i].selected = false
 			selected.remove_at(i)
+		_play_sound(SFX_FLIP, 0.85, -8.0)
 	else:
 		if selected.size() >= MAX_SELECT:
 			return
@@ -154,6 +159,8 @@ func _toggle_select(card: PlayingCard) -> void:
 			return
 		card.selected = true
 		selected.append(card)
+		# Flip pitch climbs as the chain grows.
+		_play_sound(SFX_FLIP, 1.0 + 0.07 * (selected.size() - 1), -8.0)
 	_sync_chain_indices()
 	selection_changed.emit()
 
@@ -248,6 +255,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 		# New cards fall in from above to fill the rest (a spent single
 		# deck stops mid-column and leaves the top cells empty).
 		var missing := target_y + 1
+		var column_got_cards := false
+		var column_delay := 0.0
 		for row in range(target_y, -1, -1):
 			var data := draw_card()
 			if data.is_empty():
@@ -264,10 +273,16 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			var delay := 0.05 * (missing - 1 - row)
 			if initial_deal:
 				delay += 0.04 * x
+			if not column_got_cards:
+				column_delay = delay
+			column_got_cards = true
 			tw.tween_property(card, "position", cell_center(p), 0.4) \
 					.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT) \
 					.set_delay(delay)
 			moved = true
+		if column_got_cards:
+			# One deal sound per refilled column, timed with its cards.
+			_play_sound(SFX_DEAL, randf_range(0.92, 1.12), -10.0, column_delay + 0.15)
 	if moved:
 		await tw.finished
 	else:
@@ -395,6 +410,7 @@ func shuffle_board() -> void:
 		return
 	busy = true
 	clear_selection()
+	_play_sound(SFX_SWOOSH, 1.0, -6.0)
 	var cards: Array = grid.values()
 	var cells: Array = grid.keys()
 	for attempt in 100:
@@ -447,10 +463,19 @@ func _spawn_float_text(text: String, center: Vector2) -> void:
 func _play_pop(pitch: float) -> void:
 	if _pop_wav == null:
 		_pop_wav = _make_pop_sound()
+	_play_sound(_pop_wav, pitch, -5.0)
+
+
+## Fire-and-forget one-shot player, with an optional delay.
+func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0.0) -> void:
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+		if not is_inside_tree():
+			return
 	var player := AudioStreamPlayer.new()
-	player.stream = _pop_wav
+	player.stream = stream
 	player.pitch_scale = pitch
-	player.volume_db = -5.0
+	player.volume_db = volume_db
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
