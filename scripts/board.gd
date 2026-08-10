@@ -27,7 +27,10 @@ var busy := false    # animations in flight, input ignored
 var locked := false  # game over, input ignored
 var dragging := false
 
-const SFX_SELECT := preload("res://assets/sfx/card_select.wav")
+const SFX_SELECTS := [
+	preload("res://assets/sfx/card_select.wav"),
+	preload("res://assets/sfx/card_pick.wav"),
+]
 const SFX_FLIP := preload("res://assets/sfx/card_flip.wav")
 const SFX_DEAL := preload("res://assets/sfx/deal_card.wav")
 const SFX_SWOOSH := preload("res://assets/sfx/deal_swoosh.wav")
@@ -163,8 +166,9 @@ func _toggle_select(card: PlayingCard) -> void:
 			return
 		card.selected = true
 		selected.append(card)
-		# Select pitch climbs as the chain grows.
-		_play_sound(SFX_SELECT, 1.0 + 0.07 * (selected.size() - 1), -6.0)
+		# Random select sample; pitch climbs as the chain grows.
+		_play_sound(SFX_SELECTS.pick_random(),
+				1.0 + 0.07 * (selected.size() - 1) + randf_range(-0.02, 0.02), -6.0)
 	_sync_chain_indices()
 	selection_changed.emit()
 
