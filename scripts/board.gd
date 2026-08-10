@@ -27,11 +27,14 @@ var busy := false    # animations in flight, input ignored
 var locked := false  # game over, input ignored
 var dragging := false
 
-var _pop_wav: AudioStreamWAV
-
 const SFX_FLIP := preload("res://assets/sfx/card_flip.wav")
 const SFX_DEAL := preload("res://assets/sfx/deal_card.wav")
 const SFX_SWOOSH := preload("res://assets/sfx/deal_swoosh.wav")
+const SFX_POPS := [
+	preload("res://assets/sfx/pop_1.wav"),
+	preload("res://assets/sfx/pop_2.wav"),
+	preload("res://assets/sfx/pop_3.wav"),
+]
 
 
 func reset() -> void:
@@ -461,9 +464,7 @@ func _spawn_float_text(text: String, center: Vector2) -> void:
 
 
 func _play_pop(pitch: float) -> void:
-	if _pop_wav == null:
-		_pop_wav = _make_pop_sound()
-	_play_sound(_pop_wav, pitch, -5.0)
+	_play_sound(SFX_POPS.pick_random(), pitch, -5.0)
 
 
 ## Fire-and-forget one-shot player, with an optional delay.
@@ -481,25 +482,3 @@ func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0
 	player.play()
 
 
-## Synthesizes a short "pop": a sine sweep from high to low pitch with a
-## fast exponential decay. No audio assets needed.
-static func _make_pop_sound() -> AudioStreamWAV:
-	var rate := 22050
-	var length := 0.14
-	var n := int(rate * length)
-	var data := PackedByteArray()
-	data.resize(n * 2)
-	var phase := 0.0
-	for i in n:
-		var t := float(i) / rate
-		var freq: float = 900.0 * pow(160.0 / 900.0, t / length)
-		phase += freq / rate
-		var env := exp(-t * 28.0)
-		var sample := sin(TAU * phase) * env
-		data.encode_s16(i * 2, int(clampf(sample, -1.0, 1.0) * 30000.0))
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = rate
-	wav.stereo = false
-	wav.data = data
-	return wav
