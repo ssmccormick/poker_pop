@@ -64,6 +64,7 @@ toggle, window-size presets, and music/SFX volume sliders (persisted to
 | Left click / drag | Chain adjacent cards (up to 5) |
 | Enter / Space / PLAY HAND | Play the selected hand |
 | C / Right click / CLEAR | Clear selection |
+| Esc | Pause |
 | R | Restart current mode |
 | M | Back to the main menu |
 | T | Cycle visual theme |
