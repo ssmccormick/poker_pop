@@ -34,6 +34,7 @@ const SFX_SELECTS := [
 const SFX_FLIP := preload("res://assets/sfx/card_flip.wav")
 const SFX_DEAL := preload("res://assets/sfx/deal_card.wav")
 const SFX_SWOOSH := preload("res://assets/sfx/deal_swoosh.wav")
+const SFX_SHUFFLE := preload("res://assets/sfx/shuffle.wav")
 const SFX_POPS := [
 	preload("res://assets/sfx/pop_1.wav"),
 	preload("res://assets/sfx/pop_2.wav"),
@@ -238,6 +239,8 @@ func play_hand() -> void:
 ## Drops surviving cards to the bottom of their column and deals new cards
 ## in from above the board. Awaits until every card has landed.
 func _fall_and_fill(initial_deal: bool) -> void:
+	if initial_deal:
+		_play_sound(SFX_SWOOSH, 1.0, -8.0)
 	var tw := create_tween().set_parallel(true)
 	var moved := false
 	for x in cols:
@@ -418,7 +421,7 @@ func shuffle_board() -> void:
 		return
 	busy = true
 	clear_selection()
-	_play_sound(SFX_SWOOSH, 1.0, -6.0)
+	_play_sound(SFX_SHUFFLE, 1.0, -5.0)
 	var cards: Array = grid.values()
 	var cells: Array = grid.keys()
 	for attempt in 100:
