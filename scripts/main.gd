@@ -293,6 +293,11 @@ func _on_hand_played(result: Dictionary) -> void:
 func _level_up() -> void:
 	level_transition = true
 	board.locked = true
+	# The refill after the winning hand would be thrown away by the
+	# reset — skip it so the transition starts right after the pops.
+	board.suppress_refill = true
+	if board._refill_active:
+		board._skip_refill()
 	_announce("LEVEL %d CLEAR!" % level)
 	while board.busy:
 		await get_tree().process_frame

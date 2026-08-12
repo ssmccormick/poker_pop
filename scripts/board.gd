@@ -27,7 +27,8 @@ const DEAL_CARD_DURATION := 0.9    # flight time of each dealt card
 const DEAL_STAGGER_DELAY := 0.14   # gap between dealt cards
 const DEAL_SPIN_MIN := 1.2         # throw spin, in full turns
 const DEAL_SPIN_MAX := 2.0
-const DEAL_SPIN_SETTLE := 0.45     # spin keeps decaying this long AFTER landing
+const DEAL_SPIN_SETTLE := 0.25     # spin keeps decaying this long AFTER landing
+const SETUP_STAGGER_SCALE := 0.6   # full-board setup deals use a tighter stagger
 const DEAL_START_SCALE := 2.6      # dealt cards start big (high, near the screen)
 const DEAL_ARC_HEIGHT := 460.0     # how high above the flight line the toss peaks
 
@@ -48,6 +49,9 @@ var selected: Array[PlayingCard] = []
 var busy := false    # animations in flight, input ignored
 var locked := false  # game over, input ignored
 var dragging := false
+# Set by main when a level-up is pending: the post-hand refill is
+# pointless (the board resets immediately), so skip dealing it.
+var suppress_refill := false
 
 const SFX_SELECTS := [
 	preload("res://assets/sfx/card_select.wav"),
@@ -70,6 +74,7 @@ func reset() -> void:
 		return
 	locked = false
 	busy = true
+	suppress_refill = false
 	for card in grid.values():
 		card.queue_free()
 	grid.clear()
@@ -269,6 +274,11 @@ func play_hand() -> void:
 	for card in played:
 		card.queue_free()
 
+	if suppress_refill:
+		# A level transition is about to reset the board — don't deal.
+		suppress_refill = false
+		busy = false
+		return
 	await _fall_and_fill(false)
 	busy = false
 	if not has_playable_hand():
@@ -333,6 +343,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 	var t_settle := SETTLE_DURATION * spd
 	var t_deal := DEAL_CARD_DURATION * spd
 	var t_stagger := DEAL_STAGGER_DELAY * spd
+	if initial_deal:
+		t_stagger *= SETUP_STAGGER_SCALE
 
 	# Compute settle moves and new-card slots (unchanged game logic).
 	var settle_moves: Array = []
