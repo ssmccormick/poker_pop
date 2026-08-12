@@ -27,6 +27,7 @@ const DEAL_CARD_DURATION := 0.55   # flight time of each dealt card
 const DEAL_STAGGER_DELAY := 0.08   # gap between dealt cards
 const DEAL_SPIN_MIN := 0.9         # flick spin, in full turns
 const DEAL_SPIN_MAX := 1.6
+const DEAL_START_SCALE := 1.75     # dealt cards start big (in the air)
 
 var refill_speed := 1.0  # >1 = faster; scales every refill duration/delay
 
@@ -344,9 +345,11 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.grid_pos = p
 			grid[p] = card
 			card.position = deck_origin()
-			# Flicked off the deck: starts mid-spin and slightly "far away".
+			# Flicked off the deck: mid-spin, big (up in the air, close to
+			# the screen), and drawn above every card already on the table.
 			card.rotation = -TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
-			card.scale = Vector2(0.8, 0.8)
+			card.scale = Vector2(DEAL_START_SCALE, DEAL_START_SCALE)
+			card.z_index = 20
 			add_child(card)
 			deals.append({"card": card, "pos": cell_center(p), "cell": p})
 	if settle_moves.is_empty() and deals.is_empty():
@@ -399,6 +402,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 
 
 func _on_card_dealt(card: PlayingCard) -> void:
+	if is_instance_valid(card):
+		card.z_index = 0  # back on the table with everyone else
 	card_dealt.emit(card)
 	_play_sound(SFX_DEAL, randf_range(0.95, 1.15), -13.0)
 
@@ -415,6 +420,7 @@ func _skip_refill() -> void:
 			e.card.position = e.pos
 			e.card.rotation = 0.0
 			e.card.scale = Vector2.ONE
+			e.card.z_index = 0
 	_refill_active = false
 	refill_done.emit()
 
