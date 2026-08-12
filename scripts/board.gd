@@ -23,17 +23,20 @@ const MAX_SELECT := 5
 # --- Refill presentation timing (all scaled by refill_speed) --------------
 const SETTLE_DURATION := 0.4       # Phase A: existing cards fall into gaps
 const SETTLE_DEAL_OVERLAP := 0.8   # Phase B starts at this fraction of A
-const DEAL_CARD_DURATION := 0.55   # flight time of each dealt card
-const DEAL_STAGGER_DELAY := 0.08   # gap between dealt cards
-const DEAL_SPIN_MIN := 0.9         # flick spin, in full turns
-const DEAL_SPIN_MAX := 1.6
-const DEAL_START_SCALE := 1.75     # dealt cards start big (in the air)
+const DEAL_CARD_DURATION := 0.9    # flight time of each dealt card
+const DEAL_STAGGER_DELAY := 0.14   # gap between dealt cards
+const DEAL_SPIN_MIN := 1.2         # throw spin, in full turns
+const DEAL_SPIN_MAX := 2.0
+const DEAL_SPIN_SETTLE := 0.45     # spin keeps decaying this long AFTER landing
+const DEAL_START_SCALE := 2.6      # dealt cards start big (high, near the screen)
+const DEAL_ARC_HEIGHT := 460.0     # how high above the flight line the toss peaks
 
 var refill_speed := 1.0  # >1 = faster; scales every refill duration/delay
 
 var _refill_active := false
 var _refill_tween: Tween
-var _refill_finals: Array = []  # {card, pos} snap targets for skipping
+var _refill_finals: Array = []   # {card, pos} snap targets for skipping
+var _refill_shadows: Array = []  # in-flight shadow blobs, freed on land/skip
 
 var cols := 5
 var rows := 5
@@ -290,10 +293,29 @@ func _reject_hand() -> void:
 			card.error_flash = false
 
 
-## Off-screen point the dealer deals from (top-right, toward the panel
-## where the deck counter lives).
+## Off-screen point the dealer throws from — bottom center, as if the
+## dealer sits on the player's side of the table.
 func deck_origin() -> Vector2:
-	return Vector2(board_px_size().x + PlayingCard.W * 2.0, -PlayingCard.H * 1.5)
+	return Vector2(board_px_size().x * 0.5, board_px_size().y + PlayingCard.H * 2.0)
+
+
+## Soft blob shadow that sits on the table at the card's landing slot,
+## growing and darkening as the card descends onto it.
+func _make_deal_shadow(dest: Vector2) -> Panel:
+	var sh := Panel.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0, 0, 0, 1.0)
+	box.set_corner_radius_all(12)
+	sh.add_theme_stylebox_override("panel", box)
+	sh.size = Vector2(PlayingCard.W + 12, PlayingCard.H + 12)
+	sh.position = dest - sh.size / 2.0
+	sh.pivot_offset = sh.size / 2.0
+	sh.scale = Vector2(0.3, 0.3)
+	sh.modulate = Color(1, 1, 1, 0.1)
+	sh.z_index = 5  # above the table cards, below the flying card
+	sh.visible = false
+	add_child(sh)
+	return sh
 
 
 ## The refill, presented as a dealer at a table. Two phases:
@@ -374,28 +396,46 @@ func _fall_and_fill(initial_deal: bool) -> void:
 		tw.tween_callback(settle_landed.emit).set_delay(t_settle)
 		deal_base = t_settle * SETTLE_DEAL_OVERLAP
 
-	# Phase B — staggered dealing along an arc, with a flick of rotation.
+	# Phase B — staggered throws: high arc, spinning, shadow growing on
+	# the table beneath; the card lands and finishes its spin on the felt.
+	var t_spin := t_deal + DEAL_SPIN_SETTLE * spd
 	for i in deals.size():
 		var d: Dictionary = deals[i]
 		var card: PlayingCard = d.card
 		var from: Vector2 = card.position
 		var to: Vector2 = d.pos
-		var ctrl := (from + to) * 0.5 + Vector2(0.0, -220.0)
+		var ctrl := (from + to) * 0.5 + Vector2(0.0, -DEAL_ARC_HEIGHT)
 		var delay := deal_base + i * t_stagger
+		var sh := _make_deal_shadow(to)
+		_refill_shadows.append(sh)
 		var flight := func(t: float) -> void:
 			if is_instance_valid(card):
 				card.position = from.lerp(ctrl, t).lerp(ctrl.lerp(to, t), t)
 		tw.tween_method(flight, 0.0, 1.0, t_deal) \
-				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(delay)
-		# Spin fast off the flick, decelerate, and settle flat on arrival.
-		tw.tween_property(card, "rotation", 0.0, t_deal) \
-				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(delay)
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
+		# Stays big (high) through mid-flight, then drops onto the table.
 		tw.tween_property(card, "scale", Vector2.ONE, t_deal) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
+		# The spin outlives the landing, decaying to flat on the felt.
+		tw.tween_property(card, "rotation", 0.0, t_spin) \
 				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(delay)
+		# Shadow: appears with the throw, swells and darkens as the card
+		# comes down, and vanishes under the landed card.
+		tw.tween_callback(func() -> void:
+			if is_instance_valid(sh):
+				sh.visible = true).set_delay(delay)
+		tw.tween_property(sh, "scale", Vector2.ONE, t_deal) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
+		tw.tween_property(sh, "modulate:a", 0.45, t_deal) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
+		tw.tween_callback(func() -> void:
+			if is_instance_valid(sh):
+				sh.queue_free()).set_delay(delay + t_deal)
 		tw.tween_callback(_on_card_dealt.bind(card)).set_delay(delay + t_deal)
 
 	tw.finished.connect(func() -> void:
 		if _refill_active:
+			_refill_shadows.clear()
 			_refill_active = false
 			refill_done.emit())
 	await refill_done
@@ -421,6 +461,10 @@ func _skip_refill() -> void:
 			e.card.rotation = 0.0
 			e.card.scale = Vector2.ONE
 			e.card.z_index = 0
+	for sh in _refill_shadows:
+		if is_instance_valid(sh):
+			sh.queue_free()
+	_refill_shadows.clear()
 	_refill_active = false
 	refill_done.emit()
 

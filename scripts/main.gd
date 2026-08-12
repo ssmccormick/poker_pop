@@ -981,7 +981,7 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
 		"deal":
-			await get_tree().create_timer(0.85).timeout
+			await get_tree().create_timer(1.3).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
 			return
