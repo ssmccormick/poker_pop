@@ -23,8 +23,10 @@ const MAX_SELECT := 5
 # --- Refill presentation timing (all scaled by refill_speed) --------------
 const SETTLE_DURATION := 0.4       # Phase A: existing cards fall into gaps
 const SETTLE_DEAL_OVERLAP := 0.8   # Phase B starts at this fraction of A
-const DEAL_CARD_DURATION := 0.35   # flight time of each dealt card
-const DEAL_STAGGER_DELAY := 0.05   # gap between dealt cards
+const DEAL_CARD_DURATION := 0.55   # flight time of each dealt card
+const DEAL_STAGGER_DELAY := 0.08   # gap between dealt cards
+const DEAL_SPIN_MIN := 0.9         # flick spin, in full turns
+const DEAL_SPIN_MAX := 1.6
 
 var refill_speed := 1.0  # >1 = faster; scales every refill duration/delay
 
@@ -342,7 +344,9 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.grid_pos = p
 			grid[p] = card
 			card.position = deck_origin()
-			card.rotation = randf_range(-0.42, -0.18)
+			# Flicked off the deck: starts mid-spin and slightly "far away".
+			card.rotation = -TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
+			card.scale = Vector2(0.8, 0.8)
 			add_child(card)
 			deals.append({"card": card, "pos": cell_center(p), "cell": p})
 	if settle_moves.is_empty() and deals.is_empty():
@@ -379,8 +383,12 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			if is_instance_valid(card):
 				card.position = from.lerp(ctrl, t).lerp(ctrl.lerp(to, t), t)
 		tw.tween_method(flight, 0.0, 1.0, t_deal) \
-				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).set_delay(delay)
-		tw.tween_property(card, "rotation", 0.0, t_deal).set_delay(delay)
+				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(delay)
+		# Spin fast off the flick, decelerate, and settle flat on arrival.
+		tw.tween_property(card, "rotation", 0.0, t_deal) \
+				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(delay)
+		tw.tween_property(card, "scale", Vector2.ONE, t_deal) \
+				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(delay)
 		tw.tween_callback(_on_card_dealt.bind(card)).set_delay(delay + t_deal)
 
 	tw.finished.connect(func() -> void:
@@ -406,6 +414,7 @@ func _skip_refill() -> void:
 		if is_instance_valid(e.card):
 			e.card.position = e.pos
 			e.card.rotation = 0.0
+			e.card.scale = Vector2.ONE
 	_refill_active = false
 	refill_done.emit()
 
