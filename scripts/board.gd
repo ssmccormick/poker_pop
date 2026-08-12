@@ -28,7 +28,6 @@ const DEAL_STAGGER_DELAY := 0.14   # gap between dealt cards
 const DEAL_SPIN_MIN := 1.2         # throw spin, in full turns
 const DEAL_SPIN_MAX := 2.0
 const DEAL_SPIN_SETTLE := 0.25     # spin keeps decaying this long AFTER landing
-const DEAL_REVERSE_CHANCE := 0.25  # odds a card spins the other way
 const SETUP_STAGGER_SCALE := 0.6   # full-board setup deals use a tighter stagger
 const DEAL_START_SCALE := 2.6      # dealt cards start big (high, near the screen)
 const DEAL_ARC_HEIGHT := 460.0     # how high above the flight line the toss peaks
@@ -382,9 +381,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.position = deck_origin()
 			# Flicked off the deck: mid-spin, big (up in the air, close to
 			# the screen), and drawn above every card already on the table.
-			# Spin amount and direction vary per card.
-			var spin_dir := 1.0 if randf() < DEAL_REVERSE_CHANCE else -1.0
-			card.rotation = spin_dir * TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
+			# All cards spin the same way; only the amount/speed varies.
+			card.rotation = -TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
 			card.scale = Vector2(DEAL_START_SCALE, DEAL_START_SCALE)
 			card.z_index = 20
 			add_child(card)
