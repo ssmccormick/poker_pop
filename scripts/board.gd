@@ -28,6 +28,7 @@ const DEAL_STAGGER_DELAY := 0.14   # gap between dealt cards
 const DEAL_SPIN_MIN := 1.2         # throw spin, in full turns
 const DEAL_SPIN_MAX := 2.0
 const DEAL_SPIN_SETTLE := 0.25     # spin keeps decaying this long AFTER landing
+const DEAL_REVERSE_CHANCE := 0.25  # odds a card spins the other way
 const SETUP_STAGGER_SCALE := 0.6   # full-board setup deals use a tighter stagger
 const DEAL_START_SCALE := 2.6      # dealt cards start big (high, near the screen)
 const DEAL_ARC_HEIGHT := 460.0     # how high above the flight line the toss peaks
@@ -381,7 +382,9 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.position = deck_origin()
 			# Flicked off the deck: mid-spin, big (up in the air, close to
 			# the screen), and drawn above every card already on the table.
-			card.rotation = -TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
+			# Spin amount and direction vary per card.
+			var spin_dir := 1.0 if randf() < DEAL_REVERSE_CHANCE else -1.0
+			card.rotation = spin_dir * TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
 			card.scale = Vector2(DEAL_START_SCALE, DEAL_START_SCALE)
 			card.z_index = 20
 			add_child(card)
@@ -410,7 +413,9 @@ func _fall_and_fill(initial_deal: bool) -> void:
 
 	# Phase B — staggered throws: high arc, spinning, shadow growing on
 	# the table beneath; the card lands and finishes its spin on the felt.
-	var t_spin := t_deal + DEAL_SPIN_SETTLE * spd
+	# Each card gets its own spin decay time and deceleration curve so
+	# the rotation never looks machine-identical.
+	var spin_curves: Array = [Tween.TRANS_CUBIC, Tween.TRANS_QUAD, Tween.TRANS_QUART]
 	for i in deals.size():
 		var d: Dictionary = deals[i]
 		var card: PlayingCard = d.card
@@ -429,8 +434,10 @@ func _fall_and_fill(initial_deal: bool) -> void:
 		tw.tween_property(card, "scale", Vector2.ONE, t_deal) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
 		# The spin outlives the landing, decaying to flat on the felt.
+		var t_spin := t_deal + DEAL_SPIN_SETTLE * spd * randf_range(0.5, 1.6)
 		tw.tween_property(card, "rotation", 0.0, t_spin) \
-				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(delay)
+				.set_trans(spin_curves.pick_random()).set_ease(Tween.EASE_OUT) \
+				.set_delay(delay)
 		# Shadow: appears with the throw, swells and darkens as the card
 		# comes down, and vanishes under the landed card.
 		tw.tween_callback(func() -> void:
