@@ -11,11 +11,26 @@ signal selection_changed
 signal hand_played(result: Dictionary)
 signal hand_rejected
 signal dead_board
+signal card_dealt(card: PlayingCard)  # per-card audio hook, on deal arrival
+signal settle_landed                  # fires once when Phase A lands
+signal refill_done                    # internal: refill finished or skipped
 
 const GAP := 8
 const CELL_W := PlayingCard.W + GAP
 const CELL_H := PlayingCard.H + GAP
 const MAX_SELECT := 5
+
+# --- Refill presentation timing (all scaled by refill_speed) --------------
+const SETTLE_DURATION := 0.4       # Phase A: existing cards fall into gaps
+const SETTLE_DEAL_OVERLAP := 0.8   # Phase B starts at this fraction of A
+const DEAL_CARD_DURATION := 0.35   # flight time of each dealt card
+const DEAL_STAGGER_DELAY := 0.05   # gap between dealt cards
+
+var refill_speed := 1.0  # >1 = faster; scales every refill duration/delay
+
+var _refill_active := false
+var _refill_tween: Tween
+var _refill_finals: Array = []  # {card, pos} snap targets for skipping
 
 var cols := 5
 var rows := 5
@@ -91,6 +106,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton \
 			and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		dragging = false
+	# Any click during a refill skips the animation.
+	if _refill_active and event is InputEventMouseButton and event.pressed:
+		_skip_refill()
+		return
 	if busy or locked:
 		return
 	if event is InputEventMouseButton and event.pressed:
@@ -268,13 +287,31 @@ func _reject_hand() -> void:
 			card.error_flash = false
 
 
-## Drops surviving cards to the bottom of their column and deals new cards
-## in from above the board. Awaits until every card has landed.
+## Off-screen point the dealer deals from (top-right, toward the panel
+## where the deck counter lives).
+func deck_origin() -> Vector2:
+	return Vector2(board_px_size().x + PlayingCard.W * 2.0, -PlayingCard.H * 1.5)
+
+
+## The refill, presented as a dealer at a table. Two phases:
+##   A) surviving cards settle down into the gaps below them;
+##   B) new cards are flicked in one at a time from the deck origin,
+##      arcing to their slots in top-to-bottom, left-to-right order.
+## B starts when A is SETTLE_DEAL_OVERLAP complete. Any click skips the
+## whole sequence and snaps the board to its final state.
+## Game logic (which card lands in which slot) is identical to the old
+## straight-drop version — the deck is still consumed column by column.
 func _fall_and_fill(initial_deal: bool) -> void:
 	if initial_deal:
 		_play_sound(SFX_SWOOSH, 1.0, -8.0)
-	var tw := create_tween().set_parallel(true)
-	var moved := false
+	var spd := 1.0 / maxf(refill_speed, 0.01)
+	var t_settle := SETTLE_DURATION * spd
+	var t_deal := DEAL_CARD_DURATION * spd
+	var t_stagger := DEAL_STAGGER_DELAY * spd
+
+	# Compute settle moves and new-card slots (unchanged game logic).
+	var settle_moves: Array = []
+	var deals: Array = []
 	for x in cols:
 		var col_cards: Array = []
 		for y in rows:
@@ -283,7 +320,6 @@ func _fall_and_fill(initial_deal: bool) -> void:
 				col_cards.append(grid[p])
 				grid.erase(p)
 		var target_y := rows - 1
-		# Existing cards settle to the bottom, keeping their order.
 		for i in range(col_cards.size() - 1, -1, -1):
 			var card: PlayingCard = col_cards[i]
 			var p := Vector2i(x, target_y)
@@ -291,15 +327,9 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.grid_pos = p
 			var dest := cell_center(p)
 			if card.position != dest:
-				tw.tween_property(card, "position", dest, 0.4) \
-						.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-				moved = true
+				settle_moves.append({"card": card, "pos": dest})
 			target_y -= 1
-		# New cards fall in from above to fill the rest (a spent single
-		# deck stops mid-column and leaves the top cells empty).
-		var missing := target_y + 1
-		var column_got_cards := false
-		var column_delay := 0.0
+		# A spent single deck stops mid-column, leaving top cells empty.
 		for row in range(target_y, -1, -1):
 			var data := draw_card()
 			if data.is_empty():
@@ -311,25 +341,73 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			var p := Vector2i(x, row)
 			card.grid_pos = p
 			grid[p] = card
-			card.position = cell_center(Vector2i(x, row - missing))
+			card.position = deck_origin()
+			card.rotation = randf_range(-0.42, -0.18)
 			add_child(card)
-			var delay := 0.05 * (missing - 1 - row)
-			if initial_deal:
-				delay += 0.04 * x
-			if not column_got_cards:
-				column_delay = delay
-			column_got_cards = true
-			tw.tween_property(card, "position", cell_center(p), 0.4) \
-					.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT) \
-					.set_delay(delay)
-			moved = true
-		if column_got_cards:
-			# One deal sound per refilled column, timed with its cards.
-			_play_sound(SFX_DEAL, randf_range(0.92, 1.12), -10.0, column_delay + 0.15)
-	if moved:
-		await tw.finished
-	else:
-		tw.kill()
+			deals.append({"card": card, "pos": cell_center(p), "cell": p})
+	if settle_moves.is_empty() and deals.is_empty():
+		return
+	# Presentation order for dealing: top-to-bottom, left-to-right.
+	deals.sort_custom(func(a, b) -> bool:
+		if a.cell.y != b.cell.y:
+			return a.cell.y < b.cell.y
+		return a.cell.x < b.cell.x)
+
+	_refill_finals = settle_moves + deals
+	_refill_active = true
+	var tw := create_tween().set_parallel(true)
+	_refill_tween = tw
+
+	# Phase A — settle.
+	var deal_base := 0.0
+	if not settle_moves.is_empty():
+		for m in settle_moves:
+			tw.tween_property(m.card, "position", m.pos, t_settle) \
+					.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(settle_landed.emit).set_delay(t_settle)
+		deal_base = t_settle * SETTLE_DEAL_OVERLAP
+
+	# Phase B — staggered dealing along an arc, with a flick of rotation.
+	for i in deals.size():
+		var d: Dictionary = deals[i]
+		var card: PlayingCard = d.card
+		var from: Vector2 = card.position
+		var to: Vector2 = d.pos
+		var ctrl := (from + to) * 0.5 + Vector2(0.0, -220.0)
+		var delay := deal_base + i * t_stagger
+		var flight := func(t: float) -> void:
+			if is_instance_valid(card):
+				card.position = from.lerp(ctrl, t).lerp(ctrl.lerp(to, t), t)
+		tw.tween_method(flight, 0.0, 1.0, t_deal) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).set_delay(delay)
+		tw.tween_property(card, "rotation", 0.0, t_deal).set_delay(delay)
+		tw.tween_callback(_on_card_dealt.bind(card)).set_delay(delay + t_deal)
+
+	tw.finished.connect(func() -> void:
+		if _refill_active:
+			_refill_active = false
+			refill_done.emit())
+	await refill_done
+
+
+func _on_card_dealt(card: PlayingCard) -> void:
+	card_dealt.emit(card)
+	_play_sound(SFX_DEAL, randf_range(0.95, 1.15), -13.0)
+
+
+## Completes the refill instantly: kill the tweens, snap every involved
+## card to its final slot, and release the awaiting coroutine.
+func _skip_refill() -> void:
+	if not _refill_active:
+		return
+	if _refill_tween and _refill_tween.is_valid():
+		_refill_tween.kill()
+	for e in _refill_finals:
+		if is_instance_valid(e.card):
+			e.card.position = e.pos
+			e.card.rotation = 0.0
+	_refill_active = false
+	refill_done.emit()
 
 
 # --- Dead-board detection -------------------------------------------------

@@ -8,14 +8,13 @@ const OFFWHITE := Color("e8e0c8")
 const RED := Color("c23b3b")
 const DIM := Color("8a836e")
 
-# Arcade mode difficulty curve.
-const ARCADE_BASE_TARGET := 200   # level 1 score target
-const ARCADE_TARGET_STEP := 100   # extra target per level
-const ARCADE_BASE_HANDS := 16     # level 1 hand budget
-const ARCADE_MIN_HANDS := 8
+# Arcade mode difficulty curve. No hand limit — the draining meter is
+# the challenge; keep scoring or the bar runs out.
+const ARCADE_BASE_TARGET := 600   # level 1 score target
+const ARCADE_TARGET_STEP := 150   # extra target per level
 const ARCADE_BASE_DRAIN := 2.5    # meter % lost per second at level 1
-const ARCADE_DRAIN_STEP := 0.6
-const ARCADE_MAX_DRAIN := 8.0
+const ARCADE_DRAIN_STEP := 0.3
+const ARCADE_MAX_DRAIN := 7.0
 const ARCADE_METER_GAIN := 0.4    # meter % gained per point scored
 
 const VIEW := Vector2(1920, 1080)
@@ -27,7 +26,6 @@ const PLAY_WIDTH := 1400.0  # everything left of the panel
 
 var board: Board
 var score := 0
-var hands_left := 0
 var hands_played := 0
 var game_over := false
 var game_started := false
@@ -185,10 +183,6 @@ func _arcade_target() -> int:
 	return ARCADE_BASE_TARGET + ARCADE_TARGET_STEP * (level - 1)
 
 
-func _arcade_hands() -> int:
-	return maxi(ARCADE_MIN_HANDS, ARCADE_BASE_HANDS - (level - 1))
-
-
 func _arcade_drain() -> float:
 	return minf(ARCADE_MAX_DRAIN, ARCADE_BASE_DRAIN + ARCADE_DRAIN_STEP * (level - 1))
 
@@ -204,9 +198,8 @@ func _update_labels() -> void:
 			status_label.add_theme_color_override("font_color",
 					RED if time_left < 15.0 else OFFWHITE)
 		"arcade":
-			status_label.text = "LEVEL %d    HANDS %d" % [level, hands_left]
-			status_label.add_theme_color_override("font_color",
-					RED if hands_left <= 2 else OFFWHITE)
+			status_label.text = "LEVEL %d" % level
+			status_label.add_theme_color_override("font_color", OFFWHITE)
 		_:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
@@ -292,14 +285,8 @@ func _on_hand_played(result: Dictionary) -> void:
 	if mode_kind == "arcade":
 		level_score += result.score
 		meter = clampf(meter + result.score * ARCADE_METER_GAIN, 0.0, 100.0)
-		hands_left -= 1
 		if level_score >= _arcade_target():
 			_level_up()
-		elif hands_left <= 0:
-			game_over = true
-			board.locked = true
-			_show_game_over("OUT OF HANDS\n\nLevel %d needed %d more points.\nTotal score: %d\n\nR — play again    M — menu" % \
-					[level, _arcade_target() - level_score, score])
 
 
 ## Advances arcade to the next level: fresh board, fewer hands, faster drain.
@@ -314,7 +301,6 @@ func _level_up() -> void:
 		return
 	level += 1
 	level_score = 0
-	hands_left = _arcade_hands()
 	meter = 100.0
 	_set_level_background()
 	board.reset()
@@ -361,7 +347,6 @@ func _restart() -> void:
 	level = 1
 	level_score = 0
 	meter = 100.0
-	hands_left = _arcade_hands()
 	game_over = false
 	over_layer.visible = false
 	if mode_kind == "arcade":
@@ -702,6 +687,9 @@ func _build_ui() -> void:
 	countdown_overlay.color = Color(0, 0, 0, 0.55)
 	countdown_overlay.size = Vector2(PLAY_WIDTH, VIEW.y)
 	countdown_overlay.visible = false
+	# Let clicks through so a deal animation can be skipped during the
+	# countdown; the board is locked anyway.
+	countdown_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(countdown_overlay)
 
 	announcer = Label.new()
@@ -804,7 +792,7 @@ func _build_menu() -> void:
 	arcade_btn.add_theme_font_size_override("font_size", 26)
 	arcade_btn.pressed.connect(func() -> void:
 		_start_mode("arcade"))
-	_menu_center("Rising score targets · shrinking hand budget · an always-draining bar", 776, 20, DIM)
+	_menu_center("Rising score targets · an always-draining bar · keep scoring or lose", 776, 20, DIM)
 
 	var zen_btn := _button(menu_layer, "ZEN", Vector2(700, 834), Vector2(520, 66))
 	zen_btn.add_theme_font_size_override("font_size", 26)
@@ -992,6 +980,11 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
+		"deal":
+			await get_tree().create_timer(0.85).timeout
+			get_viewport().get_texture().get_image().save_png(path)
+			get_tree().quit()
+			return
 		"over":
 			await get_tree().create_timer(3.5).timeout
 			get_viewport().get_texture().get_image().save_png(path)

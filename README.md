@@ -16,16 +16,20 @@ of a Kind** is a legal hand here.
 | --- | --- | --- | --- |
 | **Time Trial** | Unlimited | 1:00 / 3:00 / 5:00 countdown | Reshuffles |
 | **Single Deck** | Unlimited | None | One 52-card deck — play until no hands remain |
-| **Arcade** | Shrinking budget per level | Always-draining bar | Reshuffles |
+| **Arcade** | Unlimited | Always-draining bar | Reshuffles |
 | **Zen** | Unlimited | None | Reshuffles |
 
-**Arcade** is the campaign: each level sets a score target (200, then
-+100 per level) on a hand budget that shrinks each level (16 down to a
-floor of 8), while a meter beside the board drains constantly — faster
-every level. Scoring hands refills the meter. Hit the target to advance
-to a fresh board; run out of meter or hands and the run is over. If
+**Arcade** is the campaign: each level sets a score target (600, then
++150 per level) while a meter beside the board drains constantly —
+faster every level. Scoring hands refills the meter; the challenge is
+making matches quickly enough to keep the bar up. Hit the target to
+advance to a fresh board; let the meter empty and the run is over. If
 the board ever has no playable hand, Arcade reshuffles it and play
 continues (the bar keeps draining, though).
+
+Refills play out as a dealer would: surviving cards settle first, then
+new cards are flicked in one at a time from the deck. Click during the
+animation to skip it.
 
 In Single Deck the board stops refilling when the deck is spent and the
 run ends when no playable hand remains — clearing the entire board is a
