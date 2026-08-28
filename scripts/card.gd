@@ -76,6 +76,10 @@ var hand_valid := false:  # selection currently forms a playable hand
 	set(value):
 		hand_valid = value
 		queue_redraw()
+var cursed := false:  # trail-mode dead weight: unselectable, blocks chains
+	set(value):
+		cursed = value
+		queue_redraw()
 var error_flash := false:  # brief red border after an invalid submit
 	set(value):
 		error_flash = value
@@ -149,6 +153,14 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 24, col)
 	_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	_draw_suit(Vector2(0, 6), 5.0)
+
+	if cursed:
+		# Darken the face and slash it out.
+		draw_rect(rect.grow(-2), Color(0.05, 0.05, 0.08, 0.62))
+		var a := rect.position + Vector2(14, 18)
+		var b := rect.end - Vector2(14, 18)
+		draw_line(a, b, ERROR_RED, 5.0)
+		draw_line(Vector2(b.x, a.y), Vector2(a.x, b.y), ERROR_RED, 5.0)
 
 	if selected and chain_index > 0:
 		# Chain-order badge, tinted to match the border state.

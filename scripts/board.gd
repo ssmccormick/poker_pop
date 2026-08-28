@@ -42,6 +42,9 @@ var _refill_shadows: Array = []  # in-flight shadow blobs, freed on land/skip
 var cols := 5
 var rows := 5
 var single_deck := false  # deck never reshuffles; the board runs dry
+# Trail mode: when non-empty, the deck refills from this custom card
+# list ({rank, suit, cursed}) instead of a standard 52.
+var custom_deck: Array = []
 
 var grid := {}  # Vector2i -> PlayingCard
 var deck: Array = []
@@ -89,9 +92,12 @@ func reset() -> void:
 
 
 func _refill_deck() -> void:
-	for s in 4:
-		for r in range(2, 15):
-			deck.append({"rank": r, "suit": s})
+	if custom_deck.is_empty():
+		for s in 4:
+			for r in range(2, 15):
+				deck.append({"rank": r, "suit": s})
+	else:
+		deck = custom_deck.duplicate(true)
 	deck.shuffle()
 
 
@@ -185,6 +191,9 @@ static func _is_adjacent(a: Vector2i, b: Vector2i) -> bool:
 
 
 func _toggle_select(card: PlayingCard) -> void:
+	if card.cursed:
+		_play_sound(SFX_FLIP, 0.7, -10.0)
+		return
 	if card.selected:
 		# Remove this card and everything chained after it.
 		var idx := selected.find(card)
@@ -375,6 +384,7 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.material = Themes.current_material()
 			card.rank = data.rank
 			card.suit = data.suit
+			card.cursed = data.get("cursed", false)
 			var p := Vector2i(x, row)
 			card.grid_pos = p
 			grid[p] = card
@@ -493,17 +503,24 @@ func _skip_refill() -> void:
 ## hand is playable only if its exact cards form an adjacent chain.
 func has_playable_hand() -> bool:
 	# Rank-group hands (pair, trips, quads, five, two pair, full house):
-	# chains using at most two distinct ranks.
+	# chains using at most two distinct ranks. Cursed cards can't start
+	# or join any chain.
 	for p in grid:
 		var card: PlayingCard = grid[p]
+		if card.cursed:
+			continue
 		if _group_chain_exists(p, {p: true}, {card.rank: 1}):
 			return true
 	# 5-card flush chains.
 	for p in grid:
+		if grid[p].cursed:
+			continue
 		if _suit_chain_exists(p, {p: true}, 1):
 			return true
 	# 5-card straight chains (any pick order along the chain).
 	for p in grid:
+		if grid[p].cursed:
+			continue
 		if _straight_chain_exists(p, {p: true}, {grid[p].rank: true}):
 			return true
 	return false
@@ -525,7 +542,7 @@ func _group_chain_exists(p: Vector2i, visited: Dictionary, rank_counts: Dictiona
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q):
+			if not grid.has(q) or visited.has(q) or grid[q].cursed:
 				continue
 			var r: int = grid[q].rank
 			# A third distinct rank can never resolve into an exact hand.
@@ -551,7 +568,8 @@ func _suit_chain_exists(p: Vector2i, visited: Dictionary, depth: int) -> bool:
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if grid.has(q) and not visited.has(q) and grid[q].suit == suit:
+			if grid.has(q) and not visited.has(q) and not grid[q].cursed \
+					and grid[q].suit == suit:
 				visited[q] = true
 				if _suit_chain_exists(q, visited, depth + 1):
 					return true
@@ -571,7 +589,7 @@ func _straight_chain_exists(p: Vector2i, visited: Dictionary, ranks: Dictionary)
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q):
+			if not grid.has(q) or visited.has(q) or grid[q].cursed:
 				continue
 			var r: int = grid[q].rank
 			if ranks.has(r):

@@ -1,0 +1,720 @@
+class_name TrailMode
+extends Node
+
+## Trail mode: a betting roguelike run. Buy in for a chip stack, ride a
+## 12-room tarot trail, wager chips on every room, sculpt your deck as
+## you go. Bankruptcy ends the run; cashing out banks chips as cash.
+## v1 scope: risk-tiered Normal rooms + shops. Bosses, room-rule
+## variety, and card modifiers beyond Cursed come later (TRAIL_MODE.md).
+
+const ROOMS_TOTAL := 12
+const REGION_SIZE := 4
+
+# Buy-in tables: [name, cash cost, starting chips, cash-out rate,
+# target multiplier, blind multiplier]
+const TABLES := [
+	{"name": "PENNY ANTE", "cost": 0, "chips": 100, "rate": 1.0, "target_mult": 1.0, "blind_mult": 1.0},
+	{"name": "TABLE STAKES", "cost": 50, "chips": 250, "rate": 1.5, "target_mult": 1.35, "blind_mult": 1.5},
+	{"name": "HIGH ROLLER", "cost": 200, "chips": 500, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
+]
+
+# Room risk tiers offered by the tarot draw.
+const RISKS := [
+	{"tarot": "THE SUN", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10, "bet_scale": 1.0},
+	{"tarot": "WHEEL OF FORTUNE", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8, "bet_scale": 1.0},
+	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7, "bet_scale": 1.5},
+]
+
+const BASE_TARGET := 300          # room 1 target before scaling
+const TARGET_STEP := 110          # + per room
+const REGION_BLINDS := [10, 25, 50]
+const SHOP_CARD_PRICE := 50
+const SHOP_REMOVE_PRICE := 30
+const FATE_KICKER := 15           # chips for trusting The Fool
+const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
+const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
+
+const META_PATH := "user://trail_meta.cfg"
+const RUN_PATH := "user://trail_run.cfg"
+
+var main: Node2D  # set by main.gd before build()
+
+# Meta (persists forever)
+var cash := 0
+
+# Run state
+var run_active := false
+var table_tier := 0
+var chips := 0
+var deck: Array = []          # [{rank, suit, cursed}]
+var room_index := 0           # 0-based; next room to play
+var in_room := false
+var room_score := 0
+var room_hands_left := 0
+var room_target := 0
+var current_offer := {}
+var stake := 0
+var _offers: Array = []
+var _fate_offer := {}
+
+# UI
+var buyin_layer: ColorRect
+var tarot_layer: ColorRect
+var bet_layer: ColorRect
+var pick_layer: ColorRect
+var shop_layer: ColorRect
+var remove_layer: ColorRect
+var end_layer: ColorRect
+var _buyin_cash_label: Label
+var _buyin_resume_btn: Button
+var _tarot_info: Label
+var _tarot_cards_box: Control
+var _tarot_cashout_btn: Button
+var _bet_info: Label
+var _bet_slider: HSlider
+var _bet_stake_label: Label
+var _pick_box: Control
+var _shop_info: Label
+var _shop_box: Control
+var _remove_grid: GridContainer
+var _remove_info: Label
+var _end_label: Label
+
+
+func _ready() -> void:
+	_load_meta()
+
+
+# --- Persistence ----------------------------------------------------------
+
+func _load_meta() -> void:
+	var cf := ConfigFile.new()
+	cf.load(META_PATH)
+	cash = int(cf.get_value("meta", "cash", 0))
+
+
+func _save_meta() -> void:
+	if OS.get_environment("POKERPOP_SHOT") != "":
+		return  # screenshot runs must not touch real saves
+	var cf := ConfigFile.new()
+	cf.set_value("meta", "cash", cash)
+	cf.save(META_PATH)
+
+
+func _save_run() -> void:
+	if OS.get_environment("POKERPOP_SHOT") != "":
+		return
+	var cf := ConfigFile.new()
+	cf.set_value("run", "active", run_active)
+	cf.set_value("run", "tier", table_tier)
+	cf.set_value("run", "chips", chips)
+	cf.set_value("run", "room", room_index)
+	var ranks := PackedInt32Array()
+	var suits := PackedInt32Array()
+	var curses := PackedInt32Array()
+	for c in deck:
+		ranks.append(c.rank)
+		suits.append(c.suit)
+		curses.append(1 if c.get("cursed", false) else 0)
+	cf.set_value("run", "ranks", ranks)
+	cf.set_value("run", "suits", suits)
+	cf.set_value("run", "curses", curses)
+	cf.save(RUN_PATH)
+
+
+func _clear_run_save() -> void:
+	run_active = false
+	var cf := ConfigFile.new()
+	cf.set_value("run", "active", false)
+	cf.save(RUN_PATH)
+
+
+func _load_run() -> bool:
+	var cf := ConfigFile.new()
+	if cf.load(RUN_PATH) != OK or not cf.get_value("run", "active", false):
+		return false
+	table_tier = int(cf.get_value("run", "tier", 0))
+	chips = int(cf.get_value("run", "chips", 0))
+	room_index = int(cf.get_value("run", "room", 0))
+	var ranks: PackedInt32Array = cf.get_value("run", "ranks", PackedInt32Array())
+	var suits: PackedInt32Array = cf.get_value("run", "suits", PackedInt32Array())
+	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
+	deck.clear()
+	for i in ranks.size():
+		deck.append({"rank": ranks[i], "suit": suits[i],
+				"cursed": curses[i] == 1})
+	run_active = true
+	return true
+
+
+# --- Run math -------------------------------------------------------------
+
+func _table() -> Dictionary:
+	return TABLES[table_tier]
+
+
+func _blind_for(room: int) -> int:
+	var region: int = clampi(room / REGION_SIZE, 0, REGION_BLINDS.size() - 1)
+	return int(REGION_BLINDS[region] * _table().blind_mult)
+
+
+func _target_for(room: int, risk: Dictionary) -> int:
+	var base := BASE_TARGET + TARGET_STEP * room
+	return int(base * risk.target_scale * _table().target_mult)
+
+
+func _fresh_deck() -> Array:
+	var d: Array = []
+	for s in 4:
+		for r in range(2, 15):
+			d.append({"rank": r, "suit": s, "cursed": false})
+	return d
+
+
+func _cashout_value(rate_bonus := 1.0) -> int:
+	return int(chips * _table().rate * rate_bonus / 10.0)
+
+
+func _random_card_offer() -> Dictionary:
+	# Half the time, offer an exact duplicate of a card already owned
+	# (the Five of a Kind / Flushed Five enabler).
+	if randf() < 0.5 and not deck.is_empty():
+		var src: Dictionary = deck.pick_random()
+		if not src.get("cursed", false):
+			return {"rank": src.rank, "suit": src.suit, "cursed": false}
+	return {"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": false}
+
+
+# --- Flow: entry ----------------------------------------------------------
+
+func open_buyin() -> void:
+	main.menu_layer.visible = false
+	main.menu_open = false
+	_hide_all()
+	_buyin_cash_label.text = "CASH  $%d" % cash
+	_buyin_resume_btn.visible = _has_saved_run()
+	buyin_layer.visible = true
+
+
+func _has_saved_run() -> bool:
+	var cf := ConfigFile.new()
+	return cf.load(RUN_PATH) == OK and cf.get_value("run", "active", false)
+
+
+func _start_run(tier: int) -> void:
+	var cost: int = TABLES[tier].cost
+	if cash < cost:
+		return
+	cash -= cost
+	_save_meta()
+	main.menu_open = false
+	table_tier = tier
+	chips = TABLES[tier].chips
+	deck = _fresh_deck()
+	room_index = 0
+	run_active = true
+	main.score = 0
+	_save_run()
+	_show_tarot()
+
+
+func _resume_run() -> void:
+	if _load_run():
+		main.score = 0
+		_show_tarot()
+
+
+func back_to_menu() -> void:
+	_hide_all()
+	main._open_menu()
+
+
+# --- Flow: tarot (between rooms) -----------------------------------------
+
+func _show_tarot() -> void:
+	_hide_all()
+	in_room = false
+	main.game_started = false
+	main.board.locked = true
+	# Bankruptcy check against the coming room's blind.
+	if chips < _blind_for(room_index):
+		_end_run("BUSTED OUT",
+				"The table minimum is %d chips and you're down to %d.\nThe trail ends here." % [_blind_for(room_index), chips],
+				0)
+		return
+	_offers = _make_offers()
+	_fate_offer = _make_one_offer(true)
+	_render_tarot()
+	tarot_layer.visible = true
+
+
+func _make_offers() -> Array:
+	var offers: Array = []
+	# A shop appears as one of the three choices in the middle-ish of
+	# each region (and never two shops at once).
+	var want_shop := room_index % REGION_SIZE == 2
+	var risk_pool := RISKS.duplicate()
+	risk_pool.shuffle()
+	for i in 3:
+		if want_shop and i == 1:
+			offers.append({"kind": "shop", "tarot": "THE HERMIT"})
+		else:
+			offers.append(_make_one_offer(false, risk_pool[i % risk_pool.size()]))
+	return offers
+
+
+func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
+	if random_risk:
+		if randf() < 0.15:
+			return {"kind": "shop", "tarot": "THE HERMIT"}
+		risk = RISKS.pick_random()
+	return {
+		"kind": "play",
+		"tarot": risk.tarot,
+		"label": risk.label,
+		"target": _target_for(room_index, risk),
+		"hands": int(risk.hands),
+		"odds": float(risk.odds),
+		# Never demand more than the player holds (forces all-in instead).
+		"min_bet": mini(int(_blind_for(room_index) * risk.bet_scale), chips),
+	}
+
+
+func _render_tarot() -> void:
+	for child in _tarot_cards_box.get_children():
+		child.queue_free()
+	var region := room_index / REGION_SIZE + 1
+	_tarot_info.text = "ROOM %d / %d   ·   REGION %d   ·   CHIPS %d   ·   DECK %d cards" \
+			% [room_index + 1, ROOMS_TOTAL, region, chips, deck.size()]
+	_tarot_cashout_btn.text = "CASH OUT — TAKE $%d" % _cashout_value()
+	for i in _offers.size():
+		var offer: Dictionary = _offers[i]
+		var b := _tarot_card_button(offer, 300 + i * 330)
+		var picked := offer
+		b.pressed.connect(func() -> void:
+			_choose_offer(picked, false))
+	# The Fool: face-down fate.
+	var fool: Button = main._button(_tarot_cards_box, "", Vector2(300 + 3 * 330, 0), Vector2(300, 380))
+	fool.text = "THE FOOL\n\n?\n\nLet fate decide\n(+%d chips)" % FATE_KICKER
+	fool.add_theme_font_size_override("font_size", 22)
+	fool.pressed.connect(func() -> void:
+		_choose_offer(_fate_offer, true))
+
+
+func _tarot_card_button(offer: Dictionary, x: float) -> Button:
+	var b: Button = main._button(_tarot_cards_box, "", Vector2(x, 0), Vector2(300, 380))
+	b.add_theme_font_size_override("font_size", 22)
+	if offer.kind == "shop":
+		b.text = "THE HERMIT\n\nSHOP\n\nBuy cards\nBurn cards\n\nNo bet"
+	else:
+		b.text = "%s\n\n%s room\nTarget  %d\nHands  %d\nOdds  %s\n\nMin bet  %d" % [
+			offer.tarot, offer.label, offer.target, offer.hands,
+			_odds_text(offer.odds), offer.min_bet]
+	return b
+
+
+func _odds_text(odds: float) -> String:
+	if is_equal_approx(odds, 1.0):
+		return "1 : 1"
+	if is_equal_approx(odds, 1.5):
+		return "3 : 2"
+	return "2 : 1"
+
+
+func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
+	if from_fate:
+		chips += FATE_KICKER
+	current_offer = offer
+	tarot_layer.visible = false
+	if offer.kind == "shop":
+		_show_shop()
+	else:
+		_show_bet()
+
+
+func _do_cashout() -> void:
+	var payout := _cashout_value()
+	cash += payout
+	_save_meta()
+	_clear_run_save()
+	_end_run("CASHED OUT", "You walk away with $%d.\nThe trail will be waiting." % payout, payout)
+
+
+# --- Flow: betting --------------------------------------------------------
+
+func _show_bet() -> void:
+	_hide_all()
+	var o := current_offer
+	_bet_info.text = "%s — %s room\nTarget %d in %d hands   ·   odds %s\nYour chips: %d   ·   minimum bet: %d" % [
+		o.tarot, o.label, o.target, o.hands, _odds_text(o.odds), chips, o.min_bet]
+	_bet_slider.min_value = o.min_bet
+	_bet_slider.max_value = chips
+	_bet_slider.value = o.min_bet
+	_update_stake_label()
+	bet_layer.visible = true
+
+
+func _update_stake_label() -> void:
+	stake = int(_bet_slider.value)
+	var o := current_offer
+	var win_total := stake + int(stake * o.odds)
+	_bet_stake_label.text = "STAKE  %d      win pays back %d" % [stake, win_total]
+
+
+func _confirm_bet() -> void:
+	chips -= stake
+	bet_layer.visible = false
+	_start_room()
+
+
+# --- Flow: playing a room -------------------------------------------------
+
+func _start_room() -> void:
+	in_room = true
+	room_score = 0
+	room_target = current_offer.target
+	room_hands_left = current_offer.hands
+	main.mode_kind = "trail"
+	main.mode_label_text = "Trail · %s" % _table().name.capitalize()
+	main.board.custom_deck = deck.duplicate(true)
+	main.game_started = true
+	main.game_over = false
+	main.menu_music.stop()
+	if not main.music.playing:
+		main._fade_in(main.music)
+	if not main.backgrounds.is_empty():
+		main.bg_rect.texture = main.backgrounds.pick_random()
+	main.board.reset()
+	main._begin_countdown()
+
+
+func on_hand_played(result: Dictionary) -> void:
+	# main already added result.score to the run total (main.score).
+	room_score += result.score
+	if room_score >= room_target:
+		_room_cleared()
+	else:
+		room_hands_left -= 1
+		if room_hands_left <= 0:
+			_room_failed()
+
+
+func _room_cleared() -> void:
+	in_room = false
+	main.board.locked = true
+	main.board.suppress_refill = true
+	if main.board._refill_active:
+		main.board._skip_refill()
+	var winnings := stake + int(stake * current_offer.odds)
+	chips += winnings
+	main._announce("ROOM CLEAR  +%d CHIPS" % winnings)
+	_after_board_settles(func() -> void:
+		room_index += 1
+		if room_index >= ROOMS_TOTAL:
+			_trail_complete()
+		else:
+			_save_run()
+			_show_pick())
+
+
+func _room_failed() -> void:
+	in_room = false
+	main.board.locked = true
+	# Fail forward, scarred: stake is already gone; take a cursed card.
+	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+	main._announce("BUSTED — CURSED CARD", main.RED)
+	_after_board_settles(func() -> void:
+		room_index += 1
+		if room_index >= ROOMS_TOTAL:
+			_trail_complete()
+		else:
+			_save_run()
+			_show_tarot())
+
+
+func _after_board_settles(then: Callable) -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	then.call()
+
+
+## Player bailed mid-room (M to menu): the stake is already spent, so it
+## just counts as a fail — scar applied, save written.
+func on_abandon_room() -> void:
+	if not in_room:
+		return
+	in_room = false
+	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+	room_index += 1
+	if room_index >= ROOMS_TOTAL:
+		room_index = ROOMS_TOTAL - 1  # abandoning the finale just fails it
+	_save_run()
+
+
+func _trail_complete() -> void:
+	var payout := _cashout_value(COMPLETE_RATE_BONUS) + COMPLETE_PURSE * (table_tier + 1)
+	cash += payout
+	_save_meta()
+	_clear_run_save()
+	_end_run("TRAIL COMPLETE",
+			"You rode all %d rooms and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout],
+			payout)
+
+
+# --- Flow: card pick ------------------------------------------------------
+
+func _show_pick() -> void:
+	_hide_all()
+	main.game_started = false
+	for child in _pick_box.get_children():
+		child.queue_free()
+	for i in 3:
+		var card_data := _random_card_offer()
+		var holder: Button = main._button(_pick_box, "", Vector2(660 + i * 220, 0), Vector2(170, 240))
+		var pc := PlayingCard.new()
+		pc.rank = card_data.rank
+		pc.suit = card_data.suit
+		pc.material = Themes.current_material()
+		pc.scale = Vector2(1.6, 1.6)
+		pc.position = Vector2(85, 120)
+		holder.add_child(pc)
+		var data := card_data
+		holder.pressed.connect(func() -> void:
+			deck.append(data)
+			main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+			_save_run()
+			_show_tarot())
+	pick_layer.visible = true
+
+
+# --- Flow: shop -----------------------------------------------------------
+
+func _show_shop() -> void:
+	_hide_all()
+	main.game_started = false
+	_shop_info.text = "CHIPS  %d" % chips
+	for child in _shop_box.get_children():
+		child.queue_free()
+	for i in 3:
+		var card_data := _random_card_offer()
+		var holder: Button = main._button(_shop_box, "", Vector2(560 + i * 220, 0), Vector2(170, 280))
+		var pc := PlayingCard.new()
+		pc.rank = card_data.rank
+		pc.suit = card_data.suit
+		pc.material = Themes.current_material()
+		pc.scale = Vector2(1.5, 1.5)
+		pc.position = Vector2(85, 100)
+		holder.add_child(pc)
+		var price_tag: Label = main._label(holder, "%d chips" % SHOP_CARD_PRICE, Vector2(0, 236), 18, main.GOLD)
+		price_tag.size = Vector2(170, 30)
+		price_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var data := card_data
+		holder.pressed.connect(func() -> void:
+			if chips >= SHOP_CARD_PRICE:
+				chips -= SHOP_CARD_PRICE
+				deck.append(data)
+				main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+				holder.disabled = true
+				_shop_info.text = "CHIPS  %d" % chips
+				_save_run())
+	shop_layer.visible = true
+
+
+func _leave_shop() -> void:
+	room_index += 1
+	if room_index >= ROOMS_TOTAL:
+		_trail_complete()
+	else:
+		_save_run()
+		_show_tarot()
+
+
+func _show_remove() -> void:
+	shop_layer.visible = false
+	_remove_info.text = "Pick a card to burn — %d chips" % SHOP_REMOVE_PRICE
+	for child in _remove_grid.get_children():
+		child.queue_free()
+	for i in deck.size():
+		var card_data: Dictionary = deck[i]
+		var holder := Button.new()
+		holder.custom_minimum_size = Vector2(100, 140)
+		holder.focus_mode = Control.FOCUS_NONE
+		var pc := PlayingCard.new()
+		pc.rank = card_data.rank
+		pc.suit = card_data.suit
+		pc.cursed = card_data.get("cursed", false)
+		pc.material = Themes.current_material()
+		pc.position = Vector2(50, 70)
+		holder.add_child(pc)
+		var idx := i
+		holder.pressed.connect(func() -> void:
+			if chips >= SHOP_REMOVE_PRICE:
+				chips -= SHOP_REMOVE_PRICE
+				deck.remove_at(idx)
+				main.board._play_sound(Board.SFX_POPS.pick_random(), 1.0, -8.0)
+				_save_run()
+				_show_shop())
+		_remove_grid.add_child(holder)
+	remove_layer.visible = true
+
+
+# --- Flow: run end --------------------------------------------------------
+
+func _end_run(title: String, body: String, _payout: int) -> void:
+	_hide_all()
+	run_active = false
+	main.game_started = false
+	if title == "BUSTED OUT":
+		_clear_run_save()
+	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nCash: $%d" % [title, body, main.score, cash]
+	end_layer.visible = true
+
+
+# --- UI construction ------------------------------------------------------
+
+func build_ui() -> void:
+	buyin_layer = _layer()
+	_screen_title(buyin_layer, "THE TRAIL")
+	_buyin_cash_label = _center(buyin_layer, "", 240, 30, main.GOLD)
+	for i in TABLES.size():
+		var t: Dictionary = TABLES[i]
+		var label: String
+		if t.cost == 0:
+			label = "%s\n%d chips · payout ×%.1f" % [t.name, t.chips, t.rate]
+		else:
+			label = "%s — $%d\n%d chips · payout ×%.1f · harder" % [t.name, t.cost, t.chips, t.rate]
+		var b: Button = main._button(buyin_layer, label, Vector2(660, 330 + i * 130), Vector2(600, 100))
+		b.add_theme_font_size_override("font_size", 24)
+		var tier := i
+		b.pressed.connect(func() -> void:
+			_start_run(tier))
+	_buyin_resume_btn = main._button(buyin_layer, "RESUME YOUR RIDE", Vector2(660, 740), Vector2(600, 70))
+	_buyin_resume_btn.add_theme_font_size_override("font_size", 24)
+	_buyin_resume_btn.pressed.connect(_resume_run)
+	_back_button(buyin_layer, back_to_menu)
+
+	tarot_layer = _layer()
+	_screen_title(tarot_layer, "FATE DEALS")
+	_tarot_info = _center(tarot_layer, "", 230, 24, main.OFFWHITE)
+	_tarot_cards_box = Control.new()
+	_tarot_cards_box.position = Vector2(0, 330)
+	tarot_layer.add_child(_tarot_cards_box)
+	_tarot_cashout_btn = main._button(tarot_layer, "", Vector2(760, 790), Vector2(400, 64))
+	_tarot_cashout_btn.add_theme_font_size_override("font_size", 24)
+	_tarot_cashout_btn.pressed.connect(_do_cashout)
+	_center(tarot_layer, "Cashing out ends the run and banks your chips as cash.", 870, 18, main.DIM)
+	_back_button(tarot_layer, back_to_menu, "MENU")
+
+	bet_layer = _layer()
+	_screen_title(bet_layer, "PLACE YOUR BET")
+	_bet_info = _center(bet_layer, "", 250, 26, main.OFFWHITE)
+	_bet_slider = HSlider.new()
+	_bet_slider.position = Vector2(560, 460)
+	_bet_slider.size = Vector2(800, 40)
+	_bet_slider.step = 1
+	_bet_slider.value_changed.connect(func(_v: float) -> void:
+		_update_stake_label())
+	bet_layer.add_child(_bet_slider)
+	_bet_stake_label = _center(bet_layer, "", 520, 32, main.GOLD)
+	var presets := [["MIN", 1.0], ["2×", 2.0], ["5×", 5.0], ["ALL IN", -1.0]]
+	for i in presets.size():
+		var p: Array = presets[i]
+		var b: Button = main._button(bet_layer, p[0], Vector2(660 + i * 160, 600), Vector2(140, 56))
+		b.add_theme_font_size_override("font_size", 22)
+		var mult: float = p[1]
+		b.pressed.connect(func() -> void:
+			if mult < 0.0:
+				_bet_slider.value = _bet_slider.max_value
+			else:
+				_bet_slider.value = _bet_slider.min_value * mult)
+	var deal: Button = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70))
+	deal.add_theme_font_size_override("font_size", 28)
+	deal.pressed.connect(_confirm_bet)
+	var bet_back := func() -> void:
+		bet_layer.visible = false
+		_show_tarot()
+	_back_button(bet_layer, bet_back, "BACK")
+
+	pick_layer = _layer()
+	_screen_title(pick_layer, "TAKE A CARD")
+	_center(pick_layer, "One joins your deck — or take none.", 240, 22, main.DIM)
+	_pick_box = Control.new()
+	_pick_box.position = Vector2(0, 360)
+	pick_layer.add_child(_pick_box)
+	var skip: Button = main._button(pick_layer, "SKIP", Vector2(835, 740), Vector2(250, 60))
+	skip.add_theme_font_size_override("font_size", 24)
+	skip.pressed.connect(func() -> void:
+		_show_tarot())
+
+	shop_layer = _layer()
+	_screen_title(shop_layer, "THE HERMIT'S SHOP")
+	_shop_info = _center(shop_layer, "", 230, 28, main.GOLD)
+	_shop_box = Control.new()
+	_shop_box.position = Vector2(0, 320)
+	shop_layer.add_child(_shop_box)
+	var rm: Button = main._button(shop_layer, "BURN A CARD — %d chips" % SHOP_REMOVE_PRICE, Vector2(700, 700), Vector2(520, 60))
+	rm.add_theme_font_size_override("font_size", 22)
+	rm.pressed.connect(_show_remove)
+	var leave: Button = main._button(shop_layer, "BACK ON THE TRAIL", Vector2(700, 780), Vector2(520, 60))
+	leave.add_theme_font_size_override("font_size", 22)
+	leave.pressed.connect(_leave_shop)
+
+	remove_layer = _layer()
+	_screen_title(remove_layer, "BURN A CARD")
+	_remove_info = _center(remove_layer, "", 210, 24, main.OFFWHITE)
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(360, 270)
+	scroll.size = Vector2(1200, 620)
+	remove_layer.add_child(scroll)
+	_remove_grid = GridContainer.new()
+	_remove_grid.columns = 11
+	scroll.add_child(_remove_grid)
+	var remove_back := func() -> void:
+		remove_layer.visible = false
+		_show_shop()
+	_back_button(remove_layer, remove_back, "CANCEL")
+
+	end_layer = _layer()
+	_end_label = Label.new()
+	_end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_end_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_end_label.add_theme_font_size_override("font_size", 40)
+	_end_label.add_theme_color_override("font_color", main.OFFWHITE)
+	_end_label.size = main.VIEW
+	end_layer.add_child(_end_label)
+	var out: Button = main._button(end_layer, "LEAVE THE TABLE", Vector2(760, 860), Vector2(400, 64))
+	out.add_theme_font_size_override("font_size", 24)
+	out.pressed.connect(back_to_menu)
+
+
+func _layer() -> ColorRect:
+	var l := ColorRect.new()
+	l.color = main.BG
+	l.size = main.VIEW
+	l.visible = false
+	main.ui_root.add_child(l)
+	return l
+
+
+func _hide_all() -> void:
+	for l in [buyin_layer, tarot_layer, bet_layer, pick_layer, shop_layer, remove_layer, end_layer]:
+		if l:
+			l.visible = false
+
+
+func _screen_title(parent: Control, text: String) -> void:
+	var t := _center(parent, text, 100, 64, main.GOLD)
+	t.add_theme_color_override("font_color", main.GOLD)
+
+
+func _center(parent: Control, text: String, y: float, font_size: int, color: Color) -> Label:
+	var l: Label = main._label(parent, text, Vector2(0, y), font_size, color)
+	l.size = Vector2(main.VIEW.x, font_size * 2.2)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return l
+
+
+func _back_button(parent: Control, action: Callable, text := "BACK") -> void:
+	var b: Button = main._button(parent, text, Vector2(60, 970), Vector2(200, 54))
+	b.add_theme_font_size_override("font_size", 20)
+	b.pressed.connect(action)

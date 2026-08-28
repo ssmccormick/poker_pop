@@ -25,6 +25,7 @@ const BOARD_AREA_SIZE := Vector2(1320, 900)
 const PLAY_WIDTH := 1400.0  # everything left of the panel
 
 var board: Board
+var trail: TrailMode
 var score := 0
 var hands_played := 0
 var game_over := false
@@ -123,7 +124,12 @@ func _ready() -> void:
 	add_child(board)
 	_apply_board_layout()
 
+	trail = TrailMode.new()
+	trail.main = self
+	add_child(trail)
+
 	_build_ui()
+	trail.build_ui()  # trail screens sit above the HUD, below the menu
 	_build_menu()
 	_build_splash()
 
@@ -143,6 +149,20 @@ func _ready() -> void:
 				pass
 			"options":
 				_open_options()
+			"trail":
+				trail.open_buyin()
+			"trailtarot":
+				menu_layer.visible = false
+				trail._start_run(0)
+			"trailbet", "trailroom":
+				menu_layer.visible = false
+				trail._start_run(0)
+				for offer in trail._offers:
+					if offer.kind == "play":
+						trail._choose_offer(offer, false)
+						break
+				if m == "trailroom":
+					trail._confirm_bet()
 			"ready":
 				_start_mode("arcade")
 			"time":
@@ -200,16 +220,22 @@ func _update_labels() -> void:
 		"arcade":
 			status_label.text = "LEVEL %d" % level
 			status_label.add_theme_color_override("font_color", OFFWHITE)
+		"trail":
+			status_label.text = "HANDS LEFT  %d" % trail.room_hands_left
+			status_label.add_theme_color_override("font_color",
+					RED if trail.room_hands_left <= 2 else OFFWHITE)
+			deck_label.text = "CHIPS %d    STAKE %d" % [trail.chips, trail.stake]
 		_:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 
 	var show_arcade := mode_kind == "arcade" and game_started and not menu_open
+	var show_trail := mode_kind == "trail" and game_started and not menu_open and trail.in_room
 	meter_back.visible = show_arcade
 	meter_fill.visible = show_arcade
-	target_label.visible = show_arcade
-	target_bar_back.visible = show_arcade
-	target_bar_fill.visible = show_arcade
+	target_label.visible = show_arcade or show_trail
+	target_bar_back.visible = show_arcade or show_trail
+	target_bar_fill.visible = show_arcade or show_trail
 	if show_arcade:
 		var h := 892.0 * meter / 100.0
 		meter_fill.position.y = 104.0 + (892.0 - h)
@@ -218,6 +244,11 @@ func _update_labels() -> void:
 		var target := _arcade_target()
 		target_label.text = "LEVEL %d      %d / %d" % [level, level_score, target]
 		target_bar_fill.size.x = 1314.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
+	elif show_trail:
+		target_label.text = "ROOM %d / %d      %d / %d" % \
+				[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
+		target_bar_fill.size.x = 1314.0 * clampf(
+				float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_preview()
 
 
@@ -282,6 +313,9 @@ func _on_hand_played(result: Dictionary) -> void:
 	score += result.score
 	hands_played += 1
 	_announce("%s  +%d" % [String(result.name).to_upper(), result.score])
+	if mode_kind == "trail":
+		trail.on_hand_played(result)
+		return
 	if mode_kind == "arcade":
 		level_score += result.score
 		meter = clampf(meter + result.score * ARCADE_METER_GAIN, 0.0, 100.0)
@@ -316,8 +350,8 @@ func _level_up() -> void:
 func _on_dead_board() -> void:
 	if game_over or not game_started:
 		return
-	if mode_kind == "arcade":
-		# Arcade never dead-ends: reshuffle the board and keep going.
+	if mode_kind == "arcade" or mode_kind == "trail":
+		# These modes never dead-end: reshuffle the board and keep going.
 		_announce("NO MOVES — RESHUFFLE")
 		board.shuffle_board()
 		return
@@ -344,6 +378,8 @@ func _show_game_over(message: String) -> void:
 
 
 func _restart() -> void:
+	if mode_kind == "trail":
+		return  # no free room retries at a betting table
 	if not game_started or board.busy or level_transition:
 		return
 	score = 0
@@ -522,6 +558,9 @@ func _apply_audio() -> void:
 
 
 func _open_menu() -> void:
+	if mode_kind == "trail":
+		trail.on_abandon_room()  # mid-room exit counts as a fail
+		trail._hide_all()
 	countdown_id += 1  # cancel any running countdown
 	countdown_active = false
 	countdown_overlay.visible = false
@@ -548,6 +587,7 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 		"zen":
 			mode_label_text = "Zen"
 	board.single_deck = kind == "single"
+	board.custom_deck.clear()
 	menu_open = false
 	menu_layer.visible = false
 	game_started = true
@@ -776,34 +816,40 @@ func _build_menu() -> void:
 	_label(menu_layer, "POP", Vector2(1042, 110), 110, OFFWHITE)
 	_menu_center("Chain adjacent cards into poker hands", 280, 26, DIM)
 
-	_menu_center("TIME TRIAL", 380, 26, GOLD)
+	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66))
+	trail_btn.add_theme_font_size_override("font_size", 26)
+	trail_btn.pressed.connect(func() -> void:
+		trail.open_buyin())
+	_menu_center("Buy in · bet on every room · sculpt your deck · cash out or bust", 408, 20, DIM)
+
+	_menu_center("TIME TRIAL", 456, 24, GOLD)
 	var times := [60.0, 180.0, 300.0]
 	var time_names := ["1:00", "3:00", "5:00"]
 	for i in 3:
-		var b := _button(menu_layer, time_names[i], Vector2(645 + i * 220, 424), Vector2(200, 62))
-		b.add_theme_font_size_override("font_size", 24)
+		var b := _button(menu_layer, time_names[i], Vector2(645 + i * 220, 494), Vector2(200, 56))
+		b.add_theme_font_size_override("font_size", 22)
 		var secs: float = times[i]
 		b.pressed.connect(func() -> void:
 			_start_mode("time", secs))
-	_menu_center("Unlimited hands · reshuffling deck · beat the clock", 496, 20, DIM)
+	_menu_center("Unlimited hands · reshuffling deck · beat the clock", 558, 18, DIM)
 
-	var single_btn := _button(menu_layer, "SINGLE DECK", Vector2(700, 566), Vector2(520, 66))
-	single_btn.add_theme_font_size_override("font_size", 26)
+	var single_btn := _button(menu_layer, "SINGLE DECK", Vector2(700, 604), Vector2(520, 60))
+	single_btn.add_theme_font_size_override("font_size", 24)
 	single_btn.pressed.connect(func() -> void:
 		_start_mode("single"))
-	_menu_center("One 52-card deck · no timer · play until no hands remain", 642, 20, DIM)
+	_menu_center("One 52-card deck · no timer · play until no hands remain", 672, 18, DIM)
 
-	var arcade_btn := _button(menu_layer, "ARCADE", Vector2(700, 700), Vector2(520, 66))
-	arcade_btn.add_theme_font_size_override("font_size", 26)
+	var arcade_btn := _button(menu_layer, "ARCADE", Vector2(700, 712), Vector2(520, 60))
+	arcade_btn.add_theme_font_size_override("font_size", 24)
 	arcade_btn.pressed.connect(func() -> void:
 		_start_mode("arcade"))
-	_menu_center("Rising score targets · an always-draining bar · keep scoring or lose", 776, 20, DIM)
+	_menu_center("Rising score targets · an always-draining bar · keep scoring or lose", 780, 18, DIM)
 
-	var zen_btn := _button(menu_layer, "ZEN", Vector2(700, 834), Vector2(520, 66))
-	zen_btn.add_theme_font_size_override("font_size", 26)
+	var zen_btn := _button(menu_layer, "ZEN", Vector2(700, 820), Vector2(520, 60))
+	zen_btn.add_theme_font_size_override("font_size", 24)
 	zen_btn.pressed.connect(func() -> void:
 		_start_mode("zen"))
-	_menu_center("No timer · no hand limit · deck reshuffles forever", 910, 20, DIM)
+	_menu_center("No timer · no hand limit · deck reshuffles forever", 888, 18, DIM)
 
 	if OS.has_feature("web"):
 		var opt_btn := _button(menu_layer, "OPTIONS", Vector2(835, 972), Vector2(250, 54))

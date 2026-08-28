@@ -14,6 +14,7 @@ of a Kind** is a legal hand here.
 
 | Mode | Hands | Pressure | Deck |
 | --- | --- | --- | --- |
+| **The Trail** | Per-room budget | Chips are your life — bet them on every room | Your own sculpted deck |
 | **Time Trial** | Unlimited | 1:00 / 3:00 / 5:00 countdown | Reshuffles |
 | **Single Deck** | Unlimited | None | One 52-card deck — play until no hands remain |
 | **Arcade** | Unlimited | Always-draining bar | Reshuffles |
@@ -30,6 +31,15 @@ continues (the bar keeps draining, though).
 Refills play out as a dealer would: surviving cards settle first, then
 new cards are flicked in one at a time from the deck. Click during the
 animation to skip it.
+
+**The Trail** is the roguelike: buy in for a chip stack, ride 12 rooms
+dealt as tarot cards, and bet chips on every room — win at the room's
+odds or lose the stake and take a Cursed card scar. Grow your deck with
+a card pick after each cleared room (duplicates enable Five of a Kind
+builds), shop and burn cards at the Hermit, and cash out between rooms
+to bank chips as permanent cash — or push on and risk busting out.
+Cash buys the premium harder-but-richer tables. Full design:
+[TRAIL_MODE.md](TRAIL_MODE.md).
 
 In Single Deck the board stops refilling when the deck is spent and the
 run ends when no playable hand remains — clearing the entire board is a
