@@ -38,18 +38,23 @@ func _init() -> void:
 	failures += _check(bombs == 2, "exactly two bombs seeded")
 	_free_board(b)
 
-	# --- fire ticking and spreading ---------------------------------------
+	# --- fire spreads each tick, then burns down ---------------------------
 	b = _board([[3, 0, 0, 0], [7, 1, 1, 0], [9, 2, 0, 1], [4, 3, 4, 4]])
 	b.grid[Vector2i(0, 0)].hazard = "fire"
 	b.grid[Vector2i(0, 1)].cursed = true
 	var res: Dictionary = b._tick_fire_and_bombs()
+	failures += _check(res.ignited == [Vector2i(1, 0)],
+			"fire spreads to its one eligible neighbor (cursed skipped)")
+	failures += _check(b.grid[Vector2i(1, 0)].hazard == "fire", "neighbor now burning")
+	failures += _check(b.grid[Vector2i(1, 0)].rank == 7,
+			"a fresh fire doesn't burn down on the tick that lit it")
 	failures += _check(b.grid[Vector2i(0, 0)].rank == 2, "fire ticks rank down")
 	failures += _check(res.burned.is_empty(), "rank 2 has not burned yet")
 	res = b._tick_fire_and_bombs()
 	failures += _check(res.burned == [Vector2i(0, 0)], "below 2 burns up")
-	failures += _check(res.ignited == [Vector2i(1, 0)],
-			"burn ignites the plain orthogonal neighbor only (cursed skipped)")
-	failures += _check(b.grid[Vector2i(1, 0)].hazard == "fire", "neighbor now burning")
+	failures += _check(res.ignited.is_empty(),
+			"no fresh targets — everything adjacent burns or is cursed")
+	failures += _check(b.grid[Vector2i(1, 0)].rank == 6, "second fire burns down too")
 	failures += _check(b.grid[Vector2i(4, 4)].hazard == "", "distant card untouched")
 	_free_board(b)
 

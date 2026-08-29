@@ -967,33 +967,47 @@ func spawn_boss(kind: String) -> void:
 			card.suit = randi_range(0, 3)
 			card.cobra_stack = []
 			card.cobra_body = []
-			# Grow the starting body along a chain of adjacent cells.
-			var cur := card.grid_pos
-			for i in COBRA_START_TAIL:
-				var placed := false
-				var dirs := HAZARD_DIRS.duplicate()
-				dirs.shuffle()
-				for d in dirs:
-					var q: Vector2i = cur + d
-					if not grid.has(q):
-						continue
-					var seg: PlayingCard = grid[q]
-					if seg.boss != "" or seg.snake_tail or seg.is_safe \
-							or seg.objective != "":
-						continue
-					card.cobra_stack.push_back({"rank": seg.rank, "suit": seg.suit})
-					seg.hazard = ""
-					seg.cursed = false
-					seg.washed = false
-					seg.mod = ""
-					seg.honey = false
-					seg.snake_tail = true
-					card.cobra_body.append(seg)
-					cur = q
-					placed = true
+			# Grow the starting body along a chain of adjacent cells,
+			# backtracking so a dead-end first step can't shorten the
+			# tail; only a truly cramped board yields a shorter snake.
+			var chain: Array = []
+			for want in range(COBRA_START_TAIL, 0, -1):
+				chain = _grow_cobra_chain([card.grid_pos], want)
+				if not chain.is_empty():
 					break
-				if not placed:
-					break
+			for q: Vector2i in chain:
+				var seg: PlayingCard = grid[q]
+				card.cobra_stack.push_back({"rank": seg.rank, "suit": seg.suit})
+				seg.hazard = ""
+				seg.cursed = false
+				seg.washed = false
+				seg.mod = ""
+				seg.honey = false
+				seg.snake_tail = true
+				card.cobra_body.append(seg)
+
+
+## Random depth-first walk for the cobra's starting body: extends
+## `path` (head first) with `want` more distinct eligible cells, each
+## adjacent to the previous. Returns the body cells (head excluded) or
+## [] if no chain of that length exists from here.
+func _grow_cobra_chain(path: Array, want: int) -> Array:
+	if want == 0:
+		return path.slice(1)
+	var dirs := HAZARD_DIRS.duplicate()
+	dirs.shuffle()
+	for d in dirs:
+		var q: Vector2i = path[-1] + d
+		if path.has(q) or not grid.has(q):
+			continue
+		var seg: PlayingCard = grid[q]
+		if seg.boss != "" or seg.snake_tail or seg.is_safe \
+				or seg.objective != "":
+			continue
+		var found: Array = _grow_cobra_chain(path + [q], want - 1)
+		if not found.is_empty():
+			return found
+	return []
 
 
 func _find_boss() -> PlayingCard:
@@ -1243,8 +1257,9 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 	return out
 
 
-## Pure hazard bookkeeping for one hand tick: fires lose a rank (burning
-## up below 2 and igniting orthogonal plain neighbors), bomb fuses drop.
+## Pure hazard bookkeeping for one hand tick: each fire spreads to one
+## orthogonal plain neighbor and loses a rank (burning up below 2),
+## bomb fuses drop, water drips.
 ## Returns {"burned": [cells], "ignited": [cells], "exploded": bool}.
 ## Board mutation only — no animation — so it's headless-testable.
 func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
@@ -1274,21 +1289,31 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		for p in grid:
 			if grid[p].hazard == "fire":
 				fires.append(p)
+	# Each fire spreads every tick: one random orthogonal neighbor that
+	# isn't already burning (or otherwise off-limits) catches fire.
+	# Fresh fires start spreading and burning down on the NEXT tick.
+	var ignited: Array = []
+	for p in fires:
+		var fdirs := HAZARD_DIRS.duplicate()
+		fdirs.shuffle()
+		for d in fdirs:
+			var q: Vector2i = p + d
+			if not grid.has(q):
+				continue
+			var card: PlayingCard = grid[q]
+			if card.hazard == "" and not card.cursed and not card.washed \
+					and card.boss == "" and not card.is_safe \
+					and not card.snake_tail and card.objective == "":
+				card.hazard = "fire"
+				ignited.append(q)
+				break
+	# Then the fire eats: rank drops, and below 2 the card burns up
+	# (unscored) — the spreading already happened above.
 	var burned: Array = []
 	for p in fires:
 		grid[p].rank -= 1
 		if grid[p].rank < 2:
 			burned.append(p)
-	var ignited: Array = []
-	for p in burned:
-		for d in HAZARD_DIRS:
-			var q: Vector2i = p + d
-			if not grid.has(q) or ignited.has(q):
-				continue
-			var card: PlayingCard = grid[q]
-			if card.hazard == "" and not card.cursed and not card.washed:
-				card.hazard = "fire"
-				ignited.append(q)
 	var exploded := false
 	for p in grid:
 		if grid[p].hazard == "bomb":
