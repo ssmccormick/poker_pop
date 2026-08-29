@@ -74,15 +74,19 @@ sweetened with a small chip kicker for trusting the cards.
 Draft Major Arcana → room mapping (flavor pass later):
 | Card | Room |
 | --- | --- |
-| The Sun | Normal |
-| Wheel of Fortune | Timed |
-| The Hanged Man | Tight Hands |
-| The Moon | Suit Locked |
-| The Magician | Hand Locked |
-| The Tower | Pressure (drain bar) |
-| The Hermit | Shop |
-| Death | Elite |
-| The Devil | Cursed bargain event (take a cursed card for chips?) |
+| The Sun | Normal (steady risk tier — shipped) |
+| Wheel of Fortune | Normal (risky tier — shipped; was "Timed", reassign later) |
+| The Tower | Normal (dangerous tier — shipped; drain-room idea moves elsewhere) |
+| The Hermit | Shop (shipped) |
+| Death | Bomb hazard room |
+| The Devil | Fire hazard room |
+| The Chariot | Wind hazard room |
+| Strength | Stone hazard room |
+| The Moon | Heist room (crack the safe) |
+| The Star | Treasure room (key + chest) |
+| The High Priestess | Suit Locked (future) |
+| The Magician | Hand Locked (future) |
+| The Hanged Man | Tight Hands (future) |
 
 ## Room types
 
@@ -120,7 +124,60 @@ detection/reshuffles will lie.
 - Shops sell removal ("burn a card") — pricier than buying. Deck size
   has no cap; bloat is self-punishing.
 
-## Card modifiers (drafts — need our own names/flavor)
+## Hazard cards (rules locked, build pending)
+
+Hazards are ROOM TYPES on the tarot draw — the card shows the danger
+before you bet, and hazard rooms pay better odds. Hazards are states on
+normal rank/suit cards, seeded on the initial deal. One hazard per
+card; refill-dealt cards are never hazarded. Hazards tick only on
+scoring hands, after the board settles.
+
+| Hazard | Tarot | Rule | Counterplay |
+| --- | --- | --- | --- |
+| Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward) | Include it in any scoring hand to defuse |
+| Fire | THE DEVIL | Rank ticks −1 per hand; below 2 it burns up (unscored) and spreads to orthogonal neighbors | Play it (scores at current rank) to extinguish |
+| Wind | THE CHARIOT | When played, every card from its cell to the edge in its arrow direction is blown off (unscored) | It's a tool as much as a hazard — aim it at junk |
+| Stone | STRENGTH | Must be in 3 scoring hands; scores each time; cracks visibly; 3rd use pops it | Chip away; it squats on its cell meanwhile |
+
+Design calls: fire spreads 4-way (8-way wipes 5×5 boards); spread skips
+hazarded/cursed cards; hazards don't persist in the run save.
+
+## Objective cards (rules locked, build pending)
+
+**The Safe (heist).** A safe card sits on the board showing a 4-digit
+combination (ranks 2–9, duplicates possible), e.g. **3·9·5·2**. Crack
+it by chaining the combo cards IN PRINTED ORDER (any suits, normal
+adjacency) and ending the chain on the safe itself — no poker hand
+required. Cracking costs a hand like any play and scores no points.
+- **Heist room (THE MOON, odds 2.0)**: the safe IS the goal — crack it
+  within the hand budget to clear the room. No score target.
+- **Ambient safes**: random chance in normal rooms — cracking pays
+  bonus chips. Optional loot; the score target still rules the room.
+- The safe acts as a wall for normal chains (like cursed); it only
+  accepts selection as the final pick of a matching combo chain.
+
+**Key + Chest (treasure).** A key card and a chest card (both normal
+rank/suit cards with overlays) are on the board. Make a VALID poker
+hand containing BOTH — the hand scores normally and the chest opens.
+Rewards: a new card for the deck, bonus chips, cash, or (later) a
+modified card.
+- **Treasure room (THE STAR, odds 1.5)**: opening the chest is the
+  room goal.
+- **Ambient chests**: random chance in normal rooms as optional loot.
+- v1: objective spawns don't mix with hazard rooms.
+
+## Deck modifiers — first two (rules locked, build pending)
+
+Chip and Mult cards begin the modifier family: enhancements on cards
+YOU own, acquired via card picks, shops, and chests, triggering every
+time the card is played. Stored on the deck entry, drawn as overlays.
+
+| Modifier | Effect |
+| --- | --- |
+| Chip card | Pays bonus chips every time it's played in a scoring hand |
+| Mult card | Multiplies the score of any hand it's part of (×1.5; multiple mults stack multiplicatively) |
+
+## Card modifiers (further drafts — need our own names/flavor)
 
 | Modifier | Effect (draft) | Notes |
 | --- | --- | --- |
