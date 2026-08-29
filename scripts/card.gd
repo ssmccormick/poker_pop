@@ -196,7 +196,7 @@ var snake_tail := false:  # King Cobra body segment: a wall
 	set(value):
 		snake_tail = value
 		queue_redraw()
-var tail_order := 0        # eat order; highest = newest segment
+var cobra_body: Array = []   # head only: segment cards, closest-first
 var cobra_stack: Array = []  # head only: identities to revert through
 var stunned := false:
 	set(value):

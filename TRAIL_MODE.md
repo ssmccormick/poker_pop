@@ -284,13 +284,14 @@ which makes deck sculpting the boss prep (stock queens before room 14).
   rank/suit, falls normally, and STAYS honeyed until cleared. Each
   catch removes a stripe.
 - **KING COBRA** (room 21) — the boss card is his HEAD, spawning with
-  a random identity and a **2-segment tail** (the "already eaten"
-  cards, identities stored). Each hand he slithers: eats an adjacent
-  card, takes its cell AND its full identity (rank + suit), and grows
-  a tail segment. Tail segments block the board like walls. Clear his
-  head using its CURRENT identity → he's **stunned** for the next hand
-  (no eating), the oldest tail segment pops, and his identity reverts
-  to the previous meal. **Kill = clear the head with no tail left.**
+  a random identity and a **2-segment body**. Each hand he SLITHERS
+  like a real snake: the head eats an adjacent card (taking its cell
+  and full identity), the body follows the head's path, and the cell
+  the tail tip vacates is refilled by a fresh deal. Body segments
+  block the board like walls, and he prefers slithering toward open
+  space. Clear his head using its CURRENT identity → he's **stunned**
+  for a hand, the tail tip crumbles, and his identity reverts to the
+  previous meal. **Kill = clear the head with no body left.**
 - **THE DEALER** (bonus, room 22 — HIGH ROLLER RUNS ONLY) — the true
   finale exists only at the highest stakes: a **heads-up duel with
   mirror rules**. You and the Dealer alternate scoring hands on the

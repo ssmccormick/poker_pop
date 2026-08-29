@@ -356,7 +356,7 @@ func play_hand() -> void:
 				if card.boss_hp <= 1:
 					result["boss_defeated"] = true
 			"cobra":
-				if card.cobra_stack.is_empty():
+				if card.cobra_body.is_empty():
 					result["boss_defeated"] = true
 	busy = true
 	hand_played.emit(result)
@@ -391,7 +391,7 @@ func play_hand() -> void:
 				poppers.append(card)  # down he goes
 			continue
 		if card.boss == "cobra":
-			if card.cobra_stack.is_empty():
+			if card.cobra_body.is_empty():
 				defeated_boss = true
 				poppers.append(card)
 			else:
@@ -953,8 +953,34 @@ func spawn_boss(kind: String) -> void:
 			card.rank = randi_range(2, 14)
 			card.suit = randi_range(0, 3)
 			card.cobra_stack = []
+			card.cobra_body = []
+			# Grow the starting body along a chain of adjacent cells.
+			var cur := card.grid_pos
 			for i in COBRA_START_TAIL:
-				_cobra_eat(card, true)
+				var placed := false
+				var dirs := HAZARD_DIRS.duplicate()
+				dirs.shuffle()
+				for d in dirs:
+					var q: Vector2i = cur + d
+					if not grid.has(q):
+						continue
+					var seg: PlayingCard = grid[q]
+					if seg.boss != "" or seg.snake_tail or seg.is_safe \
+							or seg.objective != "":
+						continue
+					card.cobra_stack.push_back({"rank": seg.rank, "suit": seg.suit})
+					seg.hazard = ""
+					seg.cursed = false
+					seg.washed = false
+					seg.mod = ""
+					seg.honey = false
+					seg.snake_tail = true
+					card.cobra_body.append(seg)
+					cur = q
+					placed = true
+					break
+				if not placed:
+					break
 
 
 func _find_boss() -> PlayingCard:
@@ -964,10 +990,11 @@ func _find_boss() -> PlayingCard:
 	return null
 
 
-## The cobra eats an orthogonal neighbor: the head takes the victim's
-## cell AND identity; the old head cell becomes a tail wall. `instant`
-## skips animation (spawn-time setup eats; also headless-testable).
-func _cobra_eat(head: PlayingCard, instant: bool) -> void:
+## The cobra SLITHERS: the head eats an orthogonal victim (taking its
+## cell and identity), the whole body follows the path, and the cell
+## vacated by the tail tip is left empty for the refill to fill.
+## `instant` skips animation (spawn/testing). Returns true if he moved.
+func _cobra_eat(head: PlayingCard, instant: bool) -> bool:
 	# Consider every edible neighbor and slither toward open space, so
 	# he doesn't casually coil himself into a corner.
 	var candidates: Array = []
@@ -979,8 +1006,6 @@ func _cobra_eat(head: PlayingCard, instant: bool) -> void:
 		if victim.boss != "" or victim.snake_tail or victim.is_safe \
 				or victim.objective != "":
 			continue
-		# Openness: edible/free orthogonal neighbors from the target cell
-		# (his current cell will become tail, so it doesn't count).
 		var openness := 0
 		for d2 in HAZARD_DIRS:
 			var n: Vector2i = q + d2
@@ -991,61 +1016,63 @@ func _cobra_eat(head: PlayingCard, instant: bool) -> void:
 				openness += 1
 		candidates.append({"cell": q, "openness": openness})
 	if candidates.is_empty():
-		return
+		return false
 	candidates.shuffle()
 	candidates.sort_custom(func(a, b) -> bool:
 		return a.openness > b.openness)
-	var chosen: Vector2i = candidates[0].cell
-	if true:
-		var q: Vector2i = chosen
-		var victim: PlayingCard = grid[q]
-		# Old head cell becomes a tail segment remembering this identity.
-		head.cobra_stack.push_back({"rank": head.rank, "suit": head.suit})
-		var tail := PlayingCard.new()
-		tail.snake_tail = true
-		tail.tail_order = head.cobra_stack.size()
-		tail.material = Themes.current_material()
-		tail.grid_pos = head.grid_pos
-		tail.position = head.position if instant else head.position
-		grid[head.grid_pos] = tail
-		if is_inside_tree():
-			add_child(tail)
-		# Head takes the victim's cell and identity.
-		var target_pos := victim.position
-		grid[q] = head
-		head.grid_pos = q
-		head.rank = victim.rank
-		head.suit = victim.suit
-		if victim.is_inside_tree():
-			victim.queue_free()
-		else:
-			victim.free()
-		if instant or not is_inside_tree():
-			head.position = target_pos
-		else:
-			var tw := create_tween()
-			tw.tween_property(head, "position", target_pos, 0.35) \
+	var target: Vector2i = candidates[0].cell
+	var victim: PlayingCard = grid[target]
+	head.cobra_stack.push_back({"rank": head.rank, "suit": head.suit})
+	var new_rank: int = victim.rank
+	var new_suit: int = victim.suit
+	grid.erase(target)
+	if victim.is_inside_tree():
+		victim.queue_free()
+	else:
+		victim.free()
+	# Slide the snake: head into the victim's cell, each segment into
+	# the cell ahead of it. The tip's old cell is left EMPTY.
+	var freed_cell := head.grid_pos
+	grid.erase(head.grid_pos)
+	grid[target] = head
+	head.grid_pos = target
+	head.rank = new_rank
+	head.suit = new_suit
+	var moves: Array = []  # {card, cell}
+	for seg: PlayingCard in head.cobra_body:
+		var seg_old := seg.grid_pos
+		grid.erase(seg_old)
+		grid[freed_cell] = seg
+		seg.grid_pos = freed_cell
+		moves.append({"card": seg, "cell": freed_cell})
+		freed_cell = seg_old
+	# freed_cell is now the vacated tail-tip cell — the refill's job.
+	if instant or not is_inside_tree():
+		head.position = cell_center(target)
+		for m in moves:
+			m.card.position = cell_center(m.cell)
+	else:
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(head, "position", cell_center(target), 0.35) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		for m in moves:
+			tw.tween_property(m.card, "position", cell_center(m.cell), 0.35) \
 					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-		return
+		await tw.finished
+	return true
 
 
-## Head cleared with tail remaining: pop the newest segment, revert the
-## head's identity to the previous meal, and stun him for a hand.
+## Head cleared with body remaining: the tail tip crumbles, the head's
+## identity reverts to the previous meal, and he's stunned for a hand.
 func _cobra_revert(head: PlayingCard) -> void:
 	head.stunned = true
-	var newest: Vector2i
-	var best := -1
-	for p in grid:
-		if grid[p].snake_tail and grid[p].tail_order > best:
-			best = grid[p].tail_order
-			newest = p
-	if best >= 0:
-		var seg: PlayingCard = grid[newest]
-		grid.erase(newest)
-		if seg.is_inside_tree():
-			seg.queue_free()
+	if not head.cobra_body.is_empty():
+		var tip: PlayingCard = head.cobra_body.pop_back()
+		grid.erase(tip.grid_pos)
+		if tip.is_inside_tree():
+			tip.queue_free()
 		else:
-			seg.free()
+			tip.free()
 	if not head.cobra_stack.is_empty():
 		var identity: Dictionary = head.cobra_stack.pop_back()
 		head.rank = identity.rank
@@ -1129,9 +1156,11 @@ func tick_boss() -> void:
 			if b.stunned:
 				b.stunned = false
 			else:
-				_cobra_eat(b, false)
-				_play_sound(SFX_FLIP, 0.5, -8.0)
-				await get_tree().create_timer(0.4, false).timeout
+				var moved: bool = await _cobra_eat(b, false)
+				if moved:
+					_play_sound(SFX_FLIP, 0.5, -8.0)
+					# The tail tip vacated a cell — deal into the gap.
+					await _fall_and_fill(false)
 	busy = false
 
 
