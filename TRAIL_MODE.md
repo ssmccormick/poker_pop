@@ -33,11 +33,14 @@ bosses, regions.
   conversion, but difficulty modifiers stack on (steeper targets,
   faster blind escalation, meaner cursed-card injections, pricier
   shops — exact modifier list TBD). Names/numbers draft:
-  | Table | Cost | Starting chips | Cash-out rate | Difficulty mods |
+  | Table | Cost | Starting chips | Cash-out rate | Difficulty |
   | --- | --- | --- | --- | --- |
-  | Penny Ante | Free | 100 | ×1 | none |
-  | Table Stakes | $50 cash | 250 | ×1.5 | +1 modifier |
-  | High Roller | $200 cash | 500 | ×2.5 | +2 modifiers |
+  | Penny Ante | Free | 100 | ×1 | baseline |
+  | Table Stakes | $250 cash | 250 | ×1.5 | steeper targets/blinds, +hazards |
+  | High Roller | $1000 cash | 500 | ×2.5 | steepest, most hazards, Dealer finale |
+  **Boss rooms are ALL-IN**: no bet choice — the whole stack rides at
+  3:1. Shops never restock within a room, and the burn service costs
+  more with every use (once per shop).
 - **Per-room wager**: each tarot card prints the room's target, rules,
   **odds**, and its **minimum buy-in**. Bet UI is chip presets
   (**Min / 2× / 5× / ALL IN**) plus a **free slider** for exact
@@ -124,13 +127,17 @@ detection/reshuffles will lie.
 - Shops sell removal ("burn a card") — pricier than buying. Deck size
   has no cap; bloat is self-punishing.
 
-## Hazard cards (SHIPPED)
+## Hazard cards (SHIPPED — reworked after playtest round 1)
 
-Hazards are ROOM TYPES on the tarot draw — the card shows the danger
-before you bet, and hazard rooms pay better odds. Hazards are states on
-normal rank/suit cards, seeded on the initial deal. One hazard per
-card; refill-dealt cards are never hazarded. Hazards tick only on
-scoring hands, after the board settles.
+Hazards are AMBIENT: the tarot decides only a room's GOAL (target /
+heist / treasure / boss), while hazards seed randomly into EVERY play
+room — bosses included — with no warning and no odds compensation.
+Chance = 20% + 4%/room + 15%/buy-in tier (cap 95%); count = 1 + 1 per
+region (High Roller adds another half the time, cap 4), with mixed
+hazard types coexisting. The old hazard tarot cards (DEATH etc.) are
+retired. Hazards are states on normal rank/suit cards, one per card;
+refill-dealt cards are never hazarded; ticks happen only on scoring
+hands, after the board settles.
 
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |
@@ -271,12 +278,11 @@ which makes deck sculpting the boss prep (stock queens before room 14).
   card. (Hand budget ~18 — needs playtest tuning, 10 pins is a chase.)
 - **QUEEN BEE** (room 14) — **3 stripes** (HP); she and her honey can
   only be caught in **2–3 card hands** (the honey is sticky, and so is
-  she — she's a Queen, so catching her means pairing queens). Honey
-  rhythm alternates: odd hands she SPAWNS a honey card (converts a
-  card near the hive — honey keeps its rank/suit and falls normally
-  with gravity; the stickiness is purely that only 2–3 card hands can
-  clear it); even hands the honey MOVES to different cards. Each catch
-  removes a stripe.
+  she — she's a Queen, so catching her means pairing queens). Her
+  rhythm alternates: one turn she MOVES (steps into an adjacent cell),
+  the next she HONEYS a card adjacent to her. Honey keeps its
+  rank/suit, falls normally, and STAYS honeyed until cleared. Each
+  catch removes a stripe.
 - **KING COBRA** (room 21) — the boss card is his HEAD, spawning with
   a random identity and a **2-segment tail** (the "already eaten"
   cards, identities stored). Each hand he slithers: eats an adjacent

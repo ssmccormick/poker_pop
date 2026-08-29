@@ -21,8 +21,8 @@ const BOSSES := {
 # target multiplier, blind multiplier]
 const TABLES := [
 	{"name": "PENNY ANTE", "cost": 0, "chips": 100, "rate": 1.0, "target_mult": 1.0, "blind_mult": 1.0},
-	{"name": "TABLE STAKES", "cost": 50, "chips": 250, "rate": 1.5, "target_mult": 1.35, "blind_mult": 1.5},
-	{"name": "HIGH ROLLER", "cost": 200, "chips": 500, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
+	{"name": "TABLE STAKES", "cost": 250, "chips": 250, "rate": 1.5, "target_mult": 1.35, "blind_mult": 1.5},
+	{"name": "HIGH ROLLER", "cost": 1000, "chips": 500, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
 ]
 
 # Room risk tiers offered by the tarot draw.
@@ -32,18 +32,15 @@ const RISKS := [
 	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7, "bet_scale": 1.5},
 ]
 
-# Hazard rooms: better odds, a board full of trouble. From room 2 on,
-# some play offers become hazard rooms.
-const HAZARD_CHANCE := 0.35
+# Hazards are AMBIENT: any play room (bosses included) can be seeded,
+# with the chance and count climbing with depth and table stakes. The
+# tarot decides only the room's GOAL.
+const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
+const HAZARD_BASE_CHANCE := 0.20
+const HAZARD_ROOM_STEP := 0.04   # + per room index
+const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
 const OBJECTIVE_CHANCE := 0.18   # heist/treasure rooms, from room 2 on
 const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
-const HAZARD_ROOMS := [
-	{"tarot": "DEATH", "label": "Bomb", "hazard": "bomb", "odds": 2.0, "hands": 8, "count": 1},
-	{"tarot": "THE DEVIL", "label": "Fire", "hazard": "fire", "odds": 2.0, "hands": 8, "count": 2},
-	{"tarot": "THE CHARIOT", "label": "Wind", "hazard": "wind", "odds": 1.5, "hands": 8, "count": 2},
-	{"tarot": "STRENGTH", "label": "Stone", "hazard": "stone", "odds": 1.5, "hands": 8, "count": 3},
-	{"tarot": "TEMPERANCE", "label": "Water", "hazard": "water", "odds": 1.5, "hands": 8, "count": 2},
-]
 
 const BASE_TARGET := 300          # room 1 target before scaling
 const TARGET_STEP := 65           # + per room (21-room curve)
@@ -51,9 +48,10 @@ const REGION_BLINDS := [10, 25, 50]
 const SHOP_CARD_PRICE := 40       # plain card
 const SHOP_DUP_PRICE := 50        # exact duplicate of a card you own
 const SHOP_MOD_PRICE := 80        # chip/mult enhanced card
-const SHOP_REMOVE_PRICE := 30
-const PICK_MOD_CHANCE := 0.10     # card picks: chance of an enhanced offer
-const SHOP_MOD_CHANCE := 0.20     # shop slots: chance of an enhanced card
+const SHOP_REMOVE_PRICE := 30     # first burn; climbs every use
+const SHOP_REMOVE_STEP := 25      # + per burn used this run
+const PICK_MOD_CHANCE := 0.25     # card picks: chance of an enhanced offer
+const SHOP_MOD_CHANCE := 0.35     # shop slots: chance of an enhanced card
 const FATE_KICKER := 15           # chips for trusting The Fool
 const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
 const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
@@ -100,8 +98,13 @@ var room_target := 0
 var room_goal := ""      # "" score target · "safe" heist · "chest" treasure
 var room_combo: Array = []
 var relics: Array = []   # relic ids held this run
+var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
 var _fire_tick_flip := false
+var _shop_stock: Array = []      # this shop room's shelves (no restocking)
+var _shop_stock_room := -1
+var _shop_stock_relic := ""
+var _shop_burned_here := false   # one burn per shop
 var current_offer := {}
 var stake := 0
 var _offers: Array = []
@@ -130,7 +133,6 @@ var _remove_grid: GridContainer
 var _remove_info: Label
 var _end_label: Label
 var _shop_relic_btn: Button
-var _shop_relic_id := ""
 var _shop_burn_btn: Button
 var _tarot_relics: Label
 
@@ -184,6 +186,7 @@ func _save_run() -> void:
 		relic_arr.append(id)
 	cf.set_value("run", "relics", relic_arr)
 	cf.set_value("run", "second_wind_used", _second_wind_used)
+	cf.set_value("run", "burns_used", burns_used)
 	cf.save(RUN_PATH)
 
 
@@ -214,6 +217,8 @@ func _load_run() -> bool:
 	for id in cf.get_value("run", "relics", PackedStringArray()):
 		relics.append(String(id))
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
+	burns_used = int(cf.get_value("run", "burns_used", 0))
+	_shop_stock_room = -1  # resumed runs sit at a tarot, never mid-shop
 	run_active = true
 	return true
 
@@ -323,8 +328,10 @@ func _start_run(tier: int) -> void:
 	deck = _fresh_deck()
 	room_index = 0
 	relics.clear()
+	burns_used = 0
 	_second_wind_used = false
 	_fire_tick_flip = false
+	_shop_stock_room = -1
 	run_active = true
 	main.score = 0
 	_apply_relic_effects()
@@ -396,31 +403,19 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		if randf() < 0.15:
 			return {"kind": "shop", "tarot": "THE HERMIT"}
 		risk = RISKS.pick_random()
+	var region := room_index / REGION_SIZE
 	var offer := {
 		"kind": "play",
 		"tarot": risk.tarot,
 		"label": risk.label,
 		"target": _target_for(room_index, risk),
-		"hands": int(risk.hands),
+		# Rooms tighten with depth: one fewer hand per region.
+		"hands": maxi(5, int(risk.hands) - region),
 		"odds": float(risk.odds),
 		# Never demand more than the player holds (forces all-in instead).
 		"min_bet": mini(int(_blind_for(room_index) * risk.bet_scale), chips),
 	}
-	# Some offers turn hazardous: risky-tier target, hazard on the board.
-	if room_index >= 1 and randf() < HAZARD_CHANCE:
-		var hz: Dictionary = HAZARD_ROOMS.pick_random()
-		offer.tarot = hz.tarot
-		offer.label = hz.label
-		offer.odds = float(hz.odds)
-		offer.hands = int(hz.hands)
-		offer.target = _target_for(room_index, RISKS[1])
-		offer.min_bet = mini(_blind_for(room_index), chips)
-		offer["hazard"] = hz.hazard
-		var count: int = hz.count
-		if hz.hazard == "bomb" and room_index >= REGION_SIZE * 2:
-			count += 1  # late-trail bomb rooms mean business
-		offer["hazard_count"] = count
-	elif room_index >= 1 and randf() < OBJECTIVE_CHANCE:
+	if room_index >= 1 and randf() < OBJECTIVE_CHANCE:
 		# Objective rooms: no score target — do the job to clear.
 		if randf() < 0.5:
 			offer.tarot = "THE MOON"
@@ -432,7 +427,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer.label = "Treasure"
 			offer.odds = 1.5
 			offer["goal"] = "chest"
-		offer.hands = 8
+		offer.hands = maxi(5, 8 - region)
 		offer.target = 0
 		offer.min_bet = mini(_blind_for(room_index), chips)
 	return offer
@@ -478,10 +473,6 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 	if offer.kind == "shop":
 		b.text = "THE HERMIT\n\nSHOP\n\nBuy cards\nBurn cards\n\nNo bet"
 	else:
-		var hazard_line := ""
-		if offer.has("hazard"):
-			hazard_line = "\nHAZARD: %d × %s" % [offer.hazard_count,
-					String(offer.hazard).to_upper()]
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
 			goal_line = "BOSS FIGHT"
@@ -489,9 +480,12 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			goal_line = "CRACK THE SAFE"
 		elif offer.get("goal", "") == "chest":
 			goal_line = "OPEN THE CHEST"
-		b.text = "%s\n\n%s room%s\n%s\nHands  %d\nOdds  %s\n\nMin bet  %d" % [
-			offer.tarot, offer.label, hazard_line, goal_line, offer.hands,
-			_odds_text(offer.odds), offer.min_bet]
+		var bet_line := "Min bet  %d" % offer.min_bet
+		if offer.has("boss"):
+			bet_line = "ALL IN"
+		b.text = "%s\n\n%s room\n%s\nHands  %d\nOdds  %s\n\n%s" % [
+			offer.tarot, offer.label, goal_line, offer.hands,
+			_odds_text(offer.odds), bet_line]
 	return b
 
 
@@ -510,6 +504,11 @@ func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
 	tarot_layer.visible = false
 	if offer.kind == "shop":
 		_show_shop()
+	elif offer.has("boss"):
+		# The house demands everything at a boss table.
+		stake = chips
+		chips = 0
+		_start_room()
 	else:
 		_show_bet()
 
@@ -582,18 +581,10 @@ func _seed_room_specials() -> void:
 		await get_tree().process_frame
 	if not in_room:
 		return
+	# The tarot decided the GOAL; seed it first.
 	if current_offer.has("boss"):
 		main.board.spawn_boss(current_offer.boss)
 		main._announce(String(BOSSES[current_offer.boss].name).to_upper(), main.RED)
-	elif current_offer.has("hazard"):
-		main.board.apply_room_hazards(current_offer.hazard, current_offer.hazard_count)
-		# Relic adjustments to freshly-seeded hazards.
-		for p in main.board.grid:
-			var card: PlayingCard = main.board.grid[p]
-			if card.hazard == "bomb" and has_relic("bomb_badge"):
-				card.fuse += 2
-			elif card.hazard == "stone" and has_relic("chisel"):
-				card.stone_hits = Board.STONE_HITS_START - 1
 	elif room_goal == "safe":
 		room_combo = _generate_combo()
 		main.board.spawn_safe(room_combo)
@@ -606,6 +597,24 @@ func _seed_room_specials() -> void:
 			main.board.spawn_safe(room_combo)
 		else:
 			main.board.spawn_key_and_chest()
+	# Hazards are ambient in EVERY play room — bosses included — and
+	# get more frequent and more numerous with depth and stakes.
+	var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * room_index
+			+ HAZARD_TIER_STEP * table_tier, 0.0, 0.95)
+	if randf() < hz_chance:
+		var count := 1 + room_index / REGION_SIZE
+		if table_tier == 2 and randf() < 0.5:
+			count += 1
+		count = mini(count, 4)
+		for i in count:
+			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
+		# Relic adjustments to freshly-seeded hazards.
+		for p in main.board.grid:
+			var card: PlayingCard = main.board.grid[p]
+			if card.hazard == "bomb" and has_relic("bomb_badge"):
+				card.fuse = Board.BOMB_FUSE + 2
+			elif card.hazard == "stone" and has_relic("chisel"):
+				card.stone_hits = Board.STONE_HITS_START - 1
 
 
 ## A 4-digit combination drawn from low ranks present on the board.
@@ -865,25 +874,42 @@ func _shop_card_offer() -> Dictionary:
 			"cursed": false, "mod": ""}, "price": _price(SHOP_CARD_PRICE)}
 
 
+## The Hermit's price for the next burn — it climbs with every use.
+func _burn_price() -> int:
+	return _price(SHOP_REMOVE_PRICE + SHOP_REMOVE_STEP * burns_used)
+
+
 func _show_shop() -> void:
 	_hide_all()
 	main.game_started = false
+	# Stock is fixed per shop room: no restocking by leaving/burning.
+	if _shop_stock_room != room_index:
+		_shop_stock = []
+		for i in 10:
+			var o := _shop_card_offer()
+			o["bought"] = false
+			_shop_stock.append(o)
+		_shop_stock_relic = _unowned_relic()
+		_shop_burned_here = false
+		_shop_stock_room = room_index
 	_shop_info.text = "CHIPS  %d" % chips
-	_shop_burn_btn.text = "BURN A CARD — %d chips" % _price(SHOP_REMOVE_PRICE)
-	# Relic slot: one unowned relic per visit.
-	_shop_relic_id = _unowned_relic()
-	if _shop_relic_id == "" or relics.size() >= MAX_RELICS:
+	_shop_burn_btn.text = "BURN A CARD — %d chips" % _burn_price()
+	_shop_burn_btn.disabled = _shop_burned_here
+	if _shop_burned_here:
+		_shop_burn_btn.text = "THE FORGE IS COLD (one burn per shop)"
+	if _shop_stock_relic == "" or relics.size() >= MAX_RELICS \
+			or relics.has(_shop_stock_relic):
 		_shop_relic_btn.text = "NO RELICS IN STOCK"
 		_shop_relic_btn.disabled = true
 	else:
-		var r: Dictionary = RELICS[_shop_relic_id]
+		var r: Dictionary = RELICS[_shop_stock_relic]
 		_shop_relic_btn.text = "RELIC: %s — %d chips\n%s" % [r.name,
 				_price(RELIC_PRICES[r.rarity]), r.desc]
 		_shop_relic_btn.disabled = false
 	for child in _shop_box.get_children():
 		child.queue_free()
-	for i in 10:
-		var offer := _shop_card_offer()
+	for i in _shop_stock.size():
+		var offer: Dictionary = _shop_stock[i]
 		var col := i % 5
 		var row := i / 5
 		var holder: Button = main._button(_shop_box, "",
@@ -901,13 +927,18 @@ func _show_shop() -> void:
 				Vector2(0, 212), 18, main.GOLD)
 		price_tag.size = Vector2(170, 30)
 		price_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		var data: Dictionary = offer.data
+		if offer.bought:
+			holder.disabled = true
+			price_tag.text = "SOLD"
+		var slot := offer
 		holder.pressed.connect(func() -> void:
-			if chips >= price:
+			if not slot.bought and chips >= price:
 				chips -= price
-				deck.append(data)
+				slot.bought = true
+				deck.append(slot.data)
 				main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
 				holder.disabled = true
+				price_tag.text = "SOLD"
 				_shop_info.text = "CHIPS  %d" % chips
 				_save_run())
 	shop_layer.visible = true
@@ -924,7 +955,7 @@ func _leave_shop() -> void:
 
 func _show_remove() -> void:
 	shop_layer.visible = false
-	_remove_info.text = "Pick a card to burn — %d chips" % _price(SHOP_REMOVE_PRICE)
+	_remove_info.text = "Pick a card to burn — %d chips (one per shop)" % _burn_price()
 	for child in _remove_grid.get_children():
 		child.queue_free()
 	for i in deck.size():
@@ -941,8 +972,10 @@ func _show_remove() -> void:
 		holder.add_child(pc)
 		var idx := i
 		holder.pressed.connect(func() -> void:
-			if chips >= _price(SHOP_REMOVE_PRICE):
-				chips -= _price(SHOP_REMOVE_PRICE)
+			if chips >= _burn_price() and not _shop_burned_here:
+				chips -= _burn_price()
+				burns_used += 1
+				_shop_burned_here = true
 				deck.remove_at(idx)
 				main.board._play_sound(Board.SFX_POPS.pick_random(), 1.0, -8.0)
 				_save_run()
@@ -1049,13 +1082,14 @@ func build_ui() -> void:
 	_shop_relic_btn = main._button(shop_layer, "", Vector2(125, 840), Vector2(380, 76))
 	_shop_relic_btn.add_theme_font_size_override("font_size", 16)
 	_shop_relic_btn.pressed.connect(func() -> void:
-		if _shop_relic_id == "":
+		if _shop_stock_relic == "":
 			return
-		var cost := _price(RELIC_PRICES[RELICS[_shop_relic_id].rarity])
+		var cost := _price(RELIC_PRICES[RELICS[_shop_stock_relic].rarity])
 		if chips >= cost and relics.size() < MAX_RELICS:
 			chips -= cost
-			_gain_relic(_shop_relic_id)
+			_gain_relic(_shop_stock_relic)
 			main.board._play_sound(Board.SFX_SHUFFLE, 1.3, -8.0)
+			_shop_stock_relic = ""
 			_shop_relic_btn.disabled = true
 			_shop_info.text = "CHIPS  %d" % chips)
 	_shop_burn_btn = main._button(shop_layer, "", Vector2(555, 850), Vector2(380, 56))

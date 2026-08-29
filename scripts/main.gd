@@ -181,8 +181,7 @@ func _ready() -> void:
 				trail._start_run(0)
 				trail.room_index = 20  # King Cobra's table
 				trail._show_tarot()
-				trail._choose_offer(trail._offers[0], false)
-				trail._confirm_bet()
+				trail._choose_offer(trail._offers[0], false)  # bosses auto all-in
 			"ready":
 				_start_mode("arcade")
 			"time":

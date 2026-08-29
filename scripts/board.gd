@@ -1064,40 +1064,46 @@ func tick_boss() -> void:
 			b.suit = randi_range(0, 3)
 			_play_sound(SFX_SHUFFLE, 1.4, -10.0)
 		"queen":
-			# Alternating: spawn honey near the hive / relocate the honey.
+			# Alternating rhythm: she MOVES one turn, then HONEYS a card
+			# adjacent to her the next. Honey is permanent until cleared.
 			b.stunned = not b.stunned  # reuse as the rhythm flip
 			if b.stunned:
-				var near: Array = []
-				var anywhere: Array = []
-				for p in grid:
-					var card: PlayingCard = grid[p]
+				# Honey turn: coat a random orthogonal neighbor.
+				var dirs := HAZARD_DIRS.duplicate()
+				dirs.shuffle()
+				for d in dirs:
+					var q: Vector2i = b.grid_pos + d
+					if not grid.has(q):
+						continue
+					var card: PlayingCard = grid[q]
 					if card.boss == "" and not card.honey and card.hazard == "" \
 							and not card.cursed and not card.is_safe:
-						anywhere.append(card)
-						var d: Vector2i = (p - b.grid_pos).abs()
-						if maxi(d.x, d.y) <= 2:
-							near.append(card)
-				var pool: Array = near if not near.is_empty() else anywhere
-				if not pool.is_empty():
-					pool.pick_random().honey = true
-					_play_sound(SFX_FLIP, 0.8, -10.0)
-			else:
-				var honeys: Array = []
-				var plains: Array = []
-				for p in grid:
-					var card: PlayingCard = grid[p]
-					if card.honey:
-						honeys.append(card)
-					elif card.boss == "" and card.hazard == "" \
-							and not card.cursed and not card.is_safe:
-						plains.append(card)
-				plains.shuffle()
-				for h in honeys:
-					if plains.is_empty():
+						card.honey = true
+						_play_sound(SFX_FLIP, 0.8, -10.0)
 						break
-					h.honey = false
-					var target: PlayingCard = plains.pop_back()
-					target.honey = true
+			else:
+				# Move turn: the queen steps into an adjacent cell (swap).
+				var dirs := HAZARD_DIRS.duplicate()
+				dirs.shuffle()
+				for d in dirs:
+					var q: Vector2i = b.grid_pos + d
+					if not grid.has(q):
+						continue
+					var other: PlayingCard = grid[q]
+					if other.boss != "" or other.is_safe or other.snake_tail:
+						continue
+					var b_cell := b.grid_pos
+					grid[q] = b
+					grid[b_cell] = other
+					b.grid_pos = q
+					other.grid_pos = b_cell
+					var tw := create_tween().set_parallel(true)
+					tw.tween_property(b, "position", cell_center(q), 0.3) \
+							.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+					tw.tween_property(other, "position", cell_center(b_cell), 0.3) \
+							.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+					await tw.finished
+					break
 		"cobra":
 			if b.stunned:
 				b.stunned = false
