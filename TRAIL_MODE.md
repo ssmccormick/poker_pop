@@ -1,8 +1,8 @@
 # TRAIL MODE — Design Doc
 
 Status: **v1 skeleton SHIPPED** (scripts/trail.gd): buy-in tables,
-tarot room draws with risk tiers (Sun/Wheel/Tower), full betting loop
-with presets + slider, cash-out, fail-forward with Cursed scars,
+tarot room draws with risk tiers (Sun/Wheel/Tower), forced stakes by
+difficulty, cash-out, fail-forward with Cursed scars,
 1-of-3 card picks with duplicate weighting, Hermit shops (buy/burn),
 bankruptcy/complete/cash-out endings, run + cash persistence.
 Still to build: bosses (court + Dealer duel), room-rule variety
@@ -41,15 +41,18 @@ bosses, regions.
   **Boss rooms are ALL-IN**: no bet choice — the whole stack rides at
   3:1. Shops never restock within a room, and the burn service costs
   more with every use (once per shop).
-- **Per-room wager**: each tarot card prints the room's target, rules,
-  **odds**, and its **minimum buy-in**. Bet UI is chip presets
-  (**Min / 2× / 5× / ALL IN**) plus a **free slider** for exact
-  amounts. Clear → stake × odds returned. Fail → stake lost, ride on.
+- **Per-room wager — the table sets the terms**: each tarot card
+  prints the room's target, rules, **odds**, and its **forced stake**.
+  There is no free bet: Steady/Risky/Treasure tables demand **HALF
+  YOUR STACK** (floored at the region blind), Dangerous/Heist tables
+  and bosses demand **ALL IN**. Higher odds always mean a bigger
+  forced bet — picking a tarot card IS the wager. Clear → stake × odds
+  returned. Fail → stake lost, ride on.
 - **Odds by room risk** (draft): Normal 1:1 · Timed/Tight 3:2 ·
   Constraint rooms 2:1 · Elite 3:1 · Boss 4:1.
-- **Blinds escalate**: the minimum bet rises each region (poker blinds
-  structure) — late trail, you can't limp. Can't cover the min bet =
-  busted = run over.
+- **Blinds escalate**: the blind rises each region (poker blinds
+  structure) and floors the half-stack stake — late trail, you can't
+  limp. Zero chips = busted = run over.
 - **Cash out**: between any two rooms, walk away — convert remaining
   chips to cash at the buy-in's rate. Finishing the whole trail (beating
   the Dealer) cashes out at a premium multiplier plus a completion purse.
@@ -346,7 +349,8 @@ saves).
 - Run length → 20–60 min, player-controlled via cash-out.
 - Card picks → after every room, skippable, removal in shops.
 - Premium buy-ins → harder AND richer (stake-style modifiers).
-- Bet UX → presets (Min/2×/5×/ALL IN) + free slider; per-room min bets
+- Bet UX → forced stakes by difficulty (half stack / all-in), no free
+  slider (playtest round 2); per-room min bets
   printed on the tarot cards.
 - Bosses → court cards revived (JoAT/Queen Bee/King Cobra) + Dealer
   finale as heads-up duel with mirror counter-rules.

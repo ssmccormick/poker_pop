@@ -27,9 +27,9 @@ const TABLES := [
 
 # Room risk tiers offered by the tarot draw.
 const RISKS := [
-	{"tarot": "THE SUN", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10, "bet_scale": 1.0},
-	{"tarot": "WHEEL OF FORTUNE", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8, "bet_scale": 1.0},
-	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7, "bet_scale": 1.5},
+	{"tarot": "THE SUN", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10, "stake": "half"},
+	{"tarot": "WHEEL OF FORTUNE", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8, "stake": "half"},
+	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7, "stake": "all"},
 ]
 
 # Hazards are AMBIENT: any play room (bosses included) can be seeded,
@@ -126,7 +126,6 @@ var _tarot_info: Label
 var _tarot_cards_box: Control
 var _tarot_cashout_btn: Button
 var _bet_info: Label
-var _bet_slider: HSlider
 var _bet_stake_label: Label
 var _pick_box: Control
 var _shop_info: Label
@@ -427,8 +426,10 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		# Rooms tighten with depth: one fewer hand per region.
 		"hands": maxi(5, int(risk.hands) - region),
 		"odds": float(risk.odds),
-		# Never demand more than the player holds (forces all-in instead).
-		"min_bet": mini(int(_blind_for(room_index) * risk.bet_scale), chips),
+		# Fate sets the stake: dangerous tables take everything, the rest
+		# take half your stack (but never less than the table blind).
+		"stake_mode": String(risk.stake),
+		"min_bet": mini(_blind_for(room_index), chips),
 	}
 	if room_index >= 1 and randf() < OBJECTIVE_CHANCE:
 		# Objective rooms: no score target — do the job to clear.
@@ -437,11 +438,13 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer.label = "Heist"
 			offer.odds = 2.0
 			offer["goal"] = "safe"
+			offer.stake_mode = "all"
 		else:
 			offer.tarot = "THE STAR"
 			offer.label = "Treasure"
 			offer.odds = 1.5
 			offer["goal"] = "chest"
+			offer.stake_mode = "half"
 		offer.hands = maxi(5, 8 - region)
 		offer.target = 0
 		offer.min_bet = mini(_blind_for(room_index), chips)
@@ -495,8 +498,8 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			goal_line = "CRACK THE SAFE"
 		elif offer.get("goal", "") == "chest":
 			goal_line = "OPEN THE CHEST"
-		var bet_line := "Min bet  %d" % offer.min_bet
-		if offer.has("boss"):
+		var bet_line := "BET: HALF STACK"
+		if offer.has("boss") or offer.get("stake_mode", "half") == "all":
 			bet_line = "ALL IN"
 		b.text = "%s\n\n%s table\n%s\nHands  %d\nOdds  %s\n\n%s" % [
 			offer.tarot, offer.label, goal_line, offer.hands,
@@ -538,6 +541,14 @@ func _do_cashout() -> void:
 
 # --- Flow: betting --------------------------------------------------------
 
+## The table dictates the stake: "all" mode takes the whole stack,
+## "half" takes half of it, floored at the table blind.
+func _stake_for(offer: Dictionary) -> int:
+	if offer.get("stake_mode", "half") == "all":
+		return chips
+	return clampi(maxi(int(ceilf(chips / 2.0)), int(offer.get("min_bet", 1))), 1, chips)
+
+
 func _show_bet() -> void:
 	_hide_all()
 	var o := current_offer
@@ -546,21 +557,16 @@ func _show_bet() -> void:
 	var retry_line := ""
 	if not pending_retry.is_empty():
 		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust."
-	_bet_info.text = "%s — %s table\nTarget %d in %d hands   ·   odds %s\nYour chips: %d   ·   minimum bet: %d%s" % [
-		o.tarot, o.label, o.target, o.hands, _odds_text(o.odds), chips, o.min_bet,
+	stake = _stake_for(o)
+	var demand := "HALF YOUR STACK"
+	if stake >= chips:
+		demand = "ALL IN"
+	_bet_info.text = "%s — %s table\nTarget %d in %d hands   ·   odds %s\nThe table demands %s\nYour chips: %d%s" % [
+		o.tarot, o.label, o.target, o.hands, _odds_text(o.odds), demand, chips,
 		retry_line]
-	_bet_slider.min_value = o.min_bet
-	_bet_slider.max_value = chips
-	_bet_slider.value = o.min_bet
-	_update_stake_label()
+	_bet_stake_label.text = "STAKE  %d      win pays back %d" % [
+		stake, stake + int(stake * o.odds)]
 	bet_layer.visible = true
-
-
-func _update_stake_label() -> void:
-	stake = int(_bet_slider.value)
-	var o := current_offer
-	var win_total := stake + int(stake * o.odds)
-	_bet_stake_label.text = "STAKE  %d      win pays back %d" % [stake, win_total]
 
 
 func _confirm_bet() -> void:
@@ -1061,28 +1067,10 @@ func build_ui() -> void:
 	_back_button(tarot_layer, back_to_menu, "MENU")
 
 	bet_layer = _layer()
-	_screen_title(bet_layer, "PLACE YOUR BET")
-	_bet_info = _center(bet_layer, "", 250, 26, main.OFFWHITE)
-	_bet_slider = HSlider.new()
-	_bet_slider.position = Vector2(560, 450)
-	_bet_slider.size = Vector2(800, 48)
-	_bet_slider.step = 1
-	_bet_slider.value_changed.connect(func(_v: float) -> void:
-		_update_stake_label())
-	_style_bet_slider(_bet_slider)
-	bet_layer.add_child(_bet_slider)
-	_bet_stake_label = _center(bet_layer, "", 520, 32, main.GOLD)
-	var presets := [["MIN", 1.0], ["2×", 2.0], ["5×", 5.0], ["ALL IN", -1.0]]
-	for i in presets.size():
-		var p: Array = presets[i]
-		var b: Button = main._button(bet_layer, p[0], Vector2(660 + i * 160, 600), Vector2(140, 56))
-		b.add_theme_font_size_override("font_size", 22)
-		var mult: float = p[1]
-		b.pressed.connect(func() -> void:
-			if mult < 0.0:
-				_bet_slider.value = _bet_slider.max_value
-			else:
-				_bet_slider.value = _bet_slider.min_value * mult)
+	_screen_title(bet_layer, "THE STAKES")
+	_bet_info = _center(bet_layer, "", 280, 26, main.OFFWHITE)
+	_bet_stake_label = _center(bet_layer, "", 500, 40, main.GOLD)
+	_center(bet_layer, "The table sets the terms. Take them or walk.", 590, 20, main.DIM)
 	var deal: Button = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70))
 	deal.add_theme_font_size_override("font_size", 28)
 	deal.pressed.connect(_confirm_bet)
@@ -1185,40 +1173,6 @@ func _center(parent: Control, text: String, y: float, font_size: int, color: Col
 
 ## Chunky, casino-visible slider: thick gold-rimmed track, gold fill,
 ## and a fat round knob (drawn to a texture in code — no assets).
-func _style_bet_slider(slider: HSlider) -> void:
-	var track := StyleBoxFlat.new()
-	track.bg_color = Color("242424")
-	track.border_color = Color("6b5a2a")
-	track.set_border_width_all(2)
-	track.set_corner_radius_all(8)
-	track.content_margin_top = 10
-	track.content_margin_bottom = 10
-	slider.add_theme_stylebox_override("slider", track)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = main.GOLD
-	fill.set_corner_radius_all(8)
-	fill.content_margin_top = 10
-	fill.content_margin_bottom = 10
-	slider.add_theme_stylebox_override("grabber_area", fill)
-	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
-	# Knob texture: gold disc with a dark rim.
-	var size := 34
-	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
-	var c := (size - 1) / 2.0
-	for y in size:
-		for x in size:
-			var d := Vector2(x - c, y - c).length()
-			if d <= c - 0.5:
-				if d >= c - 4.0:
-					img.set_pixel(x, y, Color("6b5a2a"))
-				else:
-					img.set_pixel(x, y, main.GOLD)
-	var knob := ImageTexture.create_from_image(img)
-	slider.add_theme_icon_override("grabber", knob)
-	slider.add_theme_icon_override("grabber_highlight", knob)
-	slider.add_theme_icon_override("grabber_disabled", knob)
-
-
 func _back_button(parent: Control, action: Callable, text := "BACK") -> Button:
 	var b: Button = main._button(parent, text, Vector2(60, 970), Vector2(200, 54))
 	b.add_theme_font_size_override("font_size", 20)
