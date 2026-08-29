@@ -273,9 +273,10 @@ which makes deck sculpting the boss prep (stock queens before room 14).
   only be caught in **2–3 card hands** (the honey is sticky, and so is
   she — she's a Queen, so catching her means pairing queens). Honey
   rhythm alternates: odd hands she SPAWNS a honey card (converts a
-  card near the hive — honey keeps its rank/suit, never falls, and
-  only 2–3 card hands can clear it); even hands the honey MOVES to
-  different cards. Each catch removes a stripe.
+  card near the hive — honey keeps its rank/suit and falls normally
+  with gravity; the stickiness is purely that only 2–3 card hands can
+  clear it); even hands the honey MOVES to different cards. Each catch
+  removes a stripe.
 - **KING COBRA** (room 21) — the boss card is his HEAD, spawning with
   a random identity and a **2-segment tail** (the "already eaten"
   cards, identities stored). Each hand he slithers: eats an adjacent
