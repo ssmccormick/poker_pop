@@ -124,7 +124,7 @@ detection/reshuffles will lie.
 - Shops sell removal ("burn a card") — pricier than buying. Deck size
   has no cap; bloat is self-punishing.
 
-## Hazard cards (rules locked, build pending)
+## Hazard cards (SHIPPED)
 
 Hazards are ROOM TYPES on the tarot draw — the card shows the danger
 before you bet, and hazard rooms pay better odds. Hazards are states on

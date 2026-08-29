@@ -46,6 +46,12 @@ var single_deck := false  # deck never reshuffles; the board runs dry
 # list ({rank, suit, cursed}) instead of a standard 52.
 var custom_deck: Array = []
 
+# --- Trail hazards --------------------------------------------------------
+const BOMB_FUSE := 5
+const STONE_HITS_START := 3
+const HAZARD_DIRS: Array[Vector2i] = [
+	Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+
 var grid := {}  # Vector2i -> PlayingCard
 var deck: Array = []
 var selected: Array[PlayingCard] = []
@@ -232,10 +238,16 @@ func clear_selection() -> void:
 
 
 ## Green borders whenever the current chain is a submittable hand.
+## A washed (soaked) card in the chain suppresses the green tell — no
+## free probing of hidden identities.
 func _update_hand_validity() -> void:
 	var valid := false
 	if not selected.is_empty():
 		valid = Poker.evaluate(get_selected_data()).playable
+		for card in selected:
+			if card.washed:
+				valid = false
+				break
 	for card in selected:
 		card.hand_valid = valid
 
@@ -268,26 +280,81 @@ func play_hand() -> void:
 	center /= played.size()
 	_spawn_float_text("+%d" % result.score, center)
 
-	var tw := create_tween().set_parallel(true)
-	for i in played.size():
-		var card: PlayingCard = played[i]
-		var delay := 0.06 * i
-		grid.erase(card.grid_pos)
-		card.selected = false
-		tw.tween_property(card, "scale", Vector2.ZERO, 0.2) \
-				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN).set_delay(delay)
-		tw.tween_property(card, "rotation", randf_range(-0.7, 0.7), 0.2).set_delay(delay)
-		tw.tween_callback(_play_pop.bind(1.0 + 0.08 * i + randf_range(-0.04, 0.04))) \
-				.set_delay(delay + 0.1)
-	await tw.finished
+	# Partition: stones with uses left stay on the board; wind and water
+	# effects are snapshotted before their cells change.
+	var poppers: Array = []
+	var gusts: Array = []     # {"cell", "dir"}
+	var splashes: Array = []  # origin cells
 	for card in played:
-		card.queue_free()
+		card.selected = false
+		card.chain_index = 0
+		card.hand_valid = false
+		if card.hazard == "stone" and card.stone_hits > 1:
+			card.stone_hits -= 1
+			continue  # cracked, not cleared — keeps its cell
+		if card.hazard == "wind":
+			gusts.append({"cell": card.grid_pos, "dir": card.wind_dir})
+		elif card.hazard == "water":
+			splashes.append(card.grid_pos)
+		poppers.append(card)
+
+	if not poppers.is_empty():
+		var tw := create_tween().set_parallel(true)
+		for i in poppers.size():
+			var card: PlayingCard = poppers[i]
+			var delay := 0.06 * i
+			grid.erase(card.grid_pos)
+			tw.tween_property(card, "scale", Vector2.ZERO, 0.2) \
+					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN).set_delay(delay)
+			tw.tween_property(card, "rotation", randf_range(-0.7, 0.7), 0.2).set_delay(delay)
+			tw.tween_callback(_play_pop.bind(1.0 + 0.08 * i + randf_range(-0.04, 0.04))) \
+					.set_delay(delay + 0.1)
+		await tw.finished
+		for card in poppers:
+			card.queue_free()
 
 	if suppress_refill:
 		# A level transition is about to reset the board — don't deal.
 		suppress_refill = false
 		busy = false
 		return
+
+	# Water: each played water card soaks one random adjacent plain card.
+	for origin in splashes:
+		var dirs := HAZARD_DIRS.duplicate()
+		dirs.shuffle()
+		for d in dirs:
+			var q: Vector2i = origin + d
+			if grid.has(q):
+				var victim: PlayingCard = grid[q]
+				if victim.hazard == "" and not victim.cursed and not victim.washed:
+					victim.washed = true
+					_play_sound(SFX_FLIP, 0.6, -8.0)
+					break
+
+	# Wind: gusts blow every card from the wind cell to the edge off the
+	# board, unscored.
+	var blown := {}  # cell -> dir
+	for g in gusts:
+		for cell in wind_line_cells(g.cell, g.dir):
+			blown[cell] = g.dir
+	if not blown.is_empty():
+		_play_sound(SFX_SWOOSH, randf_range(1.1, 1.3), -5.0)
+		var gtw := create_tween().set_parallel(true)
+		var flying: Array = []
+		for cell: Vector2i in blown:
+			var card: PlayingCard = grid[cell]
+			grid.erase(cell)
+			flying.append(card)
+			card.z_index = 15
+			gtw.tween_property(card, "position",
+					card.position + Vector2(blown[cell]) * 1700.0, 0.45) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			gtw.tween_property(card, "rotation", card.rotation + 2.2, 0.45)
+		await gtw.finished
+		for card in flying:
+			card.queue_free()
+
 	await _fall_and_fill(false)
 	busy = false
 	if not has_playable_hand():
@@ -642,6 +709,107 @@ func shuffle_board() -> void:
 				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	await tw.finished
 	busy = false
+
+
+# --- Trail hazard engine --------------------------------------------------
+
+## Seeds `count` random plain cards with a hazard state (trail rooms).
+func apply_room_hazards(kind: String, count: int) -> void:
+	var candidates: Array = []
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if card.hazard == "" and not card.cursed and not card.washed:
+			candidates.append(card)
+	candidates.shuffle()
+	for i in mini(count, candidates.size()):
+		var card: PlayingCard = candidates[i]
+		card.hazard = kind
+		match kind:
+			"bomb":
+				card.fuse = BOMB_FUSE
+			"stone":
+				card.stone_hits = STONE_HITS_START
+			"wind":
+				card.wind_dir = HAZARD_DIRS.pick_random()
+
+
+## Occupied cells in a straight line from `from` (exclusive) to the edge.
+func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
+	var out: Array = []
+	var p := from + dir
+	while p.x >= 0 and p.x < cols and p.y >= 0 and p.y < rows:
+		if grid.has(p):
+			out.append(p)
+		p += dir
+	return out
+
+
+## Pure hazard bookkeeping for one hand tick: fires lose a rank (burning
+## up below 2 and igniting orthogonal plain neighbors), bomb fuses drop.
+## Returns {"burned": [cells], "ignited": [cells], "exploded": bool}.
+## Board mutation only — no animation — so it's headless-testable.
+func _tick_fire_and_bombs() -> Dictionary:
+	var fires: Array = []
+	for p in grid:
+		if grid[p].hazard == "fire":
+			fires.append(p)
+	var burned: Array = []
+	for p in fires:
+		grid[p].rank -= 1
+		if grid[p].rank < 2:
+			burned.append(p)
+	var ignited: Array = []
+	for p in burned:
+		for d in HAZARD_DIRS:
+			var q: Vector2i = p + d
+			if not grid.has(q) or ignited.has(q):
+				continue
+			var card: PlayingCard = grid[q]
+			if card.hazard == "" and not card.cursed and not card.washed:
+				card.hazard = "fire"
+				ignited.append(q)
+	var exploded := false
+	for p in grid:
+		if grid[p].hazard == "bomb":
+			grid[p].fuse -= 1
+			if grid[p].fuse <= 0:
+				exploded = true
+	return {"burned": burned, "ignited": ignited, "exploded": exploded}
+
+
+## Runs the per-hand hazard tick with animations: called by trail after
+## a scoring hand fully resolves. Returns true if a bomb detonated.
+func tick_hazards() -> bool:
+	var any := false
+	for p in grid:
+		var hz: String = grid[p].hazard
+		if hz == "fire" or hz == "bomb":
+			any = true
+			break
+	if not any:
+		return false
+	busy = true
+	var res := _tick_fire_and_bombs()
+	var burned: Array = res.burned
+	if not burned.is_empty():
+		_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)
+		var btw := create_tween().set_parallel(true)
+		var goners: Array = []
+		for cell: Vector2i in burned:
+			var card: PlayingCard = grid[cell]
+			grid.erase(cell)
+			goners.append(card)
+			btw.tween_property(card, "scale", Vector2.ZERO, 0.25) \
+					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+			btw.tween_property(card, "modulate", Color(1.6, 0.7, 0.4), 0.25)
+		await btw.finished
+		for card in goners:
+			card.queue_free()
+		await _fall_and_fill(false)
+		if not has_playable_hand():
+			dead_board.emit()
+	busy = false
+	return res.exploded
 
 
 ## Restyles every card on the board for the current theme.

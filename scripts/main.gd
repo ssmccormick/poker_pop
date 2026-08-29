@@ -154,15 +154,17 @@ func _ready() -> void:
 			"trailtarot":
 				menu_layer.visible = false
 				trail._start_run(0)
-			"trailbet", "trailroom":
+			"trailbet", "trailroom", "trailhazard":
 				menu_layer.visible = false
 				trail._start_run(0)
 				for offer in trail._offers:
 					if offer.kind == "play":
 						trail._choose_offer(offer, false)
 						break
-				if m == "trailroom":
+				if m != "trailbet":
 					trail._confirm_bet()
+				if m == "trailhazard":
+					_debug_seed_hazards()
 			"ready":
 				_start_mode("arcade")
 			"time":
@@ -296,6 +298,11 @@ func _update_preview() -> void:
 		preview_label.text = "Chain up to 5 adjacent cards to build a poker hand."
 		preview_label.add_theme_color_override("font_color", DIM)
 	else:
+		for card in board.selected:
+			if card.washed:
+				preview_label.text = "???  —  a soaked card hides this hand's value."
+				preview_label.add_theme_color_override("font_color", GOLD)
+				return
 		var result := Poker.evaluate(data)
 		if result.playable:
 			preview_label.text = "%s  —  %d pts   (base %d + pips %d)" % \
@@ -1027,10 +1034,29 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 	return b
 
 
+## Screenshot-only helper: seeds one of every hazard plus a washed card
+## so all overlays can be eyeballed in one frame.
+func _debug_seed_hazards() -> void:
+	while board.busy:
+		await get_tree().process_frame
+	for kind in ["bomb", "fire", "wind", "stone", "water"]:
+		board.apply_room_hazards(kind, 1)
+	for p in board.grid:
+		var c: PlayingCard = board.grid[p]
+		if c.hazard == "" and not c.cursed:
+			c.washed = true
+			break
+
+
 ## Debug helper: POKERPOP_SHOT=<png path> captures a frame after the deal
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
+		"trailhazard":
+			await get_tree().create_timer(4.2).timeout
+			get_viewport().get_texture().get_image().save_png(path)
+			get_tree().quit()
+			return
 		"deal":
 			await get_tree().create_timer(1.3).timeout
 			get_viewport().get_texture().get_image().save_png(path)

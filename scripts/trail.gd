@@ -25,6 +25,17 @@ const RISKS := [
 	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7, "bet_scale": 1.5},
 ]
 
+# Hazard rooms: better odds, a board full of trouble. From room 2 on,
+# some play offers become hazard rooms.
+const HAZARD_CHANCE := 0.35
+const HAZARD_ROOMS := [
+	{"tarot": "DEATH", "label": "Bomb", "hazard": "bomb", "odds": 2.0, "hands": 8, "count": 1},
+	{"tarot": "THE DEVIL", "label": "Fire", "hazard": "fire", "odds": 2.0, "hands": 8, "count": 2},
+	{"tarot": "THE CHARIOT", "label": "Wind", "hazard": "wind", "odds": 1.5, "hands": 8, "count": 2},
+	{"tarot": "STRENGTH", "label": "Stone", "hazard": "stone", "odds": 1.5, "hands": 8, "count": 3},
+	{"tarot": "TEMPERANCE", "label": "Water", "hazard": "water", "odds": 1.5, "hands": 8, "count": 2},
+]
+
 const BASE_TARGET := 300          # room 1 target before scaling
 const TARGET_STEP := 110          # + per room
 const REGION_BLINDS := [10, 25, 50]
@@ -268,7 +279,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		if randf() < 0.15:
 			return {"kind": "shop", "tarot": "THE HERMIT"}
 		risk = RISKS.pick_random()
-	return {
+	var offer := {
 		"kind": "play",
 		"tarot": risk.tarot,
 		"label": risk.label,
@@ -278,6 +289,21 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		# Never demand more than the player holds (forces all-in instead).
 		"min_bet": mini(int(_blind_for(room_index) * risk.bet_scale), chips),
 	}
+	# Some offers turn hazardous: risky-tier target, hazard on the board.
+	if room_index >= 1 and randf() < HAZARD_CHANCE:
+		var hz: Dictionary = HAZARD_ROOMS.pick_random()
+		offer.tarot = hz.tarot
+		offer.label = hz.label
+		offer.odds = float(hz.odds)
+		offer.hands = int(hz.hands)
+		offer.target = _target_for(room_index, RISKS[1])
+		offer.min_bet = mini(_blind_for(room_index), chips)
+		offer["hazard"] = hz.hazard
+		var count: int = hz.count
+		if hz.hazard == "bomb" and room_index >= REGION_SIZE * 2:
+			count += 1  # late-trail bomb rooms mean business
+		offer["hazard_count"] = count
+	return offer
 
 
 func _render_tarot() -> void:
@@ -307,8 +333,12 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 	if offer.kind == "shop":
 		b.text = "THE HERMIT\n\nSHOP\n\nBuy cards\nBurn cards\n\nNo bet"
 	else:
-		b.text = "%s\n\n%s room\nTarget  %d\nHands  %d\nOdds  %s\n\nMin bet  %d" % [
-			offer.tarot, offer.label, offer.target, offer.hands,
+		var hazard_line := ""
+		if offer.has("hazard"):
+			hazard_line = "\nHAZARD: %d × %s" % [offer.hazard_count,
+					String(offer.hazard).to_upper()]
+		b.text = "%s\n\n%s room%s\nTarget  %d\nHands  %d\nOdds  %s\n\nMin bet  %d" % [
+			offer.tarot, offer.label, hazard_line, offer.target, offer.hands,
 			_odds_text(offer.odds), offer.min_bet]
 	return b
 
@@ -386,6 +416,15 @@ func _start_room() -> void:
 		main.bg_rect.texture = main.backgrounds.pick_random()
 	main.board.reset()
 	main._begin_countdown()
+	if current_offer.has("hazard"):
+		_seed_hazards_when_ready(current_offer.hazard, current_offer.hazard_count)
+
+
+func _seed_hazards_when_ready(kind: String, count: int) -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	if in_room:
+		main.board.apply_room_hazards(kind, count)
 
 
 func on_hand_played(result: Dictionary) -> void:
@@ -397,6 +436,20 @@ func on_hand_played(result: Dictionary) -> void:
 		room_hands_left -= 1
 		if room_hands_left <= 0:
 			_room_failed()
+		else:
+			_tick_room_hazards()
+
+
+## After the hand fully resolves, hazards act: fires tick and spread,
+## bomb fuses drop. A detonation loses the room.
+func _tick_room_hazards() -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	if not in_room:
+		return
+	var exploded: bool = await main.board.tick_hazards()
+	if exploded and in_room:
+		_room_failed("KABOOM — THE BOMB WENT OFF")
 
 
 func _room_cleared() -> void:
@@ -417,12 +470,12 @@ func _room_cleared() -> void:
 			_show_pick())
 
 
-func _room_failed() -> void:
+func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	in_room = false
 	main.board.locked = true
 	# Fail forward, scarred: stake is already gone; take a cursed card.
 	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
-	main._announce("BUSTED — CURSED CARD", main.RED)
+	main._announce(reason, main.RED)
 	_after_board_settles(func() -> void:
 		room_index += 1
 		if room_index >= ROOMS_TOTAL:

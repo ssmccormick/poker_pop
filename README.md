@@ -38,8 +38,12 @@ odds or lose the stake and take a Cursed card scar. Grow your deck with
 a card pick after each cleared room (duplicates enable Five of a Kind
 builds), shop and burn cards at the Hermit, and cash out between rooms
 to bank chips as permanent cash — or push on and risk busting out.
-Cash buys the premium harder-but-richer tables. Full design:
-[TRAIL_MODE.md](TRAIL_MODE.md).
+Cash buys the premium harder-but-richer tables. From room 2 onward the
+tarot may deal **hazard rooms** at better odds: bombs on a fuse (play
+them to defuse), fire that burns ranks down and spreads, wind that
+gusts lines off the board, stones that take three hands to crack, and
+water that soaks cards' identities away — you'd better remember them.
+Full design: [TRAIL_MODE.md](TRAIL_MODE.md).
 
 In Single Deck the board stops refilling when the deck is spent and the
 run ends when no playable hand remains — clearing the entire board is a
