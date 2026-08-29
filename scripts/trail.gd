@@ -7,8 +7,15 @@ extends Node
 ## v1 scope: risk-tiered Normal rooms + shops. Bosses, room-rule
 ## variety, and card modifiers beyond Cursed come later (TRAIL_MODE.md).
 
-const ROOMS_TOTAL := 12
-const REGION_SIZE := 4
+const ROOMS_TOTAL := 21
+const REGION_SIZE := 7
+# Every 7th room is a boss; the tarot deals a single court card.
+const BOSS_ROOMS := {6: "jack", 13: "queen", 20: "cobra"}
+const BOSSES := {
+	"jack": {"tarot": "THE JACK", "name": "Jack of All Trades", "hands": 18},
+	"queen": {"tarot": "THE QUEEN", "name": "Queen Bee", "hands": 14},
+	"cobra": {"tarot": "THE KING", "name": "King Cobra", "hands": 14},
+}
 
 # Buy-in tables: [name, cash cost, starting chips, cash-out rate,
 # target multiplier, blind multiplier]
@@ -39,7 +46,7 @@ const HAZARD_ROOMS := [
 ]
 
 const BASE_TARGET := 300          # room 1 target before scaling
-const TARGET_STEP := 110          # + per room
+const TARGET_STEP := 65           # + per room (21-room curve)
 const REGION_BLINDS := [10, 25, 50]
 const SHOP_CARD_PRICE := 40       # plain card
 const SHOP_DUP_PRICE := 50        # exact duplicate of a card you own
@@ -131,6 +138,8 @@ var _tarot_relics: Label
 func _ready() -> void:
 	_load_meta()
 	main.board.safe_cracked.connect(on_safe_cracked)
+	main.board.boss_defeated.connect(func() -> void:
+		pass)  # handled via result.boss_defeated in on_hand_played
 
 
 # --- Persistence ----------------------------------------------------------
@@ -355,10 +364,23 @@ func _show_tarot() -> void:
 
 
 func _make_offers() -> Array:
+	# Boss rooms: fate deals exactly one court card.
+	if BOSS_ROOMS.has(room_index):
+		var kind: String = BOSS_ROOMS[room_index]
+		var b: Dictionary = BOSSES[kind]
+		return [{
+			"kind": "play",
+			"tarot": b.tarot,
+			"label": b.name,
+			"target": 0,
+			"hands": int(b.hands),
+			"odds": 3.0,
+			"min_bet": mini(_blind_for(room_index), chips),
+			"boss": kind,
+		}]
 	var offers: Array = []
-	# A shop appears as one of the three choices in the middle-ish of
-	# each region (and never two shops at once).
-	var want_shop := room_index % REGION_SIZE == 2
+	# Shops appear twice per 7-room region.
+	var want_shop := room_index % REGION_SIZE in [2, 5]
 	var risk_pool := RISKS.duplicate()
 	risk_pool.shuffle()
 	for i in 3:
@@ -419,6 +441,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 func _render_tarot() -> void:
 	for child in _tarot_cards_box.get_children():
 		child.queue_free()
+	var is_boss := BOSS_ROOMS.has(room_index)
 	var region := room_index / REGION_SIZE + 1
 	_tarot_info.text = "ROOM %d / %d   ·   REGION %d   ·   CHIPS %d   ·   DECK %d cards" \
 			% [room_index + 1, ROOMS_TOTAL, region, chips, deck.size()]
@@ -430,18 +453,23 @@ func _render_tarot() -> void:
 			names.append(RELICS[id].name)
 		_tarot_relics.text = "RELICS:  " + "  ·  ".join(names)
 	_tarot_cashout_btn.text = "CASH OUT — TAKE $%d" % _cashout_value()
+	var slot_count := _offers.size() + (0 if is_boss else 1)
+	var total_w := slot_count * 330 - 30
+	var start_x := (1920.0 - total_w) / 2.0
 	for i in _offers.size():
 		var offer: Dictionary = _offers[i]
-		var b := _tarot_card_button(offer, 300 + i * 330)
+		var b := _tarot_card_button(offer, start_x + i * 330)
 		var picked := offer
 		b.pressed.connect(func() -> void:
 			_choose_offer(picked, false))
-	# The Fool: face-down fate.
-	var fool: Button = main._button(_tarot_cards_box, "", Vector2(300 + 3 * 330, 0), Vector2(300, 380))
-	fool.text = "THE FOOL\n\n?\n\nLet fate decide\n(+%d chips)" % FATE_KICKER
-	fool.add_theme_font_size_override("font_size", 22)
-	fool.pressed.connect(func() -> void:
-		_choose_offer(_fate_offer, true))
+	if not is_boss:
+		# The Fool: face-down fate.
+		var fool: Button = main._button(_tarot_cards_box, "",
+				Vector2(start_x + _offers.size() * 330, 0), Vector2(300, 380))
+		fool.text = "THE FOOL\n\n?\n\nLet fate decide\n(+%d chips)" % FATE_KICKER
+		fool.add_theme_font_size_override("font_size", 22)
+		fool.pressed.connect(func() -> void:
+			_choose_offer(_fate_offer, true))
 
 
 func _tarot_card_button(offer: Dictionary, x: float) -> Button:
@@ -455,7 +483,9 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			hazard_line = "\nHAZARD: %d × %s" % [offer.hazard_count,
 					String(offer.hazard).to_upper()]
 		var goal_line := "Target  %d" % offer.target
-		if offer.get("goal", "") == "safe":
+		if offer.has("boss"):
+			goal_line = "BOSS FIGHT"
+		elif offer.get("goal", "") == "safe":
 			goal_line = "CRACK THE SAFE"
 		elif offer.get("goal", "") == "chest":
 			goal_line = "OPEN THE CHEST"
@@ -526,6 +556,8 @@ func _start_room() -> void:
 	room_score = 0
 	room_target = current_offer.target
 	room_goal = current_offer.get("goal", "")
+	if current_offer.has("boss"):
+		room_goal = "boss"
 	room_combo = []
 	room_hands_left = int(current_offer.hands) + (1 if has_relic("horseshoe") else 0)
 	main.mode_kind = "trail"
@@ -550,7 +582,10 @@ func _seed_room_specials() -> void:
 		await get_tree().process_frame
 	if not in_room:
 		return
-	if current_offer.has("hazard"):
+	if current_offer.has("boss"):
+		main.board.spawn_boss(current_offer.boss)
+		main._announce(String(BOSSES[current_offer.boss].name).to_upper(), main.RED)
+	elif current_offer.has("hazard"):
 		main.board.apply_room_hazards(current_offer.hazard, current_offer.hazard_count)
 		# Relic adjustments to freshly-seeded hazards.
 		for p in main.board.grid:
@@ -591,6 +626,9 @@ func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
 	chips += result.get("bonus_chips", 0)
 	room_score += result.score
+	if result.get("boss_defeated", false):
+		_room_cleared()
+		return
 	if result.get("chest_opened", false):
 		_open_chest()
 		if room_goal == "chest":
@@ -674,11 +712,15 @@ func _announce_after_settle(text: String) -> void:
 
 
 ## After the hand fully resolves, hazards act: fires tick and spread,
-## bomb fuses drop. A detonation loses the room.
+## bomb fuses drop. A detonation loses the room. In boss rooms the boss
+## takes his turn instead.
 func _tick_room_hazards() -> void:
 	while main.board.busy:
 		await get_tree().process_frame
 	if not in_room:
+		return
+	if room_goal == "boss":
+		await main.board.tick_boss()
 		return
 	var tick_fire := true
 	if has_relic("fire_blanket"):
@@ -753,9 +795,28 @@ func _trail_complete() -> void:
 	cash += payout
 	_save_meta()
 	_clear_run_save()
-	_end_run("TRAIL COMPLETE",
-			"You rode all %d rooms and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout],
-			payout)
+	var body := "You rode all %d rooms and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
+	if table_tier == 2:
+		body += "\n\nSomewhere past the last saloon, THE DEALER shuffles\na perfect deck and waits. (His table opens soon.)"
+	_end_run("TRAIL COMPLETE", body, payout)
+
+
+## Room banner text for boss fights.
+func boss_status() -> String:
+	for p in main.board.grid:
+		var card: PlayingCard = main.board.grid[p]
+		match card.boss:
+			"jack":
+				return "JACK OF ALL TRADES   HP %d" % card.boss_hp
+			"queen":
+				return "QUEEN BEE   STRIPES %d   (2-3 card hands!)" % card.boss_hp
+			"cobra":
+				var tail := 0
+				for q in main.board.grid:
+					if main.board.grid[q].snake_tail:
+						tail += 1
+				return "KING COBRA   TAIL %d" % tail
+	return "THE BOSS IS DOWN"
 
 
 # --- Flow: card pick ------------------------------------------------------

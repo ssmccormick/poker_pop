@@ -255,7 +255,7 @@ Draft permanent upgrades (Outfitter):
 - Starting deck variants (unlocks): e.g. "Stacked Deck" (44 cards,
   extra kings), "Flush Times" (suit-skewed) — big-ticket items
 
-## Bosses — the Court (rules locked)
+## Bosses — the Court (SHIPPED — Dealer duel still to come)
 
 **The trail is 21 rooms; every 7th room is a forced boss** (no tarot
 choice — fate deals a court card): room 7 = Jack, 14 = Queen Bee,

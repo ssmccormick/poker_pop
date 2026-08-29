@@ -176,6 +176,13 @@ func _ready() -> void:
 						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
 						"min_bet": 10, "goal": "safe"}, false)
 				trail._confirm_bet()
+			"trailboss":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail.room_index = 20  # King Cobra's table
+				trail._show_tarot()
+				trail._choose_offer(trail._offers[0], false)
+				trail._confirm_bet()
 			"ready":
 				_start_mode("arcade")
 			"time":
@@ -258,7 +265,11 @@ func _update_labels() -> void:
 		target_label.text = "LEVEL %d      %d / %d" % [level, level_score, target]
 		target_bar_fill.size.x = 1314.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
 	elif show_trail:
-		if trail.room_goal == "safe":
+		if trail.room_goal == "boss":
+			target_label.text = "ROOM %d / %d      %s" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.boss_status()]
+			target_bar_fill.size.x = 0.0
+		elif trail.room_goal == "safe":
 			var digits := PackedStringArray()
 			for d in trail.room_combo:
 				digits.append(str(d))
@@ -1080,7 +1091,7 @@ func _debug_seed_hazards() -> void:
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist":
+		"trailhazard", "trailheist", "trailboss":
 			await get_tree().create_timer(4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()

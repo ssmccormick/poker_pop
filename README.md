@@ -43,7 +43,12 @@ tarot may deal **hazard rooms** at better odds: bombs on a fuse (play
 them to defuse), fire that burns ranks down and spreads, wind that
 gusts lines off the board, stones that take three hands to crack, and
 water that soaks cards' identities away — you'd better remember them.
-Full design: [TRAIL_MODE.md](TRAIL_MODE.md).
+The trail runs 21 rooms across three regions, and every seventh room
+is a **boss**: the teleporting Jack of All Trades (pin him 10 times),
+Queen Bee and her sticky honey (2–3 card hands only), and King Cobra —
+a snake that eats your board and must be beheaded with an empty tail.
+Heists, treasure chests, deck modifiers, and 15 relics round out the
+run. Full design: [TRAIL_MODE.md](TRAIL_MODE.md).
 
 In Single Deck the board stops refilling when the deck is spent and the
 run ends when no playable hand remains — clearing the entire board is a

@@ -53,6 +53,15 @@ const CHEST_PX := [
 ]
 const SAFE_STEEL := Color("6e737c")
 const SAFE_DARK := Color("4a4e56")
+const CROWN_PX := [
+	"101010101",
+	"111111111",
+	"011111110",
+	"011111110",
+]
+const HONEY_AMBER := Color(0.92, 0.68, 0.18, 0.4)
+const SNAKE_GREEN := Color("3f7d4e")
+const SNAKE_DARK := Color("24462c")
 
 # suit ids: 0 = spades, 1 = hearts, 2 = diamonds, 3 = clubs
 const SUIT_NAMES := ["Spades", "Hearts", "Diamonds", "Clubs"]
@@ -170,6 +179,29 @@ var combo_progress := 0:  # matched prefix digits, lit up green
 	set(value):
 		combo_progress = value
 		queue_redraw()
+# Bosses (trail): "", "jack", "queen", "cobra".
+var boss := "":
+	set(value):
+		boss = value
+		queue_redraw()
+var boss_hp := 0:
+	set(value):
+		boss_hp = value
+		queue_redraw()
+var honey := false:  # Queen Bee's spread: only 2-3 card hands clear it
+	set(value):
+		honey = value
+		queue_redraw()
+var snake_tail := false:  # King Cobra body segment: a wall
+	set(value):
+		snake_tail = value
+		queue_redraw()
+var tail_order := 0        # eat order; highest = newest segment
+var cobra_stack: Array = []  # head only: identities to revert through
+var stunned := false:
+	set(value):
+		stunned = value
+		queue_redraw()
 var error_flash := false:  # brief red border after an invalid submit
 	set(value):
 		error_flash = value
@@ -238,6 +270,15 @@ func _draw() -> void:
 		_face_box.draw(get_canvas_item(), rect)
 
 	var font := ThemeDB.fallback_font
+	if snake_tail:
+		# Cobra body: a scaled green wall.
+		draw_rect(rect.grow(-3), SNAKE_GREEN)
+		for i in 5:
+			var y := -H / 2.0 + 12 + i * 20.0
+			draw_line(Vector2(-W / 2.0 + 6, y), Vector2(W / 2.0 - 6, y + 10), SNAKE_DARK, 3.0)
+		if selected and chain_index > 0:
+			pass
+		return
 	if is_safe:
 		# The locked safe: steel face, dial, and the combination on show.
 		draw_rect(rect.grow(-3), SAFE_STEEL)
@@ -302,6 +343,32 @@ func _draw() -> void:
 			_draw_pixel_map(KEY_PX, Vector2(W / 2.0 - 22, H / 2.0 - 14), 3.0, GOLD)
 		"chest":
 			_draw_pixel_map(CHEST_PX, Vector2(W / 2.0 - 16, H / 2.0 - 15), 3.0, Color("b07f3e"))
+
+	if honey:
+		draw_rect(rect.grow(-2), HONEY_AMBER)
+		_draw_pixel_map(DROP_PX, Vector2(W / 2.0 - 14, H / 2.0 - 15), 2.5, Color("c98a1e"))
+
+	match boss:
+		"jack":
+			_draw_pixel_map(CROWN_PX, Vector2(0, -H / 2.0 + 8), 3.0, GOLD)
+			var bc := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
+			draw_circle(bc, 12, ERROR_RED)
+			draw_string(font, bc + Vector2(-10, 5), str(boss_hp),
+					HORIZONTAL_ALIGNMENT_CENTER, 20, 14, Color.WHITE)
+		"queen":
+			_draw_pixel_map(CROWN_PX, Vector2(0, -H / 2.0 + 8), 3.0, GOLD)
+			for i in boss_hp:
+				draw_rect(Rect2(-21.0 + i * 15.0, H / 2.0 - 16.0, 12, 8),
+						Color(0.92, 0.68, 0.18))
+		"cobra":
+			draw_rect(rect.grow(-2), SNAKE_GREEN, false, 5.0)
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(-14, H / 2.0 - 20), Vector2(-8, H / 2.0 - 8), Vector2(-2, H / 2.0 - 20)]), SNAKE_DARK)
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(2, H / 2.0 - 20), Vector2(8, H / 2.0 - 8), Vector2(14, H / 2.0 - 20)]), SNAKE_DARK)
+			if stunned:
+				draw_string(font, Vector2(-W / 2.0, -H / 2.0 - 4), "zzz",
+						HORIZONTAL_ALIGNMENT_CENTER, W, 18, WIND_BLUE)
 
 	if cursed:
 		# Darken the face and slash it out.

@@ -15,6 +15,7 @@ signal card_dealt(card: PlayingCard)  # per-card audio hook, on deal arrival
 signal settle_landed                  # fires once when Phase A lands
 signal refill_done                    # internal: refill finished or skipped
 signal safe_cracked                   # the combo chain opened the safe
+signal boss_defeated                  # the room's boss is down
 
 const GAP := 8
 const CELL_W := PlayingCard.W + GAP
@@ -203,7 +204,7 @@ static func _is_adjacent(a: Vector2i, b: Vector2i) -> bool:
 
 
 func _toggle_select(card: PlayingCard) -> void:
-	if card.cursed:
+	if card.cursed or card.snake_tail:
 		_play_sound(SFX_FLIP, 0.7, -10.0)
 		return
 	if card.is_safe and not card.selected:
@@ -302,6 +303,12 @@ func _update_hand_validity() -> void:
 			if card.washed:
 				valid = false
 				break
+		# Sticky rule: the Queen and her honey only fall to 2-3 card hands.
+		if valid and selected.size() > 3:
+			for card in selected:
+				if card.boss == "queen" or card.honey:
+					valid = false
+					break
 	for card in selected:
 		card.hand_valid = valid
 
@@ -320,6 +327,11 @@ func play_hand() -> void:
 		if card.is_safe:
 			_crack_safe()
 			return
+	if selected.size() > 3:
+		for card in selected:
+			if card.boss == "queen" or card.honey:
+				_reject_hand()  # too big a hand for something this sticky
+				return
 	var result := Poker.evaluate(get_selected_data())
 	if not result.playable:
 		_reject_hand()
@@ -336,6 +348,16 @@ func play_hand() -> void:
 			has_chest = true
 	if has_key and has_chest:
 		result["chest_opened"] = true
+	# Predict boss outcomes so trail can clear the room before spending
+	# the hand.
+	for card in selected:
+		match card.boss:
+			"jack", "queen":
+				if card.boss_hp <= 1:
+					result["boss_defeated"] = true
+			"cobra":
+				if card.cobra_stack.is_empty():
+					result["boss_defeated"] = true
 	busy = true
 	hand_played.emit(result)
 
@@ -357,10 +379,24 @@ func play_hand() -> void:
 	var poppers: Array = []
 	var gusts: Array = []     # {"cell", "dir"}
 	var splashes: Array = []  # origin cells
+	var defeated_boss := false
 	for card in played:
 		card.selected = false
 		card.chain_index = 0
 		card.hand_valid = false
+		if card.boss == "jack" or card.boss == "queen":
+			card.boss_hp -= 1
+			if card.boss_hp <= 0:
+				defeated_boss = true
+				poppers.append(card)  # down he goes
+			continue
+		if card.boss == "cobra":
+			if card.cobra_stack.is_empty():
+				defeated_boss = true
+				poppers.append(card)
+			else:
+				_cobra_revert(card)
+			continue
 		if card.hazard == "stone" and card.stone_hits > 1:
 			card.stone_hits -= 1
 			continue  # cracked, not cleared — keeps its cell
@@ -384,6 +420,8 @@ func play_hand() -> void:
 		await tw.finished
 		for card in poppers:
 			card.queue_free()
+	if defeated_boss:
+		boss_defeated.emit()
 
 	if suppress_refill:
 		# A level transition is about to reset the board — don't deal.
@@ -729,19 +767,19 @@ func has_playable_hand() -> bool:
 	# or join any chain.
 	for p in grid:
 		var card: PlayingCard = grid[p]
-		if card.cursed or card.is_safe:
+		if card.cursed or card.is_safe or card.snake_tail:
 			continue
 		if _group_chain_exists(p, {p: true}, {card.rank: 1}):
 			return true
 	# 5-card flush chains.
 	for p in grid:
-		if grid[p].cursed or grid[p].is_safe:
+		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail:
 			continue
 		if _suit_chain_exists(p, {p: true}, 1):
 			return true
 	# 5-card straight chains (any pick order along the chain).
 	for p in grid:
-		if grid[p].cursed or grid[p].is_safe:
+		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail:
 			continue
 		if _straight_chain_exists(p, {p: true}, {grid[p].rank: true}):
 			return true
@@ -764,7 +802,7 @@ func _group_chain_exists(p: Vector2i, visited: Dictionary, rank_counts: Dictiona
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe:
+			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe or grid[q].snake_tail:
 				continue
 			var r: int = grid[q].rank
 			# A third distinct rank can never resolve into an exact hand.
@@ -790,7 +828,7 @@ func _suit_chain_exists(p: Vector2i, visited: Dictionary, depth: int) -> bool:
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if grid.has(q) and not visited.has(q) and not grid[q].cursed and not grid[q].is_safe \
+			if grid.has(q) and not visited.has(q) and not grid[q].cursed and not grid[q].is_safe and not grid[q].snake_tail \
 					and grid[q].suit == suit:
 				visited[q] = true
 				if _suit_chain_exists(q, visited, depth + 1):
@@ -811,7 +849,7 @@ func _straight_chain_exists(p: Vector2i, visited: Dictionary, ranks: Dictionary)
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe:
+			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe or grid[q].snake_tail:
 				continue
 			var r: int = grid[q].rank
 			if ranks.has(r):
@@ -881,6 +919,193 @@ func _apply_card_mods(result: Dictionary) -> void:
 		result.score = int(result.score * pow(mult_factor, mults))
 	if chip_cards > 0:
 		result["bonus_chips"] = chip_cards * chip_bonus
+
+
+# --- Trail boss engine ----------------------------------------------------
+
+const JACK_HP := 10
+const QUEEN_STRIPES := 3
+const COBRA_START_TAIL := 2
+
+## Converts a board card into the room's boss.
+func spawn_boss(kind: String) -> void:
+	var candidates: Array = []
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if card.hazard == "" and not card.cursed and not card.washed \
+				and card.objective == "" and not card.is_safe and card.boss == "":
+			candidates.append(p)
+	if candidates.is_empty():
+		return
+	var cell: Vector2i = candidates.pick_random()
+	var card: PlayingCard = grid[cell]
+	card.boss = kind
+	match kind:
+		"jack":
+			card.boss_hp = JACK_HP
+			card.rank = randi_range(2, 14)
+			card.suit = randi_range(0, 3)
+		"queen":
+			card.boss_hp = QUEEN_STRIPES
+			card.rank = 12  # she IS a queen — pair her to sting her
+			card.suit = randi_range(0, 3)
+		"cobra":
+			card.rank = randi_range(2, 14)
+			card.suit = randi_range(0, 3)
+			card.cobra_stack = []
+			for i in COBRA_START_TAIL:
+				_cobra_eat(card, true)
+
+
+func _find_boss() -> PlayingCard:
+	for p in grid:
+		if grid[p].boss != "":
+			return grid[p]
+	return null
+
+
+## The cobra eats an orthogonal neighbor: the head takes the victim's
+## cell AND identity; the old head cell becomes a tail wall. `instant`
+## skips animation (spawn-time setup eats; also headless-testable).
+func _cobra_eat(head: PlayingCard, instant: bool) -> void:
+	var dirs := HAZARD_DIRS.duplicate()
+	dirs.shuffle()
+	for d in dirs:
+		var q: Vector2i = head.grid_pos + d
+		if not grid.has(q):
+			continue
+		var victim: PlayingCard = grid[q]
+		if victim.boss != "" or victim.snake_tail or victim.is_safe \
+				or victim.objective != "":
+			continue
+		# Old head cell becomes a tail segment remembering this identity.
+		head.cobra_stack.push_back({"rank": head.rank, "suit": head.suit})
+		var tail := PlayingCard.new()
+		tail.snake_tail = true
+		tail.tail_order = head.cobra_stack.size()
+		tail.material = Themes.current_material()
+		tail.grid_pos = head.grid_pos
+		tail.position = head.position if instant else head.position
+		grid[head.grid_pos] = tail
+		if is_inside_tree():
+			add_child(tail)
+		# Head takes the victim's cell and identity.
+		var target_pos := victim.position
+		grid[q] = head
+		head.grid_pos = q
+		head.rank = victim.rank
+		head.suit = victim.suit
+		if victim.is_inside_tree():
+			victim.queue_free()
+		else:
+			victim.free()
+		if instant or not is_inside_tree():
+			head.position = target_pos
+		else:
+			var tw := create_tween()
+			tw.tween_property(head, "position", target_pos, 0.35) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		return
+
+
+## Head cleared with tail remaining: pop the newest segment, revert the
+## head's identity to the previous meal, and stun him for a hand.
+func _cobra_revert(head: PlayingCard) -> void:
+	head.stunned = true
+	var newest: Vector2i
+	var best := -1
+	for p in grid:
+		if grid[p].snake_tail and grid[p].tail_order > best:
+			best = grid[p].tail_order
+			newest = p
+	if best >= 0:
+		var seg: PlayingCard = grid[newest]
+		grid.erase(newest)
+		if seg.is_inside_tree():
+			seg.queue_free()
+		else:
+			seg.free()
+	if not head.cobra_stack.is_empty():
+		var identity: Dictionary = head.cobra_stack.pop_back()
+		head.rank = identity.rank
+		head.suit = identity.suit
+
+
+## Per-hand boss behavior, after the hand fully resolves.
+func tick_boss() -> void:
+	var b := _find_boss()
+	if b == null:
+		return
+	busy = true
+	match b.boss:
+		"jack":
+			# Teleport: swap with a random ordinary card, new disguise.
+			var candidates: Array = []
+			for p in grid:
+				var card: PlayingCard = grid[p]
+				if card != b and card.boss == "" and not card.snake_tail \
+						and not card.is_safe:
+					candidates.append(p)
+			if not candidates.is_empty():
+				var cell: Vector2i = candidates.pick_random()
+				var other: PlayingCard = grid[cell]
+				var b_cell := b.grid_pos
+				grid[cell] = b
+				grid[b_cell] = other
+				b.grid_pos = cell
+				other.grid_pos = b_cell
+				var tw := create_tween().set_parallel(true)
+				tw.tween_property(b, "position", cell_center(cell), 0.35) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+				tw.tween_property(other, "position", cell_center(b_cell), 0.35) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+				await tw.finished
+			b.rank = randi_range(2, 14)
+			b.suit = randi_range(0, 3)
+			_play_sound(SFX_SHUFFLE, 1.4, -10.0)
+		"queen":
+			# Alternating: spawn honey near the hive / relocate the honey.
+			b.stunned = not b.stunned  # reuse as the rhythm flip
+			if b.stunned:
+				var near: Array = []
+				var anywhere: Array = []
+				for p in grid:
+					var card: PlayingCard = grid[p]
+					if card.boss == "" and not card.honey and card.hazard == "" \
+							and not card.cursed and not card.is_safe:
+						anywhere.append(card)
+						var d: Vector2i = (p - b.grid_pos).abs()
+						if maxi(d.x, d.y) <= 2:
+							near.append(card)
+				var pool: Array = near if not near.is_empty() else anywhere
+				if not pool.is_empty():
+					pool.pick_random().honey = true
+					_play_sound(SFX_FLIP, 0.8, -10.0)
+			else:
+				var honeys: Array = []
+				var plains: Array = []
+				for p in grid:
+					var card: PlayingCard = grid[p]
+					if card.honey:
+						honeys.append(card)
+					elif card.boss == "" and card.hazard == "" \
+							and not card.cursed and not card.is_safe:
+						plains.append(card)
+				plains.shuffle()
+				for h in honeys:
+					if plains.is_empty():
+						break
+					h.honey = false
+					var target: PlayingCard = plains.pop_back()
+					target.honey = true
+		"cobra":
+			if b.stunned:
+				b.stunned = false
+			else:
+				_cobra_eat(b, false)
+				_play_sound(SFX_FLIP, 0.5, -8.0)
+				await get_tree().create_timer(0.4, false).timeout
+	busy = false
 
 
 # --- Trail hazard engine --------------------------------------------------
