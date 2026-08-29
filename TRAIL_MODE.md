@@ -255,22 +255,46 @@ Draft permanent upgrades (Outfitter):
 - Starting deck variants (unlocks): e.g. "Stacked Deck" (44 cards,
   extra kings), "Flush Times" (suit-skewed) — big-ticket items
 
-## Bosses — the Court
+## Bosses — the Court (rules locked)
 
-Region bosses are the court cards (reviving the old GameMaker-era
-concepts), with the old doc's final dealer capping the trail:
-- **Jack of All Trades** (region 1) — every hand type may only be
-  scored once
-- **Queen Bee** (region 2) — honeycombed board: some cells locked/cursed
-- **King Cobra** (region 3) — fast drain bar plus a big target
-- **THE DEALER** (finale) — the old design's final boss, now a
-  **heads-up duel with mirror rules**: you and the Dealer alternate
-  turns scoring hands on the SAME board — beat his total. His table
-  rules also counter your build: your most-scored hand type pays half,
-  your most-common suit is restricted. One-trick decks get punished;
-  flexible builds shine. Beating him = premium cash-out + purse.
-  (The duel — Dealer AI picking hands on the board — is the single
-  largest build item in this mode; the mirror rules are cheap.)
+**The trail is 21 rooms; every 7th room is a forced boss** (no tarot
+choice — fate deals a court card): room 7 = Jack, 14 = Queen Bee,
+21 = King Cobra. Boss rooms have no score target — defeat the boss
+within the hand budget to clear, at 3:1 odds. Bosses are LIVING CARDS
+on the board, participating in hands with their current identity —
+which makes deck sculpting the boss prep (stock queens before room 14).
+
+- **JACK OF ALL TRADES** (room 7) — a boss card with **10 HP**
+  (blackjack Jack). Every submitted hand — including ones that clear
+  him — makes him teleport and re-roll his rank AND suit. Pin him into
+  a scoring hand to deal 1 damage; do it ten times. HP badge on the
+  card. (Hand budget ~18 — needs playtest tuning, 10 pins is a chase.)
+- **QUEEN BEE** (room 14) — **3 stripes** (HP); she and her honey can
+  only be caught in **2–3 card hands** (the honey is sticky, and so is
+  she — she's a Queen, so catching her means pairing queens). Honey
+  rhythm alternates: odd hands she SPAWNS a honey card (converts a
+  card near the hive — honey keeps its rank/suit, never falls, and
+  only 2–3 card hands can clear it); even hands the honey MOVES to
+  different cards. Each catch removes a stripe.
+- **KING COBRA** (room 21) — the boss card is his HEAD, spawning with
+  a random identity and a **2-segment tail** (the "already eaten"
+  cards, identities stored). Each hand he slithers: eats an adjacent
+  card, takes its cell AND its full identity (rank + suit), and grows
+  a tail segment. Tail segments block the board like walls. Clear his
+  head using its CURRENT identity → he's **stunned** for the next hand
+  (no eating), the oldest tail segment pops, and his identity reverts
+  to the previous meal. **Kill = clear the head with no tail left.**
+- **THE DEALER** (bonus, room 22 — HIGH ROLLER RUNS ONLY) — the true
+  finale exists only at the highest stakes: a **heads-up duel with
+  mirror rules**. You and the Dealer alternate scoring hands on the
+  SAME board — beat his total; his table rules counter your build
+  (your most-scored hand type pays half, your most-common suit
+  restricted). Beating him = premium cash-out + purse + (someday) the
+  credits. The duel AI is the single largest build item in this mode.
+
+Trail restructure that comes with this: ROOMS_TOTAL 21, regions of 7,
+shops offered at region positions 3 and 6, target/blind curves
+recalibrated across 21 rooms, boss tarot cards drawn as court cards.
 
 ## Failure & stakes — fail forward, scarred
 
