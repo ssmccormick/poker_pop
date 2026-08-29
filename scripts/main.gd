@@ -265,22 +265,22 @@ func _update_labels() -> void:
 		target_bar_fill.size.x = 1314.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
 	elif show_trail:
 		if trail.room_goal == "boss":
-			target_label.text = "ROOM %d / %d      %s" % \
+			target_label.text = "TABLE %d / %d      %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.boss_status()]
 			target_bar_fill.size.x = 0.0
 		elif trail.room_goal == "safe":
 			var digits := PackedStringArray()
 			for d in trail.room_combo:
 				digits.append(str(d))
-			target_label.text = "ROOM %d / %d      SAFE  %s" % \
+			target_label.text = "TABLE %d / %d      SAFE  %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, " · ".join(digits)]
 			target_bar_fill.size.x = 1314.0 * trail.safe_progress() / 4.0
 		elif trail.room_goal == "chest":
-			target_label.text = "ROOM %d / %d      KEY + CHEST IN ONE HAND" % \
+			target_label.text = "TABLE %d / %d      KEY + CHEST IN ONE HAND" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL]
 			target_bar_fill.size.x = 0.0
 		else:
-			target_label.text = "ROOM %d / %d      %d / %d" % \
+			target_label.text = "TABLE %d / %d      %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
 			target_bar_fill.size.x = 1314.0 * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
@@ -865,7 +865,7 @@ func _build_menu() -> void:
 	trail_btn.add_theme_font_size_override("font_size", 26)
 	trail_btn.pressed.connect(func() -> void:
 		trail.open_buyin())
-	_menu_center("Buy in · bet on every room · sculpt your deck · cash out or bust", 408, 20, DIM)
+	_menu_center("Buy in · bet at every table · sculpt your deck · cash out or bust", 408, 20, DIM)
 
 	_menu_center("TIME TRIAL", 456, 24, GOLD)
 	var times := [60.0, 180.0, 300.0]

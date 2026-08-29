@@ -42,9 +42,10 @@ const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
 const OBJECTIVE_CHANCE := 0.18   # heist/treasure rooms, from room 2 on
 const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 
-const BASE_TARGET := 300          # room 1 target before scaling
-const TARGET_STEP := 65           # + per room (21-room curve)
-const REGION_BLINDS := [10, 25, 50]
+const BASE_TARGET := 300          # table 1 target before scaling
+const TARGET_STEP := 65           # + per table (21-table curve)
+const BLIND_BASE := 10            # table 1 minimum bet
+const BLIND_STEP := 5             # + per table cleared — the floor climbs
 const SHOP_CARD_PRICE := 40       # plain card
 const SHOP_DUP_PRICE := 50        # exact duplicate of a card you own
 const SHOP_MOD_PRICE := 80        # chip/mult enhanced card
@@ -268,8 +269,7 @@ func _unowned_relic() -> String:
 
 
 func _blind_for(room: int) -> int:
-	var region: int = clampi(room / REGION_SIZE, 0, REGION_BLINDS.size() - 1)
-	return int(REGION_BLINDS[region] * _table().blind_mult)
+	return int((BLIND_BASE + BLIND_STEP * room) * _table().blind_mult)
 
 
 func _target_for(room: int, risk: Dictionary) -> int:
@@ -376,7 +376,7 @@ func _show_tarot() -> void:
 	# Bankruptcy check against the coming room's blind.
 	if chips < _blind_for(room_index):
 		_end_run("BUSTED OUT",
-				"The table minimum is %d chips and you're down to %d.\nThe trail ends here." % [_blind_for(room_index), chips],
+				"The next table's minimum is %d chips and you're down to %d.\nThe trail ends here." % [_blind_for(room_index), chips],
 				0)
 		return
 	_offers = _make_offers()
@@ -453,7 +453,7 @@ func _render_tarot() -> void:
 		child.queue_free()
 	var is_boss := BOSS_ROOMS.has(room_index)
 	var region := room_index / REGION_SIZE + 1
-	_tarot_info.text = "ROOM %d / %d   ·   REGION %d   ·   CHIPS %d   ·   DECK %d cards" \
+	_tarot_info.text = "TABLE %d / %d   ·   REGION %d   ·   CHIPS %d   ·   DECK %d cards" \
 			% [room_index + 1, ROOMS_TOTAL, region, chips, deck.size()]
 	if relics.is_empty():
 		_tarot_relics.text = ""
@@ -498,7 +498,7 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		var bet_line := "Min bet  %d" % offer.min_bet
 		if offer.has("boss"):
 			bet_line = "ALL IN"
-		b.text = "%s\n\n%s room\n%s\nHands  %d\nOdds  %s\n\n%s" % [
+		b.text = "%s\n\n%s table\n%s\nHands  %d\nOdds  %s\n\n%s" % [
 			offer.tarot, offer.label, goal_line, offer.hands,
 			_odds_text(offer.odds), bet_line]
 	return b
@@ -545,8 +545,8 @@ func _show_bet() -> void:
 	_bet_back_btn.visible = pending_retry.is_empty()
 	var retry_line := ""
 	if not pending_retry.is_empty():
-		retry_line = "\nTHE ROOM STILL BARS THE WAY — beat it or bust."
-	_bet_info.text = "%s — %s room\nTarget %d in %d hands   ·   odds %s\nYour chips: %d   ·   minimum bet: %d%s" % [
+		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust."
+	_bet_info.text = "%s — %s table\nTarget %d in %d hands   ·   odds %s\nYour chips: %d   ·   minimum bet: %d%s" % [
 		o.tarot, o.label, o.target, o.hands, _odds_text(o.odds), chips, o.min_bet,
 		retry_line]
 	_bet_slider.min_value = o.min_bet
@@ -772,7 +772,7 @@ func _room_cleared() -> void:
 	if has_relic("tin_star"):
 		winnings += 10
 	chips += winnings
-	main._announce("ROOM CLEAR  +%d CHIPS" % winnings)
+	main._announce("TABLE CLEARED  +%d CHIPS" % winnings)
 	_after_board_settles(func() -> void:
 		room_index += 1
 		if room_index >= ROOMS_TOTAL:
@@ -802,7 +802,7 @@ func _retry_room() -> void:
 	if chips <= 0:
 		_clear_run_save()
 		_end_run("BUSTED OUT",
-				"That room took your last chip.\nThe trail ends here.", 0)
+				"That table took your last chip.\nThe trail ends here.", 0)
 		return
 	pending_retry = current_offer.duplicate(true)
 	current_offer.min_bet = maxi(1, mini(int(current_offer.get("min_bet", 1)), chips))
@@ -1064,11 +1064,12 @@ func build_ui() -> void:
 	_screen_title(bet_layer, "PLACE YOUR BET")
 	_bet_info = _center(bet_layer, "", 250, 26, main.OFFWHITE)
 	_bet_slider = HSlider.new()
-	_bet_slider.position = Vector2(560, 460)
-	_bet_slider.size = Vector2(800, 40)
+	_bet_slider.position = Vector2(560, 450)
+	_bet_slider.size = Vector2(800, 48)
 	_bet_slider.step = 1
 	_bet_slider.value_changed.connect(func(_v: float) -> void:
 		_update_stake_label())
+	_style_bet_slider(_bet_slider)
 	bet_layer.add_child(_bet_slider)
 	_bet_stake_label = _center(bet_layer, "", 520, 32, main.GOLD)
 	var presets := [["MIN", 1.0], ["2×", 2.0], ["5×", 5.0], ["ALL IN", -1.0]]
@@ -1180,6 +1181,42 @@ func _center(parent: Control, text: String, y: float, font_size: int, color: Col
 	l.size = Vector2(main.VIEW.x, font_size * 2.2)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
+
+
+## Chunky, casino-visible slider: thick gold-rimmed track, gold fill,
+## and a fat round knob (drawn to a texture in code — no assets).
+func _style_bet_slider(slider: HSlider) -> void:
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color("242424")
+	track.border_color = Color("6b5a2a")
+	track.set_border_width_all(2)
+	track.set_corner_radius_all(8)
+	track.content_margin_top = 10
+	track.content_margin_bottom = 10
+	slider.add_theme_stylebox_override("slider", track)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = main.GOLD
+	fill.set_corner_radius_all(8)
+	fill.content_margin_top = 10
+	fill.content_margin_bottom = 10
+	slider.add_theme_stylebox_override("grabber_area", fill)
+	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
+	# Knob texture: gold disc with a dark rim.
+	var size := 34
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var c := (size - 1) / 2.0
+	for y in size:
+		for x in size:
+			var d := Vector2(x - c, y - c).length()
+			if d <= c - 0.5:
+				if d >= c - 4.0:
+					img.set_pixel(x, y, Color("6b5a2a"))
+				else:
+					img.set_pixel(x, y, main.GOLD)
+	var knob := ImageTexture.create_from_image(img)
+	slider.add_theme_icon_override("grabber", knob)
+	slider.add_theme_icon_override("grabber_highlight", knob)
+	slider.add_theme_icon_override("grabber_disabled", knob)
 
 
 func _back_button(parent: Control, action: Callable, text := "BACK") -> Button:
