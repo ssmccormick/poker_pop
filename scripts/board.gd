@@ -968,9 +968,10 @@ func _find_boss() -> PlayingCard:
 ## cell AND identity; the old head cell becomes a tail wall. `instant`
 ## skips animation (spawn-time setup eats; also headless-testable).
 func _cobra_eat(head: PlayingCard, instant: bool) -> void:
-	var dirs := HAZARD_DIRS.duplicate()
-	dirs.shuffle()
-	for d in dirs:
+	# Consider every edible neighbor and slither toward open space, so
+	# he doesn't casually coil himself into a corner.
+	var candidates: Array = []
+	for d in HAZARD_DIRS:
 		var q: Vector2i = head.grid_pos + d
 		if not grid.has(q):
 			continue
@@ -978,6 +979,26 @@ func _cobra_eat(head: PlayingCard, instant: bool) -> void:
 		if victim.boss != "" or victim.snake_tail or victim.is_safe \
 				or victim.objective != "":
 			continue
+		# Openness: edible/free orthogonal neighbors from the target cell
+		# (his current cell will become tail, so it doesn't count).
+		var openness := 0
+		for d2 in HAZARD_DIRS:
+			var n: Vector2i = q + d2
+			if n == head.grid_pos or not grid.has(n):
+				continue
+			var nc: PlayingCard = grid[n]
+			if not nc.snake_tail and nc.boss == "" and not nc.is_safe:
+				openness += 1
+		candidates.append({"cell": q, "openness": openness})
+	if candidates.is_empty():
+		return
+	candidates.shuffle()
+	candidates.sort_custom(func(a, b) -> bool:
+		return a.openness > b.openness)
+	var chosen: Vector2i = candidates[0].cell
+	if true:
+		var q: Vector2i = chosen
+		var victim: PlayingCard = grid[q]
 		# Old head cell becomes a tail segment remembering this identity.
 		head.cobra_stack.push_back({"rank": head.rank, "suit": head.suit})
 		var tail := PlayingCard.new()
