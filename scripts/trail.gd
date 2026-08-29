@@ -105,6 +105,7 @@ var _shop_stock: Array = []      # this shop room's shelves (no restocking)
 var _shop_stock_room := -1
 var _shop_stock_relic := ""
 var _shop_burned_here := false   # one burn per shop
+var pending_retry := {}          # a failed room that MUST be retried
 var current_offer := {}
 var stake := 0
 var _offers: Array = []
@@ -134,6 +135,7 @@ var _remove_info: Label
 var _end_label: Label
 var _shop_relic_btn: Button
 var _shop_burn_btn: Button
+var _bet_back_btn: Button
 var _tarot_relics: Label
 
 
@@ -187,6 +189,7 @@ func _save_run() -> void:
 	cf.set_value("run", "relics", relic_arr)
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
+	cf.set_value("run", "pending", pending_retry)
 	cf.save(RUN_PATH)
 
 
@@ -218,7 +221,8 @@ func _load_run() -> bool:
 		relics.append(String(id))
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
-	_shop_stock_room = -1  # resumed runs sit at a tarot, never mid-shop
+	pending_retry = cf.get_value("run", "pending", {})
+	_shop_stock_room = -1  # resumed runs sit at a tarot or a retry bet
 	run_active = true
 	return true
 
@@ -332,6 +336,7 @@ func _start_run(tier: int) -> void:
 	_second_wind_used = false
 	_fire_tick_flip = false
 	_shop_stock_room = -1
+	pending_retry = {}
 	run_active = true
 	main.score = 0
 	_apply_relic_effects()
@@ -343,7 +348,17 @@ func _resume_run() -> void:
 	if _load_run():
 		main.score = 0
 		_apply_relic_effects()
-		_show_tarot()
+		if not pending_retry.is_empty() and chips > 0:
+			# A failed room still bars the way — back to its table.
+			main.menu_open = false
+			current_offer = pending_retry.duplicate(true)
+			current_offer.min_bet = maxi(1,
+					mini(int(current_offer.get("min_bet", 1)), chips))
+			_hide_all()
+			_show_bet()
+		else:
+			pending_retry = {}
+			_show_tarot()
 
 
 func back_to_menu() -> void:
@@ -526,8 +541,14 @@ func _do_cashout() -> void:
 func _show_bet() -> void:
 	_hide_all()
 	var o := current_offer
-	_bet_info.text = "%s — %s room\nTarget %d in %d hands   ·   odds %s\nYour chips: %d   ·   minimum bet: %d" % [
-		o.tarot, o.label, o.target, o.hands, _odds_text(o.odds), chips, o.min_bet]
+	# A failed room bars the way — no backing out of a retry.
+	_bet_back_btn.visible = pending_retry.is_empty()
+	var retry_line := ""
+	if not pending_retry.is_empty():
+		retry_line = "\nTHE ROOM STILL BARS THE WAY — beat it or bust."
+	_bet_info.text = "%s — %s room\nTarget %d in %d hands   ·   odds %s\nYour chips: %d   ·   minimum bet: %d%s" % [
+		o.tarot, o.label, o.target, o.hands, _odds_text(o.odds), chips, o.min_bet,
+		retry_line]
 	_bet_slider.min_value = o.min_bet
 	_bet_slider.max_value = chips
 	_bet_slider.value = o.min_bet
@@ -742,6 +763,7 @@ func _tick_room_hazards() -> void:
 
 func _room_cleared() -> void:
 	in_room = false
+	pending_retry = {}
 	main.board.locked = true
 	main.board.suppress_refill = true
 	if main.board._refill_active:
@@ -763,21 +785,29 @@ func _room_cleared() -> void:
 func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	in_room = false
 	main.board.locked = true
-	# Fail forward, scarred: stake is already gone; take a cursed card
-	# (unless Second Wind spares the first stumble of the run).
+	# The stake is gone and a curse joins the deck (unless Second Wind
+	# spares the first stumble) — and the room does NOT clear: the same
+	# table must be beaten before the trail continues.
 	if has_relic("second_wind") and not _second_wind_used:
 		_second_wind_used = true
 		reason = "BUSTED — SECOND WIND, NO SCAR"
 	else:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 	main._announce(reason, main.RED)
-	_after_board_settles(func() -> void:
-		room_index += 1
-		if room_index >= ROOMS_TOTAL:
-			_trail_complete()
-		else:
-			_save_run()
-			_show_tarot())
+	_after_board_settles(_retry_room)
+
+
+## Back to the same room's table: re-bet or bust.
+func _retry_room() -> void:
+	if chips <= 0:
+		_clear_run_save()
+		_end_run("BUSTED OUT",
+				"That room took your last chip.\nThe trail ends here.", 0)
+		return
+	pending_retry = current_offer.duplicate(true)
+	current_offer.min_bet = maxi(1, mini(int(current_offer.get("min_bet", 1)), chips))
+	_save_run()
+	_show_bet()
 
 
 func _after_board_settles(then: Callable) -> void:
@@ -787,15 +817,13 @@ func _after_board_settles(then: Callable) -> void:
 
 
 ## Player bailed mid-room (M to menu): the stake is already spent, so it
-## just counts as a fail — scar applied, save written.
+## counts as a fail — scar applied, and the room still awaits on resume.
 func on_abandon_room() -> void:
 	if not in_room:
 		return
 	in_room = false
 	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
-	room_index += 1
-	if room_index >= ROOMS_TOTAL:
-		room_index = ROOMS_TOTAL - 1  # abandoning the finale just fails it
+	pending_retry = current_offer.duplicate(true)
 	_save_run()
 
 
@@ -1060,7 +1088,7 @@ func build_ui() -> void:
 	var bet_back := func() -> void:
 		bet_layer.visible = false
 		_show_tarot()
-	_back_button(bet_layer, bet_back, "BACK")
+	_bet_back_btn = _back_button(bet_layer, bet_back, "BACK")
 
 	pick_layer = _layer()
 	_screen_title(pick_layer, "TAKE A CARD")
@@ -1154,7 +1182,8 @@ func _center(parent: Control, text: String, y: float, font_size: int, color: Col
 	return l
 
 
-func _back_button(parent: Control, action: Callable, text := "BACK") -> void:
+func _back_button(parent: Control, action: Callable, text := "BACK") -> Button:
 	var b: Button = main._button(parent, text, Vector2(60, 970), Vector2(200, 54))
 	b.add_theme_font_size_override("font_size", 20)
 	b.pressed.connect(action)
+	return b

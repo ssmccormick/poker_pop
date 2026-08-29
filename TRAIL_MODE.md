@@ -303,19 +303,21 @@ Trail restructure that comes with this: ROOMS_TOTAL 21, regions of 7,
 shops offered at region positions 3 and 6, target/blind curves
 recalibrated across 21 rooms, boss tarot cards drawn as court cards.
 
-## Failure & stakes — fail forward, scarred
+## Failure & stakes — the room bars the way
 
-Failing a room does NOT end the run. It costs you three ways:
+Failing a room does NOT clear it. It costs you three ways:
 1. Your **stake** is lost.
-2. The room's **reward is gone** — fate deals a fresh set of tarot
-   cards and the trail moves on (no grinding retries).
-3. A **Cursed card** is shuffled into your deck — dead weight that
-   can't be selected, clogging board texture until you pay a shop to
-   burn it. Losses hurt the build, not just the bankroll.
+2. A **Cursed card** is shuffled into your deck — dead weight that
+   blocks chains until you pay a shop to burn it.
+3. **You must play the same room again** — straight back to its bet
+   screen (no backing out, no cash-out) with a fresh board, re-staking
+   from what's left. Beat it or bleed out.
 
-The run ends only by **bankruptcy** (can't cover the minimum bet) or by
-choosing to **cash out**. Banked cash is always safe. The player sets
-their own stakes every room; the game only escalates the floor.
+The run ends by **bankruptcy** (a failed room leaves you at zero, or
+you can't cover a retry) or by choosing to **cash out** between rooms.
+Bosses are all-in, so a boss loss IS bankruptcy. Banked cash is always
+safe. Quitting mid-room counts as a fail, and the barred room is saved
+with the run — resuming drops you back at its table.
 
 ## Technical skeleton (build phases)
 
