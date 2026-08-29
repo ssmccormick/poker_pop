@@ -1236,7 +1236,8 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 	var out: Array = []
 	var p := from + dir
 	while p.x >= 0 and p.x < cols and p.y >= 0 and p.y < rows:
-		if grid.has(p):
+		# Safes are too heavy for the wind — the gust blows around them.
+		if grid.has(p) and not grid[p].is_safe:
 			out.append(p)
 		p += dir
 	return out

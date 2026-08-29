@@ -17,6 +17,12 @@ func _init() -> void:
 	failures += _check(line == [Vector2i(0, 2)], "wind line goes down")
 	line = b.wind_line_cells(Vector2i(0, 0), Vector2i.LEFT)
 	failures += _check(line.is_empty(), "wind line at the edge is empty")
+	var heavy := PlayingCard.new()
+	heavy.is_safe = true
+	b.grid[Vector2i(2, 0)] = heavy
+	line = b.wind_line_cells(Vector2i(0, 0), Vector2i.RIGHT)
+	failures += _check(line == [Vector2i(1, 0), Vector2i(3, 0)],
+			"the safe is too heavy for the wind")
 	_free_board(b)
 
 	# --- apply_room_hazards ------------------------------------------------
