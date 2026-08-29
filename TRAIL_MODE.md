@@ -138,9 +138,15 @@ scoring hands, after the board settles.
 | Fire | THE DEVIL | Rank ticks −1 per hand; below 2 it burns up (unscored) and spreads to orthogonal neighbors | Play it (scores at current rank) to extinguish |
 | Wind | THE CHARIOT | When played, every card from its cell to the edge in its arrow direction is blown off (unscored) | It's a tool as much as a hazard — aim it at junk |
 | Stone | STRENGTH | Must be in 3 scoring hands; scores each time; cracks visibly; 3rd use pops it | Chip away; it squats on its cell meanwhile |
+| Water | TEMPERANCE | When played, it splashes one random orthogonally-adjacent card: that card's rank and suit are WASHED AWAY — hidden until it's played. It still is what it was; you just have to remember | Play cards before they get soaked; memorize the board before splashing |
 
 Design calls: fire spreads 4-way (8-way wipes 5×5 boards); spread skips
 hazarded/cursed cards; hazards don't persist in the run save.
+Water calls: washed cards play normally (the evaluator knows the truth —
+the player doesn't); while a washed card is selected the preview shows
+"???" and the valid-hand green border is suppressed so you can't probe
+for free; the splash only lands on plain cards (never hazarded, cursed,
+objective, or already-washed ones); washing is room-local.
 
 ## Objective cards (rules locked, build pending)
 
@@ -176,6 +182,39 @@ time the card is played. Stored on the deck entry, drawn as overlays.
 | --- | --- |
 | Chip card | Pays bonus chips every time it's played in a scoring hand |
 | Mult card | Multiplies the score of any hand it's part of (×1.5; multiple mults stack multiplicatively) |
+
+## Relic system (rules drafted, build after objectives)
+
+Run-wide passive items, Balatro-joker/StS-relic style. Held for the
+run (max 5 — visible as a row on the tarot screen and a line in-room),
+saved with the run, gone when it ends. Acquired from the shop's relic
+slot, chest rewards, and eventually bosses. Rarity sets price:
+Common ~60 chips · Rare ~120 · Legendary ~250.
+
+Starter catalog (names/numbers draft):
+| Relic | Rarity | Effect |
+| --- | --- | --- |
+| Horseshoe | C | +1 hand in every room's budget |
+| Card Sleeve | C | Card picks offer 4 choices |
+| Snake Oil | C | Shop prices −25% |
+| Tin Star | C | +10 chips every cleared room |
+| Rabbit's Foot | C | Ambient safes/chests twice as likely |
+| Bomb Squad Badge | C | Bombs start with +2 fuse |
+| Chisel | C | Stones need one fewer use |
+| Fire Blanket | R | Fire ticks every 2nd hand |
+| Magnifying Glass | R | Washed cards still show their suit |
+| Gold Tooth | R | Chip cards pay double |
+| Mirror Shades | R | Mult cards ×2 instead of ×1.5 |
+| Second Wind | R | First failed room each run adds no cursed card |
+| Bankroll Clip | R | Cash-out rate +0.25× |
+| Dowsing Rod | R | Safe combos use only ranks 2–6 |
+| Lucky Chip | L | 10% chance a played hand costs no hand |
+
+## Shop v2 (with the modifier/relic build)
+
+The Hermit sells **10 cards** (2 rows of 5): plain cards 40 chips,
+duplicates-of-owned 50, modified (chip/mult) 80 — plus **1 relic slot**
+and the burn-a-card service (30). No reroll in v1.
 
 ## Card modifiers (further drafts — need our own names/flavor)
 
