@@ -39,8 +39,12 @@ const HAZARD_ROOMS := [
 const BASE_TARGET := 300          # room 1 target before scaling
 const TARGET_STEP := 110          # + per room
 const REGION_BLINDS := [10, 25, 50]
-const SHOP_CARD_PRICE := 50
+const SHOP_CARD_PRICE := 40       # plain card
+const SHOP_DUP_PRICE := 50        # exact duplicate of a card you own
+const SHOP_MOD_PRICE := 80        # chip/mult enhanced card
 const SHOP_REMOVE_PRICE := 30
+const PICK_MOD_CHANCE := 0.10     # card picks: chance of an enhanced offer
+const SHOP_MOD_CHANCE := 0.20     # shop slots: chance of an enhanced card
 const FATE_KICKER := 15           # chips for trusting The Fool
 const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
 const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
@@ -123,13 +127,16 @@ func _save_run() -> void:
 	var ranks := PackedInt32Array()
 	var suits := PackedInt32Array()
 	var curses := PackedInt32Array()
+	var mods := PackedStringArray()
 	for c in deck:
 		ranks.append(c.rank)
 		suits.append(c.suit)
 		curses.append(1 if c.get("cursed", false) else 0)
+		mods.append(c.get("mod", ""))
 	cf.set_value("run", "ranks", ranks)
 	cf.set_value("run", "suits", suits)
 	cf.set_value("run", "curses", curses)
+	cf.set_value("run", "mods", mods)
 	cf.save(RUN_PATH)
 
 
@@ -150,10 +157,12 @@ func _load_run() -> bool:
 	var ranks: PackedInt32Array = cf.get_value("run", "ranks", PackedInt32Array())
 	var suits: PackedInt32Array = cf.get_value("run", "suits", PackedInt32Array())
 	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
+	var mods: PackedStringArray = cf.get_value("run", "mods", PackedStringArray())
 	deck.clear()
 	for i in ranks.size():
 		deck.append({"rank": ranks[i], "suit": suits[i],
-				"cursed": curses[i] == 1})
+				"cursed": curses[i] == 1,
+				"mod": mods[i] if i < mods.size() else ""})
 	run_active = true
 	return true
 
@@ -186,14 +195,18 @@ func _cashout_value(rate_bonus := 1.0) -> int:
 	return int(chips * _table().rate * rate_bonus / 10.0)
 
 
-func _random_card_offer() -> Dictionary:
+func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
+	var mod := ""
+	if randf() < mod_chance:
+		mod = "mult" if randf() < 0.5 else "chip"
 	# Half the time, offer an exact duplicate of a card already owned
 	# (the Five of a Kind / Flushed Five enabler).
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
 		if not src.get("cursed", false):
-			return {"rank": src.rank, "suit": src.suit, "cursed": false}
-	return {"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": false}
+			return {"rank": src.rank, "suit": src.suit, "cursed": false, "mod": mod}
+	return {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+			"cursed": false, "mod": mod}
 
 
 # --- Flow: entry ----------------------------------------------------------
@@ -429,6 +442,7 @@ func _seed_hazards_when_ready(kind: String, count: int) -> void:
 
 func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
+	chips += result.get("bonus_chips", 0)
 	room_score += result.score
 	if room_score >= room_target:
 		_room_cleared()
@@ -527,6 +541,7 @@ func _show_pick() -> void:
 		var pc := PlayingCard.new()
 		pc.rank = card_data.rank
 		pc.suit = card_data.suit
+		pc.mod = card_data.get("mod", "")
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.6, 1.6)
 		pc.position = Vector2(85, 120)
@@ -542,29 +557,50 @@ func _show_pick() -> void:
 
 # --- Flow: shop -----------------------------------------------------------
 
+## One shop slot: the card data plus its price tier.
+func _shop_card_offer() -> Dictionary:
+	if randf() < SHOP_MOD_CHANCE:
+		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+				"cursed": false, "mod": "mult" if randf() < 0.5 else "chip"},
+				"price": SHOP_MOD_PRICE}
+	if randf() < 0.5 and not deck.is_empty():
+		var src: Dictionary = deck.pick_random()
+		if not src.get("cursed", false):
+			return {"data": {"rank": src.rank, "suit": src.suit,
+					"cursed": false, "mod": ""}, "price": SHOP_DUP_PRICE}
+	return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+			"cursed": false, "mod": ""}, "price": SHOP_CARD_PRICE}
+
+
 func _show_shop() -> void:
 	_hide_all()
 	main.game_started = false
 	_shop_info.text = "CHIPS  %d" % chips
 	for child in _shop_box.get_children():
 		child.queue_free()
-	for i in 3:
-		var card_data := _random_card_offer()
-		var holder: Button = main._button(_shop_box, "", Vector2(560 + i * 220, 0), Vector2(170, 280))
+	for i in 10:
+		var offer := _shop_card_offer()
+		var col := i % 5
+		var row := i / 5
+		var holder: Button = main._button(_shop_box, "",
+				Vector2(445 + col * 220, row * 280), Vector2(170, 250))
 		var pc := PlayingCard.new()
-		pc.rank = card_data.rank
-		pc.suit = card_data.suit
+		pc.rank = offer.data.rank
+		pc.suit = offer.data.suit
+		pc.mod = offer.data.mod
 		pc.material = Themes.current_material()
-		pc.scale = Vector2(1.5, 1.5)
-		pc.position = Vector2(85, 100)
+		pc.scale = Vector2(1.3, 1.3)
+		pc.position = Vector2(85, 95)
 		holder.add_child(pc)
-		var price_tag: Label = main._label(holder, "%d chips" % SHOP_CARD_PRICE, Vector2(0, 236), 18, main.GOLD)
+		var price: int = offer.price
+		var price_tag: Label = main._label(holder, "%d chips" % price,
+				Vector2(0, 212), 18, main.GOLD)
 		price_tag.size = Vector2(170, 30)
 		price_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		var data := card_data
+		var data: Dictionary = offer.data
 		holder.pressed.connect(func() -> void:
-			if chips >= SHOP_CARD_PRICE:
-				chips -= SHOP_CARD_PRICE
+			if chips >= price:
+				chips -= price
 				deck.append(data)
 				main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
 				holder.disabled = true
@@ -701,15 +737,15 @@ func build_ui() -> void:
 
 	shop_layer = _layer()
 	_screen_title(shop_layer, "THE HERMIT'S SHOP")
-	_shop_info = _center(shop_layer, "", 230, 28, main.GOLD)
+	_shop_info = _center(shop_layer, "", 178, 28, main.GOLD)
 	_shop_box = Control.new()
-	_shop_box.position = Vector2(0, 320)
+	_shop_box.position = Vector2(0, 240)
 	shop_layer.add_child(_shop_box)
-	var rm: Button = main._button(shop_layer, "BURN A CARD — %d chips" % SHOP_REMOVE_PRICE, Vector2(700, 700), Vector2(520, 60))
-	rm.add_theme_font_size_override("font_size", 22)
+	var rm: Button = main._button(shop_layer, "BURN A CARD — %d chips" % SHOP_REMOVE_PRICE, Vector2(555, 850), Vector2(380, 56))
+	rm.add_theme_font_size_override("font_size", 20)
 	rm.pressed.connect(_show_remove)
-	var leave: Button = main._button(shop_layer, "BACK ON THE TRAIL", Vector2(700, 780), Vector2(520, 60))
-	leave.add_theme_font_size_override("font_size", 22)
+	var leave: Button = main._button(shop_layer, "BACK ON THE TRAIL", Vector2(985, 850), Vector2(380, 56))
+	leave.add_theme_font_size_override("font_size", 20)
 	leave.pressed.connect(_leave_shop)
 
 	remove_layer = _layer()

@@ -128,6 +128,12 @@ var washed := false:  # splashed: rank/suit hidden from the player
 	set(value):
 		washed = value
 		queue_redraw()
+# Deck enhancement (trail): "", "chip" (bonus chips when played),
+# "mult" (multiplies the hand it's in).
+var mod := "":
+	set(value):
+		mod = value
+		queue_redraw()
 var error_flash := false:  # brief red border after an invalid submit
 	set(value):
 		error_flash = value
@@ -231,6 +237,15 @@ func _draw() -> void:
 				draw_rect(Rect2(-13.0 + i * 10.0, H / 2.0 - 16.0, 7, 7), Color("3a3a40"))
 		"water":
 			_draw_pixel_map(DROP_PX, Vector2(W / 2.0 - 14, H / 2.0 - 15), 3.0, WATER_BLUE)
+
+	match mod:
+		"chip":
+			var c := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
+			draw_circle(c, 9, GOLD)
+			draw_circle(c, 5, Color("a8842c"))
+		"mult":
+			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "×",
+					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, ERROR_RED)
 
 	if cursed:
 		# Darken the face and slash it out.

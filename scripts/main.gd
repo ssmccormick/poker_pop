@@ -151,6 +151,10 @@ func _ready() -> void:
 				_open_options()
 			"trail":
 				trail.open_buyin()
+			"trailshop":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail._choose_offer({"kind": "shop", "tarot": "THE HERMIT"}, false)
 			"trailtarot":
 				menu_layer.visible = false
 				trail._start_run(0)

@@ -49,6 +49,8 @@ var custom_deck: Array = []
 # --- Trail hazards --------------------------------------------------------
 const BOMB_FUSE := 5
 const STONE_HITS_START := 3
+const CHIP_BONUS := 8      # chips per played chip-mod card (trail)
+const MULT_FACTOR := 1.5   # per played mult-mod card, stacking
 const HAZARD_DIRS: Array[Vector2i] = [
 	Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
@@ -266,6 +268,7 @@ func play_hand() -> void:
 	if not result.playable:
 		_reject_hand()
 		return
+	_apply_card_mods(result)
 	result["count"] = selected.size()
 	busy = true
 	hand_played.emit(result)
@@ -278,7 +281,10 @@ func play_hand() -> void:
 	for card in played:
 		center += card.position
 	center /= played.size()
-	_spawn_float_text("+%d" % result.score, center)
+	var float_txt := "+%d" % result.score
+	if result.get("bonus_chips", 0) > 0:
+		float_txt += "  +%d CHIPS" % result.bonus_chips
+	_spawn_float_text(float_txt, center)
 
 	# Partition: stones with uses left stay on the board; wind and water
 	# effects are snapshotted before their cells change.
@@ -452,6 +458,7 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.rank = data.rank
 			card.suit = data.suit
 			card.cursed = data.get("cursed", false)
+			card.mod = data.get("mod", "")
 			var p := Vector2i(x, row)
 			card.grid_pos = p
 			grid[p] = card
@@ -709,6 +716,23 @@ func shuffle_board() -> void:
 				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	await tw.finished
 	busy = false
+
+
+## Applies deck-modifier effects from the current selection to a hand
+## result: mult cards multiply the score (stacking), chip cards add
+## bonus_chips. Pure on the result dict — headless-testable.
+func _apply_card_mods(result: Dictionary) -> void:
+	var mults := 0
+	var chip_cards := 0
+	for card in selected:
+		if card.mod == "mult":
+			mults += 1
+		elif card.mod == "chip":
+			chip_cards += 1
+	if mults > 0:
+		result.score = int(result.score * pow(MULT_FACTOR, mults))
+	if chip_cards > 0:
+		result["bonus_chips"] = chip_cards * CHIP_BONUS
 
 
 # --- Trail hazard engine --------------------------------------------------
