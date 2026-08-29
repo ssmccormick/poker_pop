@@ -14,6 +14,7 @@ signal dead_board
 signal card_dealt(card: PlayingCard)  # per-card audio hook, on deal arrival
 signal settle_landed                  # fires once when Phase A lands
 signal refill_done                    # internal: refill finished or skipped
+signal safe_cracked                   # the combo chain opened the safe
 
 const GAP := 8
 const CELL_W := PlayingCard.W + GAP
@@ -202,6 +203,20 @@ func _toggle_select(card: PlayingCard) -> void:
 	if card.cursed:
 		_play_sound(SFX_FLIP, 0.7, -10.0)
 		return
+	if card.is_safe and not card.selected:
+		# The safe only joins a chain that IS its combination, in order.
+		if _chain_matches_combo(card) \
+				and _is_adjacent(card.grid_pos, selected.back().grid_pos):
+			card.selected = true
+			selected.append(card)
+			_play_sound(SFX_SELECTS.pick_random(), 1.35, -6.0)
+			_sync_chain_indices()
+			_update_hand_validity()
+			_update_safe_progress()
+			selection_changed.emit()
+		else:
+			_play_sound(SFX_FLIP, 0.7, -10.0)
+		return
 	if card.selected:
 		# Remove this card and everything chained after it.
 		var idx := selected.find(card)
@@ -221,7 +236,32 @@ func _toggle_select(card: PlayingCard) -> void:
 				1.0 + 0.07 * (selected.size() - 1) + randf_range(-0.02, 0.02), -6.0)
 	_sync_chain_indices()
 	_update_hand_validity()
+	_update_safe_progress()
 	selection_changed.emit()
+
+
+## True when the current chain's ranks equal `safe.combo` exactly.
+func _chain_matches_combo(safe: PlayingCard) -> bool:
+	if selected.size() != safe.combo.size():
+		return false
+	for i in selected.size():
+		if selected[i].rank != safe.combo[i]:
+			return false
+	return true
+
+
+## Lights up each safe's matched combo-prefix digits from the chain.
+func _update_safe_progress() -> void:
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if not card.is_safe:
+			continue
+		var matched := 0
+		for i in mini(selected.size(), card.combo.size()):
+			if selected[i].is_safe or selected[i].rank != card.combo[i]:
+				break
+			matched += 1
+		card.combo_progress = matched
 
 
 func _sync_chain_indices() -> void:
@@ -236,6 +276,7 @@ func clear_selection() -> void:
 		card.selected = false
 		card.hand_valid = false
 	selected.clear()
+	_update_safe_progress()
 	selection_changed.emit()
 
 
@@ -244,7 +285,15 @@ func clear_selection() -> void:
 ## free probing of hidden identities.
 func _update_hand_validity() -> void:
 	var valid := false
-	if not selected.is_empty():
+	var has_safe := false
+	for card in selected:
+		if card.is_safe:
+			has_safe = true
+			break
+	if has_safe:
+		# The safe can only have joined via its full combo — crackable.
+		valid = true
+	elif not selected.is_empty():
 		valid = Poker.evaluate(get_selected_data()).playable
 		for card in selected:
 			if card.washed:
@@ -264,12 +313,26 @@ func get_selected_data() -> Array:
 func play_hand() -> void:
 	if busy or locked or selected.is_empty():
 		return
+	for card in selected:
+		if card.is_safe:
+			_crack_safe()
+			return
 	var result := Poker.evaluate(get_selected_data())
 	if not result.playable:
 		_reject_hand()
 		return
 	_apply_card_mods(result)
 	result["count"] = selected.size()
+	# Opening a chest: the hand contains both the key and the chest.
+	var has_key := false
+	var has_chest := false
+	for card in selected:
+		if card.objective == "key":
+			has_key = true
+		elif card.objective == "chest":
+			has_chest = true
+	if has_key and has_chest:
+		result["chest_opened"] = true
 	busy = true
 	hand_played.emit(result)
 
@@ -365,6 +428,88 @@ func play_hand() -> void:
 	busy = false
 	if not has_playable_hand():
 		dead_board.emit()
+
+
+## The combo chain ends on the safe: consume the chain (no score), pop
+## the safe open, and let trail decide what it was worth.
+func _crack_safe() -> void:
+	busy = true
+	safe_cracked.emit()
+	var played := selected.duplicate()
+	selected.clear()
+	selection_changed.emit()
+	var center := Vector2.ZERO
+	for card in played:
+		center += card.position
+	center /= played.size()
+	_spawn_float_text("CRACKED!", center)
+	var tw := create_tween().set_parallel(true)
+	for i in played.size():
+		var card: PlayingCard = played[i]
+		var delay := 0.07 * i
+		grid.erase(card.grid_pos)
+		card.selected = false
+		card.chain_index = 0
+		tw.tween_property(card, "scale", Vector2.ZERO, 0.22) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN).set_delay(delay)
+		tw.tween_callback(_play_pop.bind(1.1 + 0.1 * i)).set_delay(delay + 0.1)
+	await tw.finished
+	for card in played:
+		card.queue_free()
+	if suppress_refill:
+		suppress_refill = false
+		busy = false
+		return
+	await _fall_and_fill(false)
+	busy = false
+	if not has_playable_hand():
+		dead_board.emit()
+
+
+## Replaces a random plain card with the locked safe (trail heists).
+func spawn_safe(combo: Array) -> void:
+	var candidates: Array = []
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if card.hazard == "" and not card.cursed and not card.washed \
+				and card.mod == "" and card.objective == "" and not card.is_safe:
+			candidates.append(p)
+	if candidates.is_empty():
+		return
+	var cell: Vector2i = candidates.pick_random()
+	var old: PlayingCard = grid[cell]
+	var safe := PlayingCard.new()
+	safe.is_safe = true
+	safe.combo = combo
+	safe.material = Themes.current_material()
+	safe.grid_pos = cell
+	safe.position = old.position
+	grid[cell] = safe
+	add_child(safe)
+	old.queue_free()
+
+
+## Marks two random plain cards as the key and the chest.
+func spawn_key_and_chest() -> void:
+	var candidates: Array = []
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if card.hazard == "" and not card.cursed and not card.washed \
+				and card.objective == "" and not card.is_safe:
+			candidates.append(card)
+	if candidates.size() < 2:
+		return
+	candidates.shuffle()
+	candidates[0].objective = "key"
+	candidates[1].objective = "chest"
+
+
+## True if any card on the board carries the given objective mark.
+func has_objective(kind: String) -> bool:
+	for p in grid:
+		if grid[p].objective == kind:
+			return true
+	return false
 
 
 ## Invalid submit: error sound, red flash, and a shake on the selected
@@ -581,19 +726,19 @@ func has_playable_hand() -> bool:
 	# or join any chain.
 	for p in grid:
 		var card: PlayingCard = grid[p]
-		if card.cursed:
+		if card.cursed or card.is_safe:
 			continue
 		if _group_chain_exists(p, {p: true}, {card.rank: 1}):
 			return true
 	# 5-card flush chains.
 	for p in grid:
-		if grid[p].cursed:
+		if grid[p].cursed or grid[p].is_safe:
 			continue
 		if _suit_chain_exists(p, {p: true}, 1):
 			return true
 	# 5-card straight chains (any pick order along the chain).
 	for p in grid:
-		if grid[p].cursed:
+		if grid[p].cursed or grid[p].is_safe:
 			continue
 		if _straight_chain_exists(p, {p: true}, {grid[p].rank: true}):
 			return true
@@ -616,7 +761,7 @@ func _group_chain_exists(p: Vector2i, visited: Dictionary, rank_counts: Dictiona
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q) or grid[q].cursed:
+			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe:
 				continue
 			var r: int = grid[q].rank
 			# A third distinct rank can never resolve into an exact hand.
@@ -642,7 +787,7 @@ func _suit_chain_exists(p: Vector2i, visited: Dictionary, depth: int) -> bool:
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if grid.has(q) and not visited.has(q) and not grid[q].cursed \
+			if grid.has(q) and not visited.has(q) and not grid[q].cursed and not grid[q].is_safe \
 					and grid[q].suit == suit:
 				visited[q] = true
 				if _suit_chain_exists(q, visited, depth + 1):
@@ -663,7 +808,7 @@ func _straight_chain_exists(p: Vector2i, visited: Dictionary, ranks: Dictionary)
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q) or grid[q].cursed:
+			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe:
 				continue
 			var r: int = grid[q].rank
 			if ranks.has(r):

@@ -71,6 +71,28 @@ func _init() -> void:
 			"washed card in the chain kills the green tell")
 	_free_board(b)
 
+	# --- safe combo matching -----------------------------------------------
+	b = _board([[3, 0, 0, 0], [9, 1, 1, 0], [5, 2, 2, 0], [2, 3, 3, 0]])
+	var safe := PlayingCard.new()
+	safe.is_safe = true
+	safe.combo = [3, 9, 5, 2]
+	b.grid[Vector2i(4, 0)] = safe
+	b.selected.assign([b.grid[Vector2i(0, 0)], b.grid[Vector2i(1, 0)],
+			b.grid[Vector2i(2, 0)], b.grid[Vector2i(3, 0)]])
+	failures += _check(b._chain_matches_combo(safe), "exact ordered combo matches")
+	b._update_safe_progress()
+	failures += _check(safe.combo_progress == 4, "all four digits light up")
+	b.selected.assign([b.grid[Vector2i(0, 0)], b.grid[Vector2i(1, 0)],
+			b.grid[Vector2i(3, 0)]])
+	failures += _check(not b._chain_matches_combo(safe), "wrong length fails")
+	b._update_safe_progress()
+	failures += _check(safe.combo_progress == 2, "prefix stops at first mismatch")
+	b.selected.assign([b.grid[Vector2i(1, 0)], b.grid[Vector2i(0, 0)],
+			b.grid[Vector2i(2, 0)], b.grid[Vector2i(3, 0)]])
+	failures += _check(not b._chain_matches_combo(safe), "out of order fails")
+	b.selected.clear()
+	_free_board(b)
+
 	if failures == 0:
 		print("ALL HAZARD TESTS PASSED")
 	else:

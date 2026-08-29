@@ -28,6 +28,8 @@ const RISKS := [
 # Hazard rooms: better odds, a board full of trouble. From room 2 on,
 # some play offers become hazard rooms.
 const HAZARD_CHANCE := 0.35
+const OBJECTIVE_CHANCE := 0.18   # heist/treasure rooms, from room 2 on
+const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 const HAZARD_ROOMS := [
 	{"tarot": "DEATH", "label": "Bomb", "hazard": "bomb", "odds": 2.0, "hands": 8, "count": 1},
 	{"tarot": "THE DEVIL", "label": "Fire", "hazard": "fire", "odds": 2.0, "hands": 8, "count": 2},
@@ -67,6 +69,8 @@ var in_room := false
 var room_score := 0
 var room_hands_left := 0
 var room_target := 0
+var room_goal := ""      # "" score target · "safe" heist · "chest" treasure
+var room_combo: Array = []
 var current_offer := {}
 var stake := 0
 var _offers: Array = []
@@ -98,6 +102,7 @@ var _end_label: Label
 
 func _ready() -> void:
 	_load_meta()
+	main.board.safe_cracked.connect(on_safe_cracked)
 
 
 # --- Persistence ----------------------------------------------------------
@@ -316,6 +321,21 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		if hz.hazard == "bomb" and room_index >= REGION_SIZE * 2:
 			count += 1  # late-trail bomb rooms mean business
 		offer["hazard_count"] = count
+	elif room_index >= 1 and randf() < OBJECTIVE_CHANCE:
+		# Objective rooms: no score target — do the job to clear.
+		if randf() < 0.5:
+			offer.tarot = "THE MOON"
+			offer.label = "Heist"
+			offer.odds = 2.0
+			offer["goal"] = "safe"
+		else:
+			offer.tarot = "THE STAR"
+			offer.label = "Treasure"
+			offer.odds = 1.5
+			offer["goal"] = "chest"
+		offer.hands = 8
+		offer.target = 0
+		offer.min_bet = mini(_blind_for(room_index), chips)
 	return offer
 
 
@@ -350,8 +370,13 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		if offer.has("hazard"):
 			hazard_line = "\nHAZARD: %d × %s" % [offer.hazard_count,
 					String(offer.hazard).to_upper()]
-		b.text = "%s\n\n%s room%s\nTarget  %d\nHands  %d\nOdds  %s\n\nMin bet  %d" % [
-			offer.tarot, offer.label, hazard_line, offer.target, offer.hands,
+		var goal_line := "Target  %d" % offer.target
+		if offer.get("goal", "") == "safe":
+			goal_line = "CRACK THE SAFE"
+		elif offer.get("goal", "") == "chest":
+			goal_line = "OPEN THE CHEST"
+		b.text = "%s\n\n%s room%s\n%s\nHands  %d\nOdds  %s\n\nMin bet  %d" % [
+			offer.tarot, offer.label, hazard_line, goal_line, offer.hands,
 			_odds_text(offer.odds), offer.min_bet]
 	return b
 
@@ -416,6 +441,8 @@ func _start_room() -> void:
 	in_room = true
 	room_score = 0
 	room_target = current_offer.target
+	room_goal = current_offer.get("goal", "")
+	room_combo = []
 	room_hands_left = current_offer.hands
 	main.mode_kind = "trail"
 	main.mode_label_text = "Trail · %s" % _table().name.capitalize()
@@ -429,29 +456,122 @@ func _start_room() -> void:
 		main.bg_rect.texture = main.backgrounds.pick_random()
 	main.board.reset()
 	main._begin_countdown()
-	if current_offer.has("hazard"):
-		_seed_hazards_when_ready(current_offer.hazard, current_offer.hazard_count)
+	_seed_room_specials()
 
 
-func _seed_hazards_when_ready(kind: String, count: int) -> void:
+## After the deal settles, put the room's promise on the board: hazards,
+## objectives, or (in plain rooms) a surprise ambient bonus.
+func _seed_room_specials() -> void:
 	while main.board.busy:
 		await get_tree().process_frame
-	if in_room:
-		main.board.apply_room_hazards(kind, count)
+	if not in_room:
+		return
+	if current_offer.has("hazard"):
+		main.board.apply_room_hazards(current_offer.hazard, current_offer.hazard_count)
+	elif room_goal == "safe":
+		room_combo = _generate_combo()
+		main.board.spawn_safe(room_combo)
+	elif room_goal == "chest":
+		main.board.spawn_key_and_chest()
+	elif randf() < AMBIENT_CHANCE:
+		# Surprise loot in a plain room.
+		if randf() < 0.5:
+			room_combo = _generate_combo()
+			main.board.spawn_safe(room_combo)
+		else:
+			main.board.spawn_key_and_chest()
+
+
+## A 4-digit combination drawn from low ranks present on the board.
+func _generate_combo() -> Array:
+	var pool: Array = []
+	for p in main.board.grid:
+		var card: PlayingCard = main.board.grid[p]
+		if not card.cursed and not card.is_safe and card.rank <= 9:
+			pool.append(card.rank)
+	var combo: Array = []
+	for i in 4:
+		combo.append(pool.pick_random() if not pool.is_empty() else randi_range(2, 9))
+	return combo
 
 
 func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
 	chips += result.get("bonus_chips", 0)
 	room_score += result.score
-	if room_score >= room_target:
+	if result.get("chest_opened", false):
+		_open_chest()
+		if room_goal == "chest":
+			_room_cleared()
+			return
+	if room_goal == "" and room_score >= room_target:
 		_room_cleared()
+		return
+	if room_goal == "chest" and not main.board.has_objective("key"):
+		# The key (or chest) went into a hand without its partner.
+		_room_failed("THE KEY IS LOST")
+		return
+	_consume_hand()
+
+
+## A hand (or a safe crack) is spent; run out and the room is lost.
+func _consume_hand() -> void:
+	room_hands_left -= 1
+	if room_hands_left <= 0:
+		_room_failed()
 	else:
-		room_hands_left -= 1
-		if room_hands_left <= 0:
-			_room_failed()
-		else:
-			_tick_room_hazards()
+		_tick_room_hazards()
+
+
+func on_safe_cracked() -> void:
+	if room_goal == "safe":
+		_room_cleared()
+		return
+	# Ambient safe: bonus loot, but the crack still costs a hand.
+	var region := room_index / REGION_SIZE + 1
+	var loot := 40 + 20 * region
+	chips += loot
+	_announce_after_settle("SAFE LOOT  +%d CHIPS" % loot)
+	_consume_hand()
+
+
+## Chest reward roll (treasure rooms and ambient chests).
+func _open_chest() -> void:
+	var region := room_index / REGION_SIZE + 1
+	var roll := randf()
+	if roll < 0.45:
+		var loot := 30 + 15 * region
+		chips += loot
+		_announce_after_settle("CHEST  +%d CHIPS" % loot)
+	elif roll < 0.65:
+		var card := _random_card_offer(0.25)
+		deck.append(card)
+		_announce_after_settle("CHEST  NEW CARD FOR YOUR DECK")
+	elif roll < 0.80:
+		var dollars := 5 + 5 * region
+		cash += dollars
+		_save_meta()
+		_announce_after_settle("CHEST  +$%d CASH" % dollars)
+	else:
+		var enhanced := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+				"cursed": false, "mod": "mult" if randf() < 0.5 else "chip"}
+		deck.append(enhanced)
+		_announce_after_settle("CHEST  AN ENHANCED CARD!")
+	_save_run()
+
+
+## Matched combo digits on the board's safe (0-4), for the room banner.
+func safe_progress() -> int:
+	for p in main.board.grid:
+		if main.board.grid[p].is_safe:
+			return main.board.grid[p].combo_progress
+	return 0
+
+
+func _announce_after_settle(text: String) -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	main._announce(text)
 
 
 ## After the hand fully resolves, hazards act: fires tick and spread,

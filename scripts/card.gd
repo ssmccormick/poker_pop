@@ -35,6 +35,24 @@ const DROP_PX := [
 	"11111",
 	"01110",
 ]
+const KEY_PX := [
+	"0111000000",
+	"1101000000",
+	"1101111111",
+	"1101000101",
+	"0111000101",
+]
+const CHEST_PX := [
+	"01111110",
+	"11111111",
+	"10111101",
+	"11111111",
+	"10100101",
+	"10111101",
+	"11111111",
+]
+const SAFE_STEEL := Color("6e737c")
+const SAFE_DARK := Color("4a4e56")
 
 # suit ids: 0 = spades, 1 = hearts, 2 = diamonds, 3 = clubs
 const SUIT_NAMES := ["Spades", "Hearts", "Diamonds", "Clubs"]
@@ -134,6 +152,21 @@ var mod := "":
 	set(value):
 		mod = value
 		queue_redraw()
+# Objectives (trail): "", "key", "chest".
+var objective := "":
+	set(value):
+		objective = value
+		queue_redraw()
+# The locked safe (trail heists): shows a 4-digit combination.
+var is_safe := false:
+	set(value):
+		is_safe = value
+		queue_redraw()
+var combo: Array = []
+var combo_progress := 0:  # matched prefix digits, lit up green
+	set(value):
+		combo_progress = value
+		queue_redraw()
 var error_flash := false:  # brief red border after an invalid submit
 	set(value):
 		error_flash = value
@@ -202,7 +235,19 @@ func _draw() -> void:
 		_face_box.draw(get_canvas_item(), rect)
 
 	var font := ThemeDB.fallback_font
-	if washed:
+	if is_safe:
+		# The locked safe: steel face, dial, and the combination on show.
+		draw_rect(rect.grow(-3), SAFE_STEEL)
+		draw_circle(Vector2(0, 12), 16, SAFE_DARK)
+		draw_circle(Vector2(0, 12), 6, SAFE_STEEL)
+		draw_line(Vector2(0, 12), Vector2(0, -2), Color("2c2f35"), 3.0)
+		for i in combo.size():
+			var digit_col := GREEN if i < combo_progress else Color("e8e0c8")
+			draw_string(font, Vector2(-W / 2.0 + 4 + i * 18, -H / 2.0 + 28),
+					str(combo[i]), HORIZONTAL_ALIGNMENT_CENTER, 16, 17, digit_col)
+		if selected:
+			pass  # border/badge drawn below as usual
+	elif washed:
 		# The splash hides everything — you'd better remember this card.
 		draw_rect(rect.grow(-3), Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.16))
 		_draw_pixel_map(DROP_PX, Vector2(0, 2), 5.0, WATER_BLUE)
@@ -246,6 +291,12 @@ func _draw() -> void:
 		"mult":
 			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "×",
 					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, ERROR_RED)
+
+	match objective:
+		"key":
+			_draw_pixel_map(KEY_PX, Vector2(W / 2.0 - 22, H / 2.0 - 14), 3.0, GOLD)
+		"chest":
+			_draw_pixel_map(CHEST_PX, Vector2(W / 2.0 - 16, H / 2.0 - 15), 3.0, Color("b07f3e"))
 
 	if cursed:
 		# Darken the face and slash it out.

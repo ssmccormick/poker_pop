@@ -169,6 +169,13 @@ func _ready() -> void:
 					trail._confirm_bet()
 				if m == "trailhazard":
 					_debug_seed_hazards()
+			"trailheist":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail._choose_offer({"kind": "play", "tarot": "THE MOON",
+						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
+						"min_bet": 10, "goal": "safe"}, false)
+				trail._confirm_bet()
 			"ready":
 				_start_mode("arcade")
 			"time":
@@ -251,10 +258,22 @@ func _update_labels() -> void:
 		target_label.text = "LEVEL %d      %d / %d" % [level, level_score, target]
 		target_bar_fill.size.x = 1314.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
 	elif show_trail:
-		target_label.text = "ROOM %d / %d      %d / %d" % \
-				[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
-		target_bar_fill.size.x = 1314.0 * clampf(
-				float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
+		if trail.room_goal == "safe":
+			var digits := PackedStringArray()
+			for d in trail.room_combo:
+				digits.append(str(d))
+			target_label.text = "ROOM %d / %d      SAFE  %s" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, " · ".join(digits)]
+			target_bar_fill.size.x = 1314.0 * trail.safe_progress() / 4.0
+		elif trail.room_goal == "chest":
+			target_label.text = "ROOM %d / %d      KEY + CHEST IN ONE HAND" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL]
+			target_bar_fill.size.x = 0.0
+		else:
+			target_label.text = "ROOM %d / %d      %d / %d" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
+			target_bar_fill.size.x = 1314.0 * clampf(
+					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_preview()
 
 
@@ -302,6 +321,11 @@ func _update_preview() -> void:
 		preview_label.text = "Chain up to 5 adjacent cards to build a poker hand."
 		preview_label.add_theme_color_override("font_color", DIM)
 	else:
+		for card in board.selected:
+			if card.is_safe:
+				preview_label.text = "COMBINATION SET  —  play the hand to crack the safe!"
+				preview_label.add_theme_color_override("font_color", GOLD)
+				return
 		for card in board.selected:
 			if card.washed:
 				preview_label.text = "???  —  a soaked card hides this hand's value."
@@ -1056,7 +1080,7 @@ func _debug_seed_hazards() -> void:
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard":
+		"trailhazard", "trailheist":
 			await get_tree().create_timer(4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
