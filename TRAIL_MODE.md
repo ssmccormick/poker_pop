@@ -148,7 +148,7 @@ the player doesn't); while a washed card is selected the preview shows
 for free; the splash only lands on plain cards (never hazarded, cursed,
 objective, or already-washed ones); washing is room-local.
 
-## Objective cards (rules locked, build pending)
+## Objective cards (SHIPPED)
 
 **The Safe (heist).** A safe card sits on the board showing a 4-digit
 combination (ranks 2–9, duplicates possible), e.g. **3·9·5·2**. Crack
@@ -172,7 +172,7 @@ modified card.
 - **Ambient chests**: random chance in normal rooms as optional loot.
 - v1: objective spawns don't mix with hazard rooms.
 
-## Deck modifiers — first two (rules locked, build pending)
+## Deck modifiers — first two (SHIPPED)
 
 Chip and Mult cards begin the modifier family: enhancements on cards
 YOU own, acquired via card picks, shops, and chests, triggering every
@@ -183,7 +183,7 @@ time the card is played. Stored on the deck entry, drawn as overlays.
 | Chip card | Pays bonus chips every time it's played in a scoring hand |
 | Mult card | Multiplies the score of any hand it's part of (×1.5; multiple mults stack multiplicatively) |
 
-## Relic system (rules drafted, build after objectives)
+## Relic system (SHIPPED — all 15 below are in)
 
 Run-wide passive items, Balatro-joker/StS-relic style. Held for the
 run (max 5 — visible as a row on the tarot screen and a line in-room),
@@ -210,7 +210,7 @@ Starter catalog (names/numbers draft):
 | Dowsing Rod | R | Safe combos use only ranks 2–6 |
 | Lucky Chip | L | 10% chance a played hand costs no hand |
 
-## Shop v2 (with the modifier/relic build)
+## Shop v2 (SHIPPED)
 
 The Hermit sells **10 cards** (2 rows of 5): plain cards 40 chips,
 duplicates-of-owned 50, modified (chip/mult) 80 — plus **1 relic slot**

@@ -54,6 +54,27 @@ const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
 const META_PATH := "user://trail_meta.cfg"
 const RUN_PATH := "user://trail_run.cfg"
 
+# Relics: run-wide passives, max 5, bought at shops / found in chests.
+const MAX_RELICS := 5
+const RELIC_PRICES := [60, 120, 250]  # by rarity C/R/L
+const RELICS := {
+	"horseshoe": {"name": "Horseshoe", "rarity": 0, "desc": "+1 hand in every room"},
+	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks offer 4 choices"},
+	"snake_oil": {"name": "Snake Oil", "rarity": 0, "desc": "Shop prices -25%"},
+	"tin_star": {"name": "Tin Star", "rarity": 0, "desc": "+10 chips each cleared room"},
+	"rabbits_foot": {"name": "Rabbit's Foot", "rarity": 0, "desc": "Ambient loot twice as likely"},
+	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
+	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
+	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
+	"magnifying_glass": {"name": "Magnifying Glass", "rarity": 1, "desc": "Soaked cards still show their suit"},
+	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
+	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
+	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "First failed room adds no cursed card"},
+	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Cash-out rate +0.25x"},
+	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combos use only ranks 2-6"},
+	"lucky_chip": {"name": "Lucky Chip", "rarity": 2, "desc": "10% chance a hand costs no hand"},
+}
+
 var main: Node2D  # set by main.gd before build()
 
 # Meta (persists forever)
@@ -71,6 +92,9 @@ var room_hands_left := 0
 var room_target := 0
 var room_goal := ""      # "" score target · "safe" heist · "chest" treasure
 var room_combo: Array = []
+var relics: Array = []   # relic ids held this run
+var _second_wind_used := false
+var _fire_tick_flip := false
 var current_offer := {}
 var stake := 0
 var _offers: Array = []
@@ -98,6 +122,10 @@ var _shop_box: Control
 var _remove_grid: GridContainer
 var _remove_info: Label
 var _end_label: Label
+var _shop_relic_btn: Button
+var _shop_relic_id := ""
+var _shop_burn_btn: Button
+var _tarot_relics: Label
 
 
 func _ready() -> void:
@@ -142,6 +170,11 @@ func _save_run() -> void:
 	cf.set_value("run", "suits", suits)
 	cf.set_value("run", "curses", curses)
 	cf.set_value("run", "mods", mods)
+	var relic_arr := PackedStringArray()
+	for id in relics:
+		relic_arr.append(id)
+	cf.set_value("run", "relics", relic_arr)
+	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.save(RUN_PATH)
 
 
@@ -168,6 +201,10 @@ func _load_run() -> bool:
 		deck.append({"rank": ranks[i], "suit": suits[i],
 				"cursed": curses[i] == 1,
 				"mod": mods[i] if i < mods.size() else ""})
+	relics.clear()
+	for id in cf.get_value("run", "relics", PackedStringArray()):
+		relics.append(String(id))
+	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	run_active = true
 	return true
 
@@ -176,6 +213,40 @@ func _load_run() -> bool:
 
 func _table() -> Dictionary:
 	return TABLES[table_tier]
+
+
+func has_relic(id: String) -> bool:
+	return relics.has(id)
+
+
+## Shop pricing with Snake Oil applied.
+func _price(base: int) -> int:
+	return int(base * 0.75) if has_relic("snake_oil") else base
+
+
+## Pushes relic-driven settings into the board/card layer. Call at run
+## start, on load, and whenever a relic is gained.
+func _apply_relic_effects() -> void:
+	main.board.chip_bonus = Board.CHIP_BONUS * (2 if has_relic("gold_tooth") else 1)
+	main.board.mult_factor = 2.0 if has_relic("mirror_shades") else Board.MULT_FACTOR
+	PlayingCard.washed_show_suit = has_relic("magnifying_glass")
+
+
+func _gain_relic(id: String) -> void:
+	if relics.size() >= MAX_RELICS or relics.has(id):
+		return
+	relics.append(id)
+	_apply_relic_effects()
+	_save_run()
+
+
+## A random relic id the player doesn't own yet, or "" if none left.
+func _unowned_relic() -> String:
+	var pool: Array = []
+	for id in RELICS:
+		if not relics.has(id):
+			pool.append(id)
+	return pool.pick_random() if not pool.is_empty() else ""
 
 
 func _blind_for(room: int) -> int:
@@ -197,7 +268,8 @@ func _fresh_deck() -> Array:
 
 
 func _cashout_value(rate_bonus := 1.0) -> int:
-	return int(chips * _table().rate * rate_bonus / 10.0)
+	var rate: float = _table().rate + (0.25 if has_relic("bankroll_clip") else 0.0)
+	return int(chips * rate * rate_bonus / 10.0)
 
 
 func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
@@ -241,8 +313,12 @@ func _start_run(tier: int) -> void:
 	chips = TABLES[tier].chips
 	deck = _fresh_deck()
 	room_index = 0
+	relics.clear()
+	_second_wind_used = false
+	_fire_tick_flip = false
 	run_active = true
 	main.score = 0
+	_apply_relic_effects()
 	_save_run()
 	_show_tarot()
 
@@ -250,6 +326,7 @@ func _start_run(tier: int) -> void:
 func _resume_run() -> void:
 	if _load_run():
 		main.score = 0
+		_apply_relic_effects()
 		_show_tarot()
 
 
@@ -345,6 +422,13 @@ func _render_tarot() -> void:
 	var region := room_index / REGION_SIZE + 1
 	_tarot_info.text = "ROOM %d / %d   ·   REGION %d   ·   CHIPS %d   ·   DECK %d cards" \
 			% [room_index + 1, ROOMS_TOTAL, region, chips, deck.size()]
+	if relics.is_empty():
+		_tarot_relics.text = ""
+	else:
+		var names := PackedStringArray()
+		for id in relics:
+			names.append(RELICS[id].name)
+		_tarot_relics.text = "RELICS:  " + "  ·  ".join(names)
 	_tarot_cashout_btn.text = "CASH OUT — TAKE $%d" % _cashout_value()
 	for i in _offers.size():
 		var offer: Dictionary = _offers[i]
@@ -443,7 +527,7 @@ func _start_room() -> void:
 	room_target = current_offer.target
 	room_goal = current_offer.get("goal", "")
 	room_combo = []
-	room_hands_left = current_offer.hands
+	room_hands_left = int(current_offer.hands) + (1 if has_relic("horseshoe") else 0)
 	main.mode_kind = "trail"
 	main.mode_label_text = "Trail · %s" % _table().name.capitalize()
 	main.board.custom_deck = deck.duplicate(true)
@@ -468,12 +552,19 @@ func _seed_room_specials() -> void:
 		return
 	if current_offer.has("hazard"):
 		main.board.apply_room_hazards(current_offer.hazard, current_offer.hazard_count)
+		# Relic adjustments to freshly-seeded hazards.
+		for p in main.board.grid:
+			var card: PlayingCard = main.board.grid[p]
+			if card.hazard == "bomb" and has_relic("bomb_badge"):
+				card.fuse += 2
+			elif card.hazard == "stone" and has_relic("chisel"):
+				card.stone_hits = Board.STONE_HITS_START - 1
 	elif room_goal == "safe":
 		room_combo = _generate_combo()
 		main.board.spawn_safe(room_combo)
 	elif room_goal == "chest":
 		main.board.spawn_key_and_chest()
-	elif randf() < AMBIENT_CHANCE:
+	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0):
 		# Surprise loot in a plain room.
 		if randf() < 0.5:
 			room_combo = _generate_combo()
@@ -484,14 +575,15 @@ func _seed_room_specials() -> void:
 
 ## A 4-digit combination drawn from low ranks present on the board.
 func _generate_combo() -> Array:
+	var max_rank := 6 if has_relic("dowsing_rod") else 9
 	var pool: Array = []
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
-		if not card.cursed and not card.is_safe and card.rank <= 9:
+		if not card.cursed and not card.is_safe and card.rank <= max_rank:
 			pool.append(card.rank)
 	var combo: Array = []
 	for i in 4:
-		combo.append(pool.pick_random() if not pool.is_empty() else randi_range(2, 9))
+		combo.append(pool.pick_random() if not pool.is_empty() else randi_range(2, max_rank))
 	return combo
 
 
@@ -516,7 +608,10 @@ func on_hand_played(result: Dictionary) -> void:
 
 ## A hand (or a safe crack) is spent; run out and the room is lost.
 func _consume_hand() -> void:
-	room_hands_left -= 1
+	if has_relic("lucky_chip") and randf() < 0.10:
+		_announce_after_settle("LUCKY CHIP — free hand!")
+	else:
+		room_hands_left -= 1
 	if room_hands_left <= 0:
 		_room_failed()
 	else:
@@ -552,6 +647,10 @@ func _open_chest() -> void:
 		cash += dollars
 		_save_meta()
 		_announce_after_settle("CHEST  +$%d CASH" % dollars)
+	elif roll < 0.90 and relics.size() < MAX_RELICS and _unowned_relic() != "":
+		var id := _unowned_relic()
+		_gain_relic(id)
+		_announce_after_settle("CHEST  RELIC: %s!" % RELICS[id].name)
 	else:
 		var enhanced := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": "mult" if randf() < 0.5 else "chip"}
@@ -581,7 +680,11 @@ func _tick_room_hazards() -> void:
 		await get_tree().process_frame
 	if not in_room:
 		return
-	var exploded: bool = await main.board.tick_hazards()
+	var tick_fire := true
+	if has_relic("fire_blanket"):
+		_fire_tick_flip = not _fire_tick_flip
+		tick_fire = _fire_tick_flip
+	var exploded: bool = await main.board.tick_hazards(tick_fire)
 	if exploded and in_room:
 		_room_failed("KABOOM — THE BOMB WENT OFF")
 
@@ -593,6 +696,8 @@ func _room_cleared() -> void:
 	if main.board._refill_active:
 		main.board._skip_refill()
 	var winnings := stake + int(stake * current_offer.odds)
+	if has_relic("tin_star"):
+		winnings += 10
 	chips += winnings
 	main._announce("ROOM CLEAR  +%d CHIPS" % winnings)
 	_after_board_settles(func() -> void:
@@ -607,8 +712,13 @@ func _room_cleared() -> void:
 func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	in_room = false
 	main.board.locked = true
-	# Fail forward, scarred: stake is already gone; take a cursed card.
-	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+	# Fail forward, scarred: stake is already gone; take a cursed card
+	# (unless Second Wind spares the first stumble of the run).
+	if has_relic("second_wind") and not _second_wind_used:
+		_second_wind_used = true
+		reason = "BUSTED — SECOND WIND, NO SCAR"
+	else:
+		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 	main._announce(reason, main.RED)
 	_after_board_settles(func() -> void:
 		room_index += 1
@@ -655,9 +765,11 @@ func _show_pick() -> void:
 	main.game_started = false
 	for child in _pick_box.get_children():
 		child.queue_free()
-	for i in 3:
+	var pick_count := 4 if has_relic("card_sleeve") else 3
+	var start_x := 545.0 if pick_count == 4 else 660.0
+	for i in pick_count:
 		var card_data := _random_card_offer()
-		var holder: Button = main._button(_pick_box, "", Vector2(660 + i * 220, 0), Vector2(170, 240))
+		var holder: Button = main._button(_pick_box, "", Vector2(start_x + i * 220, 0), Vector2(170, 240))
 		var pc := PlayingCard.new()
 		pc.rank = card_data.rank
 		pc.suit = card_data.suit
@@ -682,20 +794,31 @@ func _shop_card_offer() -> Dictionary:
 	if randf() < SHOP_MOD_CHANCE:
 		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": "mult" if randf() < 0.5 else "chip"},
-				"price": SHOP_MOD_PRICE}
+				"price": _price(SHOP_MOD_PRICE)}
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
 		if not src.get("cursed", false):
 			return {"data": {"rank": src.rank, "suit": src.suit,
-					"cursed": false, "mod": ""}, "price": SHOP_DUP_PRICE}
+					"cursed": false, "mod": ""}, "price": _price(SHOP_DUP_PRICE)}
 	return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-			"cursed": false, "mod": ""}, "price": SHOP_CARD_PRICE}
+			"cursed": false, "mod": ""}, "price": _price(SHOP_CARD_PRICE)}
 
 
 func _show_shop() -> void:
 	_hide_all()
 	main.game_started = false
 	_shop_info.text = "CHIPS  %d" % chips
+	_shop_burn_btn.text = "BURN A CARD — %d chips" % _price(SHOP_REMOVE_PRICE)
+	# Relic slot: one unowned relic per visit.
+	_shop_relic_id = _unowned_relic()
+	if _shop_relic_id == "" or relics.size() >= MAX_RELICS:
+		_shop_relic_btn.text = "NO RELICS IN STOCK"
+		_shop_relic_btn.disabled = true
+	else:
+		var r: Dictionary = RELICS[_shop_relic_id]
+		_shop_relic_btn.text = "RELIC: %s — %d chips\n%s" % [r.name,
+				_price(RELIC_PRICES[r.rarity]), r.desc]
+		_shop_relic_btn.disabled = false
 	for child in _shop_box.get_children():
 		child.queue_free()
 	for i in 10:
@@ -740,7 +863,7 @@ func _leave_shop() -> void:
 
 func _show_remove() -> void:
 	shop_layer.visible = false
-	_remove_info.text = "Pick a card to burn — %d chips" % SHOP_REMOVE_PRICE
+	_remove_info.text = "Pick a card to burn — %d chips" % _price(SHOP_REMOVE_PRICE)
 	for child in _remove_grid.get_children():
 		child.queue_free()
 	for i in deck.size():
@@ -757,8 +880,8 @@ func _show_remove() -> void:
 		holder.add_child(pc)
 		var idx := i
 		holder.pressed.connect(func() -> void:
-			if chips >= SHOP_REMOVE_PRICE:
-				chips -= SHOP_REMOVE_PRICE
+			if chips >= _price(SHOP_REMOVE_PRICE):
+				chips -= _price(SHOP_REMOVE_PRICE)
 				deck.remove_at(idx)
 				main.board._play_sound(Board.SFX_POPS.pick_random(), 1.0, -8.0)
 				_save_run()
@@ -808,6 +931,7 @@ func build_ui() -> void:
 	_tarot_cards_box = Control.new()
 	_tarot_cards_box.position = Vector2(0, 330)
 	tarot_layer.add_child(_tarot_cards_box)
+	_tarot_relics = _center(tarot_layer, "", 272, 18, main.GOLD)
 	_tarot_cashout_btn = main._button(tarot_layer, "", Vector2(760, 790), Vector2(400, 64))
 	_tarot_cashout_btn.add_theme_font_size_override("font_size", 24)
 	_tarot_cashout_btn.pressed.connect(_do_cashout)
@@ -861,9 +985,21 @@ func build_ui() -> void:
 	_shop_box = Control.new()
 	_shop_box.position = Vector2(0, 240)
 	shop_layer.add_child(_shop_box)
-	var rm: Button = main._button(shop_layer, "BURN A CARD — %d chips" % SHOP_REMOVE_PRICE, Vector2(555, 850), Vector2(380, 56))
-	rm.add_theme_font_size_override("font_size", 20)
-	rm.pressed.connect(_show_remove)
+	_shop_relic_btn = main._button(shop_layer, "", Vector2(125, 840), Vector2(380, 76))
+	_shop_relic_btn.add_theme_font_size_override("font_size", 16)
+	_shop_relic_btn.pressed.connect(func() -> void:
+		if _shop_relic_id == "":
+			return
+		var cost := _price(RELIC_PRICES[RELICS[_shop_relic_id].rarity])
+		if chips >= cost and relics.size() < MAX_RELICS:
+			chips -= cost
+			_gain_relic(_shop_relic_id)
+			main.board._play_sound(Board.SFX_SHUFFLE, 1.3, -8.0)
+			_shop_relic_btn.disabled = true
+			_shop_info.text = "CHIPS  %d" % chips)
+	_shop_burn_btn = main._button(shop_layer, "", Vector2(555, 850), Vector2(380, 56))
+	_shop_burn_btn.add_theme_font_size_override("font_size", 20)
+	_shop_burn_btn.pressed.connect(_show_remove)
 	var leave: Button = main._button(shop_layer, "BACK ON THE TRAIL", Vector2(985, 850), Vector2(380, 56))
 	leave.add_theme_font_size_override("font_size", 20)
 	leave.pressed.connect(_leave_shop)

@@ -97,6 +97,9 @@ const CLUB_PX := [
 ]
 const SUIT_PIXELS := [SPADE_PX, HEART_PX, DIAMOND_PX, CLUB_PX]
 
+# Magnifying Glass relic: soaked cards still reveal their suit.
+static var washed_show_suit := false
+
 static var _face_box: StyleBoxFlat
 static var _selected_box: StyleBoxFlat
 static var _valid_box: StyleBoxFlat
@@ -253,6 +256,8 @@ func _draw() -> void:
 		_draw_pixel_map(DROP_PX, Vector2(0, 2), 5.0, WATER_BLUE)
 		_draw_pixel_map(DROP_PX, Vector2(-W / 2.0 + 14, -H / 2.0 + 22), 2.0, WATER_BLUE)
 		_draw_pixel_map(DROP_PX, Vector2(W / 2.0 - 16, H / 2.0 - 24), 2.0, WATER_BLUE)
+		if washed_show_suit:  # Magnifying Glass
+			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	else:
 		var col := suit_color()
 		draw_string(font, Vector2(-W / 2.0 + 8, -H / 2.0 + 27), rank_text(),

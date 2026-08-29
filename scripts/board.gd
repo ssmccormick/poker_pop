@@ -52,6 +52,9 @@ const BOMB_FUSE := 5
 const STONE_HITS_START := 3
 const CHIP_BONUS := 8      # chips per played chip-mod card (trail)
 const MULT_FACTOR := 1.5   # per played mult-mod card, stacking
+# Relic-tunable copies (Gold Tooth / Mirror Shades adjust these).
+var chip_bonus := CHIP_BONUS
+var mult_factor := MULT_FACTOR
 const HAZARD_DIRS: Array[Vector2i] = [
 	Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
@@ -875,9 +878,9 @@ func _apply_card_mods(result: Dictionary) -> void:
 		elif card.mod == "chip":
 			chip_cards += 1
 	if mults > 0:
-		result.score = int(result.score * pow(MULT_FACTOR, mults))
+		result.score = int(result.score * pow(mult_factor, mults))
 	if chip_cards > 0:
-		result["bonus_chips"] = chip_cards * CHIP_BONUS
+		result["bonus_chips"] = chip_cards * chip_bonus
 
 
 # --- Trail hazard engine --------------------------------------------------
@@ -917,11 +920,12 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 ## up below 2 and igniting orthogonal plain neighbors), bomb fuses drop.
 ## Returns {"burned": [cells], "ignited": [cells], "exploded": bool}.
 ## Board mutation only — no animation — so it's headless-testable.
-func _tick_fire_and_bombs() -> Dictionary:
+func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	var fires: Array = []
-	for p in grid:
-		if grid[p].hazard == "fire":
-			fires.append(p)
+	if tick_fire:
+		for p in grid:
+			if grid[p].hazard == "fire":
+				fires.append(p)
 	var burned: Array = []
 	for p in fires:
 		grid[p].rank -= 1
@@ -948,7 +952,7 @@ func _tick_fire_and_bombs() -> Dictionary:
 
 ## Runs the per-hand hazard tick with animations: called by trail after
 ## a scoring hand fully resolves. Returns true if a bomb detonated.
-func tick_hazards() -> bool:
+func tick_hazards(tick_fire := true) -> bool:
 	var any := false
 	for p in grid:
 		var hz: String = grid[p].hazard
@@ -958,7 +962,7 @@ func tick_hazards() -> bool:
 	if not any:
 		return false
 	busy = true
-	var res := _tick_fire_and_bombs()
+	var res := _tick_fire_and_bombs(tick_fire)
 	var burned: Array = res.burned
 	if not burned.is_empty():
 		_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)
