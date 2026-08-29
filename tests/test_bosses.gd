@@ -52,6 +52,39 @@ func _init() -> void:
 			"starting identities stored")
 	_free_board(b)
 
+	# --- a gust that reaches a standing boss counts as the kill -------------
+	b = _board([[5, 0, 0, 0], [7, 1, 1, 0], [11, 2, 2, 0], [9, 3, 0, 1]])
+	var wind: PlayingCard = b.grid[Vector2i(0, 0)]
+	wind.hazard = "wind"
+	wind.wind_dir = Vector2i.RIGHT
+	var jack: PlayingCard = b.grid[Vector2i(2, 0)]
+	jack.boss = "jack"
+	jack.boss_hp = 5
+	b.selected.assign([wind, b.grid[Vector2i(1, 0)]])
+	failures += _check(b._gust_will_hit_boss(),
+			"gust line reaching the boss predicts the kill")
+	wind.wind_dir = Vector2i.DOWN
+	b.selected.assign([wind, b.grid[Vector2i(0, 1)]])
+	failures += _check(not b._gust_will_hit_boss(),
+			"gust blowing past nothing bossy predicts no kill")
+	b.selected.clear()
+	_free_board(b)
+
+	# --- a blown tail segment unhooks from its head -------------------------
+	b = _board([[5, 0, 0, 0], [7, 3, 1, 0], [9, 1, 2, 0]])
+	head = b.grid[Vector2i(2, 0)]
+	head.boss = "cobra"
+	var s1: PlayingCard = b.grid[Vector2i(0, 0)]
+	var s2: PlayingCard = b.grid[Vector2i(1, 0)]
+	s1.snake_tail = true
+	s2.snake_tail = true
+	head.cobra_body = [s1, s2]
+	head.cobra_stack = [{"rank": 5, "suit": 0}, {"rank": 7, "suit": 3}]
+	b._cobra_detach_segment(s1)
+	failures += _check(head.cobra_body == [s2] and head.cobra_stack.size() == 1,
+			"blown segment unhooked from the head, one identity lost")
+	_free_board(b)
+
 	# --- sticky hands: queen/honey only in 2-3 card hands -------------------
 	b = _board([[8, 0, 0, 0], [8, 1, 1, 0], [8, 2, 2, 0], [8, 3, 3, 0]])
 	b.grid[Vector2i(0, 0)].honey = true

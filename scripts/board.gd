@@ -358,6 +358,10 @@ func play_hand() -> void:
 			"cobra":
 				if card.cobra_body.is_empty():
 					result["boss_defeated"] = true
+	# A gust kill counts too: a played wind card whose line reaches a
+	# boss still standing after the pops blows him off the table.
+	if _gust_will_hit_boss():
+		result["boss_defeated"] = true
 	busy = true
 	hand_played.emit(result)
 
@@ -420,11 +424,11 @@ func play_hand() -> void:
 	if defeated_boss:
 		boss_defeated.emit()
 
-	if suppress_refill:
-		# A level transition is about to reset the board — don't deal.
-		suppress_refill = false
-		busy = false
-		return
+	# A transition (room clear / level clear) suppresses the refill, but
+	# a pending gust still blows — it may be the very thing that won the
+	# table, and the boss should visibly leave with it.
+	var ending := suppress_refill
+	suppress_refill = false
 
 	# Wind: gusts blow every card from the wind cell to the edge off the
 	# board, unscored.
@@ -436,8 +440,28 @@ func play_hand() -> void:
 		_play_sound(SFX_SWOOSH, randf_range(1.1, 1.3), -5.0)
 		var gtw := create_tween().set_parallel(true)
 		var flying: Array = []
+		var gusted_boss := false
 		for cell: Vector2i in blown:
+			if not grid.has(cell):
+				continue  # already swept away with a blown cobra head
 			var card: PlayingCard = grid[cell]
+			if card.boss != "":
+				gusted_boss = true
+				# The whole snake leaves with its head.
+				for seg: PlayingCard in card.cobra_body:
+					if grid.get(seg.grid_pos) == seg:
+						grid.erase(seg.grid_pos)
+					seg.z_index = 15
+					flying.append(seg)
+					gtw.tween_property(seg, "position",
+							seg.position + Vector2(blown[cell]) * 1700.0, 0.45) \
+							.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+					gtw.tween_property(seg, "rotation", seg.rotation + 2.2, 0.45)
+				card.cobra_body.clear()
+				card.cobra_stack.clear()
+			elif card.snake_tail:
+				# Unhook the segment so the head never holds a freed card.
+				_cobra_detach_segment(card)
 			grid.erase(cell)
 			flying.append(card)
 			card.z_index = 15
@@ -448,7 +472,12 @@ func play_hand() -> void:
 		await gtw.finished
 		for card in flying:
 			card.queue_free()
+		if gusted_boss and not defeated_boss:
+			boss_defeated.emit()
 
+	if ending:
+		busy = false
+		return
 	await _fall_and_fill(false)
 	busy = false
 	if not has_playable_hand():
@@ -1061,6 +1090,38 @@ func _cobra_revert(head: PlayingCard) -> void:
 		var identity: Dictionary = head.cobra_stack.pop_back()
 		head.rank = identity.rank
 		head.suit = identity.suit
+
+
+## A tail segment leaves the board outside the normal revert path (blown
+## off by a gust): unhook it from its head so the body never holds a
+## freed card. The identity it carried is lost with it.
+func _cobra_detach_segment(seg: PlayingCard) -> void:
+	for p in grid:
+		var head: PlayingCard = grid[p]
+		if head.boss == "cobra" and head.cobra_body.has(seg):
+			head.cobra_body.erase(seg)
+			if not head.cobra_stack.is_empty():
+				head.cobra_stack.pop_back()
+			return
+
+
+## True when a wind card in the current selection will blow a boss off
+## the board: his cell sits in a gust line and he survives the pops
+## (bosses and multi-hit stones keep their cells; everything else played
+## this hand vacates before the gust resolves).
+func _gust_will_hit_boss() -> bool:
+	var vacating := {}
+	for card in selected:
+		if card.boss != "" or (card.hazard == "stone" and card.stone_hits > 1):
+			continue
+		vacating[card.grid_pos] = true
+	for card in selected:
+		if card.hazard != "wind":
+			continue
+		for cell in wind_line_cells(card.grid_pos, card.wind_dir):
+			if not vacating.has(cell) and grid[cell].boss != "":
+				return true
+	return false
 
 
 ## Per-hand boss behavior, after the hand fully resolves.
