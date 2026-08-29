@@ -651,13 +651,19 @@ func _fade_in(p: AudioStreamPlayer) -> void:
 	create_tween().tween_property(p, "volume_db", -12.0, 1.5)
 
 
-## Rebuilds the mini-card row showing the current selection in rank order.
+## Rebuilds the mini-card row showing the current selection in rank
+## order. Soaked cards keep their secret: they render soaked, unsorted,
+## at the end of the row (a sorted position would leak the rank).
 func _refresh_hand_display() -> void:
 	for child in hand_display.get_children():
 		child.queue_free()
 	var cards: Array = []
+	var soaked_count := 0
 	for card in board.selected:
-		cards.append({"rank": card.rank, "suit": card.suit})
+		if card.washed:
+			soaked_count += 1
+		else:
+			cards.append({"rank": card.rank, "suit": card.suit})
 	cards.sort_custom(func(a, b): return a.rank < b.rank)
 	for i in cards.size():
 		var mc := PlayingCard.new()
@@ -665,6 +671,13 @@ func _refresh_hand_display() -> void:
 		mc.suit = cards[i].suit
 		mc.scale = Vector2(0.72, 0.72)
 		mc.position = Vector2(i * 74.0, 0)
+		mc.material = Themes.current_material()
+		hand_display.add_child(mc)
+	for i in soaked_count:
+		var mc := PlayingCard.new()
+		mc.washed = true
+		mc.scale = Vector2(0.72, 0.72)
+		mc.position = Vector2((cards.size() + i) * 74.0, 0)
 		mc.material = Themes.current_material()
 		hand_display.add_child(mc)
 

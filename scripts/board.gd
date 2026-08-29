@@ -378,7 +378,6 @@ func play_hand() -> void:
 	# effects are snapshotted before their cells change.
 	var poppers: Array = []
 	var gusts: Array = []     # {"cell", "dir"}
-	var splashes: Array = []  # origin cells
 	var defeated_boss := false
 	for card in played:
 		card.selected = false
@@ -402,8 +401,6 @@ func play_hand() -> void:
 			continue  # cracked, not cleared — keeps its cell
 		if card.hazard == "wind":
 			gusts.append({"cell": card.grid_pos, "dir": card.wind_dir})
-		elif card.hazard == "water":
-			splashes.append(card.grid_pos)
 		poppers.append(card)
 
 	if not poppers.is_empty():
@@ -428,19 +425,6 @@ func play_hand() -> void:
 		suppress_refill = false
 		busy = false
 		return
-
-	# Water: each played water card soaks one random adjacent plain card.
-	for origin in splashes:
-		var dirs := HAZARD_DIRS.duplicate()
-		dirs.shuffle()
-		for d in dirs:
-			var q: Vector2i = origin + d
-			if grid.has(q):
-				var victim: PlayingCard = grid[q]
-				if victim.hazard == "" and not victim.cursed and not victim.washed:
-					victim.washed = true
-					_play_sound(SFX_FLIP, 0.6, -8.0)
-					break
 
 	# Wind: gusts blow every card from the wind cell to the edge off the
 	# board, unscored.
@@ -1202,6 +1186,27 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 ## Returns {"burned": [cells], "ignited": [cells], "exploded": bool}.
 ## Board mutation only — no animation — so it's headless-testable.
 func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
+	# Water drips: every uncleared water card soaks one random orthogonal
+	# plain neighbor per tick — clear it fast to stop the leak.
+	var soaked: Array = []
+	var waters: Array = []
+	for p in grid:
+		if grid[p].hazard == "water":
+			waters.append(p)
+	for p in waters:
+		var dirs := HAZARD_DIRS.duplicate()
+		dirs.shuffle()
+		for d in dirs:
+			var q: Vector2i = p + d
+			if not grid.has(q):
+				continue
+			var victim: PlayingCard = grid[q]
+			if victim.hazard == "" and not victim.cursed and not victim.washed \
+					and victim.boss == "" and not victim.is_safe \
+					and not victim.snake_tail and victim.objective == "":
+				victim.washed = true
+				soaked.append(q)
+				break
 	var fires: Array = []
 	if tick_fire:
 		for p in grid:
@@ -1228,7 +1233,8 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 			grid[p].fuse -= 1
 			if grid[p].fuse <= 0:
 				exploded = true
-	return {"burned": burned, "ignited": ignited, "exploded": exploded}
+	return {"burned": burned, "ignited": ignited, "exploded": exploded,
+			"soaked": soaked}
 
 
 ## Runs the per-hand hazard tick with animations: called by trail after
@@ -1237,13 +1243,15 @@ func tick_hazards(tick_fire := true) -> bool:
 	var any := false
 	for p in grid:
 		var hz: String = grid[p].hazard
-		if hz == "fire" or hz == "bomb":
+		if hz == "fire" or hz == "bomb" or hz == "water":
 			any = true
 			break
 	if not any:
 		return false
 	busy = true
 	var res := _tick_fire_and_bombs(tick_fire)
+	if not res.soaked.is_empty():
+		_play_sound(SFX_FLIP, 0.6, -8.0)
 	var burned: Array = res.burned
 	if not burned.is_empty():
 		_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)

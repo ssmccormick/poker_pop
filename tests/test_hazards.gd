@@ -47,6 +47,18 @@ func _init() -> void:
 	failures += _check(b.grid[Vector2i(4, 4)].hazard == "", "distant card untouched")
 	_free_board(b)
 
+	# --- water drips on the tick -------------------------------------------
+	b = _board([[5, 0, 0, 0], [7, 1, 1, 0]])
+	b.grid[Vector2i(0, 0)].hazard = "water"
+	var wres: Dictionary = b._tick_fire_and_bombs()
+	failures += _check(wres.soaked == [Vector2i(1, 0)],
+			"water soaks its orthogonal neighbor on the tick")
+	failures += _check(b.grid[Vector2i(1, 0)].washed, "neighbor is washed")
+	wres = b._tick_fire_and_bombs()
+	failures += _check(wres.soaked.is_empty(),
+			"nothing left to soak once neighbors are washed")
+	_free_board(b)
+
 	# --- bomb fuse ---------------------------------------------------------
 	b = _board([[5, 0, 0, 0], [6, 1, 1, 0]])
 	b.grid[Vector2i(0, 0)].hazard = "bomb"
@@ -106,7 +118,8 @@ func _board(cards: Array) -> Board:
 		var card := PlayingCard.new()
 		card.rank = c[0]
 		card.suit = c[1]
-		b.grid[Vector2i(c[2], c[3])] = card
+		card.grid_pos = Vector2i(c[2], c[3])
+		b.grid[card.grid_pos] = card
 	return b
 
 

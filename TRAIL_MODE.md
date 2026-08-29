@@ -145,7 +145,7 @@ hands, after the board settles.
 | Fire | THE DEVIL | Rank ticks −1 per hand; below 2 it burns up (unscored) and spreads to orthogonal neighbors | Play it (scores at current rank) to extinguish |
 | Wind | THE CHARIOT | When played, every card from its cell to the edge in its arrow direction is blown off (unscored) | It's a tool as much as a hazard — aim it at junk |
 | Stone | STRENGTH | Must be in 3 scoring hands; scores each time; cracks visibly; 3rd use pops it | Chip away; it squats on its cell meanwhile |
-| Water | TEMPERANCE | When played, it splashes one random orthogonally-adjacent card: that card's rank and suit are WASHED AWAY — hidden until it's played. It still is what it was; you just have to remember | Play cards before they get soaked; memorize the board before splashing |
+| Water | — | It DRIPS: every scoring hand, an uncleared water card soaks one random orthogonal neighbor — that card's rank and suit are WASHED AWAY, hidden until played. It still is what it was; you just have to remember | Play the water card to stop the leak (clearing it is a clean disposal, like every other hazard) |
 
 Design calls: fire spreads 4-way (8-way wipes 5×5 boards); spread skips
 hazarded/cursed cards; hazards don't persist in the run save.
