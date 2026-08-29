@@ -271,6 +271,27 @@ func _blind_for(room: int) -> int:
 	return int((BLIND_BASE + BLIND_STEP * room) * _table().blind_mult)
 
 
+## True if the stack can't cover `blind` — and in that case the run is
+## over: zero chips busts outright, anything short of the blind gets
+## force-cashed out (the house shows you the door with what's left).
+func _short_stacked(blind: int) -> bool:
+	if chips >= blind:
+		return false
+	if chips <= 0:
+		_clear_run_save()
+		_end_run("BUSTED OUT",
+				"That table took your last chip.\nThe trail ends here.", 0)
+		return true
+	var payout := _cashout_value()
+	cash += payout
+	_save_meta()
+	_clear_run_save()
+	_end_run("BLINDED OUT",
+			"The table's minimum is %d chips — you're down to %d.\nThe house cashes you out: $%d." % [blind, chips, payout],
+			payout)
+	return true
+
+
 func _target_for(room: int, risk: Dictionary) -> int:
 	var base := BASE_TARGET + TARGET_STEP * room
 	return int(base * risk.target_scale * _table().target_mult)
@@ -347,8 +368,10 @@ func _resume_run() -> void:
 	if _load_run():
 		main.score = 0
 		_apply_relic_effects()
-		if not pending_retry.is_empty() and chips > 0:
+		if not pending_retry.is_empty():
 			# A failed room still bars the way — back to its table.
+			if _short_stacked(_blind_for(room_index)):
+				return
 			main.menu_open = false
 			current_offer = pending_retry.duplicate(true)
 			current_offer.min_bet = maxi(1,
@@ -373,10 +396,7 @@ func _show_tarot() -> void:
 	main.game_started = false
 	main.board.locked = true
 	# Bankruptcy check against the coming room's blind.
-	if chips < _blind_for(room_index):
-		_end_run("BUSTED OUT",
-				"The next table's minimum is %d chips and you're down to %d.\nThe trail ends here." % [_blind_for(room_index), chips],
-				0)
+	if _short_stacked(_blind_for(room_index)):
 		return
 	_offers = _make_offers()
 	_fate_offer = _make_one_offer(true)
@@ -805,10 +825,7 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 
 ## Back to the same room's table: re-bet or bust.
 func _retry_room() -> void:
-	if chips <= 0:
-		_clear_run_save()
-		_end_run("BUSTED OUT",
-				"That table took your last chip.\nThe trail ends here.", 0)
+	if _short_stacked(_blind_for(room_index)):
 		return
 	pending_retry = current_offer.duplicate(true)
 	current_offer.min_bet = maxi(1, mini(int(current_offer.get("min_bet", 1)), chips))

@@ -52,7 +52,9 @@ bosses, regions.
   Constraint rooms 2:1 · Elite 3:1 · Boss 4:1.
 - **Blinds escalate**: the blind rises each region (poker blinds
   structure) and floors the half-stack stake — late trail, you can't
-  limp. Zero chips = busted = run over.
+  limp. Can't cover a table's blind = **BLINDED OUT**: the run is over
+  and the house cashes out your remaining chips at the buy-in's rate.
+  Zero chips = busted outright, nothing to cash.
 - **Cash out**: between any two rooms, walk away — convert remaining
   chips to cash at the buy-in's rate. Finishing the whole trail (beating
   the Dealer) cashes out at a premium multiplier plus a completion purse.
@@ -317,8 +319,10 @@ Failing a room does NOT clear it. It costs you three ways:
    screen (no backing out, no cash-out) with a fresh board, re-staking
    from what's left. Beat it or bleed out.
 
-The run ends by **bankruptcy** (a failed room leaves you at zero, or
-you can't cover a retry) or by choosing to **cash out** between rooms.
+The run ends by **bankruptcy** (a failed room leaves you at zero),
+by being **blinded out** (any table — next room or retry — whose blind
+your chips can't cover; what's left is auto-cashed out), or by choosing
+to **cash out** between rooms.
 Bosses are all-in, so a boss loss IS bankruptcy. Banked cash is always
 safe. Quitting mid-room counts as a fail, and the barred room is saved
 with the run — resuming drops you back at its table.
