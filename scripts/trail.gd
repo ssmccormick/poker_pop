@@ -163,6 +163,8 @@ var _bet_hands_label: Label
 var _bet_amount := 0
 var _bet_amount_label: Label
 var _bet_deal_btn: Button
+var _deck_view_burn := true   # deck viewer doubles as the shop's burn picker
+var _deck_stat: Label
 var stake_odds := 1.0    # effective odds locked in when the bet is placed
 var _pick_box: Control
 var _shop_info: Label
@@ -356,10 +358,25 @@ func _cashout_value(rate_bonus := 1.0) -> int:
 	return int(chips * rate * rate_bonus / 10.0)
 
 
+## Weighted enhancement roll: the classics stay common, the exotic
+## payloads (boost / chip burst / cash) come up rarer.
+func _random_mod() -> String:
+	var roll := randf()
+	if roll < 0.30:
+		return "mult"
+	if roll < 0.60:
+		return "chip"
+	if roll < 0.75:
+		return "boost"
+	if roll < 0.90:
+		return "chipsplode"
+	return "cash"
+
+
 func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 	var mod := ""
 	if randf() < mod_chance:
-		mod = "mult" if randf() < 0.5 else "chip"
+		mod = _random_mod()
 	# Half the time, offer an exact duplicate of a card already owned
 	# (the Five of a Kind / Flushed Five enabler).
 	if randf() < 0.5 and not deck.is_empty():
@@ -816,6 +833,12 @@ func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
 	chips += result.get("bonus_chips", 0)
 	room_score += result.score
+	var earned := int(result.get("cash_earned", 0))
+	if earned > 0:
+		# Cash cards pay real money, banked on the spot.
+		cash += earned
+		_save_meta()
+		_announce_after_settle("CASH CARD  +$%d" % earned)
 	if result.get("boss_defeated", false):
 		_room_cleared()
 		return
@@ -910,7 +933,7 @@ func _open_chest() -> void:
 		_announce_after_settle("CHEST  RELIC: %s!" % RELICS[id].name)
 	else:
 		var enhanced := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-				"cursed": false, "mod": "mult" if randf() < 0.5 else "chip"}
+				"cursed": false, "mod": _random_mod()}
 		deck.append(enhanced)
 		_announce_after_settle("CHEST  AN ENHANCED CARD!")
 	_save_run()
@@ -1112,7 +1135,7 @@ func _show_pick() -> void:
 func _shop_card_offer() -> Dictionary:
 	if randf() < SHOP_MOD_CHANCE:
 		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-				"cursed": false, "mod": "mult" if randf() < 0.5 else "chip"},
+				"cursed": false, "mod": _random_mod()},
 				"price": _price(SHOP_MOD_PRICE)}
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
@@ -1204,7 +1227,21 @@ func _leave_shop() -> void:
 
 func _show_remove() -> void:
 	shop_layer.visible = false
+	_deck_view_burn = true
 	_remove_info.text = "Pick a card to burn — %d chips (one per shop)" % _burn_price()
+	_populate_deck_view()
+
+
+## Read-only deck browser, reachable from the tarot screen.
+func _show_deck() -> void:
+	_hide_all()
+	_deck_view_burn = false
+	_remove_info.text = "Your deck — %d cards. Hover a card for its story." % deck.size()
+	_populate_deck_view()
+
+
+func _populate_deck_view() -> void:
+	_deck_stat.text = "Hover a card\nfor details."
 	for child in _remove_grid.get_children():
 		child.queue_free()
 	for i in deck.size():
@@ -1216,12 +1253,18 @@ func _show_remove() -> void:
 		pc.rank = card_data.rank
 		pc.suit = card_data.suit
 		pc.cursed = card_data.get("cursed", false)
+		pc.mod = card_data.get("mod", "")
 		pc.material = Themes.current_material()
 		pc.position = Vector2(50, 70)
 		holder.add_child(pc)
 		var idx := i
+		holder.mouse_entered.connect(func() -> void:
+			if idx < deck.size():
+				_deck_stat.text = _deck_stat_text(deck[idx]))
 		holder.pressed.connect(func() -> void:
-			if chips >= _burn_price() and not _shop_burned_here:
+			if idx < deck.size():
+				_deck_stat.text = _deck_stat_text(deck[idx])
+			if _deck_view_burn and chips >= _burn_price() and not _shop_burned_here:
 				chips -= _burn_price()
 				burns_used += 1
 				_shop_burned_here = true
@@ -1231,6 +1274,30 @@ func _show_remove() -> void:
 				_show_shop())
 		_remove_grid.add_child(holder)
 	remove_layer.visible = true
+
+
+## The hover panel: what this card is and what it does.
+func _deck_stat_text(d: Dictionary) -> String:
+	var rank := int(d.rank)
+	var rank_names := {11: "JACK", 12: "QUEEN", 13: "KING", 14: "ACE"}
+	var text := "%s OF %s\nPip value  %d\n\n" % [rank_names.get(rank, str(rank)),
+			String(PlayingCard.SUIT_NAMES[int(d.suit)]).to_upper(), rank]
+	if d.get("cursed", false):
+		return text + "CURSED\nDead weight: it can't be played and it blocks chains. Burn it at a shop."
+	match String(d.get("mod", "")):
+		"chip":
+			text += "CHIP\nPays +%d bonus chips every time it's played." % main.board.chip_bonus
+		"mult":
+			text += "MULT\nMultiplies the whole hand's score ×%.1f. Stacks with other mult cards." % main.board.mult_factor
+		"cash":
+			text += "CASH\nPays $1 of real, bankable cash when played."
+		"chipsplode":
+			text += "CHIP EXPLOSION\nWhen cleared, every card around it becomes a CHIP card."
+		"boost":
+			text += "BOOST\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it."
+		_:
+			text += "No enhancement.\nHonest cardboard."
+	return text
 
 
 # --- Flow: run end --------------------------------------------------------
@@ -1280,6 +1347,9 @@ func build_ui() -> void:
 	_tarot_cashout_btn.pressed.connect(_do_cashout)
 	_center(tarot_layer, "Cashing out ends the run and banks your chips as cash.", 870, 18, main.DIM)
 	_back_button(tarot_layer, back_to_menu, "MENU")
+	var deck_btn: Button = main._button(tarot_layer, "VIEW DECK", Vector2(1660, 970), Vector2(200, 54))
+	deck_btn.add_theme_font_size_override("font_size", 20)
+	deck_btn.pressed.connect(_show_deck)
 
 	bet_layer = _layer()
 	_screen_title(bet_layer, "THE STAKES")
@@ -1354,19 +1424,29 @@ func build_ui() -> void:
 	leave.pressed.connect(_leave_shop)
 
 	remove_layer = _layer()
-	_screen_title(remove_layer, "BURN A CARD")
+	_screen_title(remove_layer, "THE DECK")
 	_remove_info = _center(remove_layer, "", 210, 24, main.OFFWHITE)
 	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(360, 270)
-	scroll.size = Vector2(1200, 620)
+	scroll.position = Vector2(240, 270)
+	scroll.size = Vector2(1100, 620)
 	remove_layer.add_child(scroll)
 	_remove_grid = GridContainer.new()
-	_remove_grid.columns = 11
+	_remove_grid.columns = 10
 	scroll.add_child(_remove_grid)
+	_deck_stat = Label.new()
+	_deck_stat.position = Vector2(1400, 290)
+	_deck_stat.size = Vector2(440, 580)
+	_deck_stat.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_deck_stat.add_theme_font_size_override("font_size", 24)
+	_deck_stat.add_theme_color_override("font_color", main.GOLD)
+	remove_layer.add_child(_deck_stat)
 	var remove_back := func() -> void:
 		remove_layer.visible = false
-		_show_shop()
-	_back_button(remove_layer, remove_back, "CANCEL")
+		if _deck_view_burn:
+			_show_shop()
+		else:
+			_show_tarot()
+	_back_button(remove_layer, remove_back, "BACK")
 
 	end_layer = _layer()
 	_end_label = Label.new()

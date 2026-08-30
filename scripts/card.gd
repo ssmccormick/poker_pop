@@ -14,6 +14,8 @@ const BLACK := Color("1a1a1a")
 const FIRE_ORANGE := Color("e07830")
 const WATER_BLUE := Color("6fa8c9")
 const WIND_BLUE := Color("9ec9d8")
+const CASH_GREEN := Color("46b85e")
+const BOOST_GREEN := Color("52d67e")
 const STONE_GRAY := Color(0.42, 0.42, 0.48, 0.4)
 const BOMB_BLACK := Color("141414")
 
@@ -159,10 +161,16 @@ var washed := false:  # splashed: rank/suit hidden from the player
 		washed = value
 		queue_redraw()
 # Deck enhancement (trail): "", "chip" (bonus chips when played),
-# "mult" (multiplies the hand it's in).
+# "mult" (multiplies the hand it's in), "cash" ($1 real cash when
+# played), "chipsplode" (clearing it chips the neighborhood), "boost"
+# (clearing it raises the card its arrow points at by one rank).
 var mod := "":
 	set(value):
 		mod = value
+		queue_redraw()
+var boost_dir := Vector2i.RIGHT:  # boost: the arrow, turning each hand
+	set(value):
+		boost_dir = value
 		queue_redraw()
 # Objectives (trail): "", "key", "chest".
 var objective := "":
@@ -337,6 +345,24 @@ func _draw() -> void:
 		"mult":
 			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "×",
 					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, ERROR_RED)
+		"cash":
+			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "$",
+					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, CASH_GREEN)
+		"chipsplode":
+			var c := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
+			for k in 8:
+				var ray := Vector2.RIGHT.rotated(k * PI / 4.0)
+				draw_line(c + ray * 6.0, c + ray * 11.0, GOLD, 2.5)
+			draw_circle(c, 5.5, GOLD)
+			draw_circle(c, 3.0, Color("a8842c"))
+		"boost":
+			var base := Vector2(W / 2.0 - 15, -H / 2.0 + 38)
+			var v := Vector2(boost_dir) * 10.0
+			var perp := Vector2(-v.y, v.x).normalized() * 5.0
+			draw_line(base - v * 0.6, base + v * 0.6, BOOST_GREEN, 4.0)
+			draw_colored_polygon(PackedVector2Array([
+				base + v * 1.2, base + v * 0.3 + perp, base + v * 0.3 - perp]),
+				BOOST_GREEN)
 
 	match objective:
 		"key":

@@ -384,6 +384,8 @@ func play_hand() -> void:
 	# effects are snapshotted before their cells change.
 	var poppers: Array = []
 	var gusts: Array = []     # {"cell", "dir"}
+	var sploders: Array = []  # chip-explosion cells
+	var boosts: Array = []    # {"cell", "dir"} — boost arrows at play time
 	var defeated_boss := false
 	for card in played:
 		card.selected = false
@@ -407,6 +409,10 @@ func play_hand() -> void:
 			continue  # cracked, not cleared — keeps its cell
 		if card.hazard == "wind":
 			gusts.append({"cell": card.grid_pos, "dir": card.wind_dir})
+		if card.mod == "chipsplode":
+			sploders.append(card.grid_pos)
+		elif card.mod == "boost":
+			boosts.append({"cell": card.grid_pos, "dir": card.boost_dir})
 		poppers.append(card)
 
 	if not poppers.is_empty():
@@ -425,6 +431,31 @@ func play_hand() -> void:
 			card.queue_free()
 	if defeated_boss:
 		boss_defeated.emit()
+
+	# Mod payloads land on whatever survived the pops. Chip explosions
+	# gild the neighborhood; boosts feed the card their arrow pointed at.
+	for cell: Vector2i in sploders:
+		var gilded := false
+		for dx in [-1, 0, 1]:
+			for dy in [-1, 0, 1]:
+				var q := cell + Vector2i(dx, dy)
+				if q == cell or not grid.has(q):
+					continue
+				var c: PlayingCard = grid[q]
+				if c.mod == "" and not c.cursed and not c.is_safe \
+						and c.boss == "" and not c.snake_tail:
+					c.mod = "chip"
+					gilded = true
+		if gilded:
+			_play_sound(SFX_POPS.pick_random(), 1.5, -6.0)
+	for bdata in boosts:
+		var q: Vector2i = bdata.cell + bdata.dir
+		if grid.has(q):
+			var c: PlayingCard = grid[q]
+			if not c.is_safe and c.boss == "" and not c.snake_tail \
+					and not c.cursed:
+				c.rank = mini(14, c.rank + 1)
+				_play_sound(SFX_FLIP, 1.4, -8.0)
 
 	# A transition (room clear / level clear) suppresses the refill, but
 	# a pending gust still blows — it may be the very thing that won the
@@ -660,6 +691,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.suit = data.suit
 			card.cursed = data.get("cursed", false)
 			card.mod = data.get("mod", "")
+			if card.mod == "boost":
+				card.boost_dir = HAZARD_DIRS.pick_random()
 			var p := Vector2i(x, row)
 			card.grid_pos = p
 			grid[p] = card
@@ -925,15 +958,21 @@ func shuffle_board() -> void:
 func _apply_card_mods(result: Dictionary) -> void:
 	var mults := 0
 	var chip_cards := 0
+	var cash_cards := 0
 	for card in selected:
 		if card.mod == "mult":
 			mults += 1
 		elif card.mod == "chip":
 			chip_cards += 1
+		elif card.mod == "cash":
+			cash_cards += 1
 	if mults > 0:
 		result.score = int(result.score * pow(mult_factor, mults))
 	if chip_cards > 0:
 		result["bonus_chips"] = chip_cards * chip_bonus
+	if cash_cards > 0:
+		# Real money, straight to the pocket: $1 per cash card.
+		result["cash_earned"] = cash_cards
 
 
 # --- Trail boss engine ----------------------------------------------------
@@ -1286,6 +1325,12 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 ## Returns {"burned": [cells], "ignited": [cells], "exploded": bool}.
 ## Board mutation only — no animation — so it's headless-testable.
 func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
+	# Boost arrows swing a quarter turn (clockwise) every hand — time
+	# the clear to aim the +1 where you want it.
+	for p in grid:
+		if grid[p].mod == "boost":
+			var bd: Vector2i = grid[p].boost_dir
+			grid[p].boost_dir = Vector2i(-bd.y, bd.x)
 	# Water drips: every uncleared water card soaks one random orthogonal
 	# plain neighbor per tick — clear it fast to stop the leak.
 	var soaked: Array = []
@@ -1353,7 +1398,8 @@ func tick_hazards(tick_fire := true) -> bool:
 	var any := false
 	for p in grid:
 		var hz: String = grid[p].hazard
-		if hz == "fire" or hz == "bomb" or hz == "water":
+		if hz == "fire" or hz == "bomb" or hz == "water" \
+				or grid[p].mod == "boost":
 			any = true
 			break
 	if not any:

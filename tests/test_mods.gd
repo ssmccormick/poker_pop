@@ -46,9 +46,39 @@ func _init() -> void:
 	failures += _check(res.score == 150 and res.bonus_chips == Board.CHIP_BONUS,
 			"mult and chip in one hand both apply")
 
+	# Cash cards bank real dollars: $1 apiece.
+	var cash1 := PlayingCard.new()
+	cash1.mod = "cash"
+	var cash2 := PlayingCard.new()
+	cash2.mod = "cash"
+	b.selected.assign([cash1, cash2])
+	res = {"score": 40}
+	b._apply_card_mods(res)
+	failures += _check(res.score == 40 and res.cash_earned == 2,
+			"two cash cards earn $2, score unchanged")
+
 	b.selected.clear()
 	for c in cards:
 		c.free()
+	cash1.free()
+	cash2.free()
+	b.free()
+
+	# Boost arrows swing a quarter turn clockwise on every hazard tick.
+	b = Board.new()
+	var boost := PlayingCard.new()
+	boost.mod = "boost"
+	boost.boost_dir = Vector2i.RIGHT
+	boost.grid_pos = Vector2i(0, 0)
+	b.grid[Vector2i(0, 0)] = boost
+	b._tick_fire_and_bombs()
+	failures += _check(boost.boost_dir == Vector2i.DOWN, "boost arrow turns right→down")
+	b._tick_fire_and_bombs()
+	b._tick_fire_and_bombs()
+	b._tick_fire_and_bombs()
+	failures += _check(boost.boost_dir == Vector2i.RIGHT,
+			"four ticks bring the arrow full circle")
+	boost.free()
 	b.free()
 
 	if failures == 0:

@@ -197,16 +197,22 @@ modified card.
 - **Ambient chests**: random chance in normal rooms as optional loot.
 - v1: objective spawns don't mix with hazard rooms.
 
-## Deck modifiers — first two (SHIPPED)
+## Deck modifiers (SHIPPED)
 
-Chip and Mult cards begin the modifier family: enhancements on cards
-YOU own, acquired via card picks, shops, and chests, triggering every
-time the card is played. Stored on the deck entry, drawn as overlays.
+Enhancements on cards YOU own, acquired via card picks, shops, and
+chests, triggering every time the card is played. Stored on the deck
+entry, drawn as overlays. Roll weights: Mult 30% · Chip 30% ·
+Boost 15% · Chip Explosion 15% · Cash 10%. The deck viewer (VIEW DECK
+on the tarot screen; the shop's burn picker is the same screen) shows
+every overlay and a hover panel explaining the hovered card.
 
 | Modifier | Effect |
 | --- | --- |
 | Chip card | Pays bonus chips every time it's played in a scoring hand |
 | Mult card | Multiplies the score of any hand it's part of (×1.5; multiple mults stack multiplicatively) |
+| Cash card | Pays $1 of real, bankable cash every time it's played |
+| Chip Explosion | When cleared, every adjacent (8-way) surviving unmodified card becomes a Chip card |
+| Boost card | When cleared, the card its arrow points at gains +1 rank (cap 14). The arrow turns a quarter clockwise every hand — time the clear to aim it |
 
 ## Relic system (SHIPPED — all 15 below are in)
 
