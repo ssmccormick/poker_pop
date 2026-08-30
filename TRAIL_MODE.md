@@ -41,20 +41,22 @@ bosses, regions.
   **Boss rooms are ALL-IN**: no bet choice — the whole stack rides at
   3:1. Shops never restock within a room, and the burn service costs
   more with every use (once per shop).
-- **Per-room wager — the table sets the terms**: each tarot card
-  prints the room's target, rules, **odds**, and its **forced stake**.
-  There is no free bet: Steady/Risky/Treasure tables demand **HALF
-  YOUR STACK** (floored at the region blind), Dangerous/Heist tables
-  and bosses demand **ALL IN**. Higher odds always mean a bigger
-  forced bet — picking a tarot card IS the wager. Clear → stake × odds
-  returned. Fail → stake lost, ride on.
-- **Odds by room risk** (draft): Normal 1:1 · Timed/Tight 3:2 ·
-  Constraint rooms 2:1 · Elite 3:1 · Boss 4:1.
-- **Blinds escalate**: the blind rises each region (poker blinds
-  structure) and floors the half-stack stake — late trail, you can't
-  limp. Can't cover a table's blind = **BLINDED OUT**: the run is over
-  and the house cashes out your remaining chips at the buy-in's rate.
-  Zero chips = busted outright, nothing to cash.
+- **Per-room wager — blind + bought hands**: every room costs its
+  **blind** (the mandatory buy-in, escalating with depth and table
+  stakes) PLUS a **hand purchase**: you buy 3–12 hands on the stakes
+  screen at a per-hand price (blind ÷ 10, so hands get dearer the
+  deeper you go). Clearing pays back the blind plus blind × odds; the
+  hands money is the **house's rake, win or lose** — buying fewer
+  hands is the greed play, buying more is insurance you never get
+  back. Bosses ignore all this: ALL IN, fixed hand budget.
+- **Odds by room**: Steady 1:1 · Risky/Treasure/soft-Purge 3:2 ·
+  Dangerous/Heist/hard-Purge/Called-Hands 2:1 · Royal Hunt 5:1 ·
+  Boss 3:1.
+- **Blinds escalate**: the blind rises each room (poker blinds
+  structure) — late trail, you can't limp. Can't cover a table's
+  **cheapest seat** (blind + 3 hands) = **BLINDED OUT**: the run is
+  over and the house cashes out your remaining chips at the buy-in's
+  rate. Zero chips = busted outright, nothing to cash.
 - **Cash out**: between any two rooms, walk away — convert remaining
   chips to cash at the buy-in's rate. Finishing the whole trail (beating
   the Dealer) cashes out at a premium multiplier plus a completion purse.
@@ -86,12 +88,15 @@ Draft Major Arcana → room mapping (flavor pass later):
 | Wheel of Fortune | Normal (risky tier — shipped; was "Timed", reassign later) |
 | The Tower | Normal (dangerous tier — shipped; drain-room idea moves elsewhere) |
 | The Hermit | Shop (shipped) |
-| Death | Bomb hazard room |
-| The Devil | Fire hazard room |
-| The Chariot | Wind hazard room |
-| Strength | Stone hazard room |
-| The Moon | Heist room (crack the safe) |
-| The Star | Treasure room (key + chest) |
+| Death | Purge room: bombs (shipped) |
+| The Devil | Purge room: fire (shipped) |
+| The Chariot | Purge room: wind (shipped) |
+| Strength | Purge room: stone (shipped) |
+| Temperance | Purge room: water (shipped) |
+| The Moon | Heist room (crack the safe — shipped) |
+| The Star | Treasure room (key + chest — shipped) |
+| Judgement | Called Hands: play the demanded hands (shipped) |
+| The World | Royal Hunt: make a Royal Flush, 5:1 (shipped, rare) |
 | The High Priestess | Suit Locked (future) |
 | The Magician | Hand Locked (future) |
 | The Hanged Man | Tight Hands (future) |
@@ -100,7 +105,10 @@ Draft Major Arcana → room mapping (flavor pass later):
 
 | Room | Rule | Notes |
 | --- | --- | --- |
-| Normal | Score target within N hands | The baseline; N generous |
+| Normal | Score target within the hands you bought | The baseline |
+| Purge | Board seeded with 2–6 of ONE hazard kind; remove them all (no score target) | Shipped. Fire that spreads must be put out too; a gust that blows hazards off the board counts; a fire burning itself out counts. No ambient extras — the hazards ARE the room |
+| Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
+| Royal Hunt | Make one Royal Flush | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
 | Timed | Score target before the clock | Reuses Time Trial machinery |
 | Tight Hands | Target with very few hands (4–6) | Efficiency puzzle |
 | Suit Locked | Only 1–2 suits score | e.g. "red room": hearts/diamonds only |
@@ -353,8 +361,10 @@ saves).
 - Run length → 20–60 min, player-controlled via cash-out.
 - Card picks → after every room, skippable, removal in shops.
 - Premium buy-ins → harder AND richer (stake-style modifiers).
-- Bet UX → forced stakes by difficulty (half stack / all-in), no free
-  slider (playtest round 2); per-room min bets
+- Bet UX → blind + bought hands: pay the blind, then buy 3–12 hands at
+  blind÷10 each (the house keeps the rake; clearing returns blind +
+  blind × odds). Replaced the forced half-stack/all-in stakes, which
+  replaced the free slider; per-room min bets
   printed on the tarot cards.
 - Bosses → court cards revived (JoAT/Queen Bee/King Cobra) + Dealer
   finale as heads-up duel with mirror counter-rules.

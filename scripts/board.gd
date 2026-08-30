@@ -362,6 +362,8 @@ func play_hand() -> void:
 	# boss still standing after the pops blows him off the table.
 	if _gust_will_hit_boss():
 		result["boss_defeated"] = true
+	# Purge rooms watch this: hazards surviving the pops and gusts.
+	result["hazards_left"] = predicted_hazards_left()
 	busy = true
 	hand_played.emit(result)
 
@@ -1136,6 +1138,27 @@ func _gust_will_hit_boss() -> bool:
 			if not vacating.has(cell) and grid[cell].boss != "":
 				return true
 	return false
+
+
+## Hazard cards that will survive this hand: not popped with the
+## selection (kept stones stay put) and not sitting in a gust line.
+func predicted_hazards_left() -> int:
+	var gone := {}
+	for card in selected:
+		if card.boss != "":
+			continue
+		if card.hazard == "stone" and card.stone_hits > 1:
+			continue
+		gone[card.grid_pos] = true
+	for card in selected:
+		if card.hazard == "wind":
+			for cell in wind_line_cells(card.grid_pos, card.wind_dir):
+				gone[cell] = true
+	var left := 0
+	for p in grid:
+		if grid[p].hazard != "" and not gone.has(p):
+			left += 1
+	return left
 
 
 ## Per-hand boss behavior, after the hand fully resolves.

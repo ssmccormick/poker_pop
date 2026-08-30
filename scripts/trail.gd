@@ -25,12 +25,18 @@ const TABLES := [
 	{"name": "HIGH ROLLER", "cost": 1000, "chips": 500, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
 ]
 
-# Room risk tiers offered by the tarot draw.
+# Room risk tiers offered by the tarot draw. "hands" is the suggested
+# purchase — the stakes screen lets you buy MIN_HANDS_BUY..MAX_HANDS_BUY.
 const RISKS := [
-	{"tarot": "THE SUN", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10, "stake": "half"},
-	{"tarot": "WHEEL OF FORTUNE", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8, "stake": "half"},
-	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7, "stake": "all"},
+	{"tarot": "THE SUN", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10},
+	{"tarot": "WHEEL OF FORTUNE", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8},
+	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7},
 ]
+
+# Every hand is bought up front, priced off the room's blind; the house
+# keeps the rake win or lose. The blind itself returns with winnings.
+const MIN_HANDS_BUY := 3
+const MAX_HANDS_BUY := 12
 
 # Hazards are AMBIENT: any play room (bosses included) can be seeded,
 # with the chance and count climbing with depth and table stakes. The
@@ -39,8 +45,25 @@ const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
 const HAZARD_BASE_CHANCE := 0.20
 const HAZARD_ROOM_STEP := 0.04   # + per room index
 const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
-const OBJECTIVE_CHANCE := 0.18   # heist/treasure rooms, from room 2 on
+const OBJECTIVE_CHANCE := 0.15   # heist/treasure rooms, from room 2 on
+const PURGE_CHANCE := 0.18       # purge rooms: board of one hazard, clear them all
+const REQUIRE_CHANCE := 0.17     # called-hands rooms: play the demanded hands
+const ROYAL_CHANCE := 0.10       # of called-hands rooms (region 2+): THE WORLD
 const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
+
+const PURGE_TAROTS := {"bomb": "DEATH", "fire": "THE DEVIL",
+		"wind": "THE CHARIOT", "stone": "STRENGTH", "water": "TEMPERANCE"}
+# Called-hands templates by region: [hand name, count] — exact hands
+# only (this game scores exact compositions, so a Full House is NOT
+# three Pairs).
+const REQUIRE_POOLS := [
+	[[["Pair", 3]], [["Pair", 2], ["Two Pair", 1]],
+			[["Three of a Kind", 1], ["Pair", 1]]],
+	[[["Two Pair", 2]], [["Three of a Kind", 2]],
+			[["Straight", 1], ["Pair", 2]], [["Flush", 1]]],
+	[[["Flush", 2]], [["Full House", 1]], [["Straight", 2]],
+			[["Four of a Kind", 1]]],
+]
 
 const BASE_TARGET := 300          # table 1 target before scaling
 const TARGET_STEP := 65           # + per table (21-table curve)
@@ -96,8 +119,10 @@ var in_room := false
 var room_score := 0
 var room_hands_left := 0
 var room_target := 0
-var room_goal := ""      # "" score target · "safe" heist · "chest" treasure
+var room_goal := ""      # "" score · safe · chest · purge · hands · boss
 var room_combo: Array = []
+var room_require: Array = []     # [[hand name, remaining count], ...]
+var room_require_total := 0      # hands demanded at room start (progress bar)
 var relics: Array = []   # relic ids held this run
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
@@ -127,6 +152,8 @@ var _tarot_cards_box: Control
 var _tarot_cashout_btn: Button
 var _bet_info: Label
 var _bet_stake_label: Label
+var _bet_hands := 8
+var _bet_hands_label: Label
 var _pick_box: Control
 var _shop_info: Label
 var _shop_box: Control
@@ -271,11 +298,25 @@ func _blind_for(room: int) -> int:
 	return int((BLIND_BASE + BLIND_STEP * room) * _table().blind_mult)
 
 
-## True if the stack can't cover `blind` — and in that case the run is
-## over: zero chips busts outright, anything short of the blind gets
+## Every hand is bought up front; the price climbs with the blind, so
+## depth and table stakes both make hands dearer.
+func _hand_price(room: int) -> int:
+	return maxi(1, _blind_for(room) / 10)
+
+
+## The least a seat at this table can cost: blind plus the minimum hand
+## purchase. Bosses take the whole stack anyway, so just the blind.
+func _cheapest_seat(room: int) -> int:
+	if BOSS_ROOMS.has(room):
+		return _blind_for(room)
+	return _blind_for(room) + MIN_HANDS_BUY * _hand_price(room)
+
+
+## True if the stack can't cover `cost` — and in that case the run is
+## over: zero chips busts outright, anything short of the seat gets
 ## force-cashed out (the house shows you the door with what's left).
-func _short_stacked(blind: int) -> bool:
-	if chips >= blind:
+func _short_stacked(cost: int) -> bool:
+	if chips >= cost:
 		return false
 	if chips <= 0:
 		_clear_run_save()
@@ -287,7 +328,7 @@ func _short_stacked(blind: int) -> bool:
 	_save_meta()
 	_clear_run_save()
 	_end_run("BLINDED OUT",
-			"The table's minimum is %d chips — you're down to %d.\nThe house cashes you out: $%d." % [blind, chips, payout],
+			"A seat at this table costs at least %d chips — you're down to %d.\nThe house cashes you out: $%d." % [cost, chips, payout],
 			payout)
 	return true
 
@@ -370,12 +411,10 @@ func _resume_run() -> void:
 		_apply_relic_effects()
 		if not pending_retry.is_empty():
 			# A failed room still bars the way — back to its table.
-			if _short_stacked(_blind_for(room_index)):
+			if _short_stacked(_cheapest_seat(room_index)):
 				return
 			main.menu_open = false
 			current_offer = pending_retry.duplicate(true)
-			current_offer.min_bet = maxi(1,
-					mini(int(current_offer.get("min_bet", 1)), chips))
 			_hide_all()
 			_show_bet()
 		else:
@@ -395,8 +434,8 @@ func _show_tarot() -> void:
 	in_room = false
 	main.game_started = false
 	main.board.locked = true
-	# Bankruptcy check against the coming room's blind.
-	if _short_stacked(_blind_for(room_index)):
+	# Bankruptcy check against the coming room's cheapest seat.
+	if _short_stacked(_cheapest_seat(room_index)):
 		return
 	_offers = _make_offers()
 	_fate_offer = _make_one_offer(true)
@@ -443,31 +482,55 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		"tarot": risk.tarot,
 		"label": risk.label,
 		"target": _target_for(room_index, risk),
-		# Rooms tighten with depth: one fewer hand per region.
-		"hands": maxi(5, int(risk.hands) - region),
+		# The suggested purchase — the stakes screen sells 3-12 hands.
+		"hands": maxi(MIN_HANDS_BUY, int(risk.hands) - region),
 		"odds": float(risk.odds),
-		# Fate sets the stake: dangerous tables take everything, the rest
-		# take half your stack (but never less than the table blind).
-		"stake_mode": String(risk.stake),
-		"min_bet": mini(_blind_for(room_index), chips),
+		"min_bet": _blind_for(room_index),
+		"hand_price": _hand_price(room_index),
 	}
-	if room_index >= 1 and randf() < OBJECTIVE_CHANCE:
-		# Objective rooms: no score target — do the job to clear.
-		if randf() < 0.5:
-			offer.tarot = "THE MOON"
-			offer.label = "Heist"
-			offer.odds = 2.0
-			offer["goal"] = "safe"
-			offer.stake_mode = "all"
-		else:
-			offer.tarot = "THE STAR"
-			offer.label = "Treasure"
-			offer.odds = 1.5
-			offer["goal"] = "chest"
-			offer.stake_mode = "half"
-		offer.hands = maxi(5, 8 - region)
-		offer.target = 0
-		offer.min_bet = mini(_blind_for(room_index), chips)
+	if room_index >= 1:
+		var roll := randf()
+		if roll < OBJECTIVE_CHANCE:
+			# Objective rooms: no score target — do the job to clear.
+			if randf() < 0.5:
+				offer.tarot = "THE MOON"
+				offer.label = "Heist"
+				offer.odds = 2.0
+				offer["goal"] = "safe"
+			else:
+				offer.tarot = "THE STAR"
+				offer.label = "Treasure"
+				offer.odds = 1.5
+				offer["goal"] = "chest"
+			offer.hands = maxi(MIN_HANDS_BUY, 8 - region)
+			offer.target = 0
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE:
+			# Purge rooms: a board full of one hazard — remove them all.
+			var kind: String = HAZARD_KINDS.pick_random()
+			offer.tarot = String(PURGE_TAROTS[kind])
+			offer.label = "Purge"
+			offer.odds = 2.0 if kind in ["bomb", "fire"] else 1.5
+			offer["goal"] = "purge"
+			offer["purge_kind"] = kind
+			offer["purge_count"] = mini((2 if kind == "stone" else 3) + region, 6)
+			offer.hands = maxi(MIN_HANDS_BUY, 8 - region)
+			offer.target = 0
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE:
+			# Called hands: play exactly what the table demands.
+			offer["goal"] = "hands"
+			if region >= 1 and randf() < ROYAL_CHANCE:
+				offer.tarot = "THE WORLD"
+				offer.label = "Royal Hunt"
+				offer.odds = 5.0
+				offer["require"] = [["Royal Flush", 1]]
+			else:
+				offer.tarot = "JUDGEMENT"
+				offer.label = "Called Hands"
+				offer.odds = 1.5 if region == 0 else 2.0
+				var pool: Array = REQUIRE_POOLS[mini(region, REQUIRE_POOLS.size() - 1)]
+				offer["require"] = (pool.pick_random() as Array).duplicate(true)
+			offer.hands = maxi(MIN_HANDS_BUY, 9 - region)
+			offer.target = 0
 	return offer
 
 
@@ -518,21 +581,32 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			goal_line = "CRACK THE SAFE"
 		elif offer.get("goal", "") == "chest":
 			goal_line = "OPEN THE CHEST"
-		var bet_line := "BET: HALF STACK"
-		if offer.has("boss") or offer.get("stake_mode", "half") == "all":
+		elif offer.get("goal", "") == "purge":
+			goal_line = "CLEAR %d %s CARDS" % [offer.purge_count,
+					String(offer.purge_kind).to_upper()]
+		elif offer.get("goal", "") == "hands":
+			goal_line = "PLAY  " + _require_text(offer.require)
+		var bet_line := "Buy-in  %d\nHands  %d each" % [offer.min_bet,
+				offer.get("hand_price", 0)]
+		if offer.has("boss"):
 			bet_line = "ALL IN"
-		b.text = "%s\n\n%s table\n%s\nHands  %d\nOdds  %s\n\n%s" % [
-			offer.tarot, offer.label, goal_line, offer.hands,
+		b.text = "%s\n\n%s table\n%s\nOdds  %s\n\n%s" % [
+			offer.tarot, offer.label, goal_line,
 			_odds_text(offer.odds), bet_line]
 	return b
 
 
 func _odds_text(odds: float) -> String:
-	if is_equal_approx(odds, 1.0):
-		return "1 : 1"
 	if is_equal_approx(odds, 1.5):
 		return "3 : 2"
-	return "2 : 1"
+	return "%d : 1" % maxi(1, int(round(odds)))
+
+
+func _require_text(req: Array) -> String:
+	var parts := PackedStringArray()
+	for r in req:
+		parts.append("%d× %s" % [int(r[1]), String(r[0]).to_upper()])
+	return " + ".join(parts)
 
 
 func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
@@ -561,36 +635,65 @@ func _do_cashout() -> void:
 
 # --- Flow: betting --------------------------------------------------------
 
-## The table dictates the stake: "all" mode takes the whole stack,
-## "half" takes half of it, floored at the table blind.
-func _stake_for(offer: Dictionary) -> int:
-	if offer.get("stake_mode", "half") == "all":
-		return chips
-	return clampi(maxi(int(ceilf(chips / 2.0)), int(offer.get("min_bet", 1))), 1, chips)
-
-
+## The stakes screen: the blind is forced, the hands are bought.
 func _show_bet() -> void:
 	_hide_all()
 	var o := current_offer
+	if o.has("boss"):
+		# The house demands everything at a boss table, retry included.
+		stake = chips
+		chips = 0
+		_start_room()
+		return
 	# A failed room bars the way — no backing out of a retry.
 	_bet_back_btn.visible = pending_retry.is_empty()
-	var retry_line := ""
-	if not pending_retry.is_empty():
-		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust."
-	stake = _stake_for(o)
-	var demand := "HALF YOUR STACK"
-	if stake >= chips:
-		demand = "ALL IN"
-	_bet_info.text = "%s — %s table\nTarget %d in %d hands   ·   odds %s\nThe table demands %s\nYour chips: %d%s" % [
-		o.tarot, o.label, o.target, o.hands, _odds_text(o.odds), demand, chips,
-		retry_line]
-	_bet_stake_label.text = "STAKE  %d      win pays back %d" % [
-		stake, stake + int(stake * o.odds)]
+	_bet_hands = clampi(int(o.hands), MIN_HANDS_BUY, _max_hands_affordable())
+	_refresh_bet_labels()
 	bet_layer.visible = true
 
 
+func _max_hands_affordable() -> int:
+	var o := current_offer
+	var price := int(o.get("hand_price", 0))
+	if price <= 0:
+		return MAX_HANDS_BUY
+	return clampi((chips - int(o.min_bet)) / price, MIN_HANDS_BUY, MAX_HANDS_BUY)
+
+
+func _bet_goal_text(o: Dictionary) -> String:
+	match String(o.get("goal", "")):
+		"safe":
+			return "Crack the safe"
+		"chest":
+			return "Open the chest"
+		"purge":
+			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
+		"hands":
+			return "Play " + _require_text(o.require)
+	return "Target %d" % o.target
+
+
+func _refresh_bet_labels() -> void:
+	var o := current_offer
+	var retry_line := ""
+	if not pending_retry.is_empty():
+		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust."
+	stake = int(o.min_bet)
+	var price := int(o.get("hand_price", 0))
+	var total := stake + _bet_hands * price
+	_bet_info.text = "%s — %s table\n%s   ·   odds %s\nBuy-in %d   +   hands at %d each\nYour chips: %d%s" % [
+		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds),
+		stake, price, chips, retry_line]
+	_bet_hands_label.text = "%d HANDS" % _bet_hands
+	_bet_stake_label.text = "TOTAL  %d      clearing pays back %d" % [
+		total, stake + int(stake * o.odds)]
+
+
 func _confirm_bet() -> void:
-	chips -= stake
+	var o := current_offer
+	stake = int(o.min_bet)
+	chips -= stake + _bet_hands * int(o.get("hand_price", 0))
+	o.hands = _bet_hands
 	bet_layer.visible = false
 	_start_room()
 
@@ -605,6 +708,10 @@ func _start_room() -> void:
 	if current_offer.has("boss"):
 		room_goal = "boss"
 	room_combo = []
+	room_require = (current_offer.get("require", []) as Array).duplicate(true)
+	room_require_total = 0
+	for r in room_require:
+		room_require_total += int(r[1])
 	room_hands_left = int(current_offer.hands) + (1 if has_relic("horseshoe") else 0)
 	main.mode_kind = "trail"
 	main.mode_label_text = "Trail · %s" % _table().name.capitalize()
@@ -637,6 +744,9 @@ func _seed_room_specials() -> void:
 		main.board.spawn_safe(room_combo)
 	elif room_goal == "chest":
 		main.board.spawn_key_and_chest()
+	elif room_goal == "purge":
+		main.board.apply_room_hazards(String(current_offer.purge_kind),
+				int(current_offer.purge_count))
 	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0):
 		# Surprise loot in a plain room.
 		if randf() < 0.5:
@@ -646,22 +756,24 @@ func _seed_room_specials() -> void:
 			main.board.spawn_key_and_chest()
 	# Hazards are ambient in EVERY play room — bosses included — and
 	# get more frequent and more numerous with depth and stakes.
-	var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * room_index
-			+ HAZARD_TIER_STEP * table_tier, 0.0, 0.95)
-	if randf() < hz_chance:
-		var count := 1 + room_index / REGION_SIZE
-		if table_tier == 2 and randf() < 0.5:
-			count += 1
-		count = mini(count, 4)
-		for i in count:
-			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
-		# Relic adjustments to freshly-seeded hazards.
-		for p in main.board.grid:
-			var card: PlayingCard = main.board.grid[p]
-			if card.hazard == "bomb" and has_relic("bomb_badge"):
-				card.fuse = Board.BOMB_FUSE + 2
-			elif card.hazard == "stone" and has_relic("chisel"):
-				card.stone_hits = Board.STONE_HITS_START - 1
+	# Purge rooms are exempt: their hazards ARE the room.
+	if room_goal != "purge":
+		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * room_index
+				+ HAZARD_TIER_STEP * table_tier, 0.0, 0.95)
+		if randf() < hz_chance:
+			var count := 1 + room_index / REGION_SIZE
+			if table_tier == 2 and randf() < 0.5:
+				count += 1
+			count = mini(count, 4)
+			for i in count:
+				main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
+	# Relic adjustments to freshly-seeded hazards (purge seeds included).
+	for p in main.board.grid:
+		var card: PlayingCard = main.board.grid[p]
+		if card.hazard == "bomb" and has_relic("bomb_badge"):
+			card.fuse = Board.BOMB_FUSE + 2
+		elif card.hazard == "stone" and has_relic("chisel"):
+			card.stone_hits = Board.STONE_HITS_START - 1
 
 
 ## A 4-digit combination drawn from low ranks present on the board.
@@ -693,6 +805,17 @@ func on_hand_played(result: Dictionary) -> void:
 	if room_goal == "" and room_score >= room_target:
 		_room_cleared()
 		return
+	if room_goal == "purge" and int(result.get("hazards_left", -1)) == 0:
+		_room_cleared()
+		return
+	if room_goal == "hands":
+		for r in room_require:
+			if String(r[0]) == String(result.name) and int(r[1]) > 0:
+				r[1] = int(r[1]) - 1
+				break
+		if _require_left() == 0:
+			_room_cleared()
+			return
 	if room_goal == "chest" and not main.board.has_objective("key"):
 		# The key (or chest) went into a hand without its partner.
 		_room_failed("THE KEY IS LOST")
@@ -753,6 +876,38 @@ func _open_chest() -> void:
 	_save_run()
 
 
+## Hazard cards still on the board — purge-room progress.
+func purge_left() -> int:
+	var n := 0
+	for p in main.board.grid:
+		if main.board.grid[p].hazard != "":
+			n += 1
+	return n
+
+
+func _require_left() -> int:
+	var left := 0
+	for r in room_require:
+		left += int(r[1])
+	return left
+
+
+## Remaining demanded hands, for the room banner.
+func require_status() -> String:
+	var parts := PackedStringArray()
+	for r in room_require:
+		if int(r[1]) > 0:
+			parts.append("%d× %s" % [int(r[1]), String(r[0]).to_upper()])
+	return " · ".join(parts)
+
+
+## Fraction of the demanded hands already played (banner progress bar).
+func require_frac() -> float:
+	if room_require_total <= 0:
+		return 0.0
+	return 1.0 - float(_require_left()) / float(room_require_total)
+
+
 ## Matched combo digits on the board's safe (0-4), for the room banner.
 func safe_progress() -> int:
 	for p in main.board.grid:
@@ -785,6 +940,10 @@ func _tick_room_hazards() -> void:
 	var exploded: bool = await main.board.tick_hazards(tick_fire)
 	if exploded and in_room:
 		_room_failed("KABOOM — THE BOMB WENT OFF")
+		return
+	# A fire can burn ITSELF out on the tick — that finishes a purge too.
+	if room_goal == "purge" and in_room and purge_left() == 0:
+		_room_cleared()
 
 
 func _room_cleared() -> void:
@@ -825,10 +984,9 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 
 ## Back to the same room's table: re-bet or bust.
 func _retry_room() -> void:
-	if _short_stacked(_blind_for(room_index)):
+	if _short_stacked(_cheapest_seat(room_index)):
 		return
 	pending_retry = current_offer.duplicate(true)
-	current_offer.min_bet = maxi(1, mini(int(current_offer.get("min_bet", 1)), chips))
 	_save_run()
 	_show_bet()
 
@@ -1085,9 +1243,20 @@ func build_ui() -> void:
 
 	bet_layer = _layer()
 	_screen_title(bet_layer, "THE STAKES")
-	_bet_info = _center(bet_layer, "", 280, 26, main.OFFWHITE)
-	_bet_stake_label = _center(bet_layer, "", 500, 40, main.GOLD)
-	_center(bet_layer, "The table sets the terms. Take them or walk.", 590, 20, main.DIM)
+	_bet_info = _center(bet_layer, "", 260, 26, main.OFFWHITE)
+	var minus: Button = main._button(bet_layer, "−", Vector2(700, 460), Vector2(100, 80))
+	minus.add_theme_font_size_override("font_size", 40)
+	minus.pressed.connect(func() -> void:
+		_bet_hands = maxi(MIN_HANDS_BUY, _bet_hands - 1)
+		_refresh_bet_labels())
+	_bet_hands_label = _center(bet_layer, "", 482, 36, main.OFFWHITE)
+	var plus: Button = main._button(bet_layer, "+", Vector2(1120, 460), Vector2(100, 80))
+	plus.add_theme_font_size_override("font_size", 40)
+	plus.pressed.connect(func() -> void:
+		_bet_hands = mini(_max_hands_affordable(), _bet_hands + 1)
+		_refresh_bet_labels())
+	_center(bet_layer, "Every hand is bought up front — the house keeps the rake.", 570, 18, main.DIM)
+	_bet_stake_label = _center(bet_layer, "", 620, 36, main.GOLD)
 	var deal: Button = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70))
 	deal.add_theme_font_size_override("font_size", 28)
 	deal.pressed.connect(_confirm_bet)

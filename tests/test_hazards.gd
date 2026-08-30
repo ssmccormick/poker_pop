@@ -70,6 +70,22 @@ func _init() -> void:
 			"nothing left to soak once neighbors are washed")
 	_free_board(b)
 
+	# --- purge prediction: hazards left after pops and gusts ---------------
+	b = _board([[5, 0, 0, 0], [7, 1, 1, 0], [9, 2, 2, 0], [4, 3, 0, 1]])
+	b.grid[Vector2i(0, 0)].hazard = "bomb"
+	b.grid[Vector2i(2, 0)].hazard = "stone"
+	b.grid[Vector2i(2, 0)].stone_hits = 3
+	b.grid[Vector2i(0, 1)].hazard = "wind"
+	b.grid[Vector2i(0, 1)].wind_dir = Vector2i.UP
+	b.selected.assign([b.grid[Vector2i(0, 0)], b.grid[Vector2i(2, 0)]])
+	failures += _check(b.predicted_hazards_left() == 2,
+			"popped bomb goes; kept stone and unplayed wind remain")
+	b.selected.assign([b.grid[Vector2i(0, 1)], b.grid[Vector2i(1, 0)]])
+	failures += _check(b.predicted_hazards_left() == 1,
+			"played wind gusts the bomb away — only the stone remains")
+	b.selected.clear()
+	_free_board(b)
+
 	# --- bomb fuse ---------------------------------------------------------
 	b = _board([[5, 0, 0, 0], [6, 1, 1, 0]])
 	b.grid[Vector2i(0, 0)].hazard = "bomb"

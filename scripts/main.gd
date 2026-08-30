@@ -279,6 +279,18 @@ func _update_labels() -> void:
 			target_label.text = "TABLE %d / %d      KEY + CHEST IN ONE HAND" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL]
 			target_bar_fill.size.x = 0.0
+		elif trail.room_goal == "purge":
+			var left := trail.purge_left()
+			target_label.text = "TABLE %d / %d      PURGE  %d HAZARD%s LEFT" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, left,
+					"" if left == 1 else "S"]
+			var seeded := maxi(int(trail.current_offer.get("purge_count", 1)), 1)
+			target_bar_fill.size.x = 1314.0 * clampf(
+					1.0 - float(left) / float(seeded), 0.0, 1.0)
+		elif trail.room_goal == "hands":
+			target_label.text = "TABLE %d / %d      PLAY  %s" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.require_status()]
+			target_bar_fill.size.x = 1314.0 * clampf(trail.require_frac(), 0.0, 1.0)
 		else:
 			target_label.text = "TABLE %d / %d      %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
