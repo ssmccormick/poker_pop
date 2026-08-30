@@ -43,18 +43,19 @@ bosses, regions.
   more with every use (once per shop).
 - **Per-room wager — blind + bought hands**: every room costs its
   **blind** (the mandatory buy-in, escalating with depth and table
-  stakes) PLUS a **hand purchase**: you buy 3–12 hands on the stakes
-  screen at a per-hand price (blind ÷ 10, so hands get dearer the
-  deeper you go). Clearing pays back the blind plus blind × odds; the
-  hands money is the **house's rake, win or lose** — buying fewer
-  hands is the greed play, buying more is insurance you never get
-  back. Bosses ignore all this: ALL IN, fixed hand budget.
+  stakes), and **hands start at ZERO** — every hand is bought on the
+  stakes screen at the blind price (10 chips each at the first table,
+  climbing every room; up to 12). You can't deal without buying at
+  least one. The **whole outlay** — blind plus hands — is the stake:
+  clearing pays it back plus stake × odds; failing loses it all.
+  Buying lean is the greed play, buying deep bets big to win big.
+  Bosses ignore all this: ALL IN, fixed hand budget.
 - **Odds by room**: Steady 1:1 · Risky/Treasure/soft-Purge 3:2 ·
   Dangerous/Heist/hard-Purge/Called-Hands 2:1 · Royal Hunt 5:1 ·
   Boss 3:1.
 - **Blinds escalate**: the blind rises each room (poker blinds
   structure) — late trail, you can't limp. Can't cover a table's
-  **cheapest seat** (blind + 3 hands) = **BLINDED OUT**: the run is
+  **cheapest seat** (blind + 1 hand) = **BLINDED OUT**: the run is
   over and the house cashes out your remaining chips at the buy-in's
   rate. Zero chips = busted outright, nothing to cash.
 - **Cash out**: between any two rooms, walk away — convert remaining
@@ -361,10 +362,10 @@ saves).
 - Run length → 20–60 min, player-controlled via cash-out.
 - Card picks → after every room, skippable, removal in shops.
 - Premium buy-ins → harder AND richer (stake-style modifiers).
-- Bet UX → blind + bought hands: pay the blind, then buy 3–12 hands at
-  blind÷10 each (the house keeps the rake; clearing returns blind +
-  blind × odds). Replaced the forced half-stack/all-in stakes, which
-  replaced the free slider; per-room min bets
+- Bet UX → blind + bought hands: pay the blind, then buy hands from
+  ZERO at the blind price each (whole outlay staked; clearing returns
+  it at the room's odds). Replaced the forced half-stack/all-in
+  stakes, which replaced the free slider; per-room min bets
   printed on the tarot cards.
 - Bosses → court cards revived (JoAT/Queen Bee/King Cobra) + Dealer
   finale as heads-up duel with mirror counter-rules.
