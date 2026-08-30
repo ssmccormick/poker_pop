@@ -96,7 +96,7 @@ Draft Major Arcana → room mapping (flavor pass later):
 | Strength | Purge room: stone (shipped) |
 | Temperance | Purge room: water (shipped) |
 | The Moon | Heist room (crack the safe — shipped) |
-| The Star | Treasure room (key + chest — shipped) |
+| The Star | Treasure room (key + chest pairs, 2–4 by depth — shipped) |
 | Judgement | Called Hands: play the demanded hands (shipped) |
 | The World | Royal Hunt: make a Royal Flush, 5:1 (shipped, rare) |
 | The High Priestess | Suit Locked (future) |
@@ -189,8 +189,11 @@ rank/suit cards with overlays) are on the board. Make a VALID poker
 hand containing BOTH — the hand scores normally and the chest opens.
 Rewards: a new card for the deck, bonus chips, cash, or (later) a
 modified card.
-- **Treasure room (THE STAR, odds 1.5)**: opening the chest is the
-  room goal.
+- **Treasure room (THE STAR, odds 1.5)**: the room demands **2–4
+  pairs by depth** — each opened chest pays its reward roll AND
+  respawns a fresh key + chest on the board until the count is met.
+  Losing the key (played without its chest, burned, gusted) still
+  fails the room.
 - **Ambient chests**: random chance in normal rooms as optional loot.
 - v1: objective spawns don't mix with hazard rooms.
 

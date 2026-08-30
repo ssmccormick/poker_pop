@@ -278,9 +278,12 @@ func _update_labels() -> void:
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, " · ".join(digits)]
 			target_bar_fill.size.x = 1314.0 * trail.safe_progress() / 4.0
 		elif trail.room_goal == "chest":
-			target_label.text = "TABLE %d / %d      KEY + CHEST IN ONE HAND" % \
-					[trail.room_index + 1, TrailMode.ROOMS_TOTAL]
-			target_bar_fill.size.x = 0.0
+			target_label.text = "TABLE %d / %d      KEY + CHEST  %d / %d" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
+					trail.room_chests_opened, trail.room_chests_needed]
+			target_bar_fill.size.x = 1314.0 * clampf(
+					float(trail.room_chests_opened)
+					/ float(maxi(trail.room_chests_needed, 1)), 0.0, 1.0)
 		elif trail.room_goal == "purge":
 			var left := trail.purge_left()
 			target_label.text = "TABLE %d / %d      PURGE  %d HAZARD%s LEFT" % \

@@ -127,6 +127,8 @@ var room_goal := ""      # "" score · safe · chest · purge · hands · boss
 var room_combo: Array = []
 var room_require: Array = []     # [[hand name, remaining count], ...]
 var room_require_total := 0      # hands demanded at room start (progress bar)
+var room_chests_needed := 1      # treasure rooms: pairs to open
+var room_chests_opened := 0
 var relics: Array = []   # relic ids held this run
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
@@ -503,7 +505,12 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.label = "Treasure"
 				offer.odds = 1.5
 				offer["goal"] = "chest"
-			offer.hands = maxi(1, 8 - region)
+				# Deeper trails demand more pairs; each opened pair
+				# respawns a fresh key and chest.
+				offer["chest_count"] = mini(2 + region, 4)
+				offer.hands = mini(MAX_HANDS_BUY, 3 * int(offer.chest_count))
+			if offer.get("goal", "") == "safe":
+				offer.hands = maxi(1, 8 - region)
 			offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE:
 			# Purge rooms: a board full of one hazard — remove them all.
@@ -581,7 +588,8 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "safe":
 			goal_line = "CRACK THE SAFE"
 		elif offer.get("goal", "") == "chest":
-			goal_line = "OPEN THE CHEST"
+			var pairs := int(offer.get("chest_count", 1))
+			goal_line = "OPEN THE CHEST" if pairs == 1 else "OPEN %d CHESTS" % pairs
 		elif offer.get("goal", "") == "purge":
 			goal_line = "CLEAR %d %s CARDS" % [offer.purge_count,
 					String(offer.purge_kind).to_upper()]
@@ -673,7 +681,8 @@ func _bet_goal_text(o: Dictionary) -> String:
 		"safe":
 			return "Crack the safe"
 		"chest":
-			return "Open the chest"
+			var pairs := int(o.get("chest_count", 1))
+			return "Open the chest" if pairs == 1 else "Open %d chests" % pairs
 		"purge":
 			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
 		"hands":
@@ -722,6 +731,8 @@ func _start_room() -> void:
 	room_require_total = 0
 	for r in room_require:
 		room_require_total += int(r[1])
+	room_chests_needed = int(current_offer.get("chest_count", 1))
+	room_chests_opened = 0
 	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
 			+ (1 if has_relic("horseshoe") else 0)
 	main.mode_kind = "trail"
@@ -811,7 +822,13 @@ func on_hand_played(result: Dictionary) -> void:
 	if result.get("chest_opened", false):
 		_open_chest()
 		if room_goal == "chest":
-			_room_cleared()
+			room_chests_opened += 1
+			if room_chests_opened >= room_chests_needed:
+				_room_cleared()
+				return
+			# The job's not done: a fresh pair hits the board.
+			_consume_hand()
+			_respawn_treasure()
 			return
 	if room_goal == "" and room_score >= room_target:
 		_room_cleared()
@@ -844,6 +861,18 @@ func _consume_hand() -> void:
 		_room_failed()
 	else:
 		_tick_room_hazards()
+
+
+## Treasure rooms demand several pairs: once the board settles from
+## the opened one, a fresh key and chest are dealt onto plain cards.
+func _respawn_treasure() -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	if not in_room or room_goal != "chest":
+		return
+	main.board.spawn_key_and_chest()
+	main._announce("ANOTHER KEY, ANOTHER CHEST  (%d / %d)"
+			% [room_chests_opened, room_chests_needed])
 
 
 func on_safe_cracked() -> void:
