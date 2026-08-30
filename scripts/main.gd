@@ -75,7 +75,6 @@ var fullscreen_btn: Button
 var resolution_btn: Button
 var pause_layer: ColorRect
 var music: AudioStreamPlayer
-var menu_music: AudioStreamPlayer
 var countdown_active := false
 var countdown_id := 0
 var preview_label: Label
@@ -133,11 +132,10 @@ func _ready() -> void:
 	_build_menu()
 	_build_splash()
 
-	# Music (Echoes Below pack): "Crimson Sparks" in-game, "Tiny
-	# Troublemaker" on the menu, both looped. Nothing plays until the
-	# splash is clicked — that first gesture also unblocks web audio.
-	music = _make_music_player("res://assets/music/crimson_sparks.mp3")
-	menu_music = _make_music_player("res://assets/music/tiny_troublemaker.mp3")
+	# Music (Western Audio Bundle): one jukebox player, fed a random
+	# track from the area's playlist. Nothing plays until the splash is
+	# clicked — that first gesture also unblocks web audio.
+	music = _make_music_player()
 
 	var shot := OS.get_environment("POKERPOP_SHOT")
 	if shot != "":
@@ -552,11 +550,41 @@ func _begin_countdown() -> void:
 	countdown_overlay.visible = false
 
 
-func _make_music_player(path: String) -> AudioStreamPlayer:
-	var p := AudioStreamPlayer.new()
-	var track: AudioStreamMP3 = load(path)
+# The jukebox: every area names its playlist, one random track plays
+# looped until another area asks for a different playlist.
+const MUSIC_TRACKS := {
+	"menu": ["res://assets/music/under_the_sun.mp3"],
+	"room": ["res://assets/music/hand_on_the_gun.mp3",
+			"res://assets/music/bulletstorm.mp3",
+			"res://assets/music/riding_all_day_long.mp3",
+			"res://assets/music/hard_times.mp3",
+			"res://assets/music/paramo.mp3"],
+	"boss": ["res://assets/music/last_duel.mp3",
+			"res://assets/music/heat_and_snakes.mp3"],
+	"tarot": ["res://assets/music/thankful_town.mp3"],
+	"shop": ["res://assets/music/bar_ragtime.mp3",
+			"res://assets/music/saloon_can_can.mp3"],
+	"lost": ["res://assets/music/tears_for_our_lands.mp3",
+			"res://assets/music/harmonica_moments.mp3"],
+}
+var music_category := ""
+
+
+## Swaps the jukebox to an area's playlist (random track, looped) and
+## fades it in. Asking for the playlist already playing is a no-op.
+func play_music(category: String) -> void:
+	if category == music_category and music.playing:
+		return
+	music_category = category
+	var track: AudioStreamMP3 = load(MUSIC_TRACKS[category].pick_random())
 	track.loop = true
-	p.stream = track
+	music.stop()
+	music.stream = track
+	_fade_in(music)
+
+
+func _make_music_player() -> AudioStreamPlayer:
+	var p := AudioStreamPlayer.new()
 	p.volume_db = -12.0
 	p.bus = "Music"
 	add_child(p)
@@ -626,8 +654,7 @@ func _open_menu() -> void:
 	countdown_id += 1  # cancel any running countdown
 	countdown_active = false
 	countdown_overlay.visible = false
-	music.stop()
-	_fade_in(menu_music)
+	play_music("menu")
 	menu_open = true
 	game_started = false
 	game_over = false
@@ -653,9 +680,7 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 	menu_open = false
 	menu_layer.visible = false
 	game_started = true
-	menu_music.stop()
-	if not music.playing:
-		_fade_in(music)
+	play_music("room")
 	while board.busy:
 		await get_tree().process_frame
 	_restart()
@@ -1056,7 +1081,7 @@ func _dismiss_splash() -> void:
 		return
 	splash_layer.visible = false
 	if OS.get_environment("POKERPOP_SHOT") == "":
-		_fade_in(menu_music)
+		play_music("menu")
 
 
 func _menu_center(text: String, y: float, font_size: int, color: Color) -> Label:

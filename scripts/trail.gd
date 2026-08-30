@@ -456,6 +456,7 @@ func _show_tarot() -> void:
 	in_room = false
 	main.game_started = false
 	main.board.locked = true
+	main.play_music("tarot")
 	# Bankruptcy check against the coming room's cheapest seat.
 	if _short_stacked(_cheapest_seat(room_index)):
 		return
@@ -757,9 +758,7 @@ func _start_room() -> void:
 	main.board.custom_deck = deck.duplicate(true)
 	main.game_started = true
 	main.game_over = false
-	main.menu_music.stop()
-	if not main.music.playing:
-		main._fade_in(main.music)
+	main.play_music("boss" if current_offer.has("boss") else "room")
 	if not main.backgrounds.is_empty():
 		main.bg_rect.texture = main.backgrounds.pick_random()
 	main.board.reset()
@@ -1105,6 +1104,7 @@ func boss_status() -> String:
 func _show_pick() -> void:
 	_hide_all()
 	main.game_started = false
+	main.play_music("tarot")
 	for child in _pick_box.get_children():
 		child.queue_free()
 	var pick_count := 4 if has_relic("card_sleeve") else 3
@@ -1154,6 +1154,7 @@ func _burn_price() -> int:
 func _show_shop() -> void:
 	_hide_all()
 	main.game_started = false
+	main.play_music("shop")
 	# Stock is fixed per shop room: no restocking by leaving/burning.
 	if _shop_stock_room != room_index:
 		_shop_stock = []
@@ -1306,6 +1307,7 @@ func _end_run(title: String, body: String, _payout: int) -> void:
 	_hide_all()
 	run_active = false
 	main.game_started = false
+	main.play_music("lost" if title in ["BUSTED OUT", "BLINDED OUT"] else "menu")
 	if title == "BUSTED OUT":
 		_clear_run_save()
 	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nCash: $%d" % [title, body, main.score, cash]
