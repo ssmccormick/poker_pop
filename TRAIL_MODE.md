@@ -41,21 +41,22 @@ bosses, regions.
   **Boss rooms are ALL-IN**: no bet choice — the whole stack rides at
   3:1. Shops never restock within a room, and the burn service costs
   more with every use (once per shop).
-- **Per-room wager — blind + bought hands**: every room costs its
-  **blind** (the mandatory buy-in, escalating with depth and table
-  stakes), and **hands start at ZERO** — every hand is bought on the
-  stakes screen at the blind price (10 chips each at the first table,
-  climbing every room; up to 12). You can't deal without buying at
-  least one. The **whole outlay** — blind plus hands — is the stake:
-  clearing pays it back plus stake × odds; failing loses it all.
-  Buying lean is the greed play, buying deep bets big to win big.
-  Bosses ignore all this: ALL IN, fixed hand budget.
+- **Per-room wager — ante, bet, and promised hands**: every room
+  costs its **ante** (25 chips at the first table, climbing with depth
+  and table stakes — the house keeps it, win or lose). Then you **bet
+  chips on yourself** (minimum one ante, stepped in ante increments).
+  **Hands are free — they're what you're betting ON**: effective odds
+  = base odds × the tier's reference hands ÷ the hands you take
+  (1–12). Promise a 4-hand clear on a 7-hand Dangerous table and 2:1
+  becomes ×3.5; take 12 lazy hands and the odds shrink below base.
+  Clearing pays bet + bet × effective odds; failing loses ante and
+  bet. Bosses ignore all this: ALL IN at base odds, fixed hand budget.
 - **Odds by room**: Steady 1:1 · Risky/Treasure/soft-Purge 3:2 ·
   Dangerous/Heist/hard-Purge/Called-Hands 2:1 · Royal Hunt 5:1 ·
   Boss 3:1.
 - **Blinds escalate**: the blind rises each room (poker blinds
   structure) — late trail, you can't limp. Can't cover a table's
-  **cheapest seat** (blind + 1 hand) = **BLINDED OUT**: the run is
+  **cheapest seat** (ante + minimum bet) = **BLINDED OUT**: the run is
   over and the house cashes out your remaining chips at the buy-in's
   rate. Zero chips = busted outright, nothing to cash.
 - **Cash out**: between any two rooms, walk away — convert remaining
@@ -362,9 +363,9 @@ saves).
 - Run length → 20–60 min, player-controlled via cash-out.
 - Card picks → after every room, skippable, removal in shops.
 - Premium buy-ins → harder AND richer (stake-style modifiers).
-- Bet UX → blind + bought hands: pay the blind, then buy hands from
-  ZERO at the blind price each (whole outlay staked; clearing returns
-  it at the room's odds). Replaced the forced half-stack/all-in
+- Bet UX → ante + free bet + promised hands: the ante is sunk, the bet
+  is chosen, and the hand count scales the odds (fewer hands promised
+  = fatter payout). Replaced bought-hands, which replaced forced
   stakes, which replaced the free slider; per-room min bets
   printed on the tarot cards.
 - Bosses → court cards revived (JoAT/Queen Bee/King Cobra) + Dealer
