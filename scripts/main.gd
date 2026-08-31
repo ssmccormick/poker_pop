@@ -75,6 +75,7 @@ var fullscreen_btn: Button
 var resolution_btn: Button
 var pause_layer: ColorRect
 var music: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var countdown_active := false
 var countdown_id := 0
 var preview_label: Label
@@ -136,6 +137,7 @@ func _ready() -> void:
 	# track from the area's playlist. Nothing plays until the splash is
 	# clicked — that first gesture also unblocks web audio.
 	music = _make_music_player()
+	ambience = _make_music_player()
 
 	var shot := OS.get_environment("POKERPOP_SHOT")
 	if shot != "":
@@ -215,6 +217,11 @@ func _process(delta: float) -> void:
 				game_over = true
 				board.locked = true
 				_show_game_over("THE BAR HIT BOTTOM\n\nYou made it to level %d.\nTotal score: %d\n\nR — play again    M — menu" % [level, score])
+		elif mode_kind == "trail" and trail.in_room and trail.room_goal == "timed":
+			trail.room_time_left -= delta
+			if trail.room_time_left <= 0.0:
+				trail.room_time_left = 0.0
+				trail.on_time_up()
 	_update_labels()
 
 
@@ -240,9 +247,15 @@ func _update_labels() -> void:
 			status_label.text = "LEVEL %d" % level
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 		"trail":
-			status_label.text = "HANDS LEFT  %d" % trail.room_hands_left
-			status_label.add_theme_color_override("font_color",
-					RED if trail.room_hands_left <= 2 else OFFWHITE)
+			if trail.in_room and trail.room_goal == "timed":
+				var tsecs := ceili(trail.room_time_left)
+				status_label.text = "TIME  %d:%02d" % [tsecs / 60, tsecs % 60]
+				status_label.add_theme_color_override("font_color",
+						RED if trail.room_time_left < 15.0 else OFFWHITE)
+			else:
+				status_label.text = "HANDS LEFT  %d" % trail.room_hands_left
+				status_label.add_theme_color_override("font_color",
+						RED if trail.room_hands_left <= 2 else OFFWHITE)
 			deck_label.text = "CHIPS %d    STAKE %d" % [trail.chips, trail.stake]
 		_:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
@@ -567,11 +580,24 @@ const MUSIC_TRACKS := {
 	"lost": ["res://assets/music/tears_for_our_lands.mp3",
 			"res://assets/music/harmonica_moments.mp3"],
 }
+# A quiet ambience bed under the music, keyed by the same categories:
+# saloon chatter in shops, town sounds between rooms, wilderness at
+# the tables, night sounds for bosses and losses.
+const AMB_TRACKS := {
+	"menu": "res://assets/music/amb/town_day.mp3",
+	"room": "res://assets/music/amb/wild_day.mp3",
+	"boss": "res://assets/music/amb/wild_night.mp3",
+	"tarot": "res://assets/music/amb/town_night.mp3",
+	"shop": "res://assets/music/amb/saloon.mp3",
+	"lost": "res://assets/music/amb/night_camp.mp3",
+}
+const AMBIENCE_DB := -22.0
 var music_category := ""
 
 
 ## Swaps the jukebox to an area's playlist (random track, looped) and
-## fades it in. Asking for the playlist already playing is a no-op.
+## fades it in, with the matching ambience bed underneath. Asking for
+## the playlist already playing is a no-op.
 func play_music(category: String) -> void:
 	if category == music_category and music.playing:
 		return
@@ -581,6 +607,11 @@ func play_music(category: String) -> void:
 	music.stop()
 	music.stream = track
 	_fade_in(music)
+	var amb: AudioStreamMP3 = load(AMB_TRACKS[category])
+	amb.loop = true
+	ambience.stop()
+	ambience.stream = amb
+	_fade_in(ambience, AMBIENCE_DB)
 
 
 func _make_music_player() -> AudioStreamPlayer:
@@ -687,10 +718,10 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 
 
 ## Starts a music player from silence and eases it up to full volume.
-func _fade_in(p: AudioStreamPlayer) -> void:
+func _fade_in(p: AudioStreamPlayer, target_db := -12.0) -> void:
 	p.volume_db = -40.0
 	p.play()
-	create_tween().tween_property(p, "volume_db", -12.0, 1.5)
+	create_tween().tween_property(p, "volume_db", target_db, 1.5)
 
 
 ## Rebuilds the mini-card row showing the current selection in rank
@@ -1107,6 +1138,10 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 	b.position = pos
 	b.size = btn_size
 	b.focus_mode = Control.FOCUS_NONE
+	# Every button in the game clicks — one wire, all screens.
+	b.pressed.connect(func() -> void:
+		board._play_sound(Board.SFX_CLICKS.pick_random(),
+				randf_range(0.95, 1.05), -12.0))
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color("2a2a2a")
 	sb.border_color = GOLD

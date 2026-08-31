@@ -74,15 +74,87 @@ const SFX_SELECTS := [
 	preload("res://assets/sfx/card_pick.wav"),
 ]
 const SFX_FLIP := preload("res://assets/sfx/card_flip.wav")
-const SFX_DEAL := preload("res://assets/sfx/deal_card.wav")
 const SFX_SWOOSH := preload("res://assets/sfx/deal_swoosh.wav")
-const SFX_SHUFFLE := preload("res://assets/sfx/shuffle.wav")
 const SFX_ERROR := preload("res://assets/sfx/error.wav")
 const SFX_POPS := [
 	preload("res://assets/sfx/pop_1.wav"),
 	preload("res://assets/sfx/pop_2.wav"),
 	preload("res://assets/sfx/pop_3.wav"),
 ]
+# Western Audio Bundle one-shots. Trail reaches these as Board.SFX_*.
+const SFX_DEALS := [
+	preload("res://assets/sfx/west/card_deliver_1.mp3"),
+	preload("res://assets/sfx/west/card_deliver_2.mp3"),
+]
+const SFX_SHUFFLES := [
+	preload("res://assets/sfx/west/cards_shuffle_1.mp3"),
+	preload("res://assets/sfx/west/cards_shuffle_2.mp3"),
+]
+const SFX_CLICKS := [
+	preload("res://assets/sfx/west/ui_click_1.mp3"),
+	preload("res://assets/sfx/west/ui_click_2.mp3"),
+	preload("res://assets/sfx/west/ui_click_3.mp3"),
+]
+const SFX_COINS := [
+	preload("res://assets/sfx/west/coins_1.mp3"),
+	preload("res://assets/sfx/west/coins_2.mp3"),
+]
+const SFX_WINDS := [
+	preload("res://assets/sfx/west/wind_1.mp3"),
+	preload("res://assets/sfx/west/wind_2.mp3"),
+]
+const SFX_MATCHES := [
+	preload("res://assets/sfx/west/match_1.mp3"),
+	preload("res://assets/sfx/west/match_2.mp3"),
+]
+const SFX_KNIVES := [
+	preload("res://assets/sfx/west/knife_1.mp3"),
+	preload("res://assets/sfx/west/knife_2.mp3"),
+]
+const SFX_DYNAMITES := [
+	preload("res://assets/sfx/west/dynamite_1.mp3"),
+	preload("res://assets/sfx/west/dynamite_2.mp3"),
+	preload("res://assets/sfx/west/dynamite_3.mp3"),
+]
+const SFX_SNAKES := [
+	preload("res://assets/sfx/west/snake_1.mp3"),
+	preload("res://assets/sfx/west/snake_2.mp3"),
+	preload("res://assets/sfx/west/snake_3.mp3"),
+]
+const SFX_REVOLVERS := [
+	preload("res://assets/sfx/west/revolver_1.mp3"),
+	preload("res://assets/sfx/west/revolver_2.mp3"),
+	preload("res://assets/sfx/west/revolver_3.mp3"),
+	preload("res://assets/sfx/west/revolver_4.mp3"),
+]
+const SFX_SPITS := [
+	preload("res://assets/sfx/west/spit_1.mp3"),
+	preload("res://assets/sfx/west/spit_2.mp3"),
+	preload("res://assets/sfx/west/spit_3.mp3"),
+]
+const SFX_SALOON_DOORS := [
+	preload("res://assets/sfx/west/saloon_doors_1.mp3"),
+	preload("res://assets/sfx/west/saloon_doors_2.mp3"),
+]
+const SFX_WHISKYS := [
+	preload("res://assets/sfx/west/whisky_1.mp3"),
+	preload("res://assets/sfx/west/whisky_2.mp3"),
+]
+const SFX_CROWS := [
+	preload("res://assets/sfx/west/crow_1.mp3"),
+	preload("res://assets/sfx/west/crow_2.mp3"),
+]
+const SFX_LOSS_HOWLS := [
+	preload("res://assets/sfx/west/coyote_1.mp3"),
+	preload("res://assets/sfx/west/coyote_2.mp3"),
+	preload("res://assets/sfx/west/vulture.mp3"),
+]
+const SFX_BELL := preload("res://assets/sfx/west/bell.mp3")
+const SFX_FUSE_START := preload("res://assets/sfx/west/fuse_start.mp3")
+const SFX_REVOLVER_CHARGE := preload("res://assets/sfx/west/revolver_charge.mp3")
+const SFX_STING_WIN := preload("res://assets/sfx/west/sting_win.mp3")
+const SFX_STING_BOSS := preload("res://assets/sfx/west/sting_boss.mp3")
+const SFX_STING_COMPLETE := preload("res://assets/sfx/west/sting_complete.mp3")
 
 
 func reset() -> void:
@@ -393,6 +465,7 @@ func play_hand() -> void:
 		card.hand_valid = false
 		if card.boss == "jack" or card.boss == "queen":
 			card.boss_hp -= 1
+			_play_sound(SFX_REVOLVERS.pick_random(), randf_range(0.95, 1.1), -8.0)
 			if card.boss_hp <= 0:
 				defeated_boss = true
 				poppers.append(card)  # down he goes
@@ -406,6 +479,7 @@ func play_hand() -> void:
 			continue
 		if card.hazard == "stone" and card.stone_hits > 1:
 			card.stone_hits -= 1
+			_play_sound(SFX_KNIVES.pick_random(), randf_range(0.9, 1.1), -8.0)
 			continue  # cracked, not cleared — keeps its cell
 		if card.hazard == "wind":
 			gusts.append({"cell": card.grid_pos, "dir": card.wind_dir})
@@ -470,7 +544,7 @@ func play_hand() -> void:
 		for cell in wind_line_cells(g.cell, g.dir):
 			blown[cell] = g.dir
 	if not blown.is_empty():
-		_play_sound(SFX_SWOOSH, randf_range(1.1, 1.3), -5.0)
+		_play_sound(SFX_WINDS.pick_random(), randf_range(1.0, 1.2), -5.0)
 		var gtw := create_tween().set_parallel(true)
 		var flying: Array = []
 		var gusted_boss := false
@@ -780,7 +854,7 @@ func _on_card_dealt(card: PlayingCard) -> void:
 	if is_instance_valid(card):
 		card.z_index = 0  # back on the table with everyone else
 	card_dealt.emit(card)
-	_play_sound(SFX_DEAL, randf_range(0.95, 1.15), -13.0)
+	_play_sound(SFX_DEALS.pick_random(), randf_range(0.95, 1.15), -13.0)
 
 
 ## Completes the refill instantly: kill the tweens, snap every involved
@@ -933,7 +1007,7 @@ func shuffle_board() -> void:
 		return
 	busy = true
 	clear_selection()
-	_play_sound(SFX_SHUFFLE, 1.0, -5.0)
+	_play_sound(SFX_SHUFFLES.pick_random(), 1.0, -5.0)
 	var cards: Array = grid.values()
 	var cells: Array = grid.keys()
 	for attempt in 100:
@@ -1006,6 +1080,7 @@ func spawn_boss(kind: String) -> void:
 		"cobra":
 			card.rank = randi_range(2, 14)
 			card.suit = randi_range(0, 3)
+			_play_sound(SFX_SNAKES.pick_random(), 1.0, -6.0)
 			card.cobra_stack = []
 			card.cobra_body = []
 			# Grow the starting body along a chain of adjacent cells,
@@ -1134,6 +1209,8 @@ func _cobra_eat(head: PlayingCard, instant: bool) -> bool:
 ## identity reverts to the previous meal, and he's stunned for a hand.
 func _cobra_revert(head: PlayingCard) -> void:
 	head.stunned = true
+	_play_sound(SFX_SNAKES.pick_random(), 0.8, -8.0)
+	_play_sound(SFX_REVOLVERS.pick_random(), 1.0, -9.0)
 	if not head.cobra_body.is_empty():
 		var tip: PlayingCard = head.cobra_body.pop_back()
 		grid.erase(tip.grid_pos)
@@ -1231,7 +1308,7 @@ func tick_boss() -> void:
 				await tw.finished
 			b.rank = randi_range(2, 14)
 			b.suit = randi_range(0, 3)
-			_play_sound(SFX_SHUFFLE, 1.4, -10.0)
+			_play_sound(SFX_SHUFFLES.pick_random(), 1.4, -10.0)
 		"queen":
 			# Alternating rhythm: she MOVES one turn, then HONEYS a card
 			# adjacent to her the next. Honey is permanent until cleared.
@@ -1279,7 +1356,7 @@ func tick_boss() -> void:
 			else:
 				var moved: bool = await _cobra_eat(b, false)
 				if moved:
-					_play_sound(SFX_FLIP, 0.5, -8.0)
+					_play_sound(SFX_SNAKES.pick_random(), randf_range(0.9, 1.1), -8.0)
 					# The tail tip vacated a cell — deal into the gap.
 					await _fall_and_fill(false)
 	busy = false
@@ -1305,6 +1382,12 @@ func apply_room_hazards(kind: String, count: int) -> void:
 				card.stone_hits = STONE_HITS_START
 			"wind":
 				card.wind_dir = HAZARD_DIRS.pick_random()
+	# The room announces its danger.
+	if count > 0 and not candidates.is_empty():
+		if kind == "bomb":
+			_play_sound(SFX_FUSE_START, 1.0, -10.0)
+		elif kind == "fire":
+			_play_sound(SFX_MATCHES.pick_random(), 1.0, -8.0)
 
 
 ## Occupied cells in a straight line from `from` (exclusive) to the edge.
@@ -1408,6 +1491,10 @@ func tick_hazards(tick_fire := true) -> bool:
 	var res := _tick_fire_and_bombs(tick_fire)
 	if not res.soaked.is_empty():
 		_play_sound(SFX_FLIP, 0.6, -8.0)
+	if not res.ignited.is_empty():
+		_play_sound(SFX_MATCHES.pick_random(), randf_range(0.95, 1.1), -8.0)
+	if res.exploded:
+		_play_sound(SFX_DYNAMITES.pick_random(), 1.0, -3.0)
 	var burned: Array = res.burned
 	if not burned.is_empty():
 		_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)
@@ -1465,8 +1552,11 @@ func _play_pop(pitch: float) -> void:
 	_play_sound(SFX_POPS.pick_random(), pitch, -5.0)
 
 
-## Fire-and-forget one-shot player, with an optional delay.
+## Fire-and-forget one-shot player, with an optional delay. Safe on a
+## detached board (headless tests): it just stays silent.
 func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0.0) -> void:
+	if not is_inside_tree():
+		return
 	if delay > 0.0:
 		await get_tree().create_timer(delay, false).timeout
 		if not is_inside_tree():

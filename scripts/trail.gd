@@ -53,6 +53,8 @@ const OBJECTIVE_CHANCE := 0.15   # heist/treasure rooms, from room 2 on
 const PURGE_CHANCE := 0.18       # purge rooms: board of one hazard, clear them all
 const REQUIRE_CHANCE := 0.17     # called-hands rooms: play the demanded hands
 const ROYAL_CHANCE := 0.10       # of called-hands rooms (region 2+): THE WORLD
+const TIMED_CHANCE := 0.12       # timed tables: score the target on a clock
+const TIMED_MAX_MINUTES := 6     # the most time a timed table will sell
 const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 
 const PURGE_TAROTS := {"bomb": "DEATH", "fire": "THE DEVIL",
@@ -122,6 +124,7 @@ var room_index := 0           # 0-based; next room to play
 var in_room := false
 var room_score := 0
 var room_hands_left := 0
+var room_time_left := 0.0        # timed tables: seconds on the clock
 var room_target := 0
 var room_goal := ""      # "" score · safe · chest · purge · hands · boss
 var room_combo: Array = []
@@ -557,6 +560,15 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer["require"] = (pool.pick_random() as Array).duplicate(true)
 			offer.hands = maxi(1, 9 - region)
 			offer.target = 0
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE + TIMED_CHANCE:
+			# Beat the clock: unlimited hands, but the minutes are the
+			# promise — take fewer for fatter odds.
+			offer.tarot = "THE HANGED MAN"
+			offer.label = "Timed"
+			offer.odds = 2.0
+			offer["goal"] = "timed"
+			offer["minutes"] = maxi(2, 4 - region)
+			offer.target = _target_for(room_index, {"target_scale": 1.0})
 	return offer
 
 
@@ -613,7 +625,11 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					String(offer.purge_kind).to_upper()]
 		elif offer.get("goal", "") == "hands":
 			goal_line = "PLAY  " + _require_text(offer.require)
+		elif offer.get("goal", "") == "timed":
+			goal_line = "TARGET %d — BEAT THE CLOCK" % offer.target
 		var bet_line := "Ante  %d  ·  ~%d hands" % [offer.min_bet, offer.hands]
+		if offer.get("goal", "") == "timed":
+			bet_line = "Ante  %d  ·  ~%d min" % [offer.min_bet, offer.minutes]
 		if offer.has("boss"):
 			bet_line = "ALL IN"
 		b.text = "%s\n\n%s table\n%s\nOdds  %s\n\n%s" % [
@@ -644,6 +660,7 @@ func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
 		_show_shop()
 	elif offer.has("boss"):
 		# The house demands everything at a boss table.
+		main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 0.9, -6.0)
 		stake = chips
 		stake_odds = float(offer.odds)
 		chips = 0
@@ -653,6 +670,7 @@ func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
 
 
 func _do_cashout() -> void:
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0)
 	var payout := _cashout_value()
 	cash += payout
 	_save_meta()
@@ -668,6 +686,7 @@ func _show_bet() -> void:
 	var o := current_offer
 	if o.has("boss"):
 		# The house demands everything at a boss table, retry included.
+		main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 0.9, -6.0)
 		stake = chips
 		stake_odds = float(o.odds)
 		chips = 0
@@ -676,18 +695,30 @@ func _show_bet() -> void:
 	# A failed room bars the way — no backing out of a retry.
 	_bet_back_btn.visible = pending_retry.is_empty()
 	_bet_amount = int(o.min_bet)
-	# Hands are free — they're what you're betting ON. Start at the
-	# tier's reference count (base odds, no bonus, no penalty).
-	_bet_hands = clampi(int(o.hands), MIN_HANDS_TAKE, MAX_HANDS_BUY)
+	# Hands (or minutes, at a timed table) are free — they're what
+	# you're betting ON. Start at the tier's reference count.
+	var reference := int(o.minutes) if _is_timed(o) else int(o.hands)
+	_bet_hands = clampi(reference, MIN_HANDS_TAKE, _promise_cap())
 	_refresh_bet_labels()
 	bet_layer.visible = true
 
 
+func _is_timed(o: Dictionary) -> bool:
+	return o.get("goal", "") == "timed"
+
+
+## The most of the promise currency (hands or minutes) a table sells.
+func _promise_cap() -> int:
+	return TIMED_MAX_MINUTES if _is_timed(current_offer) else MAX_HANDS_BUY
+
+
 ## Promise a faster clear, get fatter odds: base odds scaled by the
-## tier's reference hand count over the hands you actually take.
+## tier's reference budget over what you actually take (hands, or
+## minutes at a timed table).
 func _eff_odds() -> float:
 	var o := current_offer
-	return float(o.odds) * float(o.hands) / float(maxi(MIN_HANDS_TAKE, _bet_hands))
+	var reference := float(o.minutes) if _is_timed(o) else float(o.hands)
+	return float(o.odds) * reference / float(maxi(MIN_HANDS_TAKE, _bet_hands))
 
 
 func _max_bet() -> int:
@@ -705,6 +736,8 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
 		"hands":
 			return "Play " + _require_text(o.require)
+		"timed":
+			return "Target %d before the clock dies" % o.target
 	return "Target %d" % o.target
 
 
@@ -714,23 +747,29 @@ func _refresh_bet_labels() -> void:
 	if not pending_retry.is_empty():
 		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust."
 	var blind := int(o.min_bet)
+	var unit := "min" if _is_timed(o) else "hands"
+	var reference := int(o.minutes) if _is_timed(o) else int(o.hands)
 	_bet_amount = clampi(_bet_amount, blind, _max_bet())
-	_bet_info.text = "%s — %s table\n%s   ·   base odds %s at %d hands\nAnte %d — the house keeps it\nYour chips: %d%s" % [
-		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), int(o.hands),
-		blind, chips, retry_line]
+	_bet_info.text = "%s — %s table\n%s   ·   base odds %s at %d %s\nAnte %d — the house keeps it\nYour chips: %d%s" % [
+		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), reference,
+		unit, blind, chips, retry_line]
 	_bet_amount_label.text = "BET  %d" % _bet_amount
-	_bet_hands_label.text = "%d HANDS" % _bet_hands
+	_bet_hands_label.text = "%d %s" % [_bet_hands, unit.to_upper()]
 	_bet_stake_label.text = "Odds ×%.2f      clearing pays back %d" % [
 		_eff_odds(), _bet_amount + int(_bet_amount * _eff_odds())]
 
 
 func _confirm_bet() -> void:
+	main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 1.0, -8.0)
 	var o := current_offer
 	var blind := int(o.min_bet)
 	stake = clampi(_bet_amount, blind, maxi(blind, chips - blind))
 	stake_odds = _eff_odds()
 	chips -= blind + stake
-	o["hands_bought"] = _bet_hands
+	if _is_timed(o):
+		o["minutes_bought"] = _bet_hands
+	else:
+		o["hands_bought"] = _bet_hands
 	bet_layer.visible = false
 	_start_room()
 
@@ -753,6 +792,12 @@ func _start_room() -> void:
 	room_chests_opened = 0
 	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
 			+ (1 if has_relic("horseshoe") else 0)
+	room_time_left = 0.0
+	if room_goal == "timed":
+		# The clock is the budget, not hands.
+		room_time_left = 60.0 * int(current_offer.get("minutes_bought",
+				current_offer.get("minutes", 3)))
+		room_hands_left = 999
 	main.mode_kind = "trail"
 	main.mode_label_text = "Trail · %s" % _table().name.capitalize()
 	main.board.custom_deck = deck.duplicate(true)
@@ -852,7 +897,7 @@ func on_hand_played(result: Dictionary) -> void:
 			_consume_hand()
 			_respawn_treasure()
 			return
-	if room_goal == "" and room_score >= room_target:
+	if room_goal in ["", "timed"] and room_score >= room_target:
 		_room_cleared()
 		return
 	if room_goal == "purge" and int(result.get("hazards_left", -1)) == 0:
@@ -875,6 +920,10 @@ func on_hand_played(result: Dictionary) -> void:
 
 ## A hand (or a safe crack) is spent; run out and the room is lost.
 func _consume_hand() -> void:
+	if room_goal == "timed":
+		# Timed tables never run out of hands — only of seconds.
+		_tick_room_hazards()
+		return
 	if has_relic("lucky_chip") and randf() < 0.10:
 		_announce_after_settle("LUCKY CHIP — free hand!")
 	else:
@@ -905,6 +954,8 @@ func on_safe_cracked() -> void:
 	var region := room_index / REGION_SIZE + 1
 	var loot := 40 + 20 * region
 	chips += loot
+	main.board._play_sound(Board.SFX_BELL, 1.0, -8.0)
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.3)
 	_announce_after_settle("SAFE LOOT  +%d CHIPS" % loot)
 	_consume_hand()
 
@@ -916,6 +967,7 @@ func _open_chest() -> void:
 	if roll < 0.45:
 		var loot := 30 + 15 * region
 		chips += loot
+		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0)
 		_announce_after_settle("CHEST  +%d CHIPS" % loot)
 	elif roll < 0.65:
 		var card := _random_card_offer(0.25)
@@ -1019,6 +1071,9 @@ func _room_cleared() -> void:
 	if has_relic("tin_star"):
 		winnings += 10
 	chips += winnings
+	main.board._play_sound(Board.SFX_STING_BOSS if current_offer.has("boss")
+			else Board.SFX_STING_WIN, 1.0, -6.0)
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
 	main._announce("TABLE CLEARED  +%d CHIPS" % winnings)
 	_after_board_settles(func() -> void:
 		room_index += 1
@@ -1027,6 +1082,13 @@ func _room_cleared() -> void:
 		else:
 			_save_run()
 			_show_pick())
+
+
+## The timed table's clock ran dry (driven by main._process).
+func on_time_up() -> void:
+	if not in_room or room_goal != "timed":
+		return
+	_room_failed("TIME'S UP — THE TABLE WINS")
 
 
 func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
@@ -1040,6 +1102,7 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 		reason = "BUSTED — SECOND WIND, NO SCAR"
 	else:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+		main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
 	main._announce(reason, main.RED)
 	_after_board_settles(_retry_room)
 
@@ -1066,11 +1129,14 @@ func on_abandon_room() -> void:
 		return
 	in_room = false
 	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+	main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
 	pending_retry = current_offer.duplicate(true)
 	_save_run()
 
 
 func _trail_complete() -> void:
+	main.board._play_sound(Board.SFX_STING_COMPLETE, 1.0, -5.0)
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.5)
 	var payout := _cashout_value(COMPLETE_RATE_BONUS) + COMPLETE_PURSE * (table_tier + 1)
 	cash += payout
 	_save_meta()
@@ -1152,8 +1218,11 @@ func _burn_price() -> int:
 
 
 func _show_shop() -> void:
+	var re_render := shop_layer.visible
 	_hide_all()
 	main.game_started = false
+	if not re_render:
+		main.board._play_sound(Board.SFX_SALOON_DOORS[0], 1.0, -8.0)
 	main.play_music("shop")
 	# Stock is fixed per shop room: no restocking by leaving/burning.
 	if _shop_stock_room != room_index:
@@ -1209,7 +1278,7 @@ func _show_shop() -> void:
 				chips -= price
 				slot.bought = true
 				deck.append(slot.data)
-				main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+				main.board._play_sound(Board.SFX_WHISKYS.pick_random(), 1.0, -8.0)
 				holder.disabled = true
 				price_tag.text = "SOLD"
 				_shop_info.text = "CHIPS  %d" % chips
@@ -1218,6 +1287,7 @@ func _show_shop() -> void:
 
 
 func _leave_shop() -> void:
+	main.board._play_sound(Board.SFX_SALOON_DOORS[1], 1.0, -8.0)
 	room_index += 1
 	if room_index >= ROOMS_TOTAL:
 		_trail_complete()
@@ -1270,7 +1340,7 @@ func _populate_deck_view() -> void:
 				burns_used += 1
 				_shop_burned_here = true
 				deck.remove_at(idx)
-				main.board._play_sound(Board.SFX_POPS.pick_random(), 1.0, -8.0)
+				main.board._play_sound(Board.SFX_SPITS.pick_random(), 1.0, -6.0)
 				_save_run()
 				_show_shop())
 		_remove_grid.add_child(holder)
@@ -1307,7 +1377,12 @@ func _end_run(title: String, body: String, _payout: int) -> void:
 	_hide_all()
 	run_active = false
 	main.game_started = false
-	main.play_music("lost" if title in ["BUSTED OUT", "BLINDED OUT"] else "menu")
+	if title in ["BUSTED OUT", "BLINDED OUT"]:
+		main.play_music("lost")
+		# A lone howl over the sad harmonica.
+		main.board._play_sound(Board.SFX_LOSS_HOWLS.pick_random(), 1.0, -8.0, 0.8)
+	else:
+		main.play_music("menu")
 	if title == "BUSTED OUT":
 		_clear_run_save()
 	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nCash: $%d" % [title, body, main.score, cash]
@@ -1376,7 +1451,7 @@ func build_ui() -> void:
 	var plus: Button = main._button(bet_layer, "+", Vector2(1120, 510), Vector2(100, 70))
 	plus.add_theme_font_size_override("font_size", 40)
 	plus.pressed.connect(func() -> void:
-		_bet_hands = mini(MAX_HANDS_BUY, _bet_hands + 1)
+		_bet_hands = mini(_promise_cap(), _bet_hands + 1)
 		_refresh_bet_labels())
 	_center(bet_layer, "Hands are free — fewer hands promised, fatter odds on your bet.", 600, 18, main.DIM)
 	_bet_stake_label = _center(bet_layer, "", 640, 36, main.GOLD)
@@ -1414,7 +1489,7 @@ func build_ui() -> void:
 		if chips >= cost and relics.size() < MAX_RELICS:
 			chips -= cost
 			_gain_relic(_shop_stock_relic)
-			main.board._play_sound(Board.SFX_SHUFFLE, 1.3, -8.0)
+			main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
 			_shop_stock_relic = ""
 			_shop_relic_btn.disabled = true
 			_shop_info.text = "CHIPS  %d" % chips)

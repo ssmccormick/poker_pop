@@ -50,7 +50,10 @@ bosses, regions.
   (1–12). Promise a 4-hand clear on a 7-hand Dangerous table and 2:1
   becomes ×3.5; take 12 lazy hands and the odds shrink below base.
   Clearing pays bet + bet × effective odds; failing loses ante and
-  bet. Bosses ignore all this: ALL IN at base odds, fixed hand budget.
+  bet. Timed tables sell MINUTES instead of hands — hands are
+  unlimited there, and promising fewer minutes fattens the odds the
+  same way. Bosses ignore all this: ALL IN at base odds, fixed hand
+  budget.
 - **Odds by room**: Steady 1:1 · Risky/Treasure/soft-Purge 3:2 ·
   Dangerous/Heist/hard-Purge/Called-Hands 2:1 · Royal Hunt 5:1 ·
   Boss 3:1.
@@ -101,7 +104,7 @@ Draft Major Arcana → room mapping (flavor pass later):
 | The World | Royal Hunt: make a Royal Flush, 5:1 (shipped, rare) |
 | The High Priestess | Suit Locked (future) |
 | The Magician | Hand Locked (future) |
-| The Hanged Man | Tight Hands (future) |
+| The Hanged Man | Timed table: score the target before the clock dies (shipped) |
 
 ## Room types
 
@@ -111,7 +114,7 @@ Draft Major Arcana → room mapping (flavor pass later):
 | Purge | Board seeded with 2–6 of ONE hazard kind; remove them all (no score target) | Shipped. Fire that spreads must be put out too; a gust that blows hazards off the board counts; a fire burning itself out counts. No ambient extras — the hazards ARE the room |
 | Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
 | Royal Hunt | Make one Royal Flush | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
-| Timed | Score target before the clock | Reuses Time Trial machinery |
+| Timed | Score target before the clock; hands unlimited | Shipped (THE HANGED MAN, 2:1 base). The promise dial is MINUTES (1–6, reference 4→2 by region): fewer minutes promised = fatter odds. Hazards still tick per hand |
 | Tight Hands | Target with very few hands (4–6) | Efficiency puzzle |
 | Suit Locked | Only 1–2 suits score | e.g. "red room": hearts/diamonds only |
 | Hand Locked | Only listed hand types score | e.g. "pairs are worthless tonight" |
