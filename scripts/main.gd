@@ -85,6 +85,26 @@ var over_label: Label
 var menu_layer: ColorRect
 var _announce_tween: Tween
 
+# Profiles: three save slots; trail meta/run and tutorial flags live
+# under the active one. The slot choice itself persists in settings.
+var profile := 1
+var profile_layer: ColorRect
+var _profile_menu_btn: Button
+var _profile_slot_btns: Array = []
+
+# First-time tutorials, tracked per profile.
+var tutor_seen := {}
+var _tutor_queue: Array = []
+var tutor_layer: ColorRect
+var _tutor_title: Label
+var _tutor_body: Label
+var _tutor_prev_locked := false
+
+# Interactive how-to-play tutorial state.
+var tut_step := 0
+var _tut_label: Label
+var _tut_skip_btn: Button
+
 
 func _ready() -> void:
 	get_window().title = "Poker Pop"
@@ -184,6 +204,9 @@ func _ready() -> void:
 				trail.room_index = 20  # King Cobra's table
 				trail._show_tarot()
 				trail._choose_offer(trail._offers[0], false)  # bosses auto all-in
+			"tutorial":
+				menu_layer.visible = false
+				_start_tutorial()
 			"ready":
 				_start_mode("arcade")
 			"time":
@@ -333,6 +356,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if menu_open:
 			return
+		if tutor_layer != null and tutor_layer.visible:
+			# The explainer popup eats keys; ENTER/SPACE advance it.
+			if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+				_tutor_next()
+			return
 		match event.keycode:
 			KEY_ESCAPE:
 				_toggle_pause()
@@ -393,6 +421,9 @@ func _on_hand_played(result: Dictionary) -> void:
 	score += result.score
 	hands_played += 1
 	_announce("%s  +%d" % [String(result.name).to_upper(), result.score])
+	if mode_kind == "tutorial":
+		_tut_on_hand(String(result.name))
+		return
 	if mode_kind == "trail":
 		trail.on_hand_played(result)
 		return
@@ -430,10 +461,12 @@ func _level_up() -> void:
 func _on_dead_board() -> void:
 	if game_over or not game_started:
 		return
-	if mode_kind == "arcade" or mode_kind == "trail":
+	if mode_kind in ["arcade", "trail", "tutorial"]:
 		# These modes never dead-end: reshuffle the board and keep going.
 		_announce("NO MOVES — RESHUFFLE")
 		board.shuffle_board()
+		if mode_kind == "tutorial":
+			_tut_apply_step()  # re-stamp the lesson after the shuffle
 		return
 	game_over = true
 	board.locked = true
@@ -458,7 +491,7 @@ func _show_game_over(message: String) -> void:
 
 
 func _restart() -> void:
-	if mode_kind == "trail":
+	if mode_kind == "trail" or mode_kind == "tutorial":
 		return  # no free room retries at a betting table
 	if not game_started or board.busy or level_transition:
 		return
@@ -646,6 +679,9 @@ func _setup_audio_buses() -> void:
 func _load_settings() -> void:
 	var cf := ConfigFile.new()
 	cf.load("user://settings.cfg")  # missing file is fine, defaults apply
+	profile = clampi(int(cf.get_value("profile", "current", 1)), 1, 3)
+	_migrate_legacy_saves()
+	_tutor_load()
 	fullscreen_on = cf.get_value("video", "fullscreen", true)
 	res_index = clampi(cf.get_value("video", "resolution", 2), 0, RESOLUTIONS.size() - 1)
 	music_vol = clampf(cf.get_value("audio", "music", 0.8), 0.0, 1.0)
@@ -654,8 +690,244 @@ func _load_settings() -> void:
 	_apply_audio()
 
 
+# --- Profiles -------------------------------------------------------------
+
+## Per-profile save path: user://p1_trail_meta.cfg and friends.
+func profile_path(base: String) -> String:
+	return "user://p%d_%s" % [profile, base]
+
+
+## Saves from before profiles existed become profile 1.
+func _migrate_legacy_saves() -> void:
+	for base: String in ["trail_meta.cfg", "trail_run.cfg"]:
+		var old_path := "user://" + base
+		var new_path := "user://p1_" + base
+		if FileAccess.file_exists(old_path) and not FileAccess.file_exists(new_path):
+			DirAccess.rename_absolute(old_path, new_path)
+
+
+func _select_profile(n: int) -> void:
+	profile = clampi(n, 1, 3)
+	_save_settings()
+	_tutor_load()
+	trail.run_active = false
+	trail.pending_retry = {}
+	trail._load_meta()
+	_refresh_profile_ui()
+	profile_layer.visible = false
+
+
+func _erase_profile(n: int) -> void:
+	for base in ["trail_meta.cfg", "trail_run.cfg", "tutorial.cfg"]:
+		DirAccess.remove_absolute("user://p%d_%s" % [n, base])
+	if n == profile:
+		_tutor_load()
+		trail.run_active = false
+		trail.pending_retry = {}
+		trail._load_meta()
+	_refresh_profile_ui()
+
+
+## One line of life per slot for the picker.
+func _profile_summary(n: int) -> String:
+	var cf := ConfigFile.new()
+	var has_meta := cf.load("user://p%d_trail_meta.cfg" % n) == OK
+	var cash := int(cf.get_value("meta", "cash", 0)) if has_meta else 0
+	var run := ConfigFile.new()
+	var riding: bool = run.load("user://p%d_trail_run.cfg" % n) == OK \
+			and run.get_value("run", "active", false)
+	if not has_meta and not FileAccess.file_exists("user://p%d_tutorial.cfg" % n):
+		return "PROFILE %d\n\nfresh saddle" % n
+	return "PROFILE %d\n\n$%d banked%s" % [n, cash,
+			"\nride in progress" if riding else ""]
+
+
+func _refresh_profile_ui() -> void:
+	if _profile_menu_btn != null:
+		_profile_menu_btn.text = "PROFILE %d" % profile
+	for i in _profile_slot_btns.size():
+		var b: Button = _profile_slot_btns[i]
+		b.text = _profile_summary(i + 1)
+		b.disabled = (i + 1) == profile
+
+
+# --- First-time tutorials (per profile) ------------------------------------
+
+const TUTOR := {
+	"mode_time": ["TIME TRIAL", "Score as much as you can before the clock runs out. Hands are unlimited and the deck reshuffles forever — speed is everything."],
+	"mode_single": ["SINGLE DECK", "One 52-card deck, no timer. When the deck runs dry the run is over — squeeze every point from every card."],
+	"mode_arcade": ["ARCADE", "The bar at the top is always draining. Scoring refills it; hit the level target to move up. When the bar empties, the run ends."],
+	"mode_zen": ["ZEN", "No timer, no limits, no losing. Just you, the cards, and the sound of the pops."],
+	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Cash out between tables to bank chips as permanent $cash, or ride deeper."],
+	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero, the table is lost."],
+	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. Play burning cards to put them out — every hand you wait, the fire claims another card."],
+	"hazard_wind": ["WIND CARD", "Play it and every card in the arrow's direction is blown clean off the board — unscored. Aim it at junk... or at trouble."],
+	"hazard_stone": ["STONE CARD", "Solid rock: it takes THREE scoring hands to break. It scores its rank every time you include it."],
+	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
+	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
+	"goal_chest": ["KEY & CHEST", "Somewhere on the board sit a key and a chest. Get BOTH into one valid scoring hand to open it. Lose the key and the job is off."],
+	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested. Remove every hazard card to clear the table."],
+	"goal_mine": ["GOLD MINE", "Every card is stone. Break the asked number of stones (three hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble."],
+	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
+	"goal_timed": ["HIGH NOON", "Score the target before the clock dies. Hands are unlimited — only the seconds matter."],
+	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to knock his health down. Ten hits puts him away."],
+	"boss_queen": ["QUEEN BEE", "The Queen only fits in SMALL hands — 2 or 3 cards. She alternates: one hand she moves, the next she honeys a neighbor (honeyed cards also only play in small hands). Sting her three times."],
+	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
+	"mod_chip": ["CHIP CARD", "Gold disc: pays bonus chips every time it's played in a scoring hand."],
+	"mod_mult": ["MULT CARD", "Red ×: multiplies the WHOLE hand's score when included. Multiple mults stack."],
+	"mod_gold": ["GOLD CARD", "A nugget of the real thing: pays $1 of permanent cash every time it's played — bankable even if the run busts."],
+	"mod_plus": ["PLUS CARD", "When cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time your play to aim it."],
+	"mod_minus": ["MINUS CARD", "When cleared, the aimed card DROPS a rank. Sounds bad — until you shave a King down to pair your Queens."],
+	"mod_wild": ["WILD CARD", "Counts as ANY rank and suit. The rarest card on the trail — it completes whatever hand needs it most."],
+	"mod_boom": ["EXPLOSIVE", "The rays mean this card's enhancement SPREADS: clear it and every adjacent card inherits its power."],
+	"mod_cursed": ["CURSED CARD", "Failing a table scars your deck with one of these: it can't be played and it blocks chains. Pay a shop to burn it."],
+	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
+}
+
+
+func tutor_needs(key: String) -> bool:
+	return not tutor_seen.get(key, false) \
+			and OS.get_environment("POKERPOP_SHOT") == ""
+
+
+## Queues a one-time explainer popup the first time `key` comes up.
+func tutor_show(key: String) -> void:
+	if not tutor_needs(key) or not TUTOR.has(key):
+		return
+	tutor_seen[key] = true
+	_tutor_save()
+	_tutor_queue.append(key)
+	if not tutor_layer.visible:
+		_tutor_next()
+
+
+func _tutor_next() -> void:
+	if _tutor_queue.is_empty():
+		tutor_layer.visible = false
+		board.locked = _tutor_prev_locked
+		return
+	var key: String = _tutor_queue.pop_front()
+	if not tutor_layer.visible:
+		_tutor_prev_locked = board.locked
+		board.locked = true
+	_tutor_title.text = TUTOR[key][0]
+	_tutor_body.text = TUTOR[key][1]
+	tutor_layer.visible = true
+
+
+func _tutor_load() -> void:
+	tutor_seen.clear()
+	var cf := ConfigFile.new()
+	if cf.load(profile_path("tutorial.cfg")) == OK and cf.has_section("seen"):
+		for key in cf.get_section_keys("seen"):
+			tutor_seen[key] = true
+
+
+func _tutor_save() -> void:
+	if OS.get_environment("POKERPOP_SHOT") != "":
+		return
+	var cf := ConfigFile.new()
+	for key in tutor_seen:
+		cf.set_value("seen", key, true)
+	cf.save(profile_path("tutorial.cfg"))
+
+
+# --- The how-to-play tutorial (interactive) --------------------------------
+
+# Each step stamps its cards onto the TOP ROW and waits for the player
+# to actually play that hand.
+const TUT_STEPS := [
+	{"want": "Pair", "cards": [[7, 0], [7, 1]],
+		"text": "Two cards of the SAME RANK make a PAIR. Click the two 7s at the top-left (they're side by side), then press SPACE or the PLAY HAND button."},
+	{"want": "Three of a Kind", "cards": [[9, 0], [9, 1], [9, 2]],
+		"text": "THREE OF A KIND: three matching ranks. Chain the three 9s along the top row — click them in order, each next to the last — and play."},
+	{"want": "Straight", "cards": [[5, 0], [6, 1], [7, 2], [8, 3], [9, 0]],
+		"text": "A STRAIGHT is five ranks in a row — suits don't matter, and you can pick them in any order. The top row holds 5-6-7-8-9. Chain and play!"},
+	{"want": "Flush", "cards": [[2, 1], [6, 1], [9, 1], [11, 1], [13, 1]],
+		"text": "A FLUSH is five cards of ONE SUIT. The top row is all hearts — chain all five and play."},
+	{"want": "Full House", "cards": [[4, 0], [4, 1], [4, 2], [11, 0], [11, 1]],
+		"text": "A FULL HOUSE: three of a kind PLUS a pair. Top row: three 4s and two Jacks. Every card must be part of the hand — no stray extras, ever."},
+	{"want": "", "cards": [],
+		"text": "Last one's on you: find and play ANY hand — a pair or better. Drag or click to chain adjacent cards (all 8 directions count)."},
+]
+
+
+func _start_tutorial() -> void:
+	tutor_seen["core"] = true
+	_tutor_save()
+	mode_kind = "tutorial"
+	mode_label_text = "Tutorial"
+	board.single_deck = false
+	board.custom_deck.clear()
+	menu_open = false
+	menu_layer.visible = false
+	game_started = true
+	game_over = false
+	score = 0
+	hands_played = 0
+	play_music("room")
+	board.reset()
+	while board.busy:
+		await get_tree().process_frame
+	board.locked = false
+	tut_step = 0
+	_tut_label.visible = true
+	_tut_skip_btn.visible = true
+	_tut_apply_step()
+
+
+func _tut_apply_step() -> void:
+	while board.busy:
+		await get_tree().process_frame
+	if mode_kind != "tutorial":
+		return
+	var step: Dictionary = TUT_STEPS[tut_step]
+	var cards: Array = step.cards
+	for i in cards.size():
+		var p := Vector2i(i, 0)
+		if board.grid.has(p):
+			var card: PlayingCard = board.grid[p]
+			card.rank = cards[i][0]
+			card.suit = cards[i][1]
+			card.mod = ""
+			card.hazard = ""
+	_tut_label.text = "STEP %d / %d   —   %s" % [tut_step + 1, TUT_STEPS.size(), step.text]
+
+
+func _tut_on_hand(hand_name: String) -> void:
+	var step: Dictionary = TUT_STEPS[tut_step]
+	if String(step.want) != "" and hand_name != String(step.want):
+		_announce("THAT'S A %s — WE NEED A %s" % [hand_name.to_upper(),
+				String(step.want).to_upper()], RED)
+		_tut_apply_step()  # re-stamp in case the formation was eaten
+		return
+	tut_step += 1
+	if tut_step >= TUT_STEPS.size():
+		_finish_tutorial()
+	else:
+		_tut_apply_step()
+
+
+func _finish_tutorial() -> void:
+	_announce("YOU'RE READY — WELCOME TO THE TABLE")
+	_tut_label.text = "Tutorial complete! Pick a mode from the menu."
+	while board.busy:
+		await get_tree().process_frame
+	await get_tree().create_timer(2.0).timeout
+	if mode_kind == "tutorial":
+		_end_tutorial()
+
+
+func _end_tutorial() -> void:
+	_tut_label.visible = false
+	_tut_skip_btn.visible = false
+	mode_kind = ""
+	_open_menu()
+
+
 func _save_settings() -> void:
 	var cf := ConfigFile.new()
+	cf.set_value("profile", "current", profile)
 	cf.set_value("video", "fullscreen", fullscreen_on)
 	cf.set_value("video", "resolution", res_index)
 	cf.set_value("audio", "music", music_vol)
@@ -693,6 +965,9 @@ func _open_menu() -> void:
 	countdown_active = false
 	countdown_overlay.visible = false
 	play_music("menu")
+	if _tut_label != null:
+		_tut_label.visible = false
+		_tut_skip_btn.visible = false
 	menu_open = true
 	game_started = false
 	game_over = false
@@ -702,6 +977,11 @@ func _open_menu() -> void:
 
 
 func _start_mode(kind: String, seconds: float = 0.0) -> void:
+	# A brand-new profile learns the game before its first mode.
+	if tutor_needs("core"):
+		_start_tutorial()
+		return
+	tutor_show("mode_" + kind)
 	mode_kind = kind
 	mode_time = seconds
 	match kind:
@@ -956,6 +1236,15 @@ func _build_menu() -> void:
 	_label(menu_layer, "POP", Vector2(1042, 110), 110, OFFWHITE)
 	_menu_center("Chain adjacent cards into poker hands", 280, 26, DIM)
 
+	_profile_menu_btn = _button(menu_layer, "PROFILE %d" % profile, Vector2(60, 60), Vector2(240, 54))
+	_profile_menu_btn.add_theme_font_size_override("font_size", 20)
+	_profile_menu_btn.pressed.connect(func() -> void:
+		_refresh_profile_ui()
+		profile_layer.visible = true)
+	var how_btn := _button(menu_layer, "HOW TO PLAY", Vector2(1620, 60), Vector2(240, 54))
+	how_btn.add_theme_font_size_override("font_size", 20)
+	how_btn.pressed.connect(_start_tutorial)
+
 	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66))
 	trail_btn.add_theme_font_size_override("font_size", 26)
 	trail_btn.pressed.connect(func() -> void:
@@ -1005,6 +1294,76 @@ func _build_menu() -> void:
 			get_tree().quit())
 
 	_build_options()
+	_build_profiles_and_tutor()
+
+
+func _build_profiles_and_tutor() -> void:
+	# In-game tutorial instruction strip + skip button.
+	_tut_label = _label(ui_root, "", Vector2(60, 8), 22, GOLD)
+	_tut_label.size = Vector2(1320, 84)
+	_tut_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tut_label.visible = false
+	_tut_skip_btn = _button(ui_root, "SKIP TUTORIAL", Vector2(PANEL_X, 560), Vector2(300, 56))
+	_tut_skip_btn.add_theme_font_size_override("font_size", 20)
+	_tut_skip_btn.visible = false
+	_tut_skip_btn.pressed.connect(_end_tutorial)
+
+	# Profile picker: three saddles.
+	profile_layer = ColorRect.new()
+	profile_layer.color = BG
+	profile_layer.size = VIEW
+	profile_layer.visible = false
+	ui_root.add_child(profile_layer)
+	var pt := _label(profile_layer, "CHOOSE YOUR SADDLE", Vector2(0, 140), 64, GOLD)
+	pt.size = Vector2(VIEW.x, 90)
+	pt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for i in 3:
+		var n := i + 1
+		var slot := _button(profile_layer, "", Vector2(360 + i * 420, 360), Vector2(380, 300))
+		slot.add_theme_font_size_override("font_size", 26)
+		slot.pressed.connect(func() -> void:
+			_select_profile(n))
+		_profile_slot_btns.append(slot)
+		var erase := _button(profile_layer, "ERASE", Vector2(460 + i * 420, 690), Vector2(180, 48))
+		erase.add_theme_font_size_override("font_size", 18)
+		erase.pressed.connect(func() -> void:
+			if erase.text == "ERASE":
+				erase.text = "SURE?"
+			else:
+				erase.text = "ERASE"
+				_erase_profile(n))
+	var pback := _button(profile_layer, "BACK", Vector2(860, 880), Vector2(200, 54))
+	pback.add_theme_font_size_override("font_size", 20)
+	pback.pressed.connect(func() -> void:
+		profile_layer.visible = false)
+	_refresh_profile_ui()
+
+	# The one-time explainer popup, above everything in-game.
+	tutor_layer = ColorRect.new()
+	tutor_layer.color = Color(0, 0, 0, 0.65)
+	tutor_layer.size = VIEW
+	tutor_layer.visible = false
+	tutor_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui_root.add_child(tutor_layer)
+	var panel := ColorRect.new()
+	panel.color = Color("242424")
+	panel.position = Vector2(560, 300)
+	panel.size = Vector2(800, 440)
+	tutor_layer.add_child(panel)
+	var strip := ColorRect.new()
+	strip.color = GOLD
+	strip.position = Vector2(560, 300)
+	strip.size = Vector2(800, 4)
+	tutor_layer.add_child(strip)
+	_tutor_title = _label(tutor_layer, "", Vector2(560, 330), 40, GOLD)
+	_tutor_title.size = Vector2(800, 60)
+	_tutor_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tutor_body = _label(tutor_layer, "", Vector2(620, 415), 26, OFFWHITE)
+	_tutor_body.size = Vector2(680, 220)
+	_tutor_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var ok := _button(tutor_layer, "GOT IT", Vector2(810, 660), Vector2(300, 60))
+	ok.add_theme_font_size_override("font_size", 24)
+	ok.pressed.connect(_tutor_next)
 
 
 func _build_options() -> void:

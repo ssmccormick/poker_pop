@@ -89,8 +89,7 @@ const FATE_KICKER := 15           # chips for trusting The Fool
 const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
 const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
 
-const META_PATH := "user://trail_meta.cfg"
-const RUN_PATH := "user://trail_run.cfg"
+# Meta and run saves live under the active profile (main.profile_path).
 
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
 const MAX_RELICS := 5
@@ -197,7 +196,7 @@ func _ready() -> void:
 
 func _load_meta() -> void:
 	var cf := ConfigFile.new()
-	cf.load(META_PATH)
+	cf.load(main.profile_path("trail_meta.cfg"))
 	cash = int(cf.get_value("meta", "cash", 0))
 
 
@@ -206,7 +205,7 @@ func _save_meta() -> void:
 		return  # screenshot runs must not touch real saves
 	var cf := ConfigFile.new()
 	cf.set_value("meta", "cash", cash)
-	cf.save(META_PATH)
+	cf.save(main.profile_path("trail_meta.cfg"))
 
 
 func _save_run() -> void:
@@ -240,19 +239,19 @@ func _save_run() -> void:
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
-	cf.save(RUN_PATH)
+	cf.save(main.profile_path("trail_run.cfg"))
 
 
 func _clear_run_save() -> void:
 	run_active = false
 	var cf := ConfigFile.new()
 	cf.set_value("run", "active", false)
-	cf.save(RUN_PATH)
+	cf.save(main.profile_path("trail_run.cfg"))
 
 
 func _load_run() -> bool:
 	var cf := ConfigFile.new()
-	if cf.load(RUN_PATH) != OK or not cf.get_value("run", "active", false):
+	if cf.load(main.profile_path("trail_run.cfg")) != OK or not cf.get_value("run", "active", false):
 		return false
 	table_tier = int(cf.get_value("run", "tier", 0))
 	chips = int(cf.get_value("run", "chips", 0))
@@ -307,6 +306,7 @@ func _apply_relic_effects() -> void:
 func _gain_relic(id: String) -> void:
 	if relics.size() >= MAX_RELICS or relics.has(id):
 		return
+	main.tutor_show("relics")
 	relics.append(id)
 	_apply_relic_effects()
 	_save_run()
@@ -414,6 +414,11 @@ func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 # --- Flow: entry ----------------------------------------------------------
 
 func open_buyin() -> void:
+	# A brand-new profile learns the game before hitting the trail.
+	if main.tutor_needs("core"):
+		main._start_tutorial()
+		return
+	main.tutor_show("mode_trail")
 	main.menu_layer.visible = false
 	main.menu_open = false
 	_hide_all()
@@ -424,7 +429,7 @@ func open_buyin() -> void:
 
 func _has_saved_run() -> bool:
 	var cf := ConfigFile.new()
-	return cf.load(RUN_PATH) == OK and cf.get_value("run", "active", false)
+	return cf.load(main.profile_path("trail_run.cfg")) == OK and cf.get_value("run", "active", false)
 
 
 func _start_run(tier: int) -> void:
@@ -899,6 +904,38 @@ func _seed_room_specials() -> void:
 			card.fuse = Board.BOMB_FUSE + 2
 		elif card.hazard == "stone" and has_relic("chisel"):
 			card.stone_hits = Board.STONE_HITS_START - 1
+	_tutor_room_intros()
+
+
+## First-encounter popups for whatever this room just put in play.
+func _tutor_room_intros() -> void:
+	match room_goal:
+		"safe":
+			main.tutor_show("goal_safe")
+		"chest":
+			main.tutor_show("goal_chest")
+		"purge":
+			main.tutor_show("goal_purge")
+		"mine":
+			main.tutor_show("goal_mine")
+		"hands":
+			main.tutor_show("goal_hands")
+		"timed":
+			main.tutor_show("goal_timed")
+	for p in main.board.grid:
+		var card: PlayingCard = main.board.grid[p]
+		if card.hazard != "":
+			main.tutor_show("hazard_" + card.hazard)
+		if card.objective != "":
+			main.tutor_show("goal_chest")
+		if card.is_safe:
+			main.tutor_show("goal_safe")
+		if card.boss != "":
+			main.tutor_show("boss_" + card.boss)
+		if card.mod != "":
+			main.tutor_show("mod_" + card.mod)
+		if card.boom:
+			main.tutor_show("mod_boom")
 
 
 ## A 4-digit combination drawn from low ranks present on the board.
@@ -1151,6 +1188,7 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	else:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 		main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
+		main.tutor_show("mod_cursed")
 	main._announce(reason, main.RED)
 	_after_board_settles(_retry_room)
 
@@ -1231,6 +1269,10 @@ func _show_pick() -> void:
 		pc.suit = card_data.suit
 		pc.mod = card_data.get("mod", "")
 		pc.boom = card_data.get("boom", false)
+		if pc.mod != "":
+			main.tutor_show("mod_" + pc.mod)
+		if pc.boom:
+			main.tutor_show("mod_boom")
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.6, 1.6)
 		pc.position = Vector2(85, 120)
@@ -1311,6 +1353,10 @@ func _show_shop() -> void:
 		pc.suit = offer.data.suit
 		pc.mod = offer.data.mod
 		pc.boom = offer.data.get("boom", false)
+		if pc.mod != "":
+			main.tutor_show("mod_" + pc.mod)
+		if pc.boom:
+			main.tutor_show("mod_boom")
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.3, 1.3)
 		pc.position = Vector2(85, 95)
