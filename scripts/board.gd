@@ -93,11 +93,7 @@ const SFX_SHUFFLES := [
 	preload("res://assets/sfx/west/cards_shuffle_1.mp3"),
 	preload("res://assets/sfx/west/cards_shuffle_2.mp3"),
 ]
-const SFX_CLICKS := [
-	preload("res://assets/sfx/west/ui_click_1.mp3"),
-	preload("res://assets/sfx/west/ui_click_2.mp3"),
-	preload("res://assets/sfx/west/ui_click_3.mp3"),
-]
+const SFX_CLICK := preload("res://assets/sfx/west/ui_click_2.mp3")
 const SFX_COINS := [
 	preload("res://assets/sfx/west/coins_1.mp3"),
 	preload("res://assets/sfx/west/coins_2.mp3"),
