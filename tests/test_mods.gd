@@ -46,16 +46,16 @@ func _init() -> void:
 	failures += _check(res.score == 150 and res.bonus_chips == Board.CHIP_BONUS,
 			"mult and chip in one hand both apply")
 
-	# Cash cards bank real dollars: $1 apiece.
+	# Gold cards bank real dollars: $1 apiece.
 	var cash1 := PlayingCard.new()
-	cash1.mod = "cash"
+	cash1.mod = "gold"
 	var cash2 := PlayingCard.new()
-	cash2.mod = "cash"
+	cash2.mod = "gold"
 	b.selected.assign([cash1, cash2])
 	res = {"score": 40}
 	b._apply_card_mods(res)
 	failures += _check(res.score == 40 and res.cash_earned == 2,
-			"two cash cards earn $2, score unchanged")
+			"two gold cards earn $2, score unchanged")
 
 	b.selected.clear()
 	for c in cards:
@@ -64,15 +64,15 @@ func _init() -> void:
 	cash2.free()
 	b.free()
 
-	# Boost arrows swing a quarter turn clockwise on every hazard tick.
+	# Plus/minus arrows swing a quarter turn clockwise on every tick.
 	b = Board.new()
 	var boost := PlayingCard.new()
-	boost.mod = "boost"
+	boost.mod = "plus"
 	boost.boost_dir = Vector2i.RIGHT
 	boost.grid_pos = Vector2i(0, 0)
 	b.grid[Vector2i(0, 0)] = boost
 	b._tick_fire_and_bombs()
-	failures += _check(boost.boost_dir == Vector2i.DOWN, "boost arrow turns right→down")
+	failures += _check(boost.boost_dir == Vector2i.DOWN, "plus arrow turns right→down")
 	b._tick_fire_and_bombs()
 	b._tick_fire_and_bombs()
 	b._tick_fire_and_bombs()
@@ -80,6 +80,13 @@ func _init() -> void:
 			"four ticks bring the arrow full circle")
 	boost.free()
 	b.free()
+
+	# Old save ids map onto the current mod family.
+	failures += _check(Board.migrate_mod("cash") == "gold"
+			and Board.migrate_mod("boost") == "plus"
+			and Board.migrate_mod("chipsplode") == "chip"
+			and Board.migrate_mod("wild") == "wild",
+			"legacy mod ids migrate")
 
 	if failures == 0:
 		print("ALL MOD TESTS PASSED")

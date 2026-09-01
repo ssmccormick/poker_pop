@@ -14,8 +14,8 @@ const BLACK := Color("1a1a1a")
 const FIRE_ORANGE := Color("e07830")
 const WATER_BLUE := Color("6fa8c9")
 const WIND_BLUE := Color("9ec9d8")
-const CASH_GREEN := Color("46b85e")
 const BOOST_GREEN := Color("52d67e")
+const WILD_PURPLE := Color("b06fd8")
 const STONE_GRAY := Color(0.42, 0.42, 0.48, 0.4)
 const BOMB_BLACK := Color("141414")
 
@@ -161,14 +161,20 @@ var washed := false:  # splashed: rank/suit hidden from the player
 		washed = value
 		queue_redraw()
 # Deck enhancement (trail): "", "chip" (bonus chips when played),
-# "mult" (multiplies the hand it's in), "cash" ($1 real cash when
-# played), "chipsplode" (clearing it chips the neighborhood), "boost"
-# (clearing it raises the card its arrow points at by one rank).
+# "mult" (multiplies the hand it's in), "gold" ($1 real cash when
+# played), "plus"/"minus" (clearing it raises/lowers the card the
+# arrow points at by one rank), "wild" (counts as any rank and suit).
 var mod := "":
 	set(value):
 		mod = value
 		queue_redraw()
-var boost_dir := Vector2i.RIGHT:  # boost: the arrow, turning each hand
+# The EXPLOSION rider: clearing this card spreads its mod to every
+# adjacent card. Rides on top of any mod (chip, gold, plus...).
+var boom := false:
+	set(value):
+		boom = value
+		queue_redraw()
+var boost_dir := Vector2i.RIGHT:  # plus/minus: the arrow, turning each hand
 	set(value):
 		boost_dir = value
 		queue_redraw()
@@ -337,32 +343,45 @@ func _draw() -> void:
 		"water":
 			_draw_pixel_map(DROP_PX, Vector2(W / 2.0 - 14, H / 2.0 - 15), 3.0, WATER_BLUE)
 
+	var mod_anchor := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
 	match mod:
 		"chip":
-			var c := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
-			draw_circle(c, 9, GOLD)
-			draw_circle(c, 5, Color("a8842c"))
+			draw_circle(mod_anchor, 9, GOLD)
+			draw_circle(mod_anchor, 5, Color("a8842c"))
 		"mult":
 			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "×",
 					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, ERROR_RED)
-		"cash":
-			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "$",
-					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, CASH_GREEN)
-		"chipsplode":
-			var c := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
-			for k in 8:
-				var ray := Vector2.RIGHT.rotated(k * PI / 4.0)
-				draw_line(c + ray * 6.0, c + ray * 11.0, GOLD, 2.5)
-			draw_circle(c, 5.5, GOLD)
-			draw_circle(c, 3.0, Color("a8842c"))
-		"boost":
-			var base := Vector2(W / 2.0 - 15, -H / 2.0 + 38)
-			var v := Vector2(boost_dir) * 10.0
-			var perp := Vector2(-v.y, v.x).normalized() * 5.0
-			draw_line(base - v * 0.6, base + v * 0.6, BOOST_GREEN, 4.0)
+		"gold":
+			# A nugget: rough gold lump with a glint.
 			draw_colored_polygon(PackedVector2Array([
-				base + v * 1.2, base + v * 0.3 + perp, base + v * 0.3 - perp]),
-				BOOST_GREEN)
+				mod_anchor + Vector2(-8, 3), mod_anchor + Vector2(-5, -6),
+				mod_anchor + Vector2(2, -8), mod_anchor + Vector2(8, -2),
+				mod_anchor + Vector2(6, 6), mod_anchor + Vector2(-3, 8)]), GOLD)
+			draw_rect(Rect2(mod_anchor + Vector2(-2, -4), Vector2(3, 3)),
+					Color(1.0, 0.95, 0.7))
+		"wild":
+			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "W",
+					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, WILD_PURPLE)
+		"plus", "minus":
+			var base := Vector2(W / 2.0 - 15, -H / 2.0 + 38)
+			var col := BOOST_GREEN if mod == "plus" else ERROR_RED
+			# The sign...
+			draw_rect(Rect2(base + Vector2(-7, -2), Vector2(10, 4)), col)
+			if mod == "plus":
+				draw_rect(Rect2(base + Vector2(-4, -5), Vector2(4, 10)), col)
+			# ...and the aim arrow, turning each hand.
+			var v := Vector2(boost_dir) * 9.0
+			var perp := Vector2(-v.y, v.x).normalized() * 4.0
+			var tip := base + v * 1.6
+			draw_line(base + v * 0.8, tip, col, 3.0)
+			draw_colored_polygon(PackedVector2Array([
+				tip + v * 0.4, tip - v * 0.3 + perp, tip - v * 0.3 - perp]), col)
+	if boom and mod != "":
+		# Explosion rider: rays around whatever the mod glyph is.
+		for k in 8:
+			var ray := Vector2.RIGHT.rotated(k * PI / 4.0 + PI / 8.0)
+			draw_line(mod_anchor + ray * 11.0, mod_anchor + ray * 15.0,
+					FIRE_ORANGE, 2.5)
 
 	match objective:
 		"key":

@@ -25,13 +25,13 @@ const TABLES := [
 	{"name": "HIGH ROLLER", "cost": 1000, "chips": 500, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
 ]
 
-# Room risk tiers offered by the tarot draw. "hands" is only a
-# reference budget now — the stakes screen starts at zero hands and
-# every one is bought.
+# Room risk tiers offered by the draw, named for poker betting
+# structures. "hands" is the reference budget the odds promise scales
+# against.
 const RISKS := [
-	{"tarot": "THE SUN", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10},
-	{"tarot": "WHEEL OF FORTUNE", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8},
-	{"tarot": "THE TOWER", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7},
+	{"tarot": "LIMIT TABLE", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10},
+	{"tarot": "POT LIMIT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8},
+	{"tarot": "NO LIMIT", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7},
 ]
 
 # Entering a room costs its ANTE (the house keeps it, win or lose),
@@ -57,8 +57,11 @@ const TIMED_CHANCE := 0.12       # timed tables: score the target on a clock
 const TIMED_MAX_MINUTES := 6     # the most time a timed table will sell
 const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 
-const PURGE_TAROTS := {"bomb": "DEATH", "fire": "THE DEVIL",
-		"wind": "THE CHARIOT", "stone": "STRENGTH", "water": "TEMPERANCE"}
+# Western job names for the purge rooms; a stone roll becomes the
+# GOLD MINE instead (its own room type).
+const PURGE_TAROTS := {"bomb": "POWDER KEG", "fire": "WILDFIRE",
+		"wind": "DUST STORM", "water": "FLASH FLOOD"}
+const GOLD_MINE_STONES_BASE := 3   # stones to break, +1 per region
 # Called-hands templates by region: [hand name, count] — exact hands
 # only (this game scores exact compositions, so a Full House is NOT
 # three Pairs).
@@ -132,6 +135,8 @@ var room_require: Array = []     # [[hand name, remaining count], ...]
 var room_require_total := 0      # hands demanded at room start (progress bar)
 var room_chests_needed := 1      # treasure rooms: pairs to open
 var room_chests_opened := 0
+var room_stones_needed := 1      # gold mine: stones to grind to dust
+var room_stones_broken := 0
 var relics: Array = []   # relic ids held this run
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
@@ -216,15 +221,18 @@ func _save_run() -> void:
 	var suits := PackedInt32Array()
 	var curses := PackedInt32Array()
 	var mods := PackedStringArray()
+	var booms := PackedInt32Array()
 	for c in deck:
 		ranks.append(c.rank)
 		suits.append(c.suit)
 		curses.append(1 if c.get("cursed", false) else 0)
 		mods.append(c.get("mod", ""))
+		booms.append(1 if c.get("boom", false) else 0)
 	cf.set_value("run", "ranks", ranks)
 	cf.set_value("run", "suits", suits)
 	cf.set_value("run", "curses", curses)
 	cf.set_value("run", "mods", mods)
+	cf.set_value("run", "booms", booms)
 	var relic_arr := PackedStringArray()
 	for id in relics:
 		relic_arr.append(id)
@@ -253,11 +261,15 @@ func _load_run() -> bool:
 	var suits: PackedInt32Array = cf.get_value("run", "suits", PackedInt32Array())
 	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
 	var mods: PackedStringArray = cf.get_value("run", "mods", PackedStringArray())
+	var booms: PackedInt32Array = cf.get_value("run", "booms", PackedInt32Array())
 	deck.clear()
 	for i in ranks.size():
+		var raw_mod: String = mods[i] if i < mods.size() else ""
 		deck.append({"rank": ranks[i], "suit": suits[i],
 				"cursed": curses[i] == 1,
-				"mod": mods[i] if i < mods.size() else ""})
+				"mod": Board.migrate_mod(raw_mod),
+				"boom": (i < booms.size() and booms[i] == 1)
+						or raw_mod == "chipsplode"})
 	relics.clear()
 	for id in cf.get_value("run", "relics", PackedStringArray()):
 		relics.append(String(id))
@@ -362,32 +374,41 @@ func _cashout_value(rate_bonus := 1.0) -> int:
 
 
 ## Weighted enhancement roll: the classics stay common, the exotic
-## payloads (boost / chip burst / cash) come up rarer.
+## payloads rarer, and WILD is the unicorn.
 func _random_mod() -> String:
 	var roll := randf()
-	if roll < 0.30:
+	if roll < 0.28:
 		return "mult"
-	if roll < 0.60:
+	if roll < 0.56:
 		return "chip"
-	if roll < 0.75:
-		return "boost"
-	if roll < 0.90:
-		return "chipsplode"
-	return "cash"
+	if roll < 0.72:
+		return "plus"
+	if roll < 0.84:
+		return "minus"
+	if roll < 0.97:
+		return "gold"
+	return "wild"
+
+
+## The EXPLOSION rider: a rare extra on any enhanced card.
+const BOOM_CHANCE := 0.15
 
 
 func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 	var mod := ""
+	var boom := false
 	if randf() < mod_chance:
 		mod = _random_mod()
+		boom = randf() < BOOM_CHANCE
 	# Half the time, offer an exact duplicate of a card already owned
 	# (the Five of a Kind / Flushed Five enabler).
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
 		if not src.get("cursed", false):
-			return {"rank": src.rank, "suit": src.suit, "cursed": false, "mod": mod}
+			return {"rank": src.rank, "suit": src.suit, "cursed": false,
+					"mod": mod, "boom": boom}
 	return {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-			"cursed": false, "mod": mod}
+			"cursed": false, "mod": mod, "boom": boom}
 
 
 # --- Flow: entry ----------------------------------------------------------
@@ -491,7 +512,7 @@ func _make_offers() -> Array:
 	risk_pool.shuffle()
 	for i in 3:
 		if want_shop and i == 1:
-			offers.append({"kind": "shop", "tarot": "THE HERMIT"})
+			offers.append({"kind": "shop", "tarot": "GENERAL STORE"})
 		else:
 			offers.append(_make_one_offer(false, risk_pool[i % risk_pool.size()]))
 	return offers
@@ -500,7 +521,7 @@ func _make_offers() -> Array:
 func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 	if random_risk:
 		if randf() < 0.15:
-			return {"kind": "shop", "tarot": "THE HERMIT"}
+			return {"kind": "shop", "tarot": "GENERAL STORE"}
 		risk = RISKS.pick_random()
 	var region := room_index / REGION_SIZE
 	var offer := {
@@ -517,12 +538,12 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		if roll < OBJECTIVE_CHANCE:
 			# Objective rooms: no score target — do the job to clear.
 			if randf() < 0.5:
-				offer.tarot = "THE MOON"
+				offer.tarot = "BANK JOB"
 				offer.label = "Heist"
 				offer.odds = 2.0
 				offer["goal"] = "safe"
 			else:
-				offer.tarot = "THE STAR"
+				offer.tarot = "STAGECOACH HAUL"
 				offer.label = "Treasure"
 				offer.odds = 1.5
 				offer["goal"] = "chest"
@@ -534,26 +555,37 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.hands = maxi(1, 8 - region)
 			offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE:
-			# Purge rooms: a board full of one hazard — remove them all.
 			var kind: String = HAZARD_KINDS.pick_random()
-			offer.tarot = String(PURGE_TAROTS[kind])
-			offer.label = "Purge"
-			offer.odds = 2.0 if kind in ["bomb", "fire"] else 1.5
-			offer["goal"] = "purge"
-			offer["purge_kind"] = kind
-			offer["purge_count"] = mini((2 if kind == "stone" else 3) + region, 6)
-			offer.hands = maxi(1, 8 - region)
-			offer.target = 0
+			if kind == "stone":
+				# GOLD MINE: a board of solid rock — break stones free
+				# and gold cards turn up in the rubble.
+				offer.tarot = "GOLD MINE"
+				offer.label = "Gold Mine"
+				offer.odds = 2.0
+				offer["goal"] = "mine"
+				offer["stones"] = GOLD_MINE_STONES_BASE + region
+				offer.hands = mini(MAX_HANDS_BUY, 3 * (GOLD_MINE_STONES_BASE + region))
+				offer.target = 0
+			else:
+				# Purge rooms: a board full of one hazard — remove them all.
+				offer.tarot = String(PURGE_TAROTS[kind])
+				offer.label = "Purge"
+				offer.odds = 2.0 if kind in ["bomb", "fire"] else 1.5
+				offer["goal"] = "purge"
+				offer["purge_kind"] = kind
+				offer["purge_count"] = mini(3 + region, 6)
+				offer.hands = maxi(1, 8 - region)
+				offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE:
 			# Called hands: play exactly what the table demands.
 			offer["goal"] = "hands"
 			if region >= 1 and randf() < ROYAL_CHANCE:
-				offer.tarot = "THE WORLD"
+				offer.tarot = "ROYAL HUNT"
 				offer.label = "Royal Hunt"
 				offer.odds = 5.0
 				offer["require"] = [["Royal Flush", 1]]
 			else:
-				offer.tarot = "JUDGEMENT"
+				offer.tarot = "DEALER'S CALL"
 				offer.label = "Called Hands"
 				offer.odds = 1.5 if region == 0 else 2.0
 				var pool: Array = REQUIRE_POOLS[mini(region, REQUIRE_POOLS.size() - 1)]
@@ -563,7 +595,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE + TIMED_CHANCE:
 			# Beat the clock: unlimited hands, but the minutes are the
 			# promise — take fewer for fatter odds.
-			offer.tarot = "THE HANGED MAN"
+			offer.tarot = "HIGH NOON"
 			offer.label = "Timed"
 			offer.odds = 2.0
 			offer["goal"] = "timed"
@@ -600,7 +632,7 @@ func _render_tarot() -> void:
 		# The Fool: face-down fate.
 		var fool: Button = main._button(_tarot_cards_box, "",
 				Vector2(start_x + _offers.size() * 330, 0), Vector2(300, 380))
-		fool.text = "THE FOOL\n\n?\n\nLet fate decide\n(+%d chips)" % FATE_KICKER
+		fool.text = "LUCK OF THE DRAW\n\n?\n\nLet fate decide\n(+%d chips)" % FATE_KICKER
 		fool.add_theme_font_size_override("font_size", 22)
 		fool.pressed.connect(func() -> void:
 			_choose_offer(_fate_offer, true))
@@ -610,7 +642,7 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 	var b: Button = main._button(_tarot_cards_box, "", Vector2(x, 0), Vector2(300, 380))
 	b.add_theme_font_size_override("font_size", 22)
 	if offer.kind == "shop":
-		b.text = "THE HERMIT\n\nSHOP\n\nBuy cards\nBurn cards\n\nNo bet"
+		b.text = "GENERAL STORE\n\nSHOP\n\nBuy cards\nBurn cards\n\nNo bet"
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
@@ -623,6 +655,8 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "purge":
 			goal_line = "CLEAR %d %s CARDS" % [offer.purge_count,
 					String(offer.purge_kind).to_upper()]
+		elif offer.get("goal", "") == "mine":
+			goal_line = "BREAK %d STONES — FIND GOLD" % offer.stones
 		elif offer.get("goal", "") == "hands":
 			goal_line = "PLAY  " + _require_text(offer.require)
 		elif offer.get("goal", "") == "timed":
@@ -734,6 +768,8 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Open the chest" if pairs == 1 else "Open %d chests" % pairs
 		"purge":
 			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
+		"mine":
+			return "Break %d stones (gold in the rubble)" % o.stones
 		"hands":
 			return "Play " + _require_text(o.require)
 		"timed":
@@ -790,6 +826,8 @@ func _start_room() -> void:
 		room_require_total += int(r[1])
 	room_chests_needed = int(current_offer.get("chest_count", 1))
 	room_chests_opened = 0
+	room_stones_needed = int(current_offer.get("stones", 1))
+	room_stones_broken = 0
 	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
 			+ (1 if has_relic("horseshoe") else 0)
 	room_time_left = 0.0
@@ -830,6 +868,10 @@ func _seed_room_specials() -> void:
 	elif room_goal == "purge":
 		main.board.apply_room_hazards(String(current_offer.purge_kind),
 				int(current_offer.purge_count))
+	elif room_goal == "mine":
+		# Solid rock wall to wall; broken stones may cough up gold.
+		main.board.apply_room_hazards("stone", 99)
+		main.board.gold_rush = true
 	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0):
 		# Surprise loot in a plain room.
 		if randf() < 0.5:
@@ -882,7 +924,7 @@ func on_hand_played(result: Dictionary) -> void:
 		# Cash cards pay real money, banked on the spot.
 		cash += earned
 		_save_meta()
-		_announce_after_settle("CASH CARD  +$%d" % earned)
+		_announce_after_settle("GOLD  +$%d" % earned)
 	if result.get("boss_defeated", false):
 		_room_cleared()
 		return
@@ -903,6 +945,11 @@ func on_hand_played(result: Dictionary) -> void:
 	if room_goal == "purge" and int(result.get("hazards_left", -1)) == 0:
 		_room_cleared()
 		return
+	if room_goal == "mine":
+		room_stones_broken += int(result.get("stones_broken", 0))
+		if room_stones_broken >= room_stones_needed:
+			_room_cleared()
+			return
 	if room_goal == "hands":
 		for r in room_require:
 			if String(r[0]) == String(result.name) and int(r[1]) > 0:
@@ -984,7 +1031,8 @@ func _open_chest() -> void:
 		_announce_after_settle("CHEST  RELIC: %s!" % RELICS[id].name)
 	else:
 		var enhanced := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-				"cursed": false, "mod": _random_mod()}
+				"cursed": false, "mod": _random_mod(),
+				"boom": randf() < BOOM_CHANCE}
 		deck.append(enhanced)
 		_announce_after_settle("CHEST  AN ENHANCED CARD!")
 	_save_run()
@@ -1182,6 +1230,7 @@ func _show_pick() -> void:
 		pc.rank = card_data.rank
 		pc.suit = card_data.suit
 		pc.mod = card_data.get("mod", "")
+		pc.boom = card_data.get("boom", false)
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.6, 1.6)
 		pc.position = Vector2(85, 120)
@@ -1201,7 +1250,8 @@ func _show_pick() -> void:
 func _shop_card_offer() -> Dictionary:
 	if randf() < SHOP_MOD_CHANCE:
 		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-				"cursed": false, "mod": _random_mod()},
+				"cursed": false, "mod": _random_mod(),
+				"boom": randf() < BOOM_CHANCE},
 				"price": _price(SHOP_MOD_PRICE)}
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
@@ -1260,6 +1310,7 @@ func _show_shop() -> void:
 		pc.rank = offer.data.rank
 		pc.suit = offer.data.suit
 		pc.mod = offer.data.mod
+		pc.boom = offer.data.get("boom", false)
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.3, 1.3)
 		pc.position = Vector2(85, 95)
@@ -1325,6 +1376,7 @@ func _populate_deck_view() -> void:
 		pc.suit = card_data.suit
 		pc.cursed = card_data.get("cursed", false)
 		pc.mod = card_data.get("mod", "")
+		pc.boom = card_data.get("boom", false)
 		pc.material = Themes.current_material()
 		pc.position = Vector2(50, 70)
 		holder.add_child(pc)
@@ -1360,14 +1412,18 @@ func _deck_stat_text(d: Dictionary) -> String:
 			text += "CHIP\nPays +%d bonus chips every time it's played." % main.board.chip_bonus
 		"mult":
 			text += "MULT\nMultiplies the whole hand's score ×%.1f. Stacks with other mult cards." % main.board.mult_factor
-		"cash":
-			text += "CASH\nPays $1 of real, bankable cash when played."
-		"chipsplode":
-			text += "CHIP EXPLOSION\nWhen cleared, every card around it becomes a CHIP card."
-		"boost":
-			text += "BOOST\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it."
+		"gold":
+			text += "GOLD\nPays $1 of real, bankable cash when played."
+		"plus":
+			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it."
+		"minus":
+			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank. The arrow turns a quarter every hand — time it."
+		"wild":
+			text += "WILD\nCounts as ANY rank and suit — the best possible hand wins. The rarest card on the trail."
 		_:
 			text += "No enhancement.\nHonest cardboard."
+	if d.get("boom", false):
+		text += "\n\nEXPLOSIVE\nWhen cleared, it spreads its enhancement to every adjacent card."
 	return text
 
 
@@ -1475,7 +1531,7 @@ func build_ui() -> void:
 		_show_tarot())
 
 	shop_layer = _layer()
-	_screen_title(shop_layer, "THE HERMIT'S SHOP")
+	_screen_title(shop_layer, "THE GENERAL STORE")
 	_shop_info = _center(shop_layer, "", 178, 28, main.GOLD)
 	_shop_box = Control.new()
 	_shop_box.position = Vector2(0, 240)

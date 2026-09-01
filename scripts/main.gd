@@ -154,7 +154,7 @@ func _ready() -> void:
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
-				trail._choose_offer({"kind": "shop", "tarot": "THE HERMIT"}, false)
+				trail._choose_offer({"kind": "shop", "tarot": "GENERAL STORE"}, false)
 			"trailtarot":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -295,6 +295,13 @@ func _update_labels() -> void:
 			target_bar_fill.size.x = 1314.0 * clampf(
 					float(trail.room_chests_opened)
 					/ float(maxi(trail.room_chests_needed, 1)), 0.0, 1.0)
+		elif trail.room_goal == "mine":
+			target_label.text = "TABLE %d / %d      GOLD MINE  %d / %d STONES" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
+					trail.room_stones_broken, trail.room_stones_needed]
+			target_bar_fill.size.x = 1314.0 * clampf(
+					float(trail.room_stones_broken)
+					/ float(maxi(trail.room_stones_needed, 1)), 0.0, 1.0)
 		elif trail.room_goal == "purge":
 			var left := trail.purge_left()
 			target_label.text = "TABLE %d / %d      PURGE  %d HAZARD%s LEFT" % \
@@ -736,12 +743,14 @@ func _refresh_hand_display() -> void:
 		if card.washed:
 			soaked_count += 1
 		else:
-			cards.append({"rank": card.rank, "suit": card.suit})
+			cards.append({"rank": card.rank, "suit": card.suit,
+					"mod": "wild" if card.mod == "wild" else ""})
 	cards.sort_custom(func(a, b): return a.rank < b.rank)
 	for i in cards.size():
 		var mc := PlayingCard.new()
 		mc.rank = cards[i].rank
 		mc.suit = cards[i].suit
+		mc.mod = cards[i].mod
 		mc.scale = Vector2(0.72, 0.72)
 		mc.position = Vector2(i * 74.0, 0)
 		mc.material = Themes.current_material()

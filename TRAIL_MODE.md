@@ -79,39 +79,42 @@ bosses, regions.
 - Every room clear: **pick 1 of 3 cards** to add to the deck
   (skippable); removal exists in shops to manage bloat.
 
-## The tarot trail (room selection)
+## The trail draw (room selection)
 
-At each junction, fate deals **three face-up tarot cards** — each is
-the next room, showing its type, rules, odds, and min bet. A fourth,
-face-down option: **"Let Fate Decide"** — a random different room,
+At each junction, fate deals **three face-up room cards** — each is
+the next room, showing its type, rules, odds, and ante. A fourth,
+face-down option: **LUCK OF THE DRAW** — a random different room,
 sweetened with a small chip kicker for trusting the cards.
 
-Draft Major Arcana → room mapping (flavor pass later):
+Rooms are named for poker and the West (the tarot naming retired):
 | Card | Room |
 | --- | --- |
-| The Sun | Normal (steady risk tier — shipped) |
-| Wheel of Fortune | Normal (risky tier — shipped; was "Timed", reassign later) |
-| The Tower | Normal (dangerous tier — shipped; drain-room idea moves elsewhere) |
-| The Hermit | Shop (shipped) |
-| Death | Purge room: bombs (shipped) |
-| The Devil | Purge room: fire (shipped) |
-| The Chariot | Purge room: wind (shipped) |
-| Strength | Purge room: stone (shipped) |
-| Temperance | Purge room: water (shipped) |
-| The Moon | Heist room (crack the safe — shipped) |
-| The Star | Treasure room (key + chest pairs, 2–4 by depth — shipped) |
-| Judgement | Called Hands: play the demanded hands (shipped) |
-| The World | Royal Hunt: make a Royal Flush, 5:1 (shipped, rare) |
-| The High Priestess | Suit Locked (future) |
-| The Magician | Hand Locked (future) |
-| The Hanged Man | Timed table: score the target before the clock dies (shipped) |
+| LIMIT TABLE | Normal, steady tier 1:1 (shipped) |
+| POT LIMIT | Normal, risky tier 3:2 (shipped) |
+| NO LIMIT | Normal, dangerous tier 2:1 (shipped) |
+| GENERAL STORE | Shop (shipped) |
+| POWDER KEG | Purge room: bombs (shipped) |
+| WILDFIRE | Purge room: fire (shipped) |
+| DUST STORM | Purge room: wind (shipped) |
+| FLASH FLOOD | Purge room: water (shipped) |
+| GOLD MINE | Board of solid stone; break N to clear, gold cards turn up in the rubble (shipped) |
+| BANK JOB | Heist room (crack the safe — shipped) |
+| STAGECOACH HAUL | Treasure room (key + chest pairs, 2–4 by depth — shipped) |
+| DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
+| ROYAL HUNT | Make a Royal Flush, 5:1 (shipped, rare) |
+| HIGH NOON | Timed table: score the target before the clock dies (shipped) |
+| TEXAS HOLD'EM | Variant room (Stage C — designed below) |
+| CRAZY 8s | Variant room (Stage C — designed below) |
+| BLACKJACK | Variant room (Stage C — designed below) |
+| SHOWDOWN | The Outlaw duel (Stage C — designed below) |
 
 ## Room types
 
 | Room | Rule | Notes |
 | --- | --- | --- |
 | Normal | Score target within the hands you bought | The baseline |
-| Purge | Board seeded with 2–6 of ONE hazard kind; remove them all (no score target) | Shipped. Fire that spreads must be put out too; a gust that blows hazards off the board counts; a fire burning itself out counts. No ambient extras — the hazards ARE the room |
+| Purge | Board seeded with 3–6 of ONE hazard kind (bomb/fire/wind/water); remove them all (no score target) | Shipped. Fire that spreads must be put out too; a gust that blows hazards off the board counts; a fire burning itself out counts. No ambient extras — the hazards ARE the room |
+| Gold Mine | EVERY card is stone; break N stones (3 + region) to clear | Shipped. Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash, room-local) |
 | Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
 | Royal Hunt | Make one Royal Flush | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
 | Timed | Score target before the clock; hands unlimited | Shipped (THE HANGED MAN, 2:1 base). The promise dial is MINUTES (1–6, reference 4→2 by region): fewer minutes promised = fatter odds. Hazards still tick per hand |
@@ -123,6 +126,42 @@ Draft Major Arcana → room mapping (flavor pass later):
 | Elite | Harder target + a room modifier stacked | Better card choices + more chips |
 | Event? | Mystery choice (risk/reward text event) | Post-v1 candidate |
 | Boss | Rule-warping challenge capping a region | See Bosses |
+
+## NEXT — Stage B: the poker economy (user-designed, queued)
+
+- **Score rooms go on the clock**: plain LIMIT/POT LIMIT/NO LIMIT
+  tables become TIME-limited (unlimited hands), merging HIGH NOON into
+  the standard tables. CONDITION rooms (purges, mine, heist, treasure,
+  called hands, variants, Outlaw) stay HAND-limited.
+- **CALL / RAISE / ALL IN** replaces the free bet + promise dials:
+  each room has a SET bet amount. CALL = play the room as offered.
+  RAISE = bigger bet AND the room gains an extra complication (a
+  second modifier — extra hazards, a mixed second mode, tighter
+  budget) for better odds. ALL IN = the raise, betting everything.
+- **Pickup cards**: "+30s EXTRA TIME" and "+1 EXTRA HAND" cards can
+  be dealt ambiently (~6% per refill) in rooms of the matching limit
+  type; clear them in any scoring hand to collect.
+
+## NEXT — Stage C: variant rooms (user-designed, queued)
+
+- **TEXAS HOLD'EM**: 5 community cards displayed beside the board and
+  PERSIST all room. Select exactly 2 adjacent board cards as hole
+  cards; the hand is the best 5 of the 7 (kickers allowed here — it's
+  hold'em). A RE-DEAL card has a chance to be dealt to the board;
+  scoring it refreshes the community 5.
+- **CRAZY 8s**: every 8 on the board is WILD (counts as any rank and
+  suit). Otherwise a normal score room.
+- **BLACKJACK**: poker hands OFF; you play against the house. Each
+  round the dealer draws a total (17–21); select a chain whose PIP SUM
+  (faces 10, ace 11/1) beats the dealer without exceeding 21 to win
+  the round. Bust = rejected. Beat the dealer N times to clear.
+- **SHOWDOWN — the Outlaw**: an Outlaw portrait with HP beside the
+  board. YOUR bullet cards and HIS bullet cards spawn among the deals.
+  Clear YOUR bullets in scoring hands → shots that damage him. Clear
+  HIS bullets → he shoots YOU. He also shoots if your scored hand is
+  below a posted threshold. Shots cost DUEL HP (separate, ~3 grit for
+  the room; 0 = room failed). Kill him to clear — a puzzle fight where
+  you'll trade some blood.
 
 Technical wrinkle flagged early: constraint rooms (Suit/Hand Locked)
 change what counts as a playable hand, so `Board.has_playable_hand()`
@@ -204,18 +243,22 @@ modified card.
 
 Enhancements on cards YOU own, acquired via card picks, shops, and
 chests, triggering every time the card is played. Stored on the deck
-entry, drawn as overlays. Roll weights: Mult 30% · Chip 30% ·
-Boost 15% · Chip Explosion 15% · Cash 10%. The deck viewer (VIEW DECK
-on the tarot screen; the shop's burn picker is the same screen) shows
-every overlay and a hover panel explaining the hovered card.
+entry, drawn as overlays. The deck viewer (VIEW DECK on the tarot
+screen; the shop's burn picker is the same screen) shows every
+overlay and a hover panel explaining the hovered card.
 
 | Modifier | Effect |
 | --- | --- |
 | Chip card | Pays bonus chips every time it's played in a scoring hand |
 | Mult card | Multiplies the score of any hand it's part of (×1.5; multiple mults stack multiplicatively) |
-| Cash card | Pays $1 of real, bankable cash every time it's played |
-| Chip Explosion | When cleared, every adjacent (8-way) surviving unmodified card becomes a Chip card |
-| Boost card | When cleared, the card its arrow points at gains +1 rank (cap 14). The arrow turns a quarter clockwise every hand — time the clear to aim it |
+| Gold card | Pays $1 of real, bankable cash every time it's played (gold nugget glyph) |
+| Plus card | When cleared, the card its arrow points at gains +1 rank (cap 14). The arrow turns a quarter clockwise every hand — time the clear to aim it |
+| Minus card | Mirror of Plus: the aimed card drops −1 rank (floor 2) — sculpt a King down to match your Queens |
+| Wild card | Counts as ANY rank and suit; the evaluator takes the best assignment. The rarest roll (~3%) |
+| EXPLOSIVE (rider) | Not a mod — a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
+
+Roll weights: Mult 28% · Chip 28% · Plus 16% · Minus 12% · Gold 13% ·
+Wild 3%, with the Explosive rider rolled separately on top.
 
 ## Relic system (SHIPPED — all 15 below are in)
 

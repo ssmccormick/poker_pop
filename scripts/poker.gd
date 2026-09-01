@@ -32,9 +32,24 @@ const BASE_SCORES := {
 ## "No Hand" with playable = false.
 ## Returns {"name", "base", "pips", "score", "playable"} or {} for an
 ## empty selection.
+## A card with "wild": true counts as ANY rank and suit — the best
+## assignment (playable first, then highest score) wins.
 static func evaluate(cards: Array) -> Dictionary:
 	if cards.is_empty():
 		return {}
+	for i in cards.size():
+		if cards[i].get("wild", false):
+			var work := cards.duplicate()
+			var best := {}
+			for r in range(2, 15):
+				for s in 4:
+					work[i] = {"rank": r, "suit": s}
+					var res := evaluate(work)
+					if best.is_empty() \
+							or (res.playable and not best.playable) \
+							or (res.playable == best.playable and res.score > best.score):
+						best = res
+			return best
 	var n := cards.size()
 	var rank_counts := {}
 	var suit_set := {}

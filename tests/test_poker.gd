@@ -57,6 +57,18 @@ func _init() -> void:
 		print("FAIL: empty selection should return {}")
 		failures += 1
 
+	# Wild cards count as any rank and suit — best assignment wins.
+	var w := {"rank": 2, "suit": 0, "wild": true}
+	failures += _check("Pair", [c(5, 0), w])
+	var wres := Poker.evaluate([c(5, 0), w])
+	if wres.score != 25 + 10:
+		print("FAIL: wild pairs the five (25+10), got %s" % str(wres))
+		failures += 1
+	# Four hearts + wild completes the straight flush (best over flush).
+	failures += _check("Straight Flush", [c(2, 1), c(3, 1), c(4, 1), c(5, 1), w])
+	# Two wilds upgrade a lone pair to four of a kind.
+	failures += _check("Four of a Kind", [c(9, 0), c(9, 1), w, {"rank": 2, "suit": 0, "wild": true}])
+
 	if failures == 0:
 		print("ALL POKER TESTS PASSED")
 	else:
