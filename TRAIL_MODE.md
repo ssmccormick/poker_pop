@@ -233,11 +233,12 @@ rank/suit cards with overlays) are on the board. Make a VALID poker
 hand containing BOTH — the hand scores normally and the chest opens.
 Rewards: a new card for the deck, bonus chips, cash, or (later) a
 modified card.
-- **Treasure room (THE STAR, odds 1.5)**: the room demands **2–4
-  pairs by depth** — each opened chest pays its reward roll AND
-  respawns a fresh key + chest on the board until the count is met.
-  Losing the key (played without its chest, burned, gusted) still
-  fails the room.
+- **Treasure room (STAGECOACH HAUL, odds 2.0)**: the room demands
+  **3–5 pairs by depth** — each opened chest pays its reward roll AND
+  respawns a fresh key + chest until the count is met; clearing the
+  room awards a RELIC. Losing a piece (played without its partner,
+  burned, gusted, bumped off) is NOT a fail: the missing piece
+  respawns on a fresh card — you just spent a hand relocating it.
 - **Ambient chests**: random chance in normal rooms as optional loot.
 - v1: objective spawns don't mix with hazard rooms.
 

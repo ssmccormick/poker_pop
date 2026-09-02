@@ -987,10 +987,11 @@ func on_hand_played(result: Dictionary) -> void:
 		if _require_left() == 0:
 			_room_cleared()
 			return
-	if room_goal == "chest" and not main.board.has_objective("key"):
-		# The key (or chest) went into a hand without its partner.
-		_room_failed("THE KEY IS LOST")
-		return
+	if room_goal == "chest":
+		# A key or chest played without its partner (or blown/shoved
+		# off the board) is no longer a fail — a fresh one turns up.
+		# The hand spent finding it is the price.
+		_replace_lost_treasure()
 	_consume_hand()
 
 
@@ -1008,6 +1009,25 @@ func _consume_hand() -> void:
 		_room_failed()
 	else:
 		_tick_room_hazards()
+
+
+## A key or chest went missing without its partner: once the board
+## settles, whichever piece is gone reappears on a fresh card.
+func _replace_lost_treasure() -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	if not in_room or room_goal != "chest":
+		return
+	var respawned := false
+	if not main.board.has_objective("key"):
+		main.board.spawn_objective("key")
+		respawned = true
+	if not main.board.has_objective("chest"):
+		main.board.spawn_objective("chest")
+		respawned = true
+	if respawned:
+		main.board._play_sound(Board.SFX_FLIP, 1.2, -8.0)
+		main._announce("A NEW LEAD ON THE LOOT")
 
 
 ## Treasure rooms demand several pairs: once the board settles from

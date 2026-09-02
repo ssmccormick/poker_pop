@@ -728,6 +728,19 @@ func spawn_key_and_chest() -> void:
 	candidates[1].objective = "chest"
 
 
+## Marks one random plain card as a key or chest (treasure respawns).
+func spawn_objective(kind: String) -> void:
+	var candidates: Array = []
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if card.hazard == "" and not card.cursed and not card.washed \
+				and card.objective == "" and not card.is_safe \
+				and card.boss == "" and not card.snake_tail:
+			candidates.append(card)
+	if not candidates.is_empty():
+		candidates.pick_random().objective = kind
+
+
 ## True if any card on the board carries the given objective mark.
 func has_objective(kind: String) -> bool:
 	for p in grid:
