@@ -17,6 +17,8 @@ const LIST := [
 		"pattern": "",
 		"strength": 0.0,
 		"tile_px": 200.0,
+		"suit_style": "vector",
+		"face_texture": "",
 	},
 	{
 		"name": "Felt Table",
@@ -28,6 +30,8 @@ const LIST := [
 		"pattern": "res://assets/patterns/dither_01.png",
 		"strength": 0.14,
 		"tile_px": 48.0,
+		"suit_style": "vector",
+		"face_texture": "",
 	},
 	{
 		"name": "Sketchbook",
@@ -39,6 +43,8 @@ const LIST := [
 		"pattern": "res://assets/patterns/hatching_01.png",
 		"strength": 0.26,
 		"tile_px": 300.0,
+		"suit_style": "pixel",
+		"face_texture": "",
 	},
 	{
 		"name": "Crosshatch Noir",
@@ -50,8 +56,23 @@ const LIST := [
 		"pattern": "res://assets/patterns/cross_03.png",
 		"strength": 0.26,
 		"tile_px": 200.0,
+		"suit_style": "pixel",
+		"face_texture": "",
 	},
 ]
+
+# Cached optional face textures (drop art into assets/cards/ and point
+# a theme's face_texture at it to reskin card bases).
+static var _face_textures := {}
+
+
+static func face_texture() -> Texture2D:
+	var path: String = current().get("face_texture", "")
+	if path == "" or not ResourceLoader.exists(path):
+		return null
+	if not _face_textures.has(path):
+		_face_textures[path] = load(path)
+	return _face_textures[path]
 
 static var index := 0
 static var _materials := {}

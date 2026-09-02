@@ -123,6 +123,7 @@ func _ready() -> void:
 	# unpause; everything gameplay-related is gated on tree.paused.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_audio_buses()
+	FontLib.setup()
 	_load_settings()
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
@@ -1644,6 +1645,9 @@ func _label(parent: Control, text: String, pos: Vector2, size: int, color: Color
 	l.position = pos
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
+	# Big type gets the western display font when one is installed.
+	if size >= 36 and FontLib.display != null:
+		l.add_theme_font_override("font", FontLib.display)
 	parent.add_child(l)
 	return l
 

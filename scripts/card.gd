@@ -282,8 +282,22 @@ func _draw() -> void:
 		box.draw(get_canvas_item(), rect)
 	else:
 		_face_box.draw(get_canvas_item(), rect)
+	# Optional per-theme card-base art (drop into assets/cards/).
+	var face_tex := Themes.face_texture()
+	if face_tex != null:
+		draw_texture_rect(face_tex, rect.grow(-3), false)
+	else:
+		# Subtle two-tone inner edge so flat faces read less flat.
+		draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2(rect.size.x - 6, 2)),
+				Color(1, 1, 1, 0.28))
+		draw_rect(Rect2(rect.position + Vector2(3, 3), Vector2(2, rect.size.y - 6)),
+				Color(1, 1, 1, 0.18))
+		draw_rect(Rect2(Vector2(rect.position.x + 3, rect.end.y - 5),
+				Vector2(rect.size.x - 6, 2)), Color(0, 0, 0, 0.13))
+		draw_rect(Rect2(Vector2(rect.end.x - 5, rect.position.y + 3),
+				Vector2(2, rect.size.y - 6)), Color(0, 0, 0, 0.10))
 
-	var font := ThemeDB.fallback_font
+	var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
 	if snake_tail:
 		# Cobra body: a scaled green wall.
 		draw_rect(rect.grow(-3), SNAKE_GREEN)
@@ -450,7 +464,44 @@ func _draw() -> void:
 
 ## Draws the suit pixel map centered on `center`, one pixel = `px`.
 func _draw_suit(center: Vector2, px: float) -> void:
-	_draw_pixel_map(SUIT_PIXELS[suit], center, px, suit_color())
+	if Themes.current().get("suit_style", "pixel") == "vector":
+		_draw_suit_vector(center, px)
+	else:
+		_draw_pixel_map(SUIT_PIXELS[suit], center, px, suit_color())
+
+
+## Smooth polygon suits for "vector" themes. Sized to match the pixel
+## maps (~7px wide at scale 1).
+func _draw_suit_vector(c: Vector2, px: float) -> void:
+	var col := suit_color()
+	var r := 3.6 * px
+	match suit:
+		0:  # spades — inverted heart plus a stem
+			draw_circle(c + Vector2(-r * 0.45, 0.0), r * 0.5, col)
+			draw_circle(c + Vector2(r * 0.45, 0.0), r * 0.5, col)
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-r * 0.9, 0.15 * r), c + Vector2(r * 0.9, 0.15 * r),
+				c + Vector2(0, -r)]), col)
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-r * 0.3, r), c + Vector2(r * 0.3, r),
+				c + Vector2(0, r * 0.1)]), col)
+		1:  # hearts
+			draw_circle(c + Vector2(-r * 0.45, -r * 0.3), r * 0.52, col)
+			draw_circle(c + Vector2(r * 0.45, -r * 0.3), r * 0.52, col)
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-r * 0.93, -r * 0.08), c + Vector2(r * 0.93, -r * 0.08),
+				c + Vector2(0, r)]), col)
+		2:  # diamonds
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(0, -r), c + Vector2(r * 0.72, 0),
+				c + Vector2(0, r), c + Vector2(-r * 0.72, 0)]), col)
+		3:  # clubs — three lobes and a stem
+			draw_circle(c + Vector2(0, -r * 0.42), r * 0.46, col)
+			draw_circle(c + Vector2(-r * 0.44, r * 0.08), r * 0.46, col)
+			draw_circle(c + Vector2(r * 0.44, r * 0.08), r * 0.46, col)
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-r * 0.26, r), c + Vector2(r * 0.26, r),
+				c + Vector2(0, r * 0.05)]), col)
 
 
 func _draw_pixel_map(map: Array, center: Vector2, px: float, col: Color) -> void:

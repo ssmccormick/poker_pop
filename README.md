@@ -112,13 +112,20 @@ Flushed Five is five cards of the same rank **and** suit — only
 possible once the deck has reshuffled enough for identical duplicates
 to meet on the board.
 
-## Backgrounds
+## Backgrounds & reskinning
 
-The play area sits on a background image that rotates every arcade
-level (random per run in other modes). Drop `.png`/`.jpg` images into
-`assets/backgrounds/` and they're auto-loaded; with none present the
-game generates gradient placeholders. See [POLISH.md](POLISH.md) for
-the full polish roadmap.
+Backgrounds are procedural parallax scenes (`scripts/parallax_bg.gd`):
+layered silhouettes that drift and lurch forward with every scored
+hand — the trail rides day → dusk → night by region, bosses play under
+a storm, and every mode has its own scene. To reskin other art:
+
+- `assets/cards/` — drop a card-face PNG and point a theme's
+  `face_texture` at it (`scripts/themes.gd`)
+- `assets/fonts/display.ttf` — western display font for titles,
+  banners, and the announcer; `assets/fonts/card.ttf` — card rank
+  numerals. Missing files fall back to the engine font.
+
+See [POLISH.md](POLISH.md) for the full polish roadmap.
 
 ## Themes
 
