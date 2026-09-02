@@ -18,11 +18,12 @@ const ARCADE_MAX_DRAIN := 7.0
 const ARCADE_METER_GAIN := 0.4    # meter % gained per point scored
 
 const VIEW := Vector2(1920, 1080)
-const PANEL_X := 1420.0
-# Play area the board is centered into (right edge leaves the panel free).
-const BOARD_AREA_POS := Vector2(60, 100)
+# The HUD panel sits on the LEFT; the play area fills the right side.
+const PANEL_X := 60.0
+const PLAY_X := 520.0    # left edge of the play area
+const BOARD_AREA_POS := Vector2(560, 100)
 const BOARD_AREA_SIZE := Vector2(1320, 900)
-const PLAY_WIDTH := 1400.0  # everything left of the panel
+const PLAY_WIDTH := 1400.0  # width of the play area
 
 var board: Board
 var trail: TrailMode
@@ -128,7 +129,7 @@ func _ready() -> void:
 	# arcade rotates them every level.
 	backgrounds = _load_backgrounds()
 	bg_rect = TextureRect.new()
-	bg_rect.position = Vector2.ZERO
+	bg_rect.position = Vector2(PLAY_X, 0)
 	bg_rect.size = Vector2(PLAY_WIDTH, VIEW.y)
 	bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -858,7 +859,7 @@ const TUTOR := {
 	"hazard_stone": ["STONE CARD", "Solid rock: it takes THREE scoring hands to break. It scores its rank every time you include it."],
 	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
-	"goal_chest": ["KEY & CHEST", "Somewhere on the board sit a key and a chest. Get BOTH into one valid scoring hand to open it. Lose the key and the job is off."],
+	"goal_chest": ["KEY & CHEST", "Somewhere on the board sit a key and a chest. Get BOTH into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Lose the key and the job is off. The hardest job on the trail, but the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested. Remove every hazard card to clear the table."],
 	"goal_mine": ["GOLD MINE", "Every card is stone. Break the asked number of stones (three hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
@@ -1170,15 +1171,15 @@ func _build_ui() -> void:
 	meta_label = _label(ui_root, "", Vector2(PANEL_X, 276), 16, DIM)
 
 	# Arcade banner: level target and progress, big across the board top.
-	target_label = _label(ui_root, "", Vector2(60, 8), 44, GOLD)
+	target_label = _label(ui_root, "", Vector2(560, 8), 44, GOLD)
 	target_bar_back = ColorRect.new()
 	target_bar_back.color = Color("2a2a2a")
-	target_bar_back.position = Vector2(60, 74)
+	target_bar_back.position = Vector2(560, 74)
 	target_bar_back.size = Vector2(1320, 16)
 	ui_root.add_child(target_bar_back)
 	target_bar_fill = ColorRect.new()
 	target_bar_fill.color = GOLD
-	target_bar_fill.position = Vector2(63, 77)
+	target_bar_fill.position = Vector2(563, 77)
 	target_bar_fill.size = Vector2(0, 10)
 	ui_root.add_child(target_bar_fill)
 	target_label.visible = false
@@ -1208,13 +1209,13 @@ func _build_ui() -> void:
 	# Arcade meter: a vertical bar beside the board that drains constantly.
 	meter_back = ColorRect.new()
 	meter_back.color = Color("2a2a2a")
-	meter_back.position = Vector2(14, 100)
+	meter_back.position = Vector2(1874, 100)
 	meter_back.size = Vector2(32, 900)
 	meter_back.visible = false
 	ui_root.add_child(meter_back)
 	meter_fill = ColorRect.new()
 	meter_fill.color = GOLD
-	meter_fill.position = Vector2(18, 104)
+	meter_fill.position = Vector2(1878, 104)
 	meter_fill.size = Vector2(24, 892)
 	meter_fill.visible = false
 	ui_root.add_child(meter_fill)
@@ -1231,11 +1232,12 @@ func _build_ui() -> void:
 	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nEnter / Space — play    C / Right click — clear\nEsc — pause    R — restart    T — theme    M — menu",
 			Vector2(PANEL_X, 976), 16, DIM)
 
-	preview_label = _label(ui_root, "", Vector2(60, 1026), 28, DIM)
+	preview_label = _label(ui_root, "", Vector2(560, 1026), 28, DIM)
 
 	# Darkens the play area during the Ready countdown — a clear "not yet".
 	countdown_overlay = ColorRect.new()
 	countdown_overlay.color = Color(0, 0, 0, 0.55)
+	countdown_overlay.position = Vector2(PLAY_X, 0)
 	countdown_overlay.size = Vector2(PLAY_WIDTH, VIEW.y)
 	countdown_overlay.visible = false
 	# Let clicks through so a deal animation can be skipped during the
@@ -1253,6 +1255,7 @@ func _build_ui() -> void:
 	announcer.add_theme_constant_override("shadow_offset_y", 5)
 	announcer.modulate = Color(1, 1, 1, 0)
 	ui_root.add_child(announcer)
+	announcer.position = Vector2(PLAY_X, 0)
 	announcer.size = Vector2(PLAY_WIDTH, VIEW.y)  # centered over the board
 
 	over_layer = ColorRect.new()
@@ -1385,11 +1388,11 @@ func _build_menu() -> void:
 
 func _build_profiles_and_tutor() -> void:
 	# In-game tutorial instruction strip + skip button.
-	_tut_label = _label(ui_root, "", Vector2(60, 8), 22, GOLD)
+	_tut_label = _label(ui_root, "", Vector2(560, 8), 22, GOLD)
 	_tut_label.size = Vector2(1320, 84)
 	_tut_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tut_label.visible = false
-	_tut_skip_btn = _button(ui_root, "SKIP TUTORIAL", Vector2(PANEL_X, 560), Vector2(300, 56))
+	_tut_skip_btn = _button(ui_root, "SKIP TUTORIAL", Vector2(PANEL_X + 162, 392), Vector2(250, 42))
 	_tut_skip_btn.add_theme_font_size_override("font_size", 20)
 	_tut_skip_btn.visible = false
 	_tut_skip_btn.pressed.connect(_end_tutorial)

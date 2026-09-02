@@ -101,7 +101,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | FLASH FLOOD | Purge room: water (shipped) |
 | GOLD MINE | Board of solid stone; break N to clear, gold cards turn up in the rubble (shipped) |
 | BANK JOB | Heist room (crack the safe — shipped) |
-| STAGECOACH HAUL | Treasure room (key + chest pairs, 2–4 by depth — shipped) |
+| STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs on a tight hand budget — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
 | DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
 | ROYAL HUNT | Make a Royal Flush, 5:1 (shipped, rare) |
 | HIGH NOON | Timed table: score the target before the clock dies (shipped) |

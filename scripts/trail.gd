@@ -545,14 +545,14 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 2.0
 				offer["goal"] = "safe"
 			else:
+				# The hardest job on the trail — but the strongbox
+				# holds a RELIC.
 				offer.tarot = "STAGECOACH HAUL"
 				offer.label = "Treasure"
-				offer.odds = 1.5
+				offer.odds = 2.0
 				offer["goal"] = "chest"
-				# Deeper trails demand more pairs; each opened pair
-				# respawns a fresh key and chest.
-				offer["chest_count"] = mini(2 + region, 4)
-				offer.hands = mini(MAX_HANDS_BUY, 3 * int(offer.chest_count))
+				offer["chest_count"] = mini(3 + region, 5)
+				offer.hands = mini(MAX_HANDS_BUY, 2 * int(offer.chest_count) + 1)
 			if offer.get("goal", "") == "safe":
 				offer.hands = maxi(1, 8 - region)
 			offer.target = 0
@@ -651,8 +651,7 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "safe":
 			goal_line = "CRACK THE SAFE"
 		elif offer.get("goal", "") == "chest":
-			var pairs := int(offer.get("chest_count", 1))
-			goal_line = "OPEN THE CHEST" if pairs == 1 else "OPEN %d CHESTS" % pairs
+			goal_line = "OPEN %d CHESTS\nWIN A RELIC" % int(offer.get("chest_count", 1))
 		elif offer.get("goal", "") == "purge":
 			goal_line = "CLEAR %d %s CARDS" % [offer.purge_count,
 					String(offer.purge_kind).to_upper()]
@@ -756,8 +755,8 @@ func _bet_goal_text(o: Dictionary) -> String:
 		"safe":
 			return "Crack the safe"
 		"chest":
-			var pairs := int(o.get("chest_count", 1))
-			return "Open the chest" if pairs == 1 else "Open %d chests" % pairs
+			return "Open %d chests — a RELIC rides in the strongbox" \
+					% int(o.get("chest_count", 1))
 		"purge":
 			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
 		"mine":
@@ -1143,6 +1142,15 @@ func _room_cleared() -> void:
 			else Board.SFX_STING_WIN, 1.0, -6.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
 	main._announce("TABLE CLEARED  +%d CHIPS" % winnings)
+	if room_goal == "chest":
+		# The stagecoach strongbox: a relic for the hardest job around.
+		var relic_id := _unowned_relic()
+		if relic_id != "" and relics.size() < MAX_RELICS:
+			_gain_relic(relic_id)
+			_announce_after_settle("STAGECOACH RELIC:  %s!" % RELICS[relic_id].name)
+		else:
+			chips += 60
+			_announce_after_settle("STRONGBOX  +60 CHIPS (no relic room)")
 	_after_board_settles(func() -> void:
 		room_index += 1
 		if room_index >= ROOMS_TOTAL:
