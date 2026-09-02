@@ -99,6 +99,12 @@ var tutor_layer: ColorRect
 var _tutor_title: Label
 var _tutor_body: Label
 
+# Board hover tooltip: full stats for the card under the mouse.
+var _tooltip: PanelContainer
+var _tooltip_label: Label
+var _hover_card: PlayingCard = null
+var _hover_time := 0.0
+
 # Interactive how-to-play tutorial state.
 var tut_step := 0
 var _tut_label: Label
@@ -245,6 +251,7 @@ func _process(delta: float) -> void:
 				trail.room_time_left = 0.0
 				trail.on_time_up()
 	_update_labels()
+	_update_tooltip(delta)
 
 
 func _arcade_target() -> int:
@@ -750,6 +757,93 @@ func _refresh_profile_ui() -> void:
 		b.disabled = (i + 1) == profile
 
 
+# --- Board hover tooltip ---------------------------------------------------
+
+func _update_tooltip(delta: float) -> void:
+	if _tooltip == null:
+		return
+	var can := game_started and not menu_open and not game_over \
+			and not get_tree().paused and not board.busy and not board.locked \
+			and not tutor_layer.visible
+	var card: PlayingCard = board._card_under_mouse(true) if can else null
+	if card != _hover_card:
+		_hover_card = card
+		_hover_time = 0.0
+		_tooltip.visible = false
+		return
+	if card == null or _tooltip.visible:
+		return
+	_hover_time += delta
+	if _hover_time < 0.35:
+		return
+	_tooltip_label.text = _card_tooltip_text(card)
+	_tooltip.reset_size()
+	var mp := ui_root.get_global_mouse_position()
+	var tip_size := _tooltip.get_combined_minimum_size()
+	_tooltip.position = Vector2(
+			clampf(mp.x + 26.0, 0.0, VIEW.x - tip_size.x - 10.0),
+			clampf(mp.y + 22.0, 0.0, VIEW.y - tip_size.y - 10.0))
+	_tooltip.visible = true
+
+
+## Everything the hovered card is, in one small panel.
+func _card_tooltip_text(card: PlayingCard) -> String:
+	if card.is_safe:
+		return "THE SAFE\nChain its combination in order, add the safe, and play to crack it."
+	if card.snake_tail:
+		return "COBRA TAIL\nA wall. Clear the head's face to make him cough it back up."
+	var rank_names := {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
+	var lines: Array[String] = []
+	if card.washed:
+		lines.append("SOAKED — face hidden. It still is what it was… if you remember.")
+	else:
+		lines.append("%s of %s  ·  pips %d" % [rank_names.get(card.rank, str(card.rank)),
+				PlayingCard.SUIT_NAMES[card.suit], card.rank])
+	match card.boss:
+		"jack":
+			lines.append("JACK OF ALL TRADES — HP %d. Clear him in a hand to wound him." % card.boss_hp)
+		"queen":
+			lines.append("QUEEN BEE — %d stripes. Only 2-3 card hands can hold her." % card.boss_hp)
+		"cobra":
+			lines.append("KING COBRA — %d meals in the tail. Clear his current face." % card.cobra_body.size())
+	if card.honey:
+		lines.append("HONEYED — only plays in 2-3 card hands.")
+	if card.cursed:
+		lines.append("CURSED — unplayable, blocks chains. Burn it at a shop.")
+	match card.hazard:
+		"bomb":
+			lines.append("BOMB — %d hands left on the fuse. Play it to defuse." % card.fuse)
+		"fire":
+			lines.append("FIRE — spreads every hand and burns its rank down. Play it to douse it.")
+		"wind":
+			lines.append("WIND — play it and everything along the arrow blows off the board.")
+		"stone":
+			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
+					"" if card.stone_hits == 1 else "s"])
+		"water":
+			lines.append("WATER — soaks a neighbor every hand. Play it to stop the leak.")
+	match card.mod:
+		"chip":
+			lines.append("CHIP — pays +%d chips when played." % board.chip_bonus)
+		"mult":
+			lines.append("MULT — hand score ×%.1f. Stacks with other mults." % board.mult_factor)
+		"gold":
+			lines.append("GOLD — pays $1 of permanent cash when played.")
+		"plus":
+			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand.")
+		"minus":
+			lines.append("MINUS — clearing it drops the aimed card one rank. The arrow turns each hand.")
+		"wild":
+			lines.append("WILD — counts as ANY rank and suit.")
+	if card.boom:
+		lines.append("EXPLOSIVE — clearing it spreads its enhancement to every neighbor.")
+	if card.objective == "key":
+		lines.append("THE KEY — get it and the chest into one scoring hand.")
+	elif card.objective == "chest":
+		lines.append("THE CHEST — opens when played together with the key.")
+	return "\n".join(lines)
+
+
 # --- First-time tutorials (per profile) ------------------------------------
 
 const TUTOR := {
@@ -772,16 +866,10 @@ const TUTOR := {
 	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to knock his health down. Ten hits puts him away."],
 	"boss_queen": ["QUEEN BEE", "The Queen only fits in SMALL hands — 2 or 3 cards. She alternates: one hand she moves, the next she honeys a neighbor (honeyed cards also only play in small hands). Sting her three times."],
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
-	"mod_chip": ["CHIP CARD", "Gold disc: pays bonus chips every time it's played in a scoring hand."],
-	"mod_mult": ["MULT CARD", "Red ×: multiplies the WHOLE hand's score when included. Multiple mults stack."],
-	"mod_gold": ["GOLD CARD", "A nugget of the real thing: pays $1 of permanent cash every time it's played — bankable even if the run busts."],
-	"mod_plus": ["PLUS CARD", "When cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time your play to aim it."],
-	"mod_minus": ["MINUS CARD", "When cleared, the aimed card DROPS a rank. Sounds bad — until you shave a King down to pair your Queens."],
-	"mod_wild": ["WILD CARD", "Counts as ANY rank and suit. The rarest card on the trail — it completes whatever hand needs it most."],
-	"mod_boom": ["EXPLOSIVE", "The rays mean this card's enhancement SPREADS: clear it and every adjacent card inherits its power."],
-	"mod_cursed": ["CURSED CARD", "Failing a table scars your deck with one of these: it can't be played and it blocks chains. Pay a shop to burn it."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
 }
+# (Modifier cards get no popup — hovering any board card shows a
+# tooltip with its full story instead.)
 
 
 func tutor_needs(key: String) -> bool:
@@ -1362,6 +1450,29 @@ func _build_profiles_and_tutor() -> void:
 	var ok := _button(tutor_layer, "GOT IT", Vector2(810, 660), Vector2(300, 60))
 	ok.add_theme_font_size_override("font_size", 24)
 	ok.pressed.connect(_tutor_next)
+
+	# Hover tooltip for board cards — above the HUD, ignores the mouse.
+	_tooltip = PanelContainer.new()
+	var tip_sb := StyleBoxFlat.new()
+	tip_sb.bg_color = Color("1b1b1b")
+	tip_sb.border_color = GOLD
+	tip_sb.set_border_width_all(2)
+	tip_sb.set_corner_radius_all(4)
+	tip_sb.content_margin_left = 14
+	tip_sb.content_margin_right = 14
+	tip_sb.content_margin_top = 10
+	tip_sb.content_margin_bottom = 10
+	_tooltip.add_theme_stylebox_override("panel", tip_sb)
+	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tooltip.visible = false
+	_tooltip_label = Label.new()
+	_tooltip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tooltip_label.custom_minimum_size = Vector2(360, 0)
+	_tooltip_label.add_theme_font_size_override("font_size", 19)
+	_tooltip_label.add_theme_color_override("font_color", OFFWHITE)
+	_tooltip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tooltip.add_child(_tooltip_label)
+	ui_root.add_child(_tooltip)
 
 
 func _build_options() -> void:

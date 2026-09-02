@@ -919,10 +919,6 @@ func _tutor_room_intros() -> void:
 			main.tutor_show("goal_safe")
 		if card.boss != "":
 			main.tutor_show("boss_" + card.boss)
-		if card.mod != "":
-			main.tutor_show("mod_" + card.mod)
-		if card.boom:
-			main.tutor_show("mod_boom")
 
 
 ## A 4-digit combination drawn from low ranks present on the board.
@@ -1175,7 +1171,6 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	else:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 		main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
-		main.tutor_show("mod_cursed")
 	main._announce(reason, main.RED)
 	_after_board_settles(_retry_room)
 
@@ -1256,10 +1251,6 @@ func _show_pick() -> void:
 		pc.suit = card_data.suit
 		pc.mod = card_data.get("mod", "")
 		pc.boom = card_data.get("boom", false)
-		if pc.mod != "":
-			main.tutor_show("mod_" + pc.mod)
-		if pc.boom:
-			main.tutor_show("mod_boom")
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.6, 1.6)
 		pc.position = Vector2(85, 120)
@@ -1340,10 +1331,6 @@ func _show_shop() -> void:
 		pc.suit = offer.data.suit
 		pc.mod = offer.data.mod
 		pc.boom = offer.data.get("boom", false)
-		if pc.mod != "":
-			main.tutor_show("mod_" + pc.mod)
-		if pc.boom:
-			main.tutor_show("mod_boom")
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.3, 1.3)
 		pc.position = Vector2(85, 95)
@@ -1362,7 +1349,7 @@ func _show_shop() -> void:
 				chips -= price
 				slot.bought = true
 				deck.append(slot.data)
-				main.board._play_sound(Board.SFX_WHISKYS.pick_random(), 1.0, -8.0)
+				main.board._play_sound(Board.SFX_DEALS.pick_random(), 1.0, -8.0)
 				holder.disabled = true
 				price_tag.text = "SOLD"
 				_shop_info.text = "CHIPS  %d" % chips
@@ -1425,7 +1412,7 @@ func _populate_deck_view() -> void:
 				burns_used += 1
 				_shop_burned_here = true
 				deck.remove_at(idx)
-				main.board._play_sound(Board.SFX_SPITS.pick_random(), 1.0, -6.0)
+				main.board._play_sound(Board.SFX_MATCHES.pick_random(), 1.0, -6.0)
 				_save_run()
 				_show_shop())
 		_remove_grid.add_child(holder)
