@@ -1181,6 +1181,7 @@ func _room_cleared() -> void:
 			else Board.SFX_STING_WIN, 1.0, -6.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
 	main._announce("TABLE CLEARED  +%d CHIPS" % winnings)
+	main.board.confetti()
 	if room_goal == "chest":
 		# The stagecoach strongbox: a relic for the hardest job around.
 		var relic_id := _unowned_relic()

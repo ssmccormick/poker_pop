@@ -138,6 +138,8 @@ func _ready() -> void:
 	board = Board.new()
 	board.process_mode = Node.PROCESS_MODE_PAUSABLE  # don't inherit ALWAYS
 	board.locked = true
+	board.fx = Fx.new()
+	board.add_child(board.fx)
 	board.hand_played.connect(_on_hand_played)
 	board.hand_rejected.connect(func() -> void:
 		_announce("NOT A VALID HAND", RED))
@@ -427,6 +429,8 @@ func _on_hand_played(result: Dictionary) -> void:
 	_announce("%s  +%d" % [String(result.name).to_upper(), result.score])
 	# The wagon rolls on: the scenery surges with every scored hand.
 	parallax.lurch(1.0 + result.get("count", 0) * 0.15)
+	if result.get("base", 0) >= 1200:
+		board.confetti()  # straight flush or better earns the parade
 	if mode_kind == "tutorial":
 		_tut_on_hand(String(result.name))
 		return
@@ -450,6 +454,7 @@ func _level_up() -> void:
 	if board._refill_active:
 		board._skip_refill()
 	_announce("LEVEL %d CLEAR!" % level)
+	board.confetti()
 	while board.busy:
 		await get_tree().process_frame
 	if not game_started or mode_kind != "arcade":

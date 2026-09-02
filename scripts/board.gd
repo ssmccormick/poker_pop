@@ -72,6 +72,18 @@ var suppress_refill := false
 var gold_rush := false
 const GOLD_FIND_CHANCE := 0.35
 
+# Particle helper (set by main; null on detached test boards).
+var fx: Fx
+
+
+func _fx(pos: Vector2, kind: String, tint := Color.WHITE, dir := Vector2.UP) -> void:
+	if fx != null:
+		fx.burst(pos, kind, tint, dir)
+
+
+func confetti() -> void:
+	_fx(Vector2(cols * CELL_W * 0.5, -20.0), "confetti")
+
 const SFX_SELECTS := [
 	preload("res://assets/sfx/card_select.wav"),
 	preload("res://assets/sfx/card_pick.wav"),
@@ -497,6 +509,7 @@ func play_hand() -> void:
 		if card.hazard == "stone" and card.stone_hits > 1:
 			card.stone_hits -= 1
 			_play_sound(SFX_KNIVES.pick_random(), randf_range(0.9, 1.1), -8.0)
+			_fx(card.position, "rock")
 			continue  # cracked, not cleared — keeps its cell
 		if card.hazard == "wind":
 			gusts.append({"cell": card.grid_pos, "dir": card.wind_dir})
@@ -514,6 +527,8 @@ func play_hand() -> void:
 		for i in poppers.size():
 			var card: PlayingCard = poppers[i]
 			var delay := 0.06 * i
+			_fx(card.position, "rock" if card.hazard == "stone" else "pop",
+					card.suit_color() if card.hazard != "stone" else Color.WHITE)
 			grid.erase(card.grid_pos)
 			tw.tween_property(card, "scale", Vector2.ZERO, 0.2) \
 					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN).set_delay(delay)
@@ -545,6 +560,7 @@ func play_hand() -> void:
 					spread = true
 		if spread:
 			_play_sound(SFX_POPS.pick_random(), 1.5, -6.0)
+			_fx(cell_center(bdata.cell), "smoke")
 	for adata in arrows:
 		var q: Vector2i = adata.cell + adata.dir
 		if grid.has(q):
@@ -554,6 +570,7 @@ func play_hand() -> void:
 				c.rank = mini(14, c.rank + 1) if adata.mod == "plus" \
 						else maxi(2, c.rank - 1)
 				_play_sound(SFX_FLIP, 1.4 if adata.mod == "plus" else 0.7, -8.0)
+				_fx(cell_center(q), "sparks")
 	# Bumpers shove their line one step; the far card can go off the
 	# table entirely (unscored, like a gust victim).
 	for bdata in bumps:
@@ -561,6 +578,8 @@ func play_hand() -> void:
 		if bumped.is_empty():
 			continue
 		_play_sound(SFX_FLIP, 0.9, -7.0)
+		_fx(cell_center(bdata.cell + bdata.dir), "dust", Color.WHITE,
+				Vector2(bdata.dir))
 		var btw := create_tween().set_parallel(true)
 		var shoved_off: Array = []
 		for m in bumped:
@@ -592,6 +611,8 @@ func play_hand() -> void:
 			blown[cell] = g.dir
 	if not blown.is_empty():
 		_play_sound(SFX_WINDS.pick_random(), randf_range(1.0, 1.2), -5.0)
+		for g in gusts:
+			_fx(cell_center(g.cell), "dust", Color.WHITE, Vector2(g.dir))
 		var gtw := create_tween().set_parallel(true)
 		var flying: Array = []
 		var gusted_boss := false
@@ -649,6 +670,7 @@ func play_hand() -> void:
 				lucky.mod = "gold"
 				_spawn_float_text("GOLD!", lucky.position)
 				_play_sound(SFX_COINS.pick_random(), 1.2, -8.0)
+				_fx(lucky.position, "gold")
 	busy = false
 	if not has_playable_hand():
 		dead_board.emit()
@@ -1446,6 +1468,7 @@ func tick_boss() -> void:
 				var moved: bool = await _cobra_eat(b, false)
 				if moved:
 					_play_sound(SFX_SNAKES.pick_random(), randf_range(0.9, 1.1), -8.0)
+					_fx(b.position, "dust")
 					# The tail tip vacated a cell — deal into the gap.
 					await _fall_and_fill(false)
 	busy = false
@@ -1625,10 +1648,19 @@ func tick_hazards(tick_fire := true) -> bool:
 	var res := _tick_fire_and_bombs(tick_fire)
 	if not res.soaked.is_empty():
 		_play_sound(SFX_FLIP, 0.6, -8.0)
+		for cell in res.soaked:
+			_fx(cell_center(cell), "splash")
 	if not res.ignited.is_empty():
 		_play_sound(SFX_MATCHES.pick_random(), randf_range(0.95, 1.1), -8.0)
+		for cell in res.ignited:
+			_fx(cell_center(cell), "embers")
+	for cell in res.burned:
+		_fx(cell_center(cell), "embers")
 	if res.exploded:
 		_play_sound(SFX_DYNAMITES.pick_random(), 1.0, -3.0)
+		for p in grid:
+			if grid[p].hazard == "bomb" and grid[p].fuse <= 0:
+				_fx(cell_center(p), "smoke")
 	var burned: Array = res.burned
 	if not burned.is_empty():
 		_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)
