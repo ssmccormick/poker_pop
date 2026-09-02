@@ -758,7 +758,7 @@ const TUTOR := {
 	"mode_single": ["SINGLE DECK", "One 52-card deck, no timer. When the deck runs dry the run is over — squeeze every point from every card."],
 	"mode_arcade": ["ARCADE", "The bar at the top is always draining. Scoring refills it; hit the level target to move up. When the bar empties, the run ends."],
 	"mode_zen": ["ZEN", "No timer, no limits, no losing. Just you, the cards, and the sound of the pops."],
-	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Cash out between tables to bank chips as permanent $cash, or ride deeper."],
+	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
 	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero, the table is lost."],
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. Play burning cards to put them out — every hand you wait, the fire claims another card."],
 	"hazard_wind": ["WIND CARD", "Play it and every card in the arrow's direction is blown clean off the board — unscored. Aim it at junk... or at trouble."],
@@ -1249,7 +1249,7 @@ func _build_menu() -> void:
 	trail_btn.add_theme_font_size_override("font_size", 26)
 	trail_btn.pressed.connect(func() -> void:
 		trail.open_buyin())
-	_menu_center("Buy in · bet at every table · sculpt your deck · cash out or bust", 408, 20, DIM)
+	_menu_center("Buy in · bet at every table · sculpt your deck · ride to the end or bust", 408, 20, DIM)
 
 	_menu_center("TIME TRIAL", 456, 24, GOLD)
 	var times := [60.0, 180.0, 300.0]

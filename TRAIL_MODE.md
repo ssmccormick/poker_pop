@@ -17,7 +17,7 @@ to a table, get a chip stack, and ride a trail of rooms — each a board
 challenge revealed as a tarot card. Before every room you **wager
 chips on yourself**: clear the room and the bet pays out at odds; fail
 and the stake is gone. Chips are simultaneously your health, your
-wager, and your shop wallet. **Cash out between rooms** to bank chips
+wager, and your shop wallet. **Ride to the END of the trail** to bank chips
 as permanent cash — or push deeper for bigger blinds and bigger
 payouts. Bankruptcy ends the run. Cash buys premium buy-ins and
 permanent upgrades between runs.
@@ -60,11 +60,13 @@ bosses, regions.
 - **Blinds escalate**: the blind rises each room (poker blinds
   structure) — late trail, you can't limp. Can't cover a table's
   **cheapest seat** (ante + minimum bet) = **BLINDED OUT**: the run is
-  over and the house cashes out your remaining chips at the buy-in's
-  rate. Zero chips = busted outright, nothing to cash.
-- **Cash out**: between any two rooms, walk away — convert remaining
-  chips to cash at the buy-in's rate. Finishing the whole trail (beating
-  the Dealer) cashes out at a premium multiplier plus a completion purse.
+  over and the house keeps everything — chips only turn to cash at
+  the end of the trail.
+- **No cashing out mid-ride**: chips become permanent $cash ONLY by
+  finishing all 21 tables (premium multiplier + completion purse) —
+  or $1 at a time by playing GOLD cards during the run (banked
+  instantly, and kept even if the run later busts). All-or-nothing:
+  the ride itself is the bet.
 - Shops charge the same chips you bet with — every purchase shrinks the
   stack that keeps you alive. That tension is the design.
 
@@ -315,7 +317,8 @@ Two currencies, one flow:
 - **Chips** — the run: your buy-in stack, grown by winning bets, spent
   on shops and lost to failed rooms. Bankruptcy = run over (banked cash
   is safe; unconverted chips die with the run).
-- **Cash** — the meta: earned ONLY by cashing out chips (or the
+- **Cash** — the meta: earned ONLY by finishing the trail with chips
+  or playing GOLD cards mid-run (or the
   completion purse), persists forever, spent on premium buy-ins and the
   between-runs **Outfitter** (permanent upgrades).
 - One conversion point (cash-out) keeps the currencies honest: chips
@@ -385,9 +388,9 @@ Failing a room does NOT clear it. It costs you three ways:
    from what's left. Beat it or bleed out.
 
 The run ends by **bankruptcy** (a failed room leaves you at zero),
-by being **blinded out** (any table — next room or retry — whose blind
-your chips can't cover; what's left is auto-cashed out), or by choosing
-to **cash out** between rooms.
+by being **blinded out** (any table — next room or retry — whose seat
+your chips can't cover; the house keeps what's left), or by
+**finishing the trail**. There is no early cash-out.
 Bosses are all-in, so a boss loss IS bankruptcy. Banked cash is always
 safe. Quitting mid-room counts as a fail, and the barred room is saved
 with the run — resuming drops you back at its table.

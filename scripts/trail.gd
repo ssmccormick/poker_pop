@@ -1,9 +1,10 @@
 class_name TrailMode
 extends Node
 
-## Trail mode: a betting roguelike run. Buy in for a chip stack, ride a
-## 12-room tarot trail, wager chips on every room, sculpt your deck as
-## you go. Bankruptcy ends the run; cashing out banks chips as cash.
+## Trail mode: a betting roguelike run. Buy in for a chip stack, ride
+## 21 tables, wager chips at every one, sculpt your deck as you go.
+## Bankruptcy ends the run; chips become permanent cash ONLY by
+## finishing the trail (gold cards pay $1 apiece along the way).
 ## v1 scope: risk-tiered Normal rooms + shops. Bosses, room-rule
 ## variety, and card modifiers beyond Cursed come later (TRAIL_MODE.md).
 
@@ -107,7 +108,7 @@ const RELICS := {
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
 	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "First failed room adds no cursed card"},
-	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Cash-out rate +0.25x"},
+	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Trail completion pays +0.25x"},
 	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combos use only ranks 2-6"},
 	"lucky_chip": {"name": "Lucky Chip", "rarity": 2, "desc": "10% chance a hand costs no hand"},
 }
@@ -162,7 +163,6 @@ var _buyin_cash_label: Label
 var _buyin_resume_btn: Button
 var _tarot_info: Label
 var _tarot_cards_box: Control
-var _tarot_cashout_btn: Button
 var _bet_info: Label
 var _bet_stake_label: Label
 var _bet_hands := 8
@@ -335,8 +335,8 @@ func _cheapest_seat(room: int) -> int:
 
 
 ## True if the stack can't cover `cost` — and in that case the run is
-## over: zero chips busts outright, anything short of the seat gets
-## force-cashed out (the house shows you the door with what's left).
+## over: chips only turn to cash for riders who reach the end, so a
+## short stack forfeits — the house keeps what's left.
 func _short_stacked(cost: int) -> bool:
 	if chips >= cost:
 		return false
@@ -345,13 +345,10 @@ func _short_stacked(cost: int) -> bool:
 		_end_run("BUSTED OUT",
 				"That table took your last chip.\nThe trail ends here.", 0)
 		return true
-	var payout := _cashout_value()
-	cash += payout
-	_save_meta()
 	_clear_run_save()
 	_end_run("BLINDED OUT",
-			"A seat at this table costs at least %d chips — you're down to %d.\nThe house cashes you out: $%d." % [cost, chips, payout],
-			payout)
+			"A seat at this table costs at least %d chips — you're down to %d.\nOnly riders who reach the end cash out. The house keeps the rest." % [cost, chips],
+			0)
 	return true
 
 
@@ -623,7 +620,6 @@ func _render_tarot() -> void:
 		for id in relics:
 			names.append(RELICS[id].name)
 		_tarot_relics.text = "RELICS:  " + "  ·  ".join(names)
-	_tarot_cashout_btn.text = "CASH OUT — TAKE $%d" % _cashout_value()
 	var slot_count := _offers.size() + (0 if is_boss else 1)
 	var total_w := slot_count * 330 - 30
 	var start_x := (1920.0 - total_w) / 2.0
@@ -706,15 +702,6 @@ func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
 		_start_room()
 	else:
 		_show_bet()
-
-
-func _do_cashout() -> void:
-	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0)
-	var payout := _cashout_value()
-	cash += payout
-	_save_meta()
-	_clear_run_save()
-	_end_run("CASHED OUT", "You walk away with $%d.\nThe trail will be waiting." % payout, payout)
 
 
 # --- Flow: betting --------------------------------------------------------
@@ -1058,10 +1045,10 @@ func _open_chest() -> void:
 		deck.append(card)
 		_announce_after_settle("CHEST  NEW CARD FOR YOUR DECK")
 	elif roll < 0.80:
-		var dollars := 5 + 5 * region
-		cash += dollars
-		_save_meta()
-		_announce_after_settle("CHEST  +$%d CASH" % dollars)
+		# No loose cash on the trail — the chest holds a GOLD card.
+		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+				"cursed": false, "mod": "gold", "boom": false})
+		_announce_after_settle("CHEST  A GOLD CARD!")
 	elif roll < 0.90 and relics.size() < MAX_RELICS and _unowned_relic() != "":
 		var id := _unowned_relic()
 		_gain_relic(id)
@@ -1521,10 +1508,7 @@ func build_ui() -> void:
 	_tarot_cards_box.position = Vector2(0, 330)
 	tarot_layer.add_child(_tarot_cards_box)
 	_tarot_relics = _center(tarot_layer, "", 272, 18, main.GOLD)
-	_tarot_cashout_btn = main._button(tarot_layer, "", Vector2(760, 790), Vector2(400, 64))
-	_tarot_cashout_btn.add_theme_font_size_override("font_size", 24)
-	_tarot_cashout_btn.pressed.connect(_do_cashout)
-	_center(tarot_layer, "Cashing out ends the run and banks your chips as cash.", 870, 18, main.DIM)
+	_center(tarot_layer, "No cashing out mid-ride: reach the end of the trail, or play GOLD cards for $cash along the way.", 850, 18, main.DIM)
 	_back_button(tarot_layer, back_to_menu, "MENU")
 	var deck_btn: Button = main._button(tarot_layer, "VIEW DECK", Vector2(1660, 970), Vector2(200, 54))
 	deck_btn.add_theme_font_size_override("font_size", 20)
