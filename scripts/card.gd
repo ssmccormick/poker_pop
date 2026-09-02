@@ -362,6 +362,18 @@ func _draw() -> void:
 		"wild":
 			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "W",
 					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, WILD_PURPLE)
+		"bumper":
+			var bb := Vector2(W / 2.0 - 15, -H / 2.0 + 38)
+			var bv := Vector2(boost_dir) * 9.0
+			var bperp := Vector2(-bv.y, bv.x).normalized()
+			# The pad, then the shove arrow.
+			draw_line(bb - bv * 0.6 + bperp * 8.0, bb - bv * 0.6 - bperp * 8.0,
+					WIND_BLUE, 5.0)
+			var btip := bb + bv * 1.4
+			draw_line(bb - bv * 0.2, btip, WIND_BLUE, 3.0)
+			draw_colored_polygon(PackedVector2Array([
+				btip + bv * 0.35, btip - bv * 0.25 + bperp * 4.0,
+				btip - bv * 0.25 - bperp * 4.0]), WIND_BLUE)
 		"plus", "minus":
 			var base := Vector2(W / 2.0 - 15, -H / 2.0 + 38)
 			var col := BOOST_GREEN if mod == "plus" else ERROR_RED

@@ -81,6 +81,41 @@ func _init() -> void:
 	boost.free()
 	b.free()
 
+	# Bumper shoves: gaps absorb, edges shove off, heavy cards block.
+	b = Board.new()
+	for spec in [[7, 0, 1, 0], [9, 1, 2, 0]]:
+		var c2 := PlayingCard.new()
+		c2.rank = spec[0]
+		c2.suit = spec[1]
+		c2.grid_pos = Vector2i(spec[2], spec[3])
+		b.grid[c2.grid_pos] = c2
+	var moves: Array = b._apply_bump(Vector2i(0, 0), Vector2i.RIGHT)
+	failures += _check(moves.size() == 2 and b.grid.has(Vector2i(3, 0))
+			and b.grid.has(Vector2i(2, 0)) and not b.grid.has(Vector2i(1, 0)),
+			"a gap absorbs the shove — both cards slide one step")
+	b._apply_bump(Vector2i(1, 0), Vector2i.RIGHT)  # slide to cols 3 and 4
+	moves = b._apply_bump(Vector2i(2, 0), Vector2i.RIGHT)
+	var shoved: Array = moves.filter(func(m): return m.off)
+	failures += _check(shoved.size() == 1 and b.grid.has(Vector2i(4, 0))
+			and not b.grid.has(Vector2i(3, 0)),
+			"a run reaching the edge shoves the far card off the table")
+	for m in moves:
+		if m.off:
+			m.card.free()
+	var pushed := PlayingCard.new()
+	pushed.grid_pos = Vector2i(2, 0)
+	b.grid[Vector2i(2, 0)] = pushed
+	var wall := PlayingCard.new()
+	wall.is_safe = true
+	wall.grid_pos = Vector2i(3, 0)
+	b.grid[Vector2i(3, 0)] = wall
+	moves = b._apply_bump(Vector2i(1, 0), Vector2i.RIGHT)
+	failures += _check(moves.is_empty() and b.grid.has(Vector2i(2, 0)),
+			"a safe blocks the push — nothing budges")
+	for card in b.grid.values():
+		card.free()
+	b.free()
+
 	# Old save ids map onto the current mod family.
 	failures += _check(Board.migrate_mod("cash") == "gold"
 			and Board.migrate_mod("boost") == "plus"

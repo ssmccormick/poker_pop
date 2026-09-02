@@ -474,6 +474,7 @@ func play_hand() -> void:
 	var gusts: Array = []     # {"cell", "dir"}
 	var boomers: Array = []   # {"cell", "mod"} — exploding mods spread
 	var arrows: Array = []    # {"cell", "dir", "mod"} — plus/minus aims
+	var bumps: Array = []     # {"cell", "dir"} — bumper shoves
 	var defeated_boss := false
 	for card in played:
 		card.selected = false
@@ -504,6 +505,8 @@ func play_hand() -> void:
 		if card.mod in ["plus", "minus"]:
 			arrows.append({"cell": card.grid_pos, "dir": card.boost_dir,
 					"mod": card.mod})
+		elif card.mod == "bumper":
+			bumps.append({"cell": card.grid_pos, "dir": card.boost_dir})
 		poppers.append(card)
 
 	if not poppers.is_empty():
@@ -537,7 +540,7 @@ func play_hand() -> void:
 				if c.mod == "" and not c.cursed and not c.is_safe \
 						and c.boss == "" and not c.snake_tail:
 					c.mod = bdata.mod
-					if c.mod in ["plus", "minus"]:
+					if c.mod in ["plus", "minus", "bumper"]:
 						c.boost_dir = HAZARD_DIRS.pick_random()
 					spread = true
 		if spread:
@@ -551,6 +554,29 @@ func play_hand() -> void:
 				c.rank = mini(14, c.rank + 1) if adata.mod == "plus" \
 						else maxi(2, c.rank - 1)
 				_play_sound(SFX_FLIP, 1.4 if adata.mod == "plus" else 0.7, -8.0)
+	# Bumpers shove their line one step; the far card can go off the
+	# table entirely (unscored, like a gust victim).
+	for bdata in bumps:
+		var bumped := _apply_bump(bdata.cell, bdata.dir)
+		if bumped.is_empty():
+			continue
+		_play_sound(SFX_FLIP, 0.9, -7.0)
+		var btw := create_tween().set_parallel(true)
+		var shoved_off: Array = []
+		for m in bumped:
+			if m.off:
+				shoved_off.append(m.card)
+				m.card.z_index = 15
+				btw.tween_property(m.card, "position",
+						cell_center(m.to) + Vector2(bdata.dir) * 260.0, 0.3) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				btw.tween_property(m.card, "modulate:a", 0.0, 0.3)
+			else:
+				btw.tween_property(m.card, "position", cell_center(m.to), 0.18) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		await btw.finished
+		for c in shoved_off:
+			c.queue_free()
 
 	# A transition (room clear / level clear) suppresses the refill, but
 	# a pending gust still blows — it may be the very thing that won the
@@ -803,7 +829,7 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.cursed = data.get("cursed", false)
 			card.mod = migrate_mod(data.get("mod", ""))
 			card.boom = data.get("boom", false) or data.get("mod", "") == "chipsplode"
-			if card.mod in ["plus", "minus"]:
+			if card.mod in ["plus", "minus", "bumper"]:
 				card.boost_dir = HAZARD_DIRS.pick_random()
 			var p := Vector2i(x, row)
 			card.grid_pos = p
@@ -1440,6 +1466,41 @@ func apply_room_hazards(kind: String, count: int) -> void:
 			_play_sound(SFX_MATCHES.pick_random(), 1.0, -8.0)
 
 
+## The bumper's shove: pushes the contiguous run of cards next to
+## `cell` one step along `dir`. Safes, bosses, and cobra tails are too
+## heavy and block the whole push; a gap absorbs it; a run reaching
+## the edge shoves its far card off the table. Pure grid mutation —
+## returns the moves as {card, to, off} for the caller to animate
+## (an "off" card is already out of the grid and must be freed).
+func _apply_bump(cell: Vector2i, dir: Vector2i) -> Array:
+	var run: Array = []
+	var p := cell + dir
+	while p.x >= 0 and p.x < cols and p.y >= 0 and p.y < rows and grid.has(p):
+		var c: PlayingCard = grid[p]
+		if c.is_safe or c.boss != "" or c.snake_tail:
+			break
+		run.append(p)
+		p += dir
+	if run.is_empty():
+		return []
+	var off_edge := not (p.x >= 0 and p.x < cols and p.y >= 0 and p.y < rows)
+	if not off_edge and grid.has(p):
+		return []  # shoved into something too heavy — nothing budges
+	var moves: Array = []
+	# Farthest card first so grid writes never collide.
+	for i in range(run.size() - 1, -1, -1):
+		var from: Vector2i = run[i]
+		var card: PlayingCard = grid[from]
+		grid.erase(from)
+		if i == run.size() - 1 and off_edge:
+			moves.append({"card": card, "to": from + dir, "off": true})
+		else:
+			grid[from + dir] = card
+			card.grid_pos = from + dir
+			moves.append({"card": card, "to": from + dir, "off": false})
+	return moves
+
+
 ## True when every card on the table is burning — the fire has won.
 func board_ablaze() -> bool:
 	if grid.is_empty():
@@ -1468,10 +1529,10 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 ## Returns {"burned": [cells], "ignited": [cells], "exploded": bool}.
 ## Board mutation only — no animation — so it's headless-testable.
 func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
-	# Plus/minus arrows swing a quarter turn (clockwise) every hand —
-	# time the clear to aim the ±1 where you want it.
+	# Plus/minus/bumper arrows swing a quarter turn (clockwise) every
+	# hand — time the clear to aim the effect where you want it.
 	for p in grid:
-		if grid[p].mod in ["plus", "minus"]:
+		if grid[p].mod in ["plus", "minus", "bumper"]:
 			var bd: Vector2i = grid[p].boost_dir
 			grid[p].boost_dir = Vector2i(-bd.y, bd.x)
 	# Water drips: every uncleared water card soaks one random orthogonal
@@ -1542,7 +1603,7 @@ func tick_hazards(tick_fire := true) -> bool:
 	for p in grid:
 		var hz: String = grid[p].hazard
 		if hz == "fire" or hz == "bomb" or hz == "water" \
-				or grid[p].mod in ["plus", "minus"]:
+				or grid[p].mod in ["plus", "minus", "bumper"]:
 			any = true
 			break
 	if not any:

@@ -256,11 +256,12 @@ overlay and a hover panel explaining the hovered card.
 | Gold card | Pays $1 of real, bankable cash every time it's played (gold nugget glyph) |
 | Plus card | When cleared, the card its arrow points at gains +1 rank (cap 14). The arrow turns a quarter clockwise every hand — time the clear to aim it |
 | Minus card | Mirror of Plus: the aimed card drops −1 rank (floor 2) — sculpt a King down to match your Queens |
+| Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand). A gap absorbs the push; safes/bosses/tails block it; a card pushed past the edge is removed unscored |
 | Wild card | Counts as ANY rank and suit; the evaluator takes the best assignment. The rarest roll (~3%) |
 | EXPLOSIVE (rider) | Not a mod — a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
 
-Roll weights: Mult 28% · Chip 28% · Plus 16% · Minus 12% · Gold 13% ·
-Wild 3%, with the Explosive rider rolled separately on top.
+Roll weights: Mult 26% · Chip 26% · Plus 14% · Minus 10% · Bumper 11%
+· Gold 10% · Wild 3%, with the Explosive rider rolled separately.
 
 ## Relic system (SHIPPED — all 15 below are in)
 

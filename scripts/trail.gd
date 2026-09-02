@@ -378,14 +378,16 @@ func _cashout_value(rate_bonus := 1.0) -> int:
 ## payloads rarer, and WILD is the unicorn.
 func _random_mod() -> String:
 	var roll := randf()
-	if roll < 0.28:
+	if roll < 0.26:
 		return "mult"
-	if roll < 0.56:
+	if roll < 0.52:
 		return "chip"
-	if roll < 0.72:
+	if roll < 0.66:
 		return "plus"
-	if roll < 0.84:
+	if roll < 0.76:
 		return "minus"
+	if roll < 0.87:
+		return "bumper"
 	if roll < 0.97:
 		return "gold"
 	return "wild"
@@ -1494,6 +1496,8 @@ func _deck_stat_text(d: Dictionary) -> String:
 			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it."
 		"minus":
 			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank. The arrow turns a quarter every hand — time it."
+		"bumper":
+			text += "BUMPER\nWhen cleared, it shoves the whole line of cards beside it one step in the arrow's direction — a card pushed past the edge is gone. The arrow turns every hand."
 		"wild":
 			text += "WILD\nCounts as ANY rank and suit — the best possible hand wins. The rarest card on the trail."
 		_:

@@ -839,6 +839,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand.")
 		"minus":
 			lines.append("MINUS — clearing it drops the aimed card one rank. The arrow turns each hand.")
+		"bumper":
+			lines.append("BUMPER — clearing it shoves the line beside it one step along the arrow; past the edge is gone. The arrow turns each hand.")
 		"wild":
 			lines.append("WILD — counts as ANY rank and suit.")
 	if card.boom:
