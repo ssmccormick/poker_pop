@@ -1512,16 +1512,23 @@ func build_ui() -> void:
 	bet_layer = _layer()
 	_screen_title(bet_layer, "THE STAKES")
 	_bet_info = _center(bet_layer, "", 250, 26, main.OFFWHITE)
-	var bminus: Button = main._button(bet_layer, "−", Vector2(700, 410), Vector2(100, 70))
-	bminus.add_theme_font_size_override("font_size", 40)
-	bminus.pressed.connect(func() -> void:
-		_bet_amount -= int(current_offer.min_bet)
+	_bet_amount_label = _center(bet_layer, "", 395, 36, main.OFFWHITE)
+	# Poker presets: MIN sits at the blind, RAISE doubles the bet each
+	# press, ALL IN shoves the whole stack.
+	var bet_min: Button = main._button(bet_layer, "MIN", Vector2(640, 445), Vector2(200, 60))
+	bet_min.add_theme_font_size_override("font_size", 24)
+	bet_min.pressed.connect(func() -> void:
+		_bet_amount = int(current_offer.min_bet)
 		_refresh_bet_labels())
-	_bet_amount_label = _center(bet_layer, "", 428, 34, main.OFFWHITE)
-	var bplus: Button = main._button(bet_layer, "+", Vector2(1120, 410), Vector2(100, 70))
-	bplus.add_theme_font_size_override("font_size", 40)
-	bplus.pressed.connect(func() -> void:
-		_bet_amount += int(current_offer.min_bet)
+	var bet_raise: Button = main._button(bet_layer, "RAISE ×2", Vector2(860, 445), Vector2(200, 60))
+	bet_raise.add_theme_font_size_override("font_size", 24)
+	bet_raise.pressed.connect(func() -> void:
+		_bet_amount = mini(_bet_amount * 2, _max_bet())
+		_refresh_bet_labels())
+	var bet_allin: Button = main._button(bet_layer, "ALL IN", Vector2(1080, 445), Vector2(200, 60))
+	bet_allin.add_theme_font_size_override("font_size", 24)
+	bet_allin.pressed.connect(func() -> void:
+		_bet_amount = _max_bet()
 		_refresh_bet_labels())
 	var minus: Button = main._button(bet_layer, "−", Vector2(700, 510), Vector2(100, 70))
 	minus.add_theme_font_size_override("font_size", 40)
