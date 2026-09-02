@@ -476,15 +476,15 @@ func _draw_suit_vector(c: Vector2, px: float) -> void:
 	var col := suit_color()
 	var r := 3.6 * px
 	match suit:
-		0:  # spades — inverted heart plus a stem
-			draw_circle(c + Vector2(-r * 0.45, 0.0), r * 0.5, col)
-			draw_circle(c + Vector2(r * 0.45, 0.0), r * 0.5, col)
+		0:  # spades — one tall sharp point over small low lobes
 			draw_colored_polygon(PackedVector2Array([
-				c + Vector2(-r * 0.9, 0.15 * r), c + Vector2(r * 0.9, 0.15 * r),
-				c + Vector2(0, -r)]), col)
+				c + Vector2(0, -r * 1.05), c + Vector2(r * 0.8, r * 0.38),
+				c + Vector2(-r * 0.8, r * 0.38)]), col)
+			draw_circle(c + Vector2(-r * 0.42, r * 0.28), r * 0.42, col)
+			draw_circle(c + Vector2(r * 0.42, r * 0.28), r * 0.42, col)
 			draw_colored_polygon(PackedVector2Array([
-				c + Vector2(-r * 0.3, r), c + Vector2(r * 0.3, r),
-				c + Vector2(0, r * 0.1)]), col)
+				c + Vector2(-r * 0.28, r), c + Vector2(r * 0.28, r),
+				c + Vector2(0, r * 0.3)]), col)
 		1:  # hearts
 			draw_circle(c + Vector2(-r * 0.45, -r * 0.3), r * 0.52, col)
 			draw_circle(c + Vector2(r * 0.45, -r * 0.3), r * 0.52, col)
@@ -495,13 +495,14 @@ func _draw_suit_vector(c: Vector2, px: float) -> void:
 			draw_colored_polygon(PackedVector2Array([
 				c + Vector2(0, -r), c + Vector2(r * 0.72, 0),
 				c + Vector2(0, r), c + Vector2(-r * 0.72, 0)]), col)
-		3:  # clubs — three lobes and a stem
-			draw_circle(c + Vector2(0, -r * 0.42), r * 0.46, col)
-			draw_circle(c + Vector2(-r * 0.44, r * 0.08), r * 0.46, col)
-			draw_circle(c + Vector2(r * 0.44, r * 0.08), r * 0.46, col)
+		3:  # clubs — a clearly separated trefoil and a stem
+			draw_circle(c + Vector2(0, -r * 0.55), r * 0.4, col)
+			draw_circle(c + Vector2(-r * 0.52, r * 0.22), r * 0.4, col)
+			draw_circle(c + Vector2(r * 0.52, r * 0.22), r * 0.4, col)
+			draw_circle(c + Vector2(0, r * 0.02), r * 0.2, col)
 			draw_colored_polygon(PackedVector2Array([
-				c + Vector2(-r * 0.26, r), c + Vector2(r * 0.26, r),
-				c + Vector2(0, r * 0.05)]), col)
+				c + Vector2(-r * 0.24, r), c + Vector2(r * 0.24, r),
+				c + Vector2(0, r * 0.1)]), col)
 
 
 func _draw_pixel_map(map: Array, center: Vector2, px: float, col: Color) -> void:
