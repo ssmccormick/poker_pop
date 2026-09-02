@@ -18,12 +18,15 @@ const ARCADE_MAX_DRAIN := 7.0
 const ARCADE_METER_GAIN := 0.4    # meter % gained per point scored
 
 const VIEW := Vector2(1920, 1080)
-# The HUD panel sits on the LEFT; the play area fills the right side.
-const PANEL_X := 60.0
-const PLAY_X := 520.0    # left edge of the play area
-const BOARD_AREA_POS := Vector2(560, 100)
-const BOARD_AREA_SIZE := Vector2(1320, 900)
-const PLAY_WIDTH := 1400.0  # width of the play area
+# HUD in two slim columns — main controls LEFT, payouts/hints RIGHT —
+# with the play area centered between them.
+const PANEL_X := 40.0       # left column
+const PANEL_R := 1580.0     # right column
+const PLAY_X := 370.0       # left edge of the play area
+const BOARD_AREA_POS := Vector2(380, 100)
+const BOARD_AREA_SIZE := Vector2(1160, 900)
+const PLAY_WIDTH := 1180.0  # width of the play area
+const BAR_W := 1154.0       # banner progress-bar fill width
 
 var board: Board
 var trail: TrailMode
@@ -305,7 +308,7 @@ func _update_labels() -> void:
 		meter_fill.color = GOLD if meter > 25.0 else RED
 		var target := _arcade_target()
 		target_label.text = "LEVEL %d      %d / %d" % [level, level_score, target]
-		target_bar_fill.size.x = 1314.0 * clampf(float(level_score) / float(target), 0.0, 1.0)
+		target_bar_fill.size.x = BAR_W * clampf(float(level_score) / float(target), 0.0, 1.0)
 	elif show_trail:
 		if trail.room_goal == "boss":
 			target_label.text = "TABLE %d / %d      %s" % \
@@ -317,19 +320,19 @@ func _update_labels() -> void:
 				digits.append(str(d))
 			target_label.text = "TABLE %d / %d      SAFE  %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, " · ".join(digits)]
-			target_bar_fill.size.x = 1314.0 * trail.safe_progress() / 4.0
+			target_bar_fill.size.x = BAR_W * trail.safe_progress() / 4.0
 		elif trail.room_goal == "chest":
 			target_label.text = "TABLE %d / %d      KEY + CHEST  %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					trail.room_chests_opened, trail.room_chests_needed]
-			target_bar_fill.size.x = 1314.0 * clampf(
+			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_chests_opened)
 					/ float(maxi(trail.room_chests_needed, 1)), 0.0, 1.0)
 		elif trail.room_goal == "mine":
 			target_label.text = "TABLE %d / %d      GOLD MINE  %d / %d STONES" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					trail.room_stones_broken, trail.room_stones_needed]
-			target_bar_fill.size.x = 1314.0 * clampf(
+			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_stones_broken)
 					/ float(maxi(trail.room_stones_needed, 1)), 0.0, 1.0)
 		elif trail.room_goal == "purge":
@@ -338,16 +341,16 @@ func _update_labels() -> void:
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, left,
 					"" if left == 1 else "S"]
 			var seeded := maxi(int(trail.current_offer.get("purge_count", 1)), 1)
-			target_bar_fill.size.x = 1314.0 * clampf(
+			target_bar_fill.size.x = BAR_W * clampf(
 					1.0 - float(left) / float(seeded), 0.0, 1.0)
 		elif trail.room_goal == "hands":
 			target_label.text = "TABLE %d / %d      PLAY  %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.require_status()]
-			target_bar_fill.size.x = 1314.0 * clampf(trail.require_frac(), 0.0, 1.0)
+			target_bar_fill.size.x = BAR_W * clampf(trail.require_frac(), 0.0, 1.0)
 		else:
 			target_label.text = "TABLE %d / %d      %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
-			target_bar_fill.size.x = 1314.0 * clampf(
+			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_preview()
 
@@ -1162,8 +1165,8 @@ func _build_ui() -> void:
 	# size everything explicitly to the fixed design resolution.
 	ui_root.size = VIEW
 
-	_label(ui_root, "POKER", Vector2(PANEL_X, 28), 64, RED)
-	_label(ui_root, "POP", Vector2(PANEL_X + 254, 28), 64, OFFWHITE)
+	_label(ui_root, "POKER", Vector2(PANEL_X, 28), 42, RED)
+	_label(ui_root, "POP", Vector2(PANEL_X + 168, 28), 42, OFFWHITE)
 
 	score_label = _label(ui_root, "", Vector2(PANEL_X, 140), 40, GOLD)
 	status_label = _label(ui_root, "", Vector2(PANEL_X, 204), 28, OFFWHITE)
@@ -1171,68 +1174,69 @@ func _build_ui() -> void:
 	meta_label = _label(ui_root, "", Vector2(PANEL_X, 276), 16, DIM)
 
 	# Arcade banner: level target and progress, big across the board top.
-	target_label = _label(ui_root, "", Vector2(560, 8), 44, GOLD)
+	target_label = _label(ui_root, "", Vector2(380, 8), 40, GOLD)
 	target_bar_back = ColorRect.new()
 	target_bar_back.color = Color("2a2a2a")
-	target_bar_back.position = Vector2(560, 74)
-	target_bar_back.size = Vector2(1320, 16)
+	target_bar_back.position = Vector2(380, 74)
+	target_bar_back.size = Vector2(1160, 16)
 	ui_root.add_child(target_bar_back)
 	target_bar_fill = ColorRect.new()
 	target_bar_fill.color = GOLD
-	target_bar_fill.position = Vector2(563, 77)
+	target_bar_fill.position = Vector2(383, 77)
 	target_bar_fill.size = Vector2(0, 10)
 	ui_root.add_child(target_bar_fill)
 	target_label.visible = false
 	target_bar_back.visible = false
 	target_bar_fill.visible = false
 
-	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(250, 64))
+	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60))
 	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.play_hand())
-	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X + 262, 316), Vector2(150, 64))
+	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X, 388), Vector2(145, 48))
 	clear_btn.add_theme_font_size_override("font_size", 24)
 	clear_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.clear_selection())
-	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X, 392), Vector2(150, 42))
+	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X + 155, 388), Vector2(145, 48))
 	menu_btn.add_theme_font_size_override("font_size", 18)
 	menu_btn.pressed.connect(_open_menu)
 
 	# Selected cards, shown sorted by rank so straights are easy to read.
-	_label(ui_root, "YOUR HAND", Vector2(PANEL_X, 452), 18, DIM)
+	_label(ui_root, "YOUR HAND", Vector2(PANEL_X, 460), 18, DIM)
 	hand_display = Node2D.new()
-	hand_display.position = Vector2(PANEL_X + 32, 528)
+	hand_display.position = Vector2(PANEL_X + 30, 532)
+	hand_display.scale = Vector2(0.8, 0.8)
 	ui_root.add_child(hand_display)
 
 	# Arcade meter: a vertical bar beside the board that drains constantly.
 	meter_back = ColorRect.new()
 	meter_back.color = Color("2a2a2a")
-	meter_back.position = Vector2(1874, 100)
-	meter_back.size = Vector2(32, 900)
+	meter_back.position = Vector2(1888, 100)
+	meter_back.size = Vector2(26, 900)
 	meter_back.visible = false
 	ui_root.add_child(meter_back)
 	meter_fill = ColorRect.new()
 	meter_fill.color = GOLD
-	meter_fill.position = Vector2(1878, 104)
-	meter_fill.size = Vector2(24, 892)
+	meter_fill.position = Vector2(1892, 104)
+	meter_fill.size = Vector2(18, 892)
 	meter_fill.visible = false
 	ui_root.add_child(meter_fill)
 
-	_label(ui_root, "PAYOUTS", Vector2(PANEL_X, 602), 22, DIM)
+	_label(ui_root, "PAYOUTS", Vector2(PANEL_R, 140), 22, DIM)
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
-	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_X, 636), 18, OFFWHITE)
+	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_R, 176), 18, OFFWHITE)
 	payouts.add_theme_constant_override("line_spacing", 2)
 
-	_label(ui_root, "Click or drag to chain adjacent cards\nEvery card must be part of the hand\nEnter / Space — play    C / Right click — clear\nEsc — pause    R — restart    T — theme    M — menu",
-			Vector2(PANEL_X, 976), 16, DIM)
+	_label(ui_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
+			Vector2(PANEL_R, 860), 16, DIM)
 
-	preview_label = _label(ui_root, "", Vector2(560, 1026), 28, DIM)
+	preview_label = _label(ui_root, "", Vector2(380, 1026), 26, DIM)
 
 	# Darkens the play area during the Ready countdown — a clear "not yet".
 	countdown_overlay = ColorRect.new()
@@ -1388,11 +1392,11 @@ func _build_menu() -> void:
 
 func _build_profiles_and_tutor() -> void:
 	# In-game tutorial instruction strip + skip button.
-	_tut_label = _label(ui_root, "", Vector2(560, 8), 22, GOLD)
-	_tut_label.size = Vector2(1320, 84)
+	_tut_label = _label(ui_root, "", Vector2(380, 8), 22, GOLD)
+	_tut_label.size = Vector2(1160, 84)
 	_tut_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tut_label.visible = false
-	_tut_skip_btn = _button(ui_root, "SKIP TUTORIAL", Vector2(PANEL_X + 162, 392), Vector2(250, 42))
+	_tut_skip_btn = _button(ui_root, "SKIP TUTORIAL", Vector2(PANEL_R, 60), Vector2(300, 50))
 	_tut_skip_btn.add_theme_font_size_override("font_size", 20)
 	_tut_skip_btn.visible = false
 	_tut_skip_btn.pressed.connect(_end_tutorial)

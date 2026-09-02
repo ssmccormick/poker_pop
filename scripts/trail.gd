@@ -592,7 +592,8 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 1.5 if region == 0 else 2.0
 				var pool: Array = REQUIRE_POOLS[mini(region, REQUIRE_POOLS.size() - 1)]
 				offer["require"] = (pool.pick_random() as Array).duplicate(true)
-			offer.hands = maxi(1, 9 - region)
+			# The dealer's demands take setup: never under 10 hands.
+			offer.hands = maxi(10, 12 - region)
 			offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE + TIMED_CHANCE:
 			# Beat the clock: unlimited hands, but the minutes are the
@@ -1299,6 +1300,34 @@ func _burn_price() -> int:
 	return _price(SHOP_REMOVE_PRICE + SHOP_REMOVE_STEP * burns_used)
 
 
+## Chips that must stay in the pocket while shopping: the cheapest
+## seat at the next table. Spending below it is a guaranteed bust.
+func _shop_reserve() -> int:
+	if room_index + 1 >= ROOMS_TOTAL:
+		return 0  # the last shop before the payout — spend it all
+	return _cheapest_seat(room_index + 1)
+
+
+## Blocks any purchase that would leave the player unable to sit down
+## at the next table, and says so.
+func _would_bust(price: int) -> bool:
+	if chips - price >= _shop_reserve():
+		return false
+	main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+	var msg := "THAT WOULD BUST YOU — the next table's seat costs %d chips" \
+			% _shop_reserve()
+	_shop_info.text = msg
+	_remove_info.text = msg
+	return true
+
+
+func _shop_chips_line() -> String:
+	if _shop_reserve() <= 0:
+		return "CHIPS  %d" % chips
+	return "CHIPS  %d      (the next table's seat costs %d — spend the rest)" \
+			% [chips, _shop_reserve()]
+
+
 func _show_shop() -> void:
 	var re_render := shop_layer.visible
 	_hide_all()
@@ -1316,7 +1345,7 @@ func _show_shop() -> void:
 		_shop_stock_relic = _unowned_relic()
 		_shop_burned_here = false
 		_shop_stock_room = room_index
-	_shop_info.text = "CHIPS  %d" % chips
+	_shop_info.text = _shop_chips_line()
 	_shop_burn_btn.text = "BURN A CARD — %d chips" % _burn_price()
 	_shop_burn_btn.disabled = _shop_burned_here
 	if _shop_burned_here:
@@ -1357,14 +1386,14 @@ func _show_shop() -> void:
 			price_tag.text = "SOLD"
 		var slot := offer
 		holder.pressed.connect(func() -> void:
-			if not slot.bought and chips >= price:
+			if not slot.bought and chips >= price and not _would_bust(price):
 				chips -= price
 				slot.bought = true
 				deck.append(slot.data)
 				main.board._play_sound(Board.SFX_DEALS.pick_random(), 1.0, -8.0)
 				holder.disabled = true
 				price_tag.text = "SOLD"
-				_shop_info.text = "CHIPS  %d" % chips
+				_shop_info.text = _shop_chips_line()
 				_save_run())
 	shop_layer.visible = true
 
@@ -1419,7 +1448,8 @@ func _populate_deck_view() -> void:
 		holder.pressed.connect(func() -> void:
 			if idx < deck.size():
 				_deck_stat.text = _deck_stat_text(deck[idx])
-			if _deck_view_burn and chips >= _burn_price() and not _shop_burned_here:
+			if _deck_view_burn and chips >= _burn_price() \
+					and not _shop_burned_here and not _would_bust(_burn_price()):
 				chips -= _burn_price()
 				burns_used += 1
 				_shop_burned_here = true
@@ -1578,13 +1608,13 @@ func build_ui() -> void:
 		if _shop_stock_relic == "":
 			return
 		var cost := _price(RELIC_PRICES[RELICS[_shop_stock_relic].rarity])
-		if chips >= cost and relics.size() < MAX_RELICS:
+		if chips >= cost and relics.size() < MAX_RELICS and not _would_bust(cost):
 			chips -= cost
 			_gain_relic(_shop_stock_relic)
 			main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
 			_shop_stock_relic = ""
 			_shop_relic_btn.disabled = true
-			_shop_info.text = "CHIPS  %d" % chips)
+			_shop_info.text = _shop_chips_line())
 	_shop_burn_btn = main._button(shop_layer, "", Vector2(555, 850), Vector2(380, 56))
 	_shop_burn_btn.add_theme_font_size_override("font_size", 20)
 	_shop_burn_btn.pressed.connect(_show_remove)
