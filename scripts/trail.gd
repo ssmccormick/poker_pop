@@ -841,8 +841,13 @@ func _start_room() -> void:
 	main.game_started = true
 	main.game_over = false
 	main.play_music("boss" if current_offer.has("boss") else "room")
-	if not main.backgrounds.is_empty():
-		main.bg_rect.texture = main.backgrounds.pick_random()
+	# The ride's backdrop: daylight fades region by region; bosses
+	# play under a storm.
+	if current_offer.has("boss"):
+		main.parallax.set_scene("storm")
+	else:
+		var looks := ["trail_day", "trail_dusk", "trail_night"]
+		main.parallax.set_scene(looks[clampi(room_index / REGION_SIZE, 0, 2)])
 	main.board.reset()
 	main._begin_countdown()
 	_seed_room_specials()

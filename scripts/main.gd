@@ -50,6 +50,7 @@ var meter := 100.0
 var level_transition := false
 
 var ui_root: Control
+var hud_root: Control
 var score_label: Label
 var status_label: Label
 var deck_label: Label
@@ -62,8 +63,7 @@ var target_bar_fill: ColorRect
 var hand_display: Node2D
 var splash_layer: ColorRect
 var countdown_overlay: ColorRect
-var bg_rect: TextureRect
-var backgrounds: Array = []
+var parallax: ParallaxScene
 
 # Settings (persisted to user://settings.cfg).
 const RESOLUTIONS: Array[Vector2i] = [
@@ -129,20 +129,11 @@ func _ready() -> void:
 		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
 	RenderingServer.set_default_clear_color(Themes.current().bg)
 
-	# Background image behind the (transparent) play area. Drop images
-	# into assets/backgrounds/ to replace the generated placeholders;
-	# arcade rotates them every level.
-	backgrounds = _load_backgrounds()
-	bg_rect = TextureRect.new()
-	bg_rect.position = Vector2(PLAY_X, 0)
-	bg_rect.size = Vector2(PLAY_WIDTH, VIEW.y)
-	bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	bg_rect.modulate = Color(0.55, 0.55, 0.55)  # dimmed so cards stay readable
-	bg_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if not backgrounds.is_empty():
-		bg_rect.texture = backgrounds[0]
-	add_child(bg_rect)
+	# Procedural parallax backdrop: full-bleed silhouette scenes that
+	# drift, and lurch forward whenever a hand scores.
+	parallax = ParallaxScene.new()
+	add_child(parallax)
+	parallax.set_scene("trail_dusk")
 
 	board = Board.new()
 	board.process_mode = Node.PROCESS_MODE_PAUSABLE  # don't inherit ALWAYS
@@ -269,6 +260,7 @@ func _arcade_drain() -> float:
 
 
 func _update_labels() -> void:
+	hud_root.visible = not menu_open
 	score_label.text = "SCORE  %d" % score
 	deck_label.text = "DECK  %d" % board.deck.size()
 	meta_label.text = "%s  ·  Theme: %s (T)" % [mode_label_text, Themes.current().name]
@@ -433,6 +425,8 @@ func _on_hand_played(result: Dictionary) -> void:
 	score += result.score
 	hands_played += 1
 	_announce("%s  +%d" % [String(result.name).to_upper(), result.score])
+	# The wagon rolls on: the scenery surges with every scored hand.
+	parallax.lurch(1.0 + result.get("count", 0) * 0.15)
 	if mode_kind == "tutorial":
 		_tut_on_hand(String(result.name))
 		return
@@ -464,7 +458,7 @@ func _level_up() -> void:
 	level += 1
 	level_score = 0
 	meter = 100.0
-	_set_level_background()
+	parallax.set_scene("plains", level)
 	board.reset()
 	level_transition = false
 	_begin_countdown()
@@ -515,68 +509,17 @@ func _restart() -> void:
 	meter = 100.0
 	game_over = false
 	over_layer.visible = false
-	if mode_kind == "arcade":
-		_set_level_background()
-	elif not backgrounds.is_empty():
-		bg_rect.texture = backgrounds.pick_random()
+	match mode_kind:
+		"arcade":
+			parallax.set_scene("plains", level)
+		"time":
+			parallax.set_scene("canyon")
+		"single":
+			parallax.set_scene("homestead")
+		"zen", "tutorial":
+			parallax.set_scene("stars")
 	board.reset()
 	_begin_countdown()
-
-
-## Loads background images from assets/backgrounds (any the user drops
-## in), falling back to generated gradient placeholders. Export builds
-## list imported files with .import/.remap suffixes — strip them.
-func _load_backgrounds() -> Array:
-	var out: Array = []
-	var seen := {}
-	var dir := DirAccess.open("res://assets/backgrounds")
-	if dir:
-		for f in dir.get_files():
-			var fname := f.trim_suffix(".import").trim_suffix(".remap")
-			var lower := fname.to_lower()
-			if not (lower.ends_with(".png") or lower.ends_with(".jpg")
-					or lower.ends_with(".jpeg") or lower.ends_with(".webp")):
-				continue
-			if seen.has(fname):
-				continue
-			seen[fname] = true
-			var tex := load("res://assets/backgrounds/" + fname)
-			if tex is Texture2D:
-				out.append(tex)
-	if out.is_empty():
-		out = _generate_placeholder_backgrounds()
-	return out
-
-
-func _generate_placeholder_backgrounds() -> Array:
-	var palettes := [
-		[Color("14532d"), Color("052014")],  # felt green
-		[Color("1e3a5f"), Color("0a1220")],  # midnight blue
-		[Color("5f1e2e"), Color("200a10")],  # wine red
-		[Color("4a3a1e"), Color("1d1408")],  # tobacco brown
-		[Color("3a1e5f"), Color("140a20")],  # violet
-		[Color("1e5f5a"), Color("0a201e")],  # teal
-	]
-	var out: Array = []
-	for p in palettes:
-		var g := Gradient.new()
-		g.colors = PackedColorArray([p[0], p[1]])
-		g.offsets = PackedFloat32Array([0.0, 1.0])
-		var tex := GradientTexture2D.new()
-		tex.gradient = g
-		tex.fill = GradientTexture2D.FILL_RADIAL
-		tex.fill_from = Vector2(0.5, 0.35)
-		tex.fill_to = Vector2(0.5, 1.2)
-		tex.width = 480
-		tex.height = 270
-		out.append(tex)
-	return out
-
-
-func _set_level_background() -> void:
-	if backgrounds.is_empty():
-		return
-	bg_rect.texture = backgrounds[(level - 1) % backgrounds.size()]
 
 
 ## "Ready... POP!" before play begins — on run start and on every arcade
@@ -960,6 +903,7 @@ func _start_tutorial() -> void:
 	score = 0
 	hands_played = 0
 	play_music("room")
+	parallax.set_scene("stars")
 	board.reset()
 	while board.busy:
 		await get_tree().process_frame
@@ -1059,6 +1003,7 @@ func _open_menu() -> void:
 	countdown_active = false
 	countdown_overlay.visible = false
 	play_music("menu")
+	parallax.set_scene("trail_dusk")
 	if _tut_label != null:
 		_tut_label.visible = false
 		_tut_skip_btn.visible = false
@@ -1169,41 +1114,48 @@ func _build_ui() -> void:
 	# size everything explicitly to the fixed design resolution.
 	ui_root.size = VIEW
 
-	_label(ui_root, "POKER", Vector2(PANEL_X, 28), 42, RED)
-	_label(ui_root, "POP", Vector2(PANEL_X + 168, 28), 42, OFFWHITE)
+	# Everything gameplay-HUD lives under one container so the menu
+	# (now translucent over the parallax) can hide it wholesale.
+	hud_root = Control.new()
+	hud_root.size = VIEW
+	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_root.add_child(hud_root)
 
-	score_label = _label(ui_root, "", Vector2(PANEL_X, 140), 40, GOLD)
-	status_label = _label(ui_root, "", Vector2(PANEL_X, 204), 28, OFFWHITE)
-	deck_label = _label(ui_root, "", Vector2(PANEL_X, 246), 20, OFFWHITE)
-	meta_label = _label(ui_root, "", Vector2(PANEL_X, 276), 16, DIM)
+	_label(hud_root, "POKER", Vector2(PANEL_X, 28), 42, RED)
+	_label(hud_root, "POP", Vector2(PANEL_X + 168, 28), 42, OFFWHITE)
+
+	score_label = _label(hud_root, "", Vector2(PANEL_X, 140), 40, GOLD)
+	status_label = _label(hud_root, "", Vector2(PANEL_X, 204), 28, OFFWHITE)
+	deck_label = _label(hud_root, "", Vector2(PANEL_X, 246), 20, OFFWHITE)
+	meta_label = _label(hud_root, "", Vector2(PANEL_X, 276), 16, DIM)
 
 	# Arcade banner: level target and progress, big across the board top.
-	target_label = _label(ui_root, "", Vector2(380, 8), 40, GOLD)
+	target_label = _label(hud_root, "", Vector2(380, 8), 40, GOLD)
 	target_bar_back = ColorRect.new()
 	target_bar_back.color = Color("2a2a2a")
 	target_bar_back.position = Vector2(380, 74)
 	target_bar_back.size = Vector2(1160, 16)
-	ui_root.add_child(target_bar_back)
+	hud_root.add_child(target_bar_back)
 	target_bar_fill = ColorRect.new()
 	target_bar_fill.color = GOLD
 	target_bar_fill.position = Vector2(383, 77)
 	target_bar_fill.size = Vector2(0, 10)
-	ui_root.add_child(target_bar_fill)
+	hud_root.add_child(target_bar_fill)
 	target_label.visible = false
 	target_bar_back.visible = false
 	target_bar_fill.visible = false
 
-	var play_btn := _button(ui_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60))
+	var play_btn := _button(hud_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60))
 	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.play_hand())
-	var clear_btn := _button(ui_root, "CLEAR", Vector2(PANEL_X, 388), Vector2(145, 48))
+	var clear_btn := _button(hud_root, "CLEAR", Vector2(PANEL_X, 388), Vector2(145, 48))
 	clear_btn.add_theme_font_size_override("font_size", 24)
 	clear_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.clear_selection())
-	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X + 155, 388), Vector2(145, 48))
+	var menu_btn := _button(hud_root, "MENU", Vector2(PANEL_X + 155, 388), Vector2(145, 48))
 	menu_btn.add_theme_font_size_override("font_size", 18)
 	menu_btn.pressed.connect(func() -> void:
 		# Mid-game, MENU opens the pause screen (like ESC) so exiting
@@ -1214,11 +1166,11 @@ func _build_ui() -> void:
 			_open_menu())
 
 	# Selected cards, shown sorted by rank so straights are easy to read.
-	_label(ui_root, "YOUR HAND", Vector2(PANEL_X, 460), 18, DIM)
+	_label(hud_root, "YOUR HAND", Vector2(PANEL_X, 460), 18, DIM)
 	hand_display = Node2D.new()
 	hand_display.position = Vector2(PANEL_X + 30, 532)
 	hand_display.scale = Vector2(0.8, 0.8)
-	ui_root.add_child(hand_display)
+	hud_root.add_child(hand_display)
 
 	# Arcade meter: a vertical bar beside the board that drains constantly.
 	meter_back = ColorRect.new()
@@ -1226,27 +1178,27 @@ func _build_ui() -> void:
 	meter_back.position = Vector2(1888, 100)
 	meter_back.size = Vector2(26, 900)
 	meter_back.visible = false
-	ui_root.add_child(meter_back)
+	hud_root.add_child(meter_back)
 	meter_fill = ColorRect.new()
 	meter_fill.color = GOLD
 	meter_fill.position = Vector2(1892, 104)
 	meter_fill.size = Vector2(18, 892)
 	meter_fill.visible = false
-	ui_root.add_child(meter_fill)
+	hud_root.add_child(meter_fill)
 
-	_label(ui_root, "PAYOUTS", Vector2(PANEL_R, 140), 22, DIM)
+	_label(hud_root, "PAYOUTS", Vector2(PANEL_R, 140), 22, DIM)
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
 	var lines := PackedStringArray()
 	for hand_name in names:
 		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
-	var payouts := _label(ui_root, "\n".join(lines), Vector2(PANEL_R, 176), 18, OFFWHITE)
+	var payouts := _label(hud_root, "\n".join(lines), Vector2(PANEL_R, 176), 18, OFFWHITE)
 	payouts.add_theme_constant_override("line_spacing", 2)
 
-	_label(ui_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
+	_label(hud_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
 			Vector2(PANEL_R, 860), 16, DIM)
 
-	preview_label = _label(ui_root, "", Vector2(380, 1026), 26, DIM)
+	preview_label = _label(hud_root, "", Vector2(380, 1026), 26, DIM)
 
 	# Darkens the play area during the Ready countdown — a clear "not yet".
 	countdown_overlay = ColorRect.new()
@@ -1366,13 +1318,42 @@ func _toggle_pause() -> void:
 
 
 func _build_menu() -> void:
+	# Translucent scrim: the dusk trail parallax rides behind the menu.
 	menu_layer = ColorRect.new()
-	menu_layer.color = BG
+	menu_layer.color = Color(0.05, 0.05, 0.06, 0.62)
 	menu_layer.size = VIEW
 	ui_root.add_child(menu_layer)
 
-	_label(menu_layer, "POKER", Vector2(600, 110), 110, RED)
-	_label(menu_layer, "POP", Vector2(1042, 110), 110, OFFWHITE)
+	# Ghost cards drifting up behind the buttons, forever.
+	for i in 7:
+		var ghost := PlayingCard.new()
+		ghost.rank = randi_range(2, 14)
+		ghost.suit = randi_range(0, 3)
+		ghost.modulate = Color(1, 1, 1, 0.13)
+		ghost.scale = Vector2(1.4, 1.4)
+		ghost.rotation = randf_range(-0.5, 0.5)
+		var gx := randf_range(180.0, 1740.0)
+		ghost.position = Vector2(gx, 1220.0)
+		menu_layer.add_child(ghost)
+		var dur := randf_range(16.0, 30.0)
+		var gtw := create_tween().set_loops()
+		gtw.tween_property(ghost, "position:y", -240.0, dur) \
+				.from(1220.0 + i * 160.0)
+		gtw.parallel().tween_property(ghost, "rotation",
+				ghost.rotation + randf_range(-1.2, 1.2), dur)
+		gtw.tween_callback(func() -> void:
+			ghost.rank = randi_range(2, 14)
+			ghost.suit = randi_range(0, 3)
+			ghost.position.x = randf_range(180.0, 1740.0))
+
+	var title_poker := _label(menu_layer, "POKER", Vector2(600, 110), 110, RED)
+	var title_pop := _label(menu_layer, "POP", Vector2(1042, 110), 110, OFFWHITE)
+	for t: Label in [title_poker, title_pop]:
+		var ttw := create_tween().set_loops()
+		ttw.tween_property(t, "position:y", 102.0, 2.2) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		ttw.tween_property(t, "position:y", 118.0, 2.2) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_menu_center("Chain adjacent cards into poker hands", 280, 26, DIM)
 
 	_profile_menu_btn = _button(menu_layer, "PROFILE %d" % profile, Vector2(60, 60), Vector2(240, 54))
@@ -1438,11 +1419,11 @@ func _build_menu() -> void:
 
 func _build_profiles_and_tutor() -> void:
 	# In-game tutorial instruction strip + skip button.
-	_tut_label = _label(ui_root, "", Vector2(380, 8), 22, GOLD)
+	_tut_label = _label(hud_root, "", Vector2(380, 8), 22, GOLD)
 	_tut_label.size = Vector2(1160, 84)
 	_tut_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tut_label.visible = false
-	_tut_skip_btn = _button(ui_root, "SKIP TUTORIAL", Vector2(PANEL_R, 60), Vector2(300, 50))
+	_tut_skip_btn = _button(hud_root, "SKIP TUTORIAL", Vector2(PANEL_R, 60), Vector2(300, 50))
 	_tut_skip_btn.add_theme_font_size_override("font_size", 20)
 	_tut_skip_btn.visible = false
 	_tut_skip_btn.pressed.connect(_end_tutorial)
@@ -1525,7 +1506,7 @@ func _build_profiles_and_tutor() -> void:
 	_tooltip_label.add_theme_color_override("font_color", OFFWHITE)
 	_tooltip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip.add_child(_tooltip_label)
-	ui_root.add_child(_tooltip)
+	hud_root.add_child(_tooltip)
 
 
 func _build_options() -> void:

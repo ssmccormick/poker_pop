@@ -79,6 +79,11 @@ Drop files into `assets/voice/` with these names (`.ogg`, `.mp3`, or
 
 ## Phase 4 — Backgrounds & theming
 
+- [x] Procedural parallax backdrops (scripts/parallax_bg.gd):
+      full-bleed silhouette scenes per mode (trail day/dusk/night by
+      region, storm bosses, canyon/plains/homestead/stars), slow
+      drift + lurch-on-scored-hand, animated translucent main menu
+      with drifting ghost cards. Supersedes static background images.
 - [ ] Real background art in `assets/backgrounds/` (auto-loaded,
       rotates per arcade level; random per run elsewhere)
 - [ ] Slow drift/zoom on backgrounds (Ken Burns) for life
