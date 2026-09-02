@@ -98,7 +98,6 @@ var _tutor_queue: Array = []
 var tutor_layer: ColorRect
 var _tutor_title: Label
 var _tutor_body: Label
-var _tutor_prev_locked := false
 
 # Interactive how-to-play tutorial state.
 var tut_step := 0
@@ -802,14 +801,13 @@ func tutor_show(key: String) -> void:
 
 
 func _tutor_next() -> void:
+	# No board locking here: the scrim swallows mouse events and
+	# _unhandled_input gates the keys while the popup is up. (Locking
+	# raced with the deal countdown's own unlock and froze the board.)
 	if _tutor_queue.is_empty():
 		tutor_layer.visible = false
-		board.locked = _tutor_prev_locked
 		return
 	var key: String = _tutor_queue.pop_front()
-	if not tutor_layer.visible:
-		_tutor_prev_locked = board.locked
-		board.locked = true
 	_tutor_title.text = TUTOR[key][0]
 	_tutor_body.text = TUTOR[key][1]
 	tutor_layer.visible = true
