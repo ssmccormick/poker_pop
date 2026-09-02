@@ -392,8 +392,10 @@ by being **blinded out** (any table — next room or retry — whose seat
 your chips can't cover; the house keeps what's left), or by
 **finishing the trail**. There is no early cash-out.
 Bosses are all-in, so a boss loss IS bankruptcy. Banked cash is always
-safe. Quitting mid-room counts as a fail, and the barred room is saved
-with the run — resuming drops you back at its table.
+safe. Quitting mid-room is NOT a fail: the whole outlay is refunded,
+the room is saved with the run, and resuming sits you back down at its
+stakes screen like a fresh visit (fresh board — no scumming penalty,
+by design).
 
 ## Technical skeleton (build phases)
 

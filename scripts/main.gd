@@ -78,6 +78,8 @@ var options_layer: ColorRect
 var fullscreen_btn: Button
 var resolution_btn: Button
 var pause_layer: ColorRect
+var _pause_music_slider: HSlider
+var _pause_sfx_slider: HSlider
 var music: AudioStreamPlayer
 var ambience: AudioStreamPlayer
 var countdown_active := false
@@ -1201,7 +1203,13 @@ func _build_ui() -> void:
 			board.clear_selection())
 	var menu_btn := _button(ui_root, "MENU", Vector2(PANEL_X + 155, 388), Vector2(145, 48))
 	menu_btn.add_theme_font_size_override("font_size", 18)
-	menu_btn.pressed.connect(_open_menu)
+	menu_btn.pressed.connect(func() -> void:
+		# Mid-game, MENU opens the pause screen (like ESC) so exiting
+		# is a deliberate second click, with sound settings right there.
+		if game_started and not game_over and not menu_open:
+			_toggle_pause()
+		else:
+			_open_menu())
 
 	# Selected cards, shown sorted by rank so straights are easy to read.
 	_label(ui_root, "YOUR HAND", Vector2(PANEL_X, 460), 18, DIM)
@@ -1298,16 +1306,50 @@ func _build_pause() -> void:
 	restart.pressed.connect(func() -> void:
 		_toggle_pause()
 		_restart())
-	var to_menu := _button(pause_layer, "MENU", Vector2(810, 634), Vector2(300, 64))
-	to_menu.add_theme_font_size_override("font_size", 26)
+	var to_menu := _button(pause_layer, "EXIT TO MENU", Vector2(810, 634), Vector2(300, 64))
+	to_menu.add_theme_font_size_override("font_size", 24)
 	to_menu.pressed.connect(func() -> void:
 		_toggle_pause()
 		_open_menu())
+	_center_on(pause_layer, "Leaving a trail table is safe — your stake comes back\nand the table waits for your return.", 712, 16, DIM)
+
+	# Sound, right here — no need to leave the table to turn it down.
+	_label(pause_layer, "MUSIC", Vector2(660, 790), 22, OFFWHITE)
+	_pause_music_slider = _make_volume_slider(pause_layer, Vector2(830, 790),
+			func(v: float) -> void:
+				music_vol = v)
+	_label(pause_layer, "SFX", Vector2(660, 848), 22, OFFWHITE)
+	_pause_sfx_slider = _make_volume_slider(pause_layer, Vector2(830, 848),
+			func(v: float) -> void:
+				sfx_vol = v)
 	if not OS.has_feature("web"):
-		var quit := _button(pause_layer, "QUIT", Vector2(810, 716), Vector2(300, 64))
-		quit.add_theme_font_size_override("font_size", 26)
+		var quit := _button(pause_layer, "QUIT", Vector2(810, 930), Vector2(300, 56))
+		quit.add_theme_font_size_override("font_size", 24)
 		quit.pressed.connect(func() -> void:
 			get_tree().quit())
+
+
+func _center_on(parent: Control, text: String, y: float, font_size: int, color: Color) -> Label:
+	var l := _label(parent, text, Vector2(0, y), font_size, color)
+	l.size = Vector2(VIEW.x, font_size * 3.0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return l
+
+
+## A 0-1 volume slider wired through _apply_audio + settings save.
+func _make_volume_slider(parent: Control, pos: Vector2, setter: Callable) -> HSlider:
+	var s := HSlider.new()
+	s.min_value = 0.0
+	s.max_value = 1.0
+	s.step = 0.05
+	s.position = pos
+	s.size = Vector2(430, 36)
+	parent.add_child(s)
+	s.value_changed.connect(func(v: float) -> void:
+		setter.call(v)
+		_apply_audio()
+		_save_settings())
+	return s
 
 
 func _toggle_pause() -> void:
@@ -1316,6 +1358,8 @@ func _toggle_pause() -> void:
 		pause_layer.visible = false
 	elif game_started and not menu_open and not game_over:
 		get_tree().paused = true
+		_pause_music_slider.set_value_no_signal(music_vol)
+		_pause_sfx_slider.set_value_no_signal(sfx_vol)
 		pause_layer.visible = true
 
 

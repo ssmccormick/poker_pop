@@ -146,7 +146,8 @@ var _shop_stock: Array = []      # this shop room's shelves (no restocking)
 var _shop_stock_room := -1
 var _shop_stock_relic := ""
 var _shop_burned_here := false   # one burn per shop
-var pending_retry := {}          # a failed room that MUST be retried
+var pending_retry := {}          # a room that MUST be played next
+var pending_is_retry := true     # true = failed there (scarred); false = just stepped away
 var current_offer := {}
 var stake := 0
 var _offers: Array = []
@@ -240,6 +241,7 @@ func _save_run() -> void:
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
+	cf.set_value("run", "pending_hard", pending_is_retry)
 	cf.save(main.profile_path("trail_run.cfg"))
 
 
@@ -276,6 +278,7 @@ func _load_run() -> bool:
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
+	pending_is_retry = cf.get_value("run", "pending_hard", true)
 	_shop_stock_room = -1  # resumed runs sit at a tarot or a retry bet
 	run_active = true
 	return true
@@ -719,7 +722,7 @@ func _show_bet() -> void:
 		chips = 0
 		_start_room()
 		return
-	# A failed room bars the way — no backing out of a retry.
+	# A pending room bars the way — no backing out to a fresh draw.
 	_bet_back_btn.visible = pending_retry.is_empty()
 	_bet_amount = int(o.min_bet)
 	# Hands (or minutes, at a timed table) are free — they're what
@@ -774,7 +777,8 @@ func _refresh_bet_labels() -> void:
 	var o := current_offer
 	var retry_line := ""
 	if not pending_retry.is_empty():
-		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust."
+		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust." \
+				if pending_is_retry else "\nBack to the table you stepped away from."
 	var blind := int(o.min_bet)
 	var unit := "min" if _is_timed(o) else "hands"
 	var reference := int(o.minutes) if _is_timed(o) else int(o.hands)
@@ -1196,6 +1200,7 @@ func _retry_room() -> void:
 	if _short_stacked(_cheapest_seat(room_index)):
 		return
 	pending_retry = current_offer.duplicate(true)
+	pending_is_retry = true
 	_save_run()
 	_show_bet()
 
@@ -1212,9 +1217,15 @@ func on_abandon_room() -> void:
 	if not in_room:
 		return
 	in_room = false
-	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
-	main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
+	# No penalty for stepping away: the whole outlay comes back and the
+	# table is saved — returning restarts it like a fresh sit-down.
+	if current_offer.has("boss"):
+		chips += stake
+	else:
+		chips += stake + int(current_offer.get("min_bet", 0))
+	stake = 0
 	pending_retry = current_offer.duplicate(true)
+	pending_is_retry = false
 	_save_run()
 
 
