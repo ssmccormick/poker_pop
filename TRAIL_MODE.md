@@ -201,7 +201,7 @@ hands, after the board settles.
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |
 | Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward) | Include it in any scoring hand to defuse |
-| Fire | THE DEVIL | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored) | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card |
+| Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored). If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card |
 | Wind | THE CHARIOT | When played, every card from its cell to the edge in its arrow direction is blown off (unscored). Safes are too heavy to move | It's a tool as much as a hazard — aim it at junk, or at a BOSS: blowing one off the table counts as the kill (a gusted tail segment wounds the cobra) |
 | Stone | STRENGTH | Must be in 3 scoring hands; scores each time; cracks visibly; 3rd use pops it | Chip away; it squats on its cell meanwhile |
 | Water | — | It DRIPS: every scoring hand, an uncleared water card soaks one random orthogonal neighbor — that card's rank and suit are WASHED AWAY, hidden until played. It still is what it was; you just have to remember | Play the water card to stop the leak (clearing it is a clean disposal, like every other hazard) |

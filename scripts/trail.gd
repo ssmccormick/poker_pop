@@ -1122,6 +1122,10 @@ func _tick_room_hazards() -> void:
 	if exploded and in_room:
 		_room_failed("KABOOM — THE BOMB WENT OFF")
 		return
+	if in_room and main.board.board_ablaze():
+		# Every card burning: nothing left to save.
+		_room_failed("THE WHOLE TABLE'S ABLAZE")
+		return
 	# A fire can burn ITSELF out on the tick — that finishes a purge too.
 	if room_goal == "purge" and in_room and purge_left() == 0:
 		_room_cleared()

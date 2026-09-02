@@ -70,6 +70,14 @@ func _init() -> void:
 			"nothing left to soak once neighbors are washed")
 	_free_board(b)
 
+	# --- a fully burning board loses the table ------------------------------
+	b = _board([[5, 0, 0, 0], [7, 1, 1, 0]])
+	b.grid[Vector2i(0, 0)].hazard = "fire"
+	failures += _check(not b.board_ablaze(), "one unburned card keeps hope alive")
+	b.grid[Vector2i(1, 0)].hazard = "fire"
+	failures += _check(b.board_ablaze(), "every card burning = the fire has won")
+	_free_board(b)
+
 	# --- purge prediction: hazards left after pops and gusts ---------------
 	b = _board([[5, 0, 0, 0], [7, 1, 1, 0], [9, 2, 2, 0], [4, 3, 0, 1]])
 	b.grid[Vector2i(0, 0)].hazard = "bomb"

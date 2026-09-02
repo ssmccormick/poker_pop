@@ -1440,6 +1440,16 @@ func apply_room_hazards(kind: String, count: int) -> void:
 			_play_sound(SFX_MATCHES.pick_random(), 1.0, -8.0)
 
 
+## True when every card on the table is burning — the fire has won.
+func board_ablaze() -> bool:
+	if grid.is_empty():
+		return false
+	for p in grid:
+		if grid[p].hazard != "fire":
+			return false
+	return true
+
+
 ## Occupied cells in a straight line from `from` (exclusive) to the edge.
 func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 	var out: Array = []
