@@ -93,7 +93,9 @@ const SFX_SHUFFLES := [
 	preload("res://assets/sfx/west/cards_shuffle_1.mp3"),
 	preload("res://assets/sfx/west/cards_shuffle_2.mp3"),
 ]
-const SFX_CLICK := preload("res://assets/sfx/west/ui_click_2.mp3")
+# UI click: the short card-pick tick, quiet and fixed-pitch (the
+# bundle's "Button" sounds were musical stingers — too much).
+const SFX_CLICK := preload("res://assets/sfx/card_pick.wav")
 const SFX_COINS := [
 	preload("res://assets/sfx/west/coins_1.mp3"),
 	preload("res://assets/sfx/west/coins_2.mp3"),

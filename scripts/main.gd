@@ -1509,7 +1509,7 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 	# Every button in the game clicks — one wire, all screens, one
 	# simple consistent sound.
 	b.pressed.connect(func() -> void:
-		board._play_sound(Board.SFX_CLICK, 1.0, -12.0))
+		board._play_sound(Board.SFX_CLICK, 1.15, -14.0))
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color("2a2a2a")
 	sb.border_color = GOLD
