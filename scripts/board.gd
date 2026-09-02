@@ -210,10 +210,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton \
 			and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		dragging = false
-	# Any click during a refill skips the animation.
+	# A click during a refill skips the animation — and then falls
+	# through, so the SAME click selects the card under it. No dead
+	# clicks between hands.
 	if _refill_active and event is InputEventMouseButton and event.pressed:
 		_skip_refill()
-		return
 	if busy or locked:
 		return
 	if event is InputEventMouseButton and event.pressed:
@@ -398,6 +399,10 @@ func get_selected_data() -> Array:
 
 
 func play_hand() -> void:
+	if busy and _refill_active:
+		# Submitting mid-deal fast-forwards the deal (busy clears
+		# synchronously) so the hand goes straight in.
+		_skip_refill()
 	if busy or locked or selected.is_empty():
 		return
 	for card in selected:
