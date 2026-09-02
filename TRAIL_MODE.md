@@ -99,7 +99,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | WILDFIRE | Purge room: fire (shipped) |
 | DUST STORM | Purge room: wind (shipped) |
 | FLASH FLOOD | Purge room: water (shipped) |
-| GOLD MINE | Board of solid stone; break N to clear, gold cards turn up in the rubble (shipped) |
+| GOLD MINE | Board choked with stone; break N to clear, gold cards turn up in the rubble (shipped) |
 | BANK JOB | Heist room (crack the safe — shipped) |
 | STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs on a tight hand budget — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
 | DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
@@ -116,7 +116,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | --- | --- | --- |
 | Normal | Score target within the hands you bought | The baseline |
 | Purge | Board seeded with 3–6 of ONE hazard kind (bomb/fire/wind/water); remove them all (no score target) | Shipped. Fire that spreads must be put out too; a gust that blows hazards off the board counts; a fire burning itself out counts. No ambient extras — the hazards ARE the room |
-| Gold Mine | EVERY card is stone; break N stones (3 + region) to clear | Shipped. Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash, room-local) |
+| Gold Mine | ~12 of 25 cards are stone; break N stones (3 + region) to clear | Shipped. NOT a solid board — the plain cards between stones pop and refill so the mine shifts every hand (a solid board let one hand repeat 3×). Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash, room-local) |
 | Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
 | Royal Hunt | Make one Royal Flush | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
 | Timed | Score target before the clock; hands unlimited | Shipped (THE HANGED MAN, 2:1 base). The promise dial is MINUTES (1–6, reference 4→2 by region): fewer minutes promised = fatter odds. Hazards still tick per hand |

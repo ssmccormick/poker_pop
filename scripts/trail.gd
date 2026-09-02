@@ -63,6 +63,7 @@ const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 const PURGE_TAROTS := {"bomb": "POWDER KEG", "fire": "WILDFIRE",
 		"wind": "DUST STORM", "water": "FLASH FLOOD"}
 const GOLD_MINE_STONES_BASE := 3   # stones to break, +1 per region
+const GOLD_MINE_STONE_SEED := 12   # stones seeded (about half the board)
 # Called-hands templates by region: [hand name, count] — exact hands
 # only (this game scores exact compositions, so a Full House is NOT
 # three Pairs).
@@ -861,8 +862,10 @@ func _seed_room_specials() -> void:
 		main.board.apply_room_hazards(String(current_offer.purge_kind),
 				int(current_offer.purge_count))
 	elif room_goal == "mine":
-		# Solid rock wall to wall; broken stones may cough up gold.
-		main.board.apply_room_hazards("stone", 99)
+		# A board choked with rock — but NOT solid: the plain cards
+		# between the stones pop and refill, so the mine keeps shifting
+		# and the same hand can't just be replayed three times.
+		main.board.apply_room_hazards("stone", GOLD_MINE_STONE_SEED)
 		main.board.gold_rush = true
 	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0):
 		# Surprise loot in a plain room.

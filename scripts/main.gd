@@ -864,7 +864,7 @@ const TUTOR := {
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
 	"goal_chest": ["KEY & CHEST", "Somewhere on the board sit a key and a chest. Get BOTH into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Lose the key and the job is off. The hardest job on the trail, but the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested. Remove every hazard card to clear the table."],
-	"goal_mine": ["GOLD MINE", "Every card is stone. Break the asked number of stones (three hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble."],
+	"goal_mine": ["GOLD MINE", "The board is choked with stone. Break the asked number of stones (three scoring hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble. The plain cards between the rocks keep popping and shifting, so keep finding new seams."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
 	"goal_timed": ["HIGH NOON", "Score the target before the clock dies. Hands are unlimited — only the seconds matter."],
 	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to knock his health down. Ten hits puts him away."],
