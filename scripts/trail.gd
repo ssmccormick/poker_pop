@@ -943,6 +943,7 @@ func _start_room() -> void:
 	else:
 		var looks := ["trail_day", "trail_dusk", "trail_night"]
 		main.parallax.set_scene(looks[clampi(room_index / REGION_SIZE, 0, 2)])
+	main.board.visible = true
 	main.board.reset()
 	main._begin_countdown()
 	_seed_room_specials()
@@ -1241,9 +1242,9 @@ func _open_chest() -> void:
 	_save_run()
 
 
-## Fresh dealer total for the next blackjack round.
+## Fresh dealer hand for the next blackjack round.
 func _deal_dealer() -> void:
-	main.board.blackjack_target = randi_range(16, 20)
+	main.board.deal_blackjack_dealer()
 
 
 ## Score an Outlaw hand must reach or he takes a free shot.

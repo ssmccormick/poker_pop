@@ -294,10 +294,13 @@ func _update_labels() -> void:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 
-	var show_community := not board.holdem_community.is_empty() \
+	var show_community := not board.panel_cards().is_empty() \
 			and game_started and not menu_open
 	_community_label.visible = show_community
 	community_display.visible = show_community
+	if show_community:
+		_community_label.text = "DEALER SHOWS %d" % board.blackjack_target \
+				if board.blackjack_target > 0 else "COMMUNITY"
 	var show_arcade := mode_kind == "arcade" and game_started and not menu_open
 	var show_trail := mode_kind == "trail" and game_started and not menu_open and trail.in_room
 	meter_back.visible = show_arcade
@@ -574,6 +577,7 @@ func _restart() -> void:
 			parallax.set_scene("homestead")
 		"zen", "tutorial":
 			parallax.set_scene("stars")
+	board.visible = true
 	board.reset()
 	_begin_countdown()
 
@@ -964,6 +968,7 @@ func _start_tutorial() -> void:
 	hands_played = 0
 	play_music("room")
 	parallax.set_scene("stars")
+	board.visible = true
 	board.reset()
 	while board.busy:
 		await get_tree().process_frame
@@ -1064,6 +1069,7 @@ func _open_menu() -> void:
 	countdown_overlay.visible = false
 	play_music("menu")
 	parallax.set_scene("trail_dusk")
+	board.visible = false  # no stale table lingering behind the menu scrim
 	if _tut_label != null:
 		_tut_label.visible = false
 		_tut_skip_btn.visible = false
@@ -1143,12 +1149,14 @@ func _refresh_hand_display() -> void:
 		hand_display.add_child(mc)
 
 
-## Rebuilds the hold'em community row in the panel.
+## Rebuilds the panel card row: the hold'em community, or the
+## blackjack dealer's hand.
 func _refresh_community() -> void:
 	for child in community_display.get_children():
 		child.queue_free()
-	for i in board.holdem_community.size():
-		var data: Dictionary = board.holdem_community[i]
+	var cards: Array = board.panel_cards()
+	for i in cards.size():
+		var data: Dictionary = cards[i]
 		var mc := PlayingCard.new()
 		mc.rank = data.rank
 		mc.suit = data.suit

@@ -81,6 +81,7 @@ signal community_changed
 var holdem_community: Array = []
 # BLACKJACK: > this dealer total without busting 21 (0 = poker rules).
 var blackjack_target := 0
+var blackjack_dealer_cards: Array = []  # the dealer's actual hand, on show
 # CRAZY 8s: every 8 on the board counts as wild.
 var eights_wild := false
 
@@ -101,6 +102,28 @@ func deal_community() -> void:
 ## Best 5-card hand from the 2 hole cards plus the community.
 func holdem_result() -> Dictionary:
 	return Poker.best_of(get_selected_data() + holdem_community)
+
+
+## The dealer draws a real hand to 17+, standing at 20 or under (a 21
+## would be unbeatable). His cards go on show in the panel.
+func deal_blackjack_dealer() -> void:
+	while true:
+		var cards: Array = []
+		while Poker.blackjack_sum(cards) < 17:
+			cards.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3)})
+		var total := Poker.blackjack_sum(cards)
+		if total <= 20:
+			blackjack_dealer_cards = cards
+			blackjack_target = total
+			break
+	community_changed.emit()
+
+
+## Whatever card row the current variant wants shown in the panel.
+func panel_cards() -> Array:
+	if not blackjack_dealer_cards.is_empty():
+		return blackjack_dealer_cards
+	return holdem_community
 
 
 func _fx(pos: Vector2, kind: String, tint := Color.WHITE, dir := Vector2.UP) -> void:
@@ -206,6 +229,7 @@ func reset() -> void:
 	gold_rush = false
 	holdem_community.clear()
 	blackjack_target = 0
+	blackjack_dealer_cards.clear()
 	eights_wild = false
 	PlayingCard.eights_wild = false
 	for card in grid.values():
