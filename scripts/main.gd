@@ -245,7 +245,7 @@ func _process(delta: float) -> void:
 				game_over = true
 				board.locked = true
 				_show_game_over("THE BAR HIT BOTTOM\n\nYou made it to level %d.\nTotal score: %d\n\nR — play again    M — menu" % [level, score])
-		elif mode_kind == "trail" and trail.in_room and trail.room_goal == "timed":
+		elif mode_kind == "trail" and trail.in_room and trail.room_on_clock():
 			trail.room_time_left -= delta
 			if trail.room_time_left <= 0.0:
 				trail.room_time_left = 0.0
@@ -277,7 +277,7 @@ func _update_labels() -> void:
 			status_label.text = "LEVEL %d" % level
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 		"trail":
-			if trail.in_room and trail.room_goal == "timed":
+			if trail.in_room and trail.room_on_clock():
 				var tsecs := ceili(trail.room_time_left)
 				status_label.text = "TIME  %d:%02d" % [tsecs / 60, tsecs % 60]
 				status_label.add_theme_color_override("font_color",
@@ -815,7 +815,7 @@ const TUTOR := {
 	"hazard_stone": ["STONE CARD", "Solid rock: it takes THREE scoring hands to break. It scores its rank every time you include it."],
 	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
-	"goal_chest": ["KEY & CHEST", "Somewhere on the board sit a key and a chest. Get BOTH into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Playing a piece without its partner isn't fatal: a new one turns up elsewhere, but the hand is spent. The hardest job on the trail — the strongbox holds a RELIC."],
+	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Playing a piece without its partner isn't fatal: a new one turns up elsewhere, but the seconds keep draining. The hardest job on the trail — the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested. Remove every hazard card to clear the table."],
 	"goal_mine": ["GOLD MINE", "The board is choked with stone. Break the asked number of stones (three scoring hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble. The plain cards between the rocks keep popping and shifting, so keep finding new seams."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],

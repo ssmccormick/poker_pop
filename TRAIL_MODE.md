@@ -101,7 +101,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | FLASH FLOOD | Purge room: water (shipped) |
 | GOLD MINE | Board choked with stone; break N to clear, gold cards turn up in the rubble (shipped) |
 | BANK JOB | Heist room (crack the safe — shipped) |
-| STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs on a tight hand budget — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
+| STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs ON THE CLOCK (unlimited hands, ~1 min per pair, minutes are the odds promise) — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
 | DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
 | ROYAL HUNT | Make a Royal Flush, 5:1 (shipped, rare) |
 | HIGH NOON | Timed table: score the target before the clock dies (shipped) |
@@ -234,11 +234,13 @@ hand containing BOTH — the hand scores normally and the chest opens.
 Rewards: a new card for the deck, bonus chips, cash, or (later) a
 modified card.
 - **Treasure room (STAGECOACH HAUL, odds 2.0)**: the room demands
-  **3–5 pairs by depth** — each opened chest pays its reward roll AND
+  **3–5 pairs by depth**, and it runs **on the clock** — unlimited
+  hands, reference ~1 minute per pair + 1, with minutes as the odds
+  promise like HIGH NOON. Each opened chest pays its reward roll AND
   respawns a fresh key + chest until the count is met; clearing the
   room awards a RELIC. Losing a piece (played without its partner,
   burned, gusted, bumped off) is NOT a fail: the missing piece
-  respawns on a fresh card — you just spent a hand relocating it.
+  respawns on a fresh card — it just cost you seconds.
 - **Ambient chests**: random chance in normal rooms as optional loot.
 - v1: objective spawns don't mix with hazard rooms.
 

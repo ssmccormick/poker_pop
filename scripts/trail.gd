@@ -558,7 +558,10 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 2.0
 				offer["goal"] = "chest"
 				offer["chest_count"] = mini(3 + region, 5)
-				offer.hands = mini(MAX_HANDS_BUY, 2 * int(offer.chest_count) + 1)
+				# The stage runs on a schedule: this job is on the CLOCK,
+				# not a hand budget — about a minute per pair, plus one.
+				offer["minutes"] = mini(TIMED_MAX_MINUTES,
+						1 + int(offer.chest_count))
 			if offer.get("goal", "") == "safe":
 				offer.hands = maxi(1, 8 - region)
 			offer.target = 0
@@ -669,8 +672,8 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "timed":
 			goal_line = "TARGET %d — BEAT THE CLOCK" % offer.target
 		var bet_line := "Ante  %d  ·  ~%d hands" % [offer.min_bet, offer.hands]
-		if offer.get("goal", "") == "timed":
-			bet_line = "Ante  %d  ·  ~%d min" % [offer.min_bet, offer.minutes]
+		if offer.get("goal", "") in ["timed", "chest"]:
+			bet_line = "Ante  %d  ·  ~%d min" % [offer.min_bet, offer.get("minutes", 4)]
 		if offer.has("boss"):
 			bet_line = "ALL IN"
 		b.text = "%s\n\n%s table\n%s\nOdds  %s\n\n%s" % [
@@ -729,14 +732,19 @@ func _show_bet() -> void:
 	_bet_amount = int(o.min_bet)
 	# Hands (or minutes, at a timed table) are free — they're what
 	# you're betting ON. Start at the tier's reference count.
-	var reference := int(o.minutes) if _is_timed(o) else int(o.hands)
+	var reference := int(o.get("minutes", 4)) if _is_timed(o) else int(o.hands)
 	_bet_hands = clampi(reference, MIN_HANDS_TAKE, _promise_cap())
 	_refresh_bet_labels()
 	bet_layer.visible = true
 
 
 func _is_timed(o: Dictionary) -> bool:
-	return o.get("goal", "") == "timed"
+	return o.get("goal", "") in ["timed", "chest"]
+
+
+## Rooms that run on the clock instead of a hand budget.
+func room_on_clock() -> bool:
+	return room_goal in ["timed", "chest"]
 
 
 ## The most of the promise currency (hands or minutes) a table sells.
@@ -749,7 +757,7 @@ func _promise_cap() -> int:
 ## minutes at a timed table).
 func _eff_odds() -> float:
 	var o := current_offer
-	var reference := float(o.minutes) if _is_timed(o) else float(o.hands)
+	var reference := float(o.get("minutes", 4)) if _is_timed(o) else float(o.hands)
 	return float(o.odds) * reference / float(maxi(MIN_HANDS_TAKE, _bet_hands))
 
 
@@ -783,7 +791,7 @@ func _refresh_bet_labels() -> void:
 				if pending_is_retry else "\nBack to the table you stepped away from."
 	var blind := int(o.min_bet)
 	var unit := "min" if _is_timed(o) else "hands"
-	var reference := int(o.minutes) if _is_timed(o) else int(o.hands)
+	var reference := int(o.get("minutes", 4)) if _is_timed(o) else int(o.hands)
 	_bet_amount = clampi(_bet_amount, blind, _max_bet())
 	_bet_info.text = "%s — %s table\n%s   ·   base odds %s at %d %s\nAnte %d — the house keeps it\nYour chips: %d%s" % [
 		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), reference,
@@ -830,7 +838,7 @@ func _start_room() -> void:
 	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
 			+ (1 if has_relic("horseshoe") else 0)
 	room_time_left = 0.0
-	if room_goal == "timed":
+	if room_on_clock():
 		# The clock is the budget, not hands.
 		room_time_left = 60.0 * int(current_offer.get("minutes_bought",
 				current_offer.get("minutes", 3)))
@@ -1002,8 +1010,8 @@ func on_hand_played(result: Dictionary) -> void:
 
 ## A hand (or a safe crack) is spent; run out and the room is lost.
 func _consume_hand() -> void:
-	if room_goal == "timed":
-		# Timed tables never run out of hands — only of seconds.
+	if room_on_clock():
+		# Clock rooms never run out of hands — only of seconds.
 		_tick_room_hazards()
 		return
 	if has_relic("lucky_chip") and randf() < 0.10:
@@ -1202,9 +1210,10 @@ func _room_cleared() -> void:
 
 ## The timed table's clock ran dry (driven by main._process).
 func on_time_up() -> void:
-	if not in_room or room_goal != "timed":
+	if not in_room or not room_on_clock():
 		return
-	_room_failed("TIME'S UP — THE TABLE WINS")
+	_room_failed("TIME'S UP — THE STAGE ROLLED ON" if room_goal == "chest"
+			else "TIME'S UP — THE TABLE WINS")
 
 
 func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
