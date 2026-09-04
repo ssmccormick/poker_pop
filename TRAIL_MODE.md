@@ -105,10 +105,17 @@ Rooms are named for poker and the West (the tarot naming retired):
 | DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
 | ROYAL HUNT | Make a Royal Flush, 5:1 (shipped, rare) |
 | HIGH NOON | Timed table: score the target before the clock dies (shipped) |
-| TEXAS HOLD'EM | Variant room (Stage C — designed below) |
-| CRAZY 8s | Variant room (Stage C — designed below) |
-| BLACKJACK | Variant room (Stage C — designed below) |
-| SHOWDOWN | The Outlaw duel (Stage C — designed below) |
+| TEXAS HOLD'EM | Variant: persistent 5-card community, pick 2 hole cards, best playable subset of the 7 scores; RE-DEAL card refreshes the community (shipped) |
+| CRAZY 8s | Variant: every 8 on the board is WILD; score target (shipped) |
+| BLACKJACK | Variant: poker off — chains score their pip sum (faces 10, aces 11/1); beat the dealer's 16–20 without busting, 3+region wins to clear (shipped) |
+| SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (5+region HP), HIS red bullets shoot you, weak hands under the posted score give him free shots; 3 GRIT (shipped) |
+
+**Goal vs limit**: every non-boss room now rolls its challenge type
+independently — 50% a HAND BUDGET, 50% ON THE CLOCK (plain score
+tables drawing the clock take the HIGH NOON name). Minutes default to
+~0.4 × the hand reference. The old dedicated timed room is folded in.
+Any directional card (wind, plus, minus, bumper) turns its arrow a
+quarter clockwise every hand.
 
 ## Room types
 

@@ -25,6 +25,51 @@ const BASE_SCORES := {
 }
 
 
+## Hold'em helper: the best PLAYABLE hand hidden inside up to 7 cards.
+## Because this game scores exact compositions (no kickers), every
+## 2-5 card subset is tried — a lone pair among seven cards still
+## counts as a Pair. Returns {} when nothing at all plays.
+static func best_of(cards: Array) -> Dictionary:
+	var best := {}
+	var n := cards.size()
+	for mask in range(1 << n):
+		var bits := 0
+		var m := mask
+		while m > 0:
+			bits += m & 1
+			m >>= 1
+		if bits < 2 or bits > 5:
+			continue
+		var subset: Array = []
+		for i in n:
+			if mask & (1 << i):
+				subset.append(cards[i])
+		var res := evaluate(subset)
+		if res.playable and (best.is_empty() or res.score > best.score):
+			best = res
+	return best
+
+
+## Blackjack pip total: faces count 10, aces 11 (dropping to 1 apiece
+## while the total would bust).
+static func blackjack_sum(cards: Array) -> int:
+	var total := 0
+	var aces := 0
+	for c in cards:
+		var r: int = c.rank
+		if r == 14:
+			aces += 1
+			total += 11
+		elif r >= 11:
+			total += 10
+		else:
+			total += r
+	while total > 21 and aces > 0:
+		total -= 10
+		aces -= 1
+	return total
+
+
 ## cards: Array of {"rank": int (2..14, ace = 14), "suit": int (0..3)}.
 ## Selection order does not matter — five consecutive ranks are a straight
 ## however they were picked. Selections whose cards don't ALL participate

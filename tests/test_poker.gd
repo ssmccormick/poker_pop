@@ -69,6 +69,31 @@ func _init() -> void:
 	# Two wilds upgrade a lone pair to four of a kind.
 	failures += _check("Four of a Kind", [c(9, 0), c(9, 1), w, {"rank": 2, "suit": 0, "wild": true}])
 
+	# Hold'em best_of: the strongest playable subset of seven.
+	var seven := [c(9, 0), c(9, 1), c(11, 0), c(11, 1), c(2, 2), c(5, 3), c(3, 2)]
+	var b7 := Poker.best_of(seven)
+	if b7.is_empty() or b7.name != "Two Pair":
+		print("FAIL: best_of should find Two Pair, got %s" % str(b7))
+		failures += 1
+	var flush7 := [c(2, 1), c(6, 1), c(9, 1), c(11, 1), c(13, 1), c(4, 0), c(4, 2)]
+	if Poker.best_of(flush7).name != "Flush":
+		print("FAIL: best_of should find the Flush")
+		failures += 1
+	if not Poker.best_of([c(2, 0), c(5, 1), c(9, 2)]).is_empty():
+		print("FAIL: best_of with no hand should be empty")
+		failures += 1
+
+	# Blackjack sums: faces are 10, aces 11 dropping to 1.
+	if Poker.blackjack_sum([c(14, 0), c(13, 1)]) != 21:
+		print("FAIL: A+K should sum 21")
+		failures += 1
+	if Poker.blackjack_sum([c(14, 0), c(14, 1), c(9, 2)]) != 21:
+		print("FAIL: A+A+9 should sum 21 (one soft ace)")
+		failures += 1
+	if Poker.blackjack_sum([c(13, 0), c(12, 1), c(5, 2)]) != 25:
+		print("FAIL: K+Q+5 should bust at 25")
+		failures += 1
+
 	if failures == 0:
 		print("ALL POKER TESTS PASSED")
 	else:

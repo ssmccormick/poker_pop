@@ -61,6 +61,8 @@ var target_label: Label
 var target_bar_back: ColorRect
 var target_bar_fill: ColorRect
 var hand_display: Node2D
+var community_display: Node2D
+var _community_label: Label
 var splash_layer: ColorRect
 var countdown_overlay: ColorRect
 var parallax: ParallaxScene
@@ -146,6 +148,7 @@ func _ready() -> void:
 		_announce("NOT A VALID HAND", RED))
 	board.dead_board.connect(_on_dead_board)
 	board.selection_changed.connect(_refresh_hand_display)
+	board.community_changed.connect(_refresh_community)
 	add_child(board)
 	_apply_board_layout()
 
@@ -291,6 +294,10 @@ func _update_labels() -> void:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 
+	var show_community := not board.holdem_community.is_empty() \
+			and game_started and not menu_open
+	_community_label.visible = show_community
+	community_display.visible = show_community
 	var show_arcade := mode_kind == "arcade" and game_started and not menu_open
 	var show_trail := mode_kind == "trail" and game_started and not menu_open and trail.in_room
 	meter_back.visible = show_arcade
@@ -332,6 +339,20 @@ func _update_labels() -> void:
 			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_stones_broken)
 					/ float(maxi(trail.room_stones_needed, 1)), 0.0, 1.0)
+		elif trail.room_goal == "blackjack":
+			target_label.text = "TABLE %d / %d      DEALER SHOWS %d  ·  WINS %d / %d" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
+					board.blackjack_target, trail.room_wins, trail.room_wins_needed]
+			target_bar_fill.size.x = BAR_W * clampf(
+					float(trail.room_wins) / float(maxi(trail.room_wins_needed, 1)),
+					0.0, 1.0)
+		elif trail.room_goal == "outlaw":
+			target_label.text = "TABLE %d / %d      OUTLAW HP %d  ·  GRIT %d  ·  SCORE %d+" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
+					trail.room_outlaw_hp, trail.room_grit, trail._outlaw_bar()]
+			target_bar_fill.size.x = BAR_W * clampf(
+					1.0 - float(trail.room_outlaw_hp) / float(maxi(trail.room_outlaw_max, 1)),
+					0.0, 1.0)
 		elif trail.room_goal == "purge":
 			var left := trail.purge_left()
 			target_label.text = "TABLE %d / %d      PURGE  %d HAZARD%s LEFT" % \
@@ -397,6 +418,35 @@ func _update_preview() -> void:
 		preview_label.add_theme_color_override("font_color", DIM)
 		return
 	var data := board.get_selected_data()
+	if board.blackjack_target > 0:
+		if data.is_empty():
+			preview_label.text = "Chain cards toward 21 — beat the dealer's %d." % board.blackjack_target
+			preview_label.add_theme_color_override("font_color", DIM)
+		else:
+			var total := Poker.blackjack_sum(data)
+			if total > 21:
+				preview_label.text = "SUM %d — BUST!" % total
+				preview_label.add_theme_color_override("font_color", RED)
+			elif total > board.blackjack_target and data.size() >= 2:
+				preview_label.text = "SUM %d beats the dealer's %d — play it!" % [total, board.blackjack_target]
+				preview_label.add_theme_color_override("font_color", GOLD)
+			else:
+				preview_label.text = "SUM %d — the dealer shows %d." % [total, board.blackjack_target]
+				preview_label.add_theme_color_override("font_color", DIM)
+		return
+	if not board.holdem_community.is_empty():
+		if data.size() != 2:
+			preview_label.text = "Pick exactly TWO adjacent hole cards — best 5 of 7 with the community."
+			preview_label.add_theme_color_override("font_color", DIM)
+		else:
+			var best := board.holdem_result()
+			if best.is_empty():
+				preview_label.text = "No hand in those seven — try different hole cards."
+				preview_label.add_theme_color_override("font_color", RED)
+			else:
+				preview_label.text = "%s  —  %d pts" % [best.name, best.score]
+				preview_label.add_theme_color_override("font_color", GOLD)
+		return
 	if data.is_empty():
 		preview_label.text = "Chain up to 5 adjacent cards to build a poker hand."
 		preview_label.add_theme_color_override("font_color", DIM)
@@ -771,7 +821,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"fire":
 			lines.append("FIRE — spreads every hand and burns its rank down. Play it to douse it.")
 		"wind":
-			lines.append("WIND — play it and everything along the arrow blows off the board.")
+			lines.append("WIND — play it and everything along the arrow blows off the board. The arrow turns each hand.")
 		"stone":
 			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
 					"" if card.stone_hits == 1 else "s"])
@@ -811,7 +861,7 @@ const TUTOR := {
 	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
 	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero, the table is lost."],
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. Play burning cards to put them out — and if EVERY card on the table catches fire, the table is LOST."],
-	"hazard_wind": ["WIND CARD", "Play it and every card in the arrow's direction is blown clean off the board — unscored. Aim it at junk... or at trouble."],
+	"hazard_wind": ["WIND CARD", "Play it and every card in the arrow's direction is blown clean off the board — unscored. The arrow turns a quarter every hand, so time your gust. Aim it at junk... or at trouble."],
 	"hazard_stone": ["STONE CARD", "Solid rock: it takes THREE scoring hands to break. It scores its rank every time you include it."],
 	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
@@ -819,10 +869,14 @@ const TUTOR := {
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested. Remove every hazard card to clear the table."],
 	"goal_mine": ["GOLD MINE", "The board is choked with stone. Break the asked number of stones (three scoring hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble. The plain cards between the rocks keep popping and shifting, so keep finding new seams."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
-	"goal_timed": ["HIGH NOON", "Score the target before the clock dies. Hands are unlimited — only the seconds matter."],
+	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
 	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to knock his health down. Ten hits puts him away."],
 	"boss_queen": ["QUEEN BEE", "The Queen only fits in SMALL hands — 2 or 3 cards. She alternates: one hand she moves, the next she honeys a neighbor (honeyed cards also only play in small hands). Sting her three times."],
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
+	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
+	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. Chase the score target and let the eights do the dirty work."],
+	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house. Chain cards summing as close to 21 as you dare (faces 10, aces 11 or 1): beat the DEALER'S TOTAL without busting to win the round. Win enough rounds to clear."],
+	"goal_outlaw": ["SHOWDOWN", "The Outlaw waits. Clear YOUR bullets (gold) in scoring hands to shoot him; touch HIS bullets (red) and he shoots you. Weak hands under the posted score give him a free shot too. Run out of GRIT and you're done — gun him down first."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
@@ -1089,6 +1143,20 @@ func _refresh_hand_display() -> void:
 		hand_display.add_child(mc)
 
 
+## Rebuilds the hold'em community row in the panel.
+func _refresh_community() -> void:
+	for child in community_display.get_children():
+		child.queue_free()
+	for i in board.holdem_community.size():
+		var data: Dictionary = board.holdem_community[i]
+		var mc := PlayingCard.new()
+		mc.rank = data.rank
+		mc.suit = data.suit
+		mc.position = Vector2(i * 74.0 + 46.0, 0)
+		mc.material = Themes.current_material()
+		community_display.add_child(mc)
+
+
 func _announce(text: String, color: Color = GOLD) -> void:
 	announcer.text = text
 	announcer.add_theme_color_override("font_color", color)
@@ -1177,6 +1245,13 @@ func _build_ui() -> void:
 	hand_display.position = Vector2(PANEL_X + 30, 532)
 	hand_display.scale = Vector2(0.8, 0.8)
 	hud_root.add_child(hand_display)
+
+	# Hold'em community cards (visible only when a community is live).
+	_community_label = _label(hud_root, "COMMUNITY", Vector2(PANEL_X, 646), 18, DIM)
+	community_display = Node2D.new()
+	community_display.position = Vector2(PANEL_X + 26, 730)
+	community_display.scale = Vector2(0.62, 0.62)
+	hud_root.add_child(community_display)
 
 	# Arcade meter: a vertical bar beside the board that drains constantly.
 	meter_back = ColorRect.new()

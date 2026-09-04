@@ -110,6 +110,8 @@ const SUIT_PIXELS := [SPADE_PX, HEART_PX, DIAMOND_PX, CLUB_PX]
 
 # Magnifying Glass relic: soaked cards still reveal their suit.
 static var washed_show_suit := false
+# CRAZY 8s room: every 8 on the board is wild (drawn with a W badge).
+static var eights_wild := false
 
 static var _face_box: StyleBoxFlat
 static var _selected_box: StyleBoxFlat
@@ -402,6 +404,10 @@ func _draw() -> void:
 			draw_line(base + v * 0.8, tip, col, 3.0)
 			draw_colored_polygon(PackedVector2Array([
 				tip + v * 0.4, tip - v * 0.3 + perp, tip - v * 0.3 - perp]), col)
+	if eights_wild and rank == 8 and mod == "" and not washed:
+		# Crazy 8s: every 8 is wild tonight.
+		draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "W",
+				HORIZONTAL_ALIGNMENT_CENTER, 22, 24, WILD_PURPLE)
 	if boom and mod != "":
 		# Explosion rider: rays around whatever the mod glyph is.
 		for k in 8:
@@ -414,6 +420,17 @@ func _draw() -> void:
 			_draw_pixel_map(KEY_PX, Vector2(W / 2.0 - 22, H / 2.0 - 14), 3.0, GOLD)
 		"chest":
 			_draw_pixel_map(CHEST_PX, Vector2(W / 2.0 - 16, H / 2.0 - 15), 3.0, Color("b07f3e"))
+		"redeal":
+			var rc := Vector2(W / 2.0 - 16, H / 2.0 - 16)
+			draw_arc(rc, 9.0, 0.7, TAU - 0.4, 14, WIND_BLUE, 3.0)
+			var tip := rc + Vector2.RIGHT.rotated(0.7) * 9.0
+			draw_colored_polygon(PackedVector2Array([
+				tip + Vector2(4, -4), tip + Vector2(-4, -4), tip + Vector2(0, 5)]),
+				WIND_BLUE)
+		"bullet":
+			_draw_bullet(GOLD)
+		"hisbullet":
+			_draw_bullet(ERROR_RED)
 
 	if honey:
 		draw_rect(rect.grow(-2), HONEY_AMBER)
@@ -463,6 +480,14 @@ func _draw() -> void:
 
 
 ## Draws the suit pixel map centered on `center`, one pixel = `px`.
+## Duel ammunition: a little cartridge, gold for yours, red for his.
+func _draw_bullet(col: Color) -> void:
+	var base := Vector2(W / 2.0 - 20, H / 2.0 - 24)
+	draw_rect(Rect2(base, Vector2(9, 14)), col)
+	draw_colored_polygon(PackedVector2Array([
+		base + Vector2(0, 0), base + Vector2(9, 0), base + Vector2(4.5, -8)]), col)
+
+
 func _draw_suit(center: Vector2, px: float) -> void:
 	if Themes.current().get("suit_style", "pixel") == "vector":
 		_draw_suit_vector(center, px)

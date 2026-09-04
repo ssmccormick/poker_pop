@@ -75,6 +75,33 @@ const GOLD_FIND_CHANCE := 0.35
 # Particle helper (set by main; null on detached test boards).
 var fx: Fx
 
+# --- Variant-room rules (trail) -------------------------------------------
+signal community_changed
+# TEXAS HOLD'EM: 5 shared cards; you pick exactly 2 hole cards.
+var holdem_community: Array = []
+# BLACKJACK: > this dealer total without busting 21 (0 = poker rules).
+var blackjack_target := 0
+# CRAZY 8s: every 8 on the board counts as wild.
+var eights_wild := false
+
+
+func _select_cap() -> int:
+	return 2 if not holdem_community.is_empty() else MAX_SELECT
+
+
+## Deals (or re-deals) the hold'em community: five fresh shared cards.
+func deal_community() -> void:
+	holdem_community.clear()
+	for i in 5:
+		holdem_community.append({"rank": randi_range(2, 14),
+				"suit": randi_range(0, 3)})
+	community_changed.emit()
+
+
+## Best 5-card hand from the 2 hole cards plus the community.
+func holdem_result() -> Dictionary:
+	return Poker.best_of(get_selected_data() + holdem_community)
+
 
 func _fx(pos: Vector2, kind: String, tint := Color.WHITE, dir := Vector2.UP) -> void:
 	if fx != null:
@@ -177,6 +204,10 @@ func reset() -> void:
 	busy = true
 	suppress_refill = false
 	gold_rush = false
+	holdem_community.clear()
+	blackjack_target = 0
+	eights_wild = false
+	PlayingCard.eights_wild = false
 	for card in grid.values():
 		card.queue_free()
 	grid.clear()
@@ -281,7 +312,7 @@ func _drag_over(card: PlayingCard) -> void:
 		# Dragging back over the previous card undoes the last step.
 		_toggle_select(selected.back())
 	elif not card.selected:
-		if selected.size() < MAX_SELECT and _is_adjacent(card.grid_pos, selected.back().grid_pos):
+		if selected.size() < _select_cap() and _is_adjacent(card.grid_pos, selected.back().grid_pos):
 			_toggle_select(card)
 
 
@@ -316,7 +347,7 @@ func _toggle_select(card: PlayingCard) -> void:
 			selected.remove_at(i)
 		_play_sound(SFX_FLIP, 0.85, -8.0)
 	else:
-		if selected.size() >= MAX_SELECT:
+		if selected.size() >= _select_cap():
 			return
 		if not selected.is_empty() and not _is_adjacent(card.grid_pos, selected.back().grid_pos):
 			return
@@ -384,6 +415,11 @@ func _update_hand_validity() -> void:
 	if has_safe:
 		# The safe can only have joined via its full combo — crackable.
 		valid = true
+	elif blackjack_target > 0:
+		var total := Poker.blackjack_sum(get_selected_data())
+		valid = selected.size() >= 2 and total <= 21 and total > blackjack_target
+	elif not holdem_community.is_empty():
+		valid = selected.size() == 2 and not holdem_result().is_empty()
 	elif not selected.is_empty():
 		valid = Poker.evaluate(get_selected_data()).playable
 		for card in selected:
@@ -404,7 +440,7 @@ func get_selected_data() -> Array:
 	var out := []
 	for card in selected:
 		var d := {"rank": card.rank, "suit": card.suit}
-		if card.mod == "wild":
+		if card.mod == "wild" or (eights_wild and card.rank == 8):
 			d["wild"] = true
 		out.append(d)
 	return out
@@ -426,20 +462,48 @@ func play_hand() -> void:
 			if card.boss == "queen" or card.honey:
 				_reject_hand()  # too big a hand for something this sticky
 				return
-	var result := Poker.evaluate(get_selected_data())
-	if not result.playable:
-		_reject_hand()
-		return
+	var result: Dictionary
+	if blackjack_target > 0:
+		# BLACKJACK: beat the dealer's total without busting 21.
+		var total := Poker.blackjack_sum(get_selected_data())
+		if selected.size() < 2 or total > 21 or total <= blackjack_target:
+			_reject_hand()
+			return
+		result = {"name": "Twenty-One!" if total == 21 else "Beat the Dealer",
+				"base": 0, "pips": total, "score": total * 3, "playable": true,
+				"blackjack_win": true}
+	elif not holdem_community.is_empty():
+		# HOLD'EM: exactly 2 hole cards; best 5 of 7 with the community.
+		if selected.size() != 2:
+			_reject_hand()
+			return
+		result = holdem_result()
+		if result.is_empty():
+			_reject_hand()
+			return
+	else:
+		result = Poker.evaluate(get_selected_data())
+		if not result.playable:
+			_reject_hand()
+			return
 	_apply_card_mods(result)
 	result["count"] = selected.size()
-	# Opening a chest: the hand contains both the key and the chest.
+	# Objectives riding in the hand: key+chest pairs, duel bullets, and
+	# the hold'em re-deal card.
 	var has_key := false
 	var has_chest := false
 	for card in selected:
-		if card.objective == "key":
-			has_key = true
-		elif card.objective == "chest":
-			has_chest = true
+		match card.objective:
+			"key":
+				has_key = true
+			"chest":
+				has_chest = true
+			"bullet":
+				result["bullets_you"] = int(result.get("bullets_you", 0)) + 1
+			"hisbullet":
+				result["bullets_his"] = int(result.get("bullets_his", 0)) + 1
+			"redeal":
+				result["redeal"] = true
 	if has_key and has_chest:
 		result["chest_opened"] = true
 	# Predict boss outcomes so trail can clear the room before spending
@@ -540,6 +604,10 @@ func play_hand() -> void:
 			card.queue_free()
 	if defeated_boss:
 		boss_defeated.emit()
+	if result.get("redeal", false):
+		# The re-deal card refreshes the whole community.
+		deal_community()
+		_play_sound(SFX_SHUFFLES.pick_random(), 1.2, -8.0)
 
 	# Mod payloads land on whatever survived the pops. Explosions spread
 	# their mod through the neighborhood; plus/minus feed the card the
@@ -983,6 +1051,10 @@ func _skip_refill() -> void:
 ## Every card in a chain must participate in the hand (no kickers), so a
 ## hand is playable only if its exact cards form an adjacent chain.
 func has_playable_hand() -> bool:
+	# Variant rooms judge hands by their own rules; the trail reshuffles
+	# dead boards anyway, so never call these dead.
+	if blackjack_target > 0 or not holdem_community.is_empty():
+		return true
 	# Rank-group hands (pair, trips, quads, five, two pair, full house):
 	# chains using at most two distinct ranks. Cursed cards can't start
 	# or join any chain.
@@ -1565,12 +1637,16 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 ## Returns {"burned": [cells], "ignited": [cells], "exploded": bool}.
 ## Board mutation only — no animation — so it's headless-testable.
 func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
-	# Plus/minus/bumper arrows swing a quarter turn (clockwise) every
-	# hand — time the clear to aim the effect where you want it.
+	# EVERY directional card swings its arrow a quarter turn (clockwise)
+	# each hand — plus/minus/bumper mods AND wind hazards. Time the
+	# clear to aim the effect where you want it.
 	for p in grid:
 		if grid[p].mod in ["plus", "minus", "bumper"]:
 			var bd: Vector2i = grid[p].boost_dir
 			grid[p].boost_dir = Vector2i(-bd.y, bd.x)
+		if grid[p].hazard == "wind":
+			var wd: Vector2i = grid[p].wind_dir
+			grid[p].wind_dir = Vector2i(-wd.y, wd.x)
 	# Water drips: every uncleared water card soaks one random orthogonal
 	# plain neighbor per tick — clear it fast to stop the leak.
 	var soaked: Array = []
@@ -1638,7 +1714,7 @@ func tick_hazards(tick_fire := true) -> bool:
 	var any := false
 	for p in grid:
 		var hz: String = grid[p].hazard
-		if hz == "fire" or hz == "bomb" or hz == "water" \
+		if hz == "fire" or hz == "bomb" or hz == "water" or hz == "wind" \
 				or grid[p].mod in ["plus", "minus", "bumper"]:
 			any = true
 			break

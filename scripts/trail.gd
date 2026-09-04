@@ -50,12 +50,16 @@ const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
 const HAZARD_BASE_CHANCE := 0.20
 const HAZARD_ROOM_STEP := 0.04   # + per room index
 const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
-const OBJECTIVE_CHANCE := 0.15   # heist/treasure rooms, from room 2 on
-const PURGE_CHANCE := 0.18       # purge rooms: board of one hazard, clear them all
-const REQUIRE_CHANCE := 0.17     # called-hands rooms: play the demanded hands
+const OBJECTIVE_CHANCE := 0.12   # heist/treasure rooms, from room 2 on
+const PURGE_CHANCE := 0.14       # purge rooms: board of one hazard, clear them all
+const REQUIRE_CHANCE := 0.12     # called-hands rooms: play the demanded hands
 const ROYAL_CHANCE := 0.10       # of called-hands rooms (region 2+): THE WORLD
-const TIMED_CHANCE := 0.12       # timed tables: score the target on a clock
-const TIMED_MAX_MINUTES := 6     # the most time a timed table will sell
+const TIMED_MAX_MINUTES := 6     # the most time a clock table will sell
+# Variant rooms that play by DIFFERENT rules (from room 2 on):
+const HOLDEM_CHANCE := 0.08      # community cards + 2 hole cards
+const CRAZY8_CHANCE := 0.07      # every 8 on the board is wild
+const BLACKJACK_CHANCE := 0.08   # sum to 21, beat the dealer
+const OUTLAW_CHANCE := 0.08      # the duel: your bullets vs his
 const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 
 # Western job names for the purge rooms; a stone roll becomes the
@@ -68,12 +72,16 @@ const GOLD_MINE_STONE_SEED := 12   # stones seeded (about half the board)
 # only (this game scores exact compositions, so a Full House is NOT
 # three Pairs).
 const REQUIRE_POOLS := [
-	[[["Pair", 3]], [["Pair", 2], ["Two Pair", 1]],
-			[["Three of a Kind", 1], ["Pair", 1]]],
-	[[["Two Pair", 2]], [["Three of a Kind", 2]],
-			[["Straight", 1], ["Pair", 2]], [["Flush", 1]]],
-	[[["Flush", 2]], [["Full House", 1]], [["Straight", 2]],
-			[["Four of a Kind", 1]]],
+	[[["Pair", 4], ["Two Pair", 1]], [["Pair", 3], ["Three of a Kind", 2]],
+			[["Pair", 5]]],
+	[[["Two Pair", 2], ["Pair", 2], ["Three of a Kind", 1]],
+			[["Three of a Kind", 3], ["Pair", 2]],
+			[["Straight", 1], ["Pair", 3], ["Two Pair", 1]],
+			[["Flush", 1], ["Pair", 3]]],
+	[[["Flush", 2], ["Pair", 2], ["Two Pair", 1]],
+			[["Full House", 1], ["Three of a Kind", 2], ["Pair", 2]],
+			[["Straight", 2], ["Two Pair", 2]],
+			[["Four of a Kind", 1], ["Pair", 3]]],
 ]
 
 const BASE_TARGET := 300          # table 1 target before scaling
@@ -130,7 +138,9 @@ var room_score := 0
 var room_hands_left := 0
 var room_time_left := 0.0        # timed tables: seconds on the clock
 var room_target := 0
-var room_goal := ""      # "" score · safe · chest · purge · hands · boss
+var room_goal := ""      # "" score · safe/chest · purge/mine · hands · boss ·
+                         # holdem · crazy8 · blackjack · outlaw
+var room_limit := "hands"  # "hands" budget or "time" countdown
 var room_combo: Array = []
 var room_require: Array = []     # [[hand name, remaining count], ...]
 var room_require_total := 0      # hands demanded at room start (progress bar)
@@ -138,6 +148,13 @@ var room_chests_needed := 1      # treasure rooms: pairs to open
 var room_chests_opened := 0
 var room_stones_needed := 1      # gold mine: stones to grind to dust
 var room_stones_broken := 0
+var room_wins_needed := 3        # blackjack: rounds to take off the dealer
+var room_wins := 0
+var room_outlaw_hp := 5          # showdown: the Outlaw's health...
+var room_outlaw_max := 5
+var room_grit := 3               # ...and yours
+const OUTLAW_GRIT := 3
+const OUTLAW_BAR_BASE := 60      # score under this and he fires (+ per region)
 var relics: Array = []   # relic ids held this run
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
@@ -558,8 +575,9 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 2.0
 				offer["goal"] = "chest"
 				offer["chest_count"] = mini(3 + region, 5)
-				# The stage runs on a schedule: this job is on the CLOCK,
-				# not a hand budget — about a minute per pair, plus one.
+				# References for either limit: ~2 hands per pair, or
+				# about a minute per pair plus one on the clock.
+				offer.hands = mini(MAX_HANDS_BUY, 2 * int(offer.chest_count) + 1)
 				offer["minutes"] = mini(TIMED_MAX_MINUTES,
 						1 + int(offer.chest_count))
 			if offer.get("goal", "") == "safe":
@@ -601,18 +619,59 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 1.5 if region == 0 else 2.0
 				var pool: Array = REQUIRE_POOLS[mini(region, REQUIRE_POOLS.size() - 1)]
 				offer["require"] = (pool.pick_random() as Array).duplicate(true)
-			# The dealer's demands take setup: never under 10 hands.
-			offer.hands = maxi(10, 12 - region)
+			# ~5 called hands on a tight 8-hand budget: every hand
+			# should be working toward a demand.
+			offer.hands = 8
 			offer.target = 0
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE + TIMED_CHANCE:
-			# Beat the clock: unlimited hands, but the minutes are the
-			# promise — take fewer for fatter odds.
-			offer.tarot = "HIGH NOON"
-			offer.label = "Timed"
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
+				+ HOLDEM_CHANCE:
+			# Hold'em: 5 community cards, pick 2 hole cards per hand.
+			offer.tarot = "TEXAS HOLD'EM"
+			offer.label = "Hold'em"
 			offer.odds = 2.0
-			offer["goal"] = "timed"
-			offer["minutes"] = maxi(2, 4 - region)
-			offer.target = _target_for(room_index, {"target_scale": 1.0})
+			offer["goal"] = "holdem"
+			offer.target = _target_for(room_index, {"target_scale": 1.1})
+			offer.hands = 8
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
+				+ HOLDEM_CHANCE + CRAZY8_CHANCE:
+			# Crazy 8s: a normal table, but every 8 is wild.
+			offer.tarot = "CRAZY 8s"
+			offer.label = "Wild Eights"
+			offer.odds = 1.5
+			offer["goal"] = "crazy8"
+			offer.target = _target_for(room_index, {"target_scale": 1.25})
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
+				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE:
+			# Blackjack: chains score their pip sum — beat the dealer.
+			offer.tarot = "BLACKJACK"
+			offer.label = "Twenty-One"
+			offer.odds = 2.0
+			offer["goal"] = "blackjack"
+			offer["wins"] = 3 + region
+			offer.hands = mini(MAX_HANDS_BUY, 3 * (3 + region))
+			offer.target = 0
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
+				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
+				+ OUTLAW_CHANCE:
+			# The duel: clear YOUR bullets to shoot, dodge HIS.
+			offer.tarot = "SHOWDOWN"
+			offer.label = "The Outlaw"
+			offer.odds = 2.5
+			offer["goal"] = "outlaw"
+			offer["outlaw_hp"] = 5 + region
+			offer.hands = 10
+			offer.target = 0
+	# Every job deals as either a HAND BUDGET or a COUNTDOWN (50/50).
+	# Plain score tables that draw the clock take the HIGH NOON name.
+	if randf() < 0.5:
+		offer["limit"] = "time"
+		if not offer.has("minutes"):
+			offer["minutes"] = clampi(roundi(int(offer.hands) * 0.4), 2,
+					TIMED_MAX_MINUTES)
+		if offer.get("goal", "") == "":
+			offer.tarot = "HIGH NOON"
+	else:
+		offer["limit"] = "hands"
 	return offer
 
 
@@ -667,13 +726,22 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					String(offer.purge_kind).to_upper()]
 		elif offer.get("goal", "") == "mine":
 			goal_line = "BREAK %d STONES — FIND GOLD" % offer.stones
+		elif offer.get("goal", "") == "holdem":
+			goal_line = "TARGET %d — HOLD'EM RULES" % offer.target
+		elif offer.get("goal", "") == "crazy8":
+			goal_line = "TARGET %d — 8s ARE WILD" % offer.target
+		elif offer.get("goal", "") == "blackjack":
+			goal_line = "BEAT THE DEALER %d TIMES" % offer.wins
+		elif offer.get("goal", "") == "outlaw":
+			goal_line = "GUN DOWN THE OUTLAW (%d HP)" % offer.outlaw_hp
 		elif offer.get("goal", "") == "hands":
 			goal_line = "PLAY  " + _require_text(offer.require)
 		elif offer.get("goal", "") == "timed":
 			goal_line = "TARGET %d — BEAT THE CLOCK" % offer.target
 		var bet_line := "Ante  %d  ·  ~%d hands" % [offer.min_bet, offer.hands]
-		if offer.get("goal", "") in ["timed", "chest"]:
-			bet_line = "Ante  %d  ·  ~%d min" % [offer.min_bet, offer.get("minutes", 4)]
+		if offer.get("limit", "hands") == "time":
+			bet_line = "Ante  %d\nON THE CLOCK — ~%d min" % [offer.min_bet,
+					offer.get("minutes", 4)]
 		if offer.has("boss"):
 			bet_line = "ALL IN"
 		b.text = "%s\n\n%s table\n%s\nOdds  %s\n\n%s" % [
@@ -739,12 +807,12 @@ func _show_bet() -> void:
 
 
 func _is_timed(o: Dictionary) -> bool:
-	return o.get("goal", "") in ["timed", "chest"]
+	return o.get("limit", "hands") == "time"
 
 
 ## Rooms that run on the clock instead of a hand budget.
 func room_on_clock() -> bool:
-	return room_goal in ["timed", "chest"]
+	return room_limit == "time"
 
 
 ## The most of the promise currency (hands or minutes) a table sells.
@@ -776,6 +844,14 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
 		"mine":
 			return "Break %d stones (gold in the rubble)" % o.stones
+		"holdem":
+			return "Target %d — pick 2 hole cards, best 5 of 7 with the community" % o.target
+		"crazy8":
+			return "Target %d — every 8 on the board is WILD" % o.target
+		"blackjack":
+			return "Beat the dealer %d times — sum to 21, don't bust" % o.wins
+		"outlaw":
+			return "Duel: shoot the Outlaw %d times before your grit runs out" % o.outlaw_hp
 		"hands":
 			return "Play " + _require_text(o.require)
 		"timed":
@@ -824,8 +900,14 @@ func _start_room() -> void:
 	room_score = 0
 	room_target = current_offer.target
 	room_goal = current_offer.get("goal", "")
+	# Legacy saves: the old HIGH NOON room type folds into "" + clock.
+	if room_goal == "timed":
+		room_goal = ""
+		current_offer["limit"] = "time"
+	room_limit = current_offer.get("limit", "hands")
 	if current_offer.has("boss"):
 		room_goal = "boss"
+		room_limit = "hands"
 	room_combo = []
 	room_require = (current_offer.get("require", []) as Array).duplicate(true)
 	room_require_total = 0
@@ -835,6 +917,11 @@ func _start_room() -> void:
 	room_chests_opened = 0
 	room_stones_needed = int(current_offer.get("stones", 1))
 	room_stones_broken = 0
+	room_wins_needed = int(current_offer.get("wins", 3))
+	room_wins = 0
+	room_outlaw_hp = int(current_offer.get("outlaw_hp", 5))
+	room_outlaw_max = room_outlaw_hp
+	room_grit = OUTLAW_GRIT
 	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
 			+ (1 if has_relic("horseshoe") else 0)
 	room_time_left = 0.0
@@ -886,6 +973,21 @@ func _seed_room_specials() -> void:
 		# and the same hand can't just be replayed three times.
 		main.board.apply_room_hazards("stone", GOLD_MINE_STONE_SEED)
 		main.board.gold_rush = true
+	elif room_goal == "holdem":
+		main.board.deal_community()
+		if randf() < 0.5:
+			main.board.spawn_objective("redeal")
+	elif room_goal == "crazy8":
+		main.board.eights_wild = true
+		PlayingCard.eights_wild = true
+		main.board.apply_theme()  # repaint so the 8s show their W
+	elif room_goal == "blackjack":
+		_deal_dealer()
+	elif room_goal == "outlaw":
+		for i in 2:
+			main.board.spawn_objective("bullet")
+		for i in 2:
+			main.board.spawn_objective("hisbullet")
 	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0):
 		# Surprise loot in a plain room.
 		if randf() < 0.5:
@@ -929,8 +1031,16 @@ func _tutor_room_intros() -> void:
 			main.tutor_show("goal_mine")
 		"hands":
 			main.tutor_show("goal_hands")
-		"timed":
-			main.tutor_show("goal_timed")
+		"holdem":
+			main.tutor_show("goal_holdem")
+		"crazy8":
+			main.tutor_show("goal_crazy8")
+		"blackjack":
+			main.tutor_show("goal_blackjack")
+		"outlaw":
+			main.tutor_show("goal_outlaw")
+	if room_on_clock():
+		main.tutor_show("goal_timed")
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
 		if card.hazard != "":
@@ -981,9 +1091,40 @@ func on_hand_played(result: Dictionary) -> void:
 			_consume_hand()
 			_respawn_treasure()
 			return
-	if room_goal in ["", "timed"] and room_score >= room_target:
+	if room_goal in ["", "timed", "holdem", "crazy8"] and room_score >= room_target:
 		_room_cleared()
 		return
+	if room_goal == "holdem":
+		_holdem_upkeep()
+	if room_goal == "blackjack" and result.get("blackjack_win", false):
+		room_wins += 1
+		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+		if room_wins >= room_wins_needed:
+			_room_cleared()
+			return
+		_deal_dealer()
+		_announce_after_settle("ROUND WON  %d / %d — DEALER SHOWS %d"
+				% [room_wins, room_wins_needed, main.board.blackjack_target])
+	if room_goal == "outlaw":
+		var hits := int(result.get("bullets_you", 0))
+		var caught := int(result.get("bullets_his", 0))
+		if hits > 0:
+			room_outlaw_hp -= hits
+			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 1.0, -6.0)
+		if room_outlaw_hp <= 0:
+			_room_cleared()
+			return
+		# Weak hands (and touching HIS bullets) give him a free shot.
+		if result.score < _outlaw_bar():
+			caught += 1
+		if caught > 0:
+			room_grit -= caught
+			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 0.8, -5.0)
+			if room_grit <= 0:
+				_room_failed("GUNNED DOWN AT THE SHOWDOWN")
+				return
+			_announce_after_settle("THE OUTLAW FIRES — GRIT %d" % room_grit)
+		_replenish_bullets()
 	if room_goal == "purge" and int(result.get("hazards_left", -1)) == 0:
 		_room_cleared()
 		return
@@ -1098,6 +1239,41 @@ func _open_chest() -> void:
 		deck.append(enhanced)
 		_announce_after_settle("CHEST  AN ENHANCED CARD!")
 	_save_run()
+
+
+## Fresh dealer total for the next blackjack round.
+func _deal_dealer() -> void:
+	main.board.blackjack_target = randi_range(16, 20)
+
+
+## Score an Outlaw hand must reach or he takes a free shot.
+func _outlaw_bar() -> int:
+	return OUTLAW_BAR_BASE + 15 * (room_index / REGION_SIZE)
+
+
+## Keeps two of each bullet kind on the duel board.
+func _replenish_bullets() -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	if not in_room or room_goal != "outlaw":
+		return
+	for kind in ["bullet", "hisbullet"]:
+		var have := 0
+		for p in main.board.grid:
+			if main.board.grid[p].objective == kind:
+				have += 1
+		for i in 2 - have:
+			main.board.spawn_objective(kind)
+
+
+## Hold'em housekeeping: the re-deal card has a chance to turn up.
+func _holdem_upkeep() -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	if not in_room or room_goal != "holdem":
+		return
+	if not main.board.has_objective("redeal") and randf() < 0.35:
+		main.board.spawn_objective("redeal")
 
 
 ## Hazard cards still on the board — purge-room progress.
