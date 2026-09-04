@@ -63,6 +63,8 @@ var target_bar_fill: ColorRect
 var hand_display: Node2D
 var community_display: Node2D
 var _community_label: Label
+var outlaw: OutlawPortrait
+var _damage_flash: ColorRect
 var splash_layer: ColorRect
 var countdown_overlay: ColorRect
 var parallax: ParallaxScene
@@ -206,6 +208,14 @@ func _ready() -> void:
 						"min_bet": 10, "goal": "safe"}, false)
 				trail._bet_hands = 8
 				trail._confirm_bet()
+			"trailoutlaw":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail._choose_offer({"kind": "play", "tarot": "SHOWDOWN",
+						"label": "The Outlaw", "target": 0, "hands": 10, "odds": 2.5,
+						"min_bet": 10, "goal": "outlaw", "outlaw_hp": 6}, false)
+				trail._bet_hands = 8
+				trail._confirm_bet()
 			"trailboss":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -294,6 +304,8 @@ func _update_labels() -> void:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 
+	outlaw.visible = outlaw.dying or (mode_kind == "trail" and game_started \
+			and not menu_open and trail.in_room and trail.room_goal == "outlaw")
 	var show_community := not board.panel_cards().is_empty() \
 			and game_started and not menu_open
 	_community_label.visible = show_community
@@ -1149,6 +1161,13 @@ func _refresh_hand_display() -> void:
 		hand_display.add_child(mc)
 
 
+## The Outlaw landed one: a quick red blink over everything.
+func flash_red() -> void:
+	var tw := create_tween()
+	tw.tween_property(_damage_flash, "color:a", 0.26, 0.05)
+	tw.tween_property(_damage_flash, "color:a", 0.0, 0.4)
+
+
 ## Rebuilds the panel card row: the hold'em community, or the
 ## blackjack dealer's hand.
 func _refresh_community() -> void:
@@ -1260,6 +1279,19 @@ func _build_ui() -> void:
 	community_display.position = Vector2(PANEL_X + 26, 730)
 	community_display.scale = Vector2(0.62, 0.62)
 	hud_root.add_child(community_display)
+
+	# The Showdown's Outlaw, waiting in the left column.
+	outlaw = OutlawPortrait.new()
+	outlaw.position = Vector2(PANEL_X + 150, 790)
+	outlaw.visible = false
+	hud_root.add_child(outlaw)
+
+	# Red vignette blink when the Outlaw lands a shot.
+	_damage_flash = ColorRect.new()
+	_damage_flash.color = Color(0.8, 0.1, 0.1, 0.0)
+	_damage_flash.size = VIEW
+	_damage_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_root.add_child(_damage_flash)
 
 	# Arcade meter: a vertical bar beside the board that drains constantly.
 	meter_back = ColorRect.new()

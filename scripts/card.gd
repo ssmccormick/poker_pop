@@ -145,6 +145,7 @@ var cursed := false:  # trail-mode dead weight: unselectable, blocks chains
 var hazard := "":
 	set(value):
 		hazard = value
+		_update_ambient()
 		queue_redraw()
 var fuse := 0:  # bomb: hands until detonation
 	set(value):
@@ -157,6 +158,8 @@ var stone_hits := 0:  # stone: scoring uses left
 var wind_dir := Vector2i.RIGHT:
 	set(value):
 		wind_dir = value
+		if _ambient != null and hazard == "wind":
+			_ambient.direction = Vector2(wind_dir)
 		queue_redraw()
 var washed := false:  # splashed: rank/suit hidden from the player
 	set(value):
@@ -222,6 +225,93 @@ var error_flash := false:  # brief red border after an invalid submit
 	set(value):
 		error_flash = value
 		queue_redraw()
+
+# Ambient particles that live on the card while it's hazarded.
+var _ambient: CPUParticles2D
+
+
+## Every hazard smoulders, drips, sparks, or swirls constantly.
+func _update_ambient() -> void:
+	if _ambient != null:
+		_ambient.queue_free()
+		_ambient = null
+	if hazard == "":
+		return
+	var p := CPUParticles2D.new()
+	p.emitting = true
+	p.z_index = 3
+	p.explosiveness = 0.0
+	match hazard:
+		"fire":
+			p.position = Vector2(0, -6)
+			p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+			p.emission_rect_extents = Vector2(22, 12)
+			p.amount = 7
+			p.lifetime = 1.0
+			p.direction = Vector2.UP
+			p.spread = 25.0
+			p.gravity = Vector2(0, -150)
+			p.initial_velocity_min = 15.0
+			p.initial_velocity_max = 45.0
+			p.scale_amount_min = 2.0
+			p.scale_amount_max = 4.0
+			p.color = Color("e07830")
+		"bomb":
+			p.position = Vector2(-W / 2.0 + 22, H / 2.0 - 32)
+			p.amount = 5
+			p.lifetime = 0.45
+			p.direction = Vector2.UP
+			p.spread = 60.0
+			p.gravity = Vector2(0, 200)
+			p.initial_velocity_min = 30.0
+			p.initial_velocity_max = 70.0
+			p.scale_amount_min = 1.5
+			p.scale_amount_max = 2.5
+			p.color = Color("ffdf8a")
+		"water":
+			p.position = Vector2(0, H / 2.0 - 6)
+			p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+			p.emission_rect_extents = Vector2(24, 2)
+			p.amount = 3
+			p.lifetime = 0.8
+			p.direction = Vector2.DOWN
+			p.spread = 8.0
+			p.gravity = Vector2(0, 320)
+			p.initial_velocity_min = 5.0
+			p.initial_velocity_max = 20.0
+			p.scale_amount_min = 2.0
+			p.scale_amount_max = 3.0
+			p.color = Color("6fa8c9")
+		"wind":
+			p.position = Vector2.ZERO
+			p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+			p.emission_rect_extents = Vector2(20, 26)
+			p.amount = 5
+			p.lifetime = 0.55
+			p.direction = Vector2(wind_dir)
+			p.spread = 12.0
+			p.gravity = Vector2.ZERO
+			p.initial_velocity_min = 60.0
+			p.initial_velocity_max = 110.0
+			p.scale_amount_min = 1.5
+			p.scale_amount_max = 3.0
+			p.color = Color(0.7, 0.8, 0.85, 0.6)
+		"stone":
+			p.position = Vector2(0, H / 2.0 - 10)
+			p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+			p.emission_rect_extents = Vector2(22, 4)
+			p.amount = 2
+			p.lifetime = 0.9
+			p.direction = Vector2.DOWN
+			p.spread = 15.0
+			p.gravity = Vector2(0, 260)
+			p.initial_velocity_min = 5.0
+			p.initial_velocity_max = 15.0
+			p.scale_amount_min = 1.5
+			p.scale_amount_max = 2.5
+			p.color = Color(0.5, 0.5, 0.55, 0.7)
+	_ambient = p
+	add_child(p)
 
 
 ## Invalidates the cached styleboxes; call after a theme change.

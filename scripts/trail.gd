@@ -985,6 +985,7 @@ func _seed_room_specials() -> void:
 	elif room_goal == "blackjack":
 		_deal_dealer()
 	elif room_goal == "outlaw":
+		main.outlaw.appear(room_outlaw_hp)
 		for i in 2:
 			main.board.spawn_objective("bullet")
 		for i in 2:
@@ -1111,8 +1112,11 @@ func on_hand_played(result: Dictionary) -> void:
 		var caught := int(result.get("bullets_his", 0))
 		if hits > 0:
 			room_outlaw_hp -= hits
+			main.outlaw.set_hp(room_outlaw_hp)
+			main.outlaw.flinch()
 			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 1.0, -6.0)
 		if room_outlaw_hp <= 0:
+			main.outlaw.die()
 			_room_cleared()
 			return
 		# Weak hands (and touching HIS bullets) give him a free shot.
@@ -1120,6 +1124,8 @@ func on_hand_played(result: Dictionary) -> void:
 			caught += 1
 		if caught > 0:
 			room_grit -= caught
+			main.outlaw.shoot()
+			main.flash_red()
 			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 0.8, -5.0)
 			if room_grit <= 0:
 				_room_failed("GUNNED DOWN AT THE SHOWDOWN")
