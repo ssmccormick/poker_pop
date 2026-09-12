@@ -1088,6 +1088,9 @@ func on_hand_played(result: Dictionary) -> void:
 	if result.get("boss_defeated", false):
 		_room_cleared()
 		return
+	if result.get("jack_shrugged", false):
+		_announce_after_settle("THE JACK SCOFFS — BEAT %d TO WOUND HIM"
+				% main.board.jack_bar)
 	if result.get("chest_opened", false):
 		_open_chest()
 		if room_goal == "chest":
@@ -1474,7 +1477,8 @@ func boss_status() -> String:
 		var card: PlayingCard = main.board.grid[p]
 		match card.boss:
 			"jack":
-				return "JACK OF ALL TRADES   HP %d" % card.boss_hp
+				return "JACK OF ALL TRADES   HP %d  ·  BEAT %d TO WOUND" \
+						% [card.boss_hp, main.board.jack_bar]
 			"queen":
 				return "QUEEN BEE   STRIPES %d   (2-3 card hands!)" % card.boss_hp
 			"cobra":

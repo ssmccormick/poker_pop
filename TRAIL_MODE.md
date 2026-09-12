@@ -358,8 +358,10 @@ which makes deck sculpting the boss prep (stock queens before room 14).
 - **JACK OF ALL TRADES** (room 7) — a boss card with **10 HP**
   (blackjack Jack). Every submitted hand — including ones that clear
   him — makes him teleport and re-roll his rank AND suit. Pin him into
-  a scoring hand to deal 1 damage; do it ten times. HP badge on the
-  card. (Hand budget ~18 — needs playtest tuning, 10 pins is a chase.)
+  a scoring hand to deal 1 damage — but only hands **beating his bar**
+  count (starts 50, **+25 per wound**, shown in the banner); weaker
+  hands make him scoff and stay. Do it ten times. HP badge on the
+  card. A gust that blows him off the table still counts regardless.
 - **QUEEN BEE** (room 14) — **3 stripes** (HP); she and her honey can
   only be caught in **2–3 card hands** (the honey is sticky, and so is
   she — she's a Queen, so catching her means pairing queens). Her

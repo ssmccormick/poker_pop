@@ -822,7 +822,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 				PlayingCard.SUIT_NAMES[card.suit], card.rank])
 	match card.boss:
 		"jack":
-			lines.append("JACK OF ALL TRADES — HP %d. Clear him in a hand to wound him." % card.boss_hp)
+			lines.append("JACK OF ALL TRADES — HP %d. Only hands scoring %d+ wound him, and the bar rises per hit." % [card.boss_hp, board.jack_bar])
 		"queen":
 			lines.append("QUEEN BEE — %d stripes. Only 2-3 card hands can hold her." % card.boss_hp)
 		"cobra":
@@ -886,7 +886,7 @@ const TUTOR := {
 	"goal_mine": ["GOLD MINE", "The board is choked with stone. Break the asked number of stones (three scoring hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble. The plain cards between the rocks keep popping and shifting, so keep finding new seams."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
-	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to knock his health down. Ten hits puts him away."],
+	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to wound him, but only hands that BEAT HIS BAR count — and the bar rises with every hit. Ten wounds puts him away."],
 	"boss_queen": ["QUEEN BEE", "The Queen only fits in SMALL hands — 2 or 3 cards. She alternates: one hand she moves, the next she honeys a neighbor (honeyed cards also only play in small hands). Sting her three times."],
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],

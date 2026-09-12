@@ -227,6 +227,7 @@ func reset() -> void:
 	busy = true
 	suppress_refill = false
 	gold_rush = false
+	jack_bar = 0
 	holdem_community.clear()
 	blackjack_target = 0
 	blackjack_dealer_cards.clear()
@@ -534,7 +535,13 @@ func play_hand() -> void:
 	# the hand.
 	for card in selected:
 		match card.boss:
-			"jack", "queen":
+			"jack":
+				# The Jack shrugs off hands under his rising bar.
+				if jack_bar > 0 and result.score < jack_bar:
+					result["jack_shrugged"] = true
+				elif card.boss_hp <= 1:
+					result["boss_defeated"] = true
+			"queen":
 				if card.boss_hp <= 1:
 					result["boss_defeated"] = true
 			"cobra":
@@ -580,8 +587,14 @@ func play_hand() -> void:
 		card.selected = false
 		card.chain_index = 0
 		card.hand_valid = false
+		if card.boss == "jack" and result.get("jack_shrugged", false):
+			# Too weak to wound him — he stays, and his tick will
+			# reroll and teleport as usual.
+			continue
 		if card.boss == "jack" or card.boss == "queen":
 			card.boss_hp -= 1
+			if card.boss == "jack":
+				jack_bar += JACK_BAR_STEP
 			_play_sound(SFX_REVOLVERS.pick_random(), randf_range(0.95, 1.1), -8.0)
 			if card.boss_hp <= 0:
 				defeated_boss = true
@@ -1261,6 +1274,11 @@ static func migrate_mod(mod: String) -> String:
 const JACK_HP := 10
 const QUEEN_STRIPES := 3
 const COBRA_START_TAIL := 2
+# The Jack only respects strong hands: the hand that clears him must
+# beat this bar to wound him, and every wound raises it.
+const JACK_BAR_BASE := 50
+const JACK_BAR_STEP := 25
+var jack_bar := 0
 
 ## Converts a board card into the room's boss.
 func spawn_boss(kind: String) -> void:
@@ -1278,6 +1296,7 @@ func spawn_boss(kind: String) -> void:
 	match kind:
 		"jack":
 			card.boss_hp = JACK_HP
+			jack_bar = JACK_BAR_BASE
 			card.rank = randi_range(2, 14)
 			card.suit = randi_range(0, 3)
 		"queen":
