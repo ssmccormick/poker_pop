@@ -16,19 +16,8 @@ const WATER_BLUE := Color("6fa8c9")
 const WIND_BLUE := Color("9ec9d8")
 const BOOST_GREEN := Color("52d67e")
 const WILD_PURPLE := Color("b06fd8")
-const STONE_GRAY := Color(0.42, 0.42, 0.48, 0.4)
 const BOMB_BLACK := Color("141414")
 
-const FLAME_PX := [
-	"0001000",
-	"0011000",
-	"0011100",
-	"0111110",
-	"1111111",
-	"1110111",
-	"0111110",
-	"0011100",
-]
 const DROP_PX := [
 	"00100",
 	"00100",
@@ -153,8 +142,12 @@ var fuse := 0:  # bomb: hands until detonation
 		queue_redraw()
 var stone_hits := 0:  # stone: scoring uses left
 	set(value):
+		if value < stone_hits and hazard == "stone" and is_inside_tree():
+			_crumble_burst()
 		stone_hits = value
+		_stone_max = maxi(_stone_max, value)
 		queue_redraw()
+var _stone_max := 0  # heaviest the rock has been; cracks scale off it
 var wind_dir := Vector2i.RIGHT:
 	set(value):
 		wind_dir = value
@@ -228,10 +221,23 @@ var error_flash := false:  # brief red border after an invalid submit
 
 # Ambient particles that live on the card while it's hazarded.
 var _ambient: CPUParticles2D
+# Animation clock for the full-card hazard treatments; _phase keeps
+# every card's flames/waves/swirls out of step with its neighbours.
+var _t := 0.0
+var _phase := randf() * TAU
+
+
+func _process(delta: float) -> void:
+	if hazard == "":
+		set_process(false)
+		return
+	_t += delta
+	queue_redraw()
 
 
 ## Every hazard smoulders, drips, sparks, or swirls constantly.
 func _update_ambient() -> void:
+	set_process(hazard != "")
 	if _ambient != null:
 		_ambient.queue_free()
 		_ambient = null
@@ -434,8 +440,10 @@ func _draw() -> void:
 			draw_string(font, c + Vector2(-10, 5), str(fuse),
 					HORIZONTAL_ALIGNMENT_CENTER, 20, 14, Color.WHITE)
 		"fire":
-			_draw_pixel_map(FLAME_PX, Vector2(W / 2.0 - 14, H / 2.0 - 15), 3.0, FIRE_ORANGE)
+			_draw_fire(rect)
 		"wind":
+			_draw_wind_swirl()
+			# The direction arrow — the part that matters for planning.
 			var base := Vector2(W / 2.0 - 18, H / 2.0 - 17)
 			var v := Vector2(wind_dir) * 11.0
 			var perp := Vector2(-v.y, v.x).normalized() * 6.0
@@ -443,11 +451,11 @@ func _draw() -> void:
 			draw_colored_polygon(PackedVector2Array([
 				base + v * 1.5, base + v * 0.5 + perp, base + v * 0.5 - perp]), WIND_BLUE)
 		"stone":
-			draw_rect(rect.grow(-2), STONE_GRAY)
+			_draw_rock(rect)
 			for i in stone_hits:
 				draw_rect(Rect2(-13.0 + i * 10.0, H / 2.0 - 16.0, 7, 7), Color("3a3a40"))
 		"water":
-			_draw_pixel_map(DROP_PX, Vector2(W / 2.0 - 14, H / 2.0 - 15), 3.0, WATER_BLUE)
+			_draw_water(rect)
 
 	var mod_anchor := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
 	match mod:
@@ -627,3 +635,139 @@ func _draw_pixel_map(map: Array, center: Vector2, px: float, col: Color) -> void
 		for x in row.length():
 			if row[x] == "1":
 				draw_rect(Rect2(origin + Vector2(x * px, y * px), Vector2(px, px)), col)
+
+
+## The card is ablaze: a flickering heat tint over the whole face and
+## three layers of tongues climbing from the bottom — deep red at the
+## back, orange, then a bright core. Translucent so the rank survives.
+func _draw_fire(rect: Rect2) -> void:
+	var flicker := 0.05 * sin(_t * 9.0 + _phase)
+	draw_rect(rect.grow(-2), Color(0.95, 0.45, 0.1, 0.16 + flicker))
+	_draw_flame_layer(rect, rect.size.y * 0.72, 4, 5.1, Color(0.72, 0.16, 0.05, 0.75))
+	_draw_flame_layer(rect, rect.size.y * 0.5, 5, 6.3, Color(0.9, 0.46, 0.16, 0.8))
+	_draw_flame_layer(rect, rect.size.y * 0.3, 6, 7.9, Color(1.0, 0.85, 0.5, 0.8))
+
+
+## One strip of flame tongues along the bottom edge; peaks breathe
+## with the clock so the fire visibly dances.
+func _draw_flame_layer(rect: Rect2, max_h: float, tongues: int, speed: float,
+		col: Color) -> void:
+	var left := rect.position.x + 2.0
+	var width := rect.size.x - 4.0
+	var floor_y := rect.end.y - 2.0
+	var pts := PackedVector2Array()
+	pts.append(Vector2(left, floor_y))
+	var n := tongues * 2
+	for i in n + 1:
+		var x := left + width * i / n
+		var wave := 0.6 + 0.4 * sin(_t * speed + i * 2.1 + _phase)
+		var h := max_h * wave if i % 2 == 1 else max_h * wave * 0.3
+		pts.append(Vector2(x, floor_y - h))
+	pts.append(Vector2(left + width, floor_y))
+	draw_colored_polygon(pts, col)
+
+
+## Half-swamped: water fills the lower half behind a rolling waveline,
+## with the odd bubble working its way up to the surface.
+func _draw_water(rect: Rect2) -> void:
+	var level := rect.position.y + rect.size.y * 0.52
+	var surface := PackedVector2Array()
+	var n := 10
+	for i in n + 1:
+		var x := rect.position.x + 2.0 + (rect.size.x - 4.0) * i / n
+		surface.append(Vector2(x, level + 3.0 * sin(x * 0.16 + _t * 2.6 + _phase)))
+	var fill := surface.duplicate()
+	fill.append(Vector2(rect.end.x - 2.0, rect.end.y - 2.0))
+	fill.append(Vector2(rect.position.x + 2.0, rect.end.y - 2.0))
+	draw_colored_polygon(fill, Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.42))
+	draw_polyline(surface, Color(0.82, 0.93, 1.0, 0.8), 2.0)
+	for b in 3:
+		var cycle := fposmod(_t * (0.45 + b * 0.17) + b * 0.37 + _phase, 1.0)
+		var bx := rect.position.x + rect.size.x * (0.25 + 0.25 * b) \
+				+ 4.0 * sin(cycle * 9.0 + b)
+		var by := lerpf(rect.end.y - 8.0, level + 6.0, cycle)
+		draw_circle(Vector2(bx, by), 2.2,
+				Color(0.85, 0.95, 1.0, 0.55 * (1.0 - cycle * 0.5)))
+
+
+## Caught in a twister: translucent streaks orbiting the whole card,
+## front and back, so it reads as wrapped in moving air.
+func _draw_wind_swirl() -> void:
+	for k in 3:
+		var lead := _t * 2.6 + _phase + k * TAU / 3.0
+		var pts := PackedVector2Array()
+		for s in 9:
+			var a := lead - s * 0.11
+			pts.append(Vector2(cos(a) * W * 0.62, sin(a) * H * 0.42))
+		draw_polyline(pts, Color(0.75, 0.85, 0.9, 0.5), 3.0)
+
+
+## Solid rock over the face: a slab of jittered facets that lose
+## chunks (revealing the card) and gain cracks as scorings chip at it.
+func _draw_rock(rect: Rect2) -> void:
+	var total := maxi(_stone_max, 1)
+	var dmg := 1.0 - float(stone_hits) / total
+	var inner := rect.grow(-3)
+	var cols := 3
+	var rows := 4
+	var cw := inner.size.x / cols
+	var ch := inner.size.y / rows
+	var gone := int(floor(dmg * (cols * rows - 3)))
+	for i in cols * rows:
+		# Chunks fall off in a scattered (but stable) order.
+		if (i * 5 + 2) % (cols * rows) < gone:
+			continue
+		var cx := i % cols
+		var cy := i / cols
+		var o := Vector2(inner.position.x + cx * cw, inner.position.y + cy * ch)
+		var corners := PackedVector2Array([
+			o, o + Vector2(cw, 0), o + Vector2(cw, ch), o + Vector2(0, ch)])
+		for j in 4:
+			corners[j] += Vector2(sin(_phase * 3.0 + i * 1.7 + j * 2.3),
+					cos(_phase * 2.0 + i * 2.9 + j * 1.1)) * 3.0
+		var shade := 0.4 + 0.07 * float((i * 7 + int(_phase * 10.0)) % 3)
+		draw_colored_polygon(corners, Color(shade, shade, shade + 0.04, 0.55))
+	# Facet seams give it depth even when whole.
+	for cx in range(1, cols):
+		var x := inner.position.x + cx * cw
+		draw_line(Vector2(x, inner.position.y), Vector2(x, inner.end.y),
+				Color(0.2, 0.2, 0.24, 0.35), 1.5)
+	for cy in range(1, rows):
+		var y := inner.position.y + cy * ch
+		draw_line(Vector2(inner.position.x, y), Vector2(inner.end.x, y),
+				Color(0.2, 0.2, 0.24, 0.35), 1.5)
+	# Cracks spread from the middle as the rock weakens.
+	var cracks := ceili(dmg * 3.0)
+	for c in cracks:
+		var ang := _phase + c * 2.4
+		var p := Vector2(sin(ang) * 8.0, cos(ang) * 10.0)
+		var step := Vector2.RIGHT.rotated(ang) * 11.0
+		var pts := PackedVector2Array([p])
+		for s in 4:
+			p += step + Vector2(sin(_phase + c * 3.1 + s * 1.9) * 5.0,
+					cos(_phase + c * 1.3 + s * 2.7) * 5.0)
+			pts.append(p)
+		draw_polyline(pts, Color(0.12, 0.12, 0.15, 0.8), 2.0)
+
+
+## A scoring landed on the rock: grey shards break loose and fall.
+func _crumble_burst() -> void:
+	var p := CPUParticles2D.new()
+	p.one_shot = true
+	p.emitting = true
+	p.explosiveness = 1.0
+	p.amount = 10
+	p.lifetime = 0.7
+	p.z_index = 4
+	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	p.emission_rect_extents = Vector2(W * 0.35, H * 0.35)
+	p.direction = Vector2.DOWN
+	p.spread = 40.0
+	p.gravity = Vector2(0, 500)
+	p.initial_velocity_min = 40.0
+	p.initial_velocity_max = 110.0
+	p.scale_amount_min = 2.0
+	p.scale_amount_max = 4.0
+	p.color = Color(0.5, 0.5, 0.55)
+	add_child(p)
+	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
