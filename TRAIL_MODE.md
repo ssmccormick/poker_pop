@@ -41,19 +41,17 @@ bosses, regions.
   **Boss rooms are ALL-IN**: no bet choice — the whole stack rides at
   3:1. Shops never restock within a room, and the burn service costs
   more with every use (once per shop).
-- **Per-room wager — ante, bet, and promised hands**: every room
-  costs its **ante** (25 chips at the first table, climbing with depth
-  and table stakes — the house keeps it, win or lose). Then you **bet
-  chips on yourself** (minimum one ante, stepped in ante increments).
-  **Hands are free — they're what you're betting ON**: effective odds
-  = base odds × the tier's reference hands ÷ the hands you take
-  (1–12). Promise a 4-hand clear on a 7-hand Dangerous table and 2:1
-  becomes ×3.5; take 12 lazy hands and the odds shrink below base.
-  Clearing pays bet + bet × effective odds; failing loses ante and
-  bet. Timed tables sell MINUTES instead of hands — hands are
-  unlimited there, and promising fewer minutes fattens the odds the
-  same way. Bosses ignore all this: ALL IN at base odds, fixed hand
-  budget.
+- **Per-room wager — ante and bet at posted odds**: every room costs
+  its **ante** (25 chips at the first table, climbing with depth and
+  table stakes — the house keeps it, win or lose). Then you **bet
+  chips on yourself** at the table's posted odds (MIN / RAISE ×2 /
+  ALL IN). The hand budget (or minute budget on clock tables) is
+  FIXED by the table and tightens as the trail deepens — no haggling
+  over it. Clearing pays bet + bet × odds; failing loses ante and
+  bet. Bosses are ALL IN at base odds, fixed hand budget.
+  *(The old promise dial — trading fewer hands/minutes for fatter
+  odds — was removed 2026-09-12; difficulty now comes purely from
+  progression.)*
 - **Odds by room**: Steady 1:1 · Risky/Treasure/soft-Purge 3:2 ·
   Dangerous/Heist/hard-Purge/Called-Hands 2:1 · Royal Hunt 5:1 ·
   Boss 3:1.
@@ -101,7 +99,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | FLASH FLOOD | Purge room: water (shipped) |
 | GOLD MINE | Board choked with stone; break N to clear, gold cards turn up in the rubble (shipped) |
 | BANK JOB | Heist room (crack the safe — shipped) |
-| STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs ON THE CLOCK (unlimited hands, ~1 min per pair, minutes are the odds promise) — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
+| STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs ON THE CLOCK (unlimited hands, ~1 min per pair, fixed by the table) — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
 | DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
 | ROYAL HUNT | Make a Royal Flush, 5:1 (shipped, rare) |
 | HIGH NOON | Timed table: score the target before the clock dies (shipped) |
@@ -126,7 +124,7 @@ quarter clockwise every hand.
 | Gold Mine | ~12 of 25 cards are stone; break N stones (3 + region) to clear | Shipped. NOT a solid board — the plain cards between stones pop and refill so the mine shifts every hand (a solid board let one hand repeat 3×). Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash, room-local) |
 | Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
 | Royal Hunt | Make one Royal Flush | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
-| Timed | Score target before the clock; hands unlimited | Shipped (THE HANGED MAN, 2:1 base). The promise dial is MINUTES (1–6, reference 4→2 by region): fewer minutes promised = fatter odds. Hazards still tick per hand |
+| Timed | Score target before the clock; hands unlimited | Shipped (THE HANGED MAN, 2:1 base). The minute budget is fixed by the table (4→2 by region). Hazards still tick per hand |
 | Tight Hands | Target with very few hands (4–6) | Efficiency puzzle |
 | Suit Locked | Only 1–2 suits score | e.g. "red room": hearts/diamonds only |
 | Hand Locked | Only listed hand types score | e.g. "pairs are worthless tonight" |
@@ -142,7 +140,7 @@ quarter clockwise every hand.
   tables become TIME-limited (unlimited hands), merging HIGH NOON into
   the standard tables. CONDITION rooms (purges, mine, heist, treasure,
   called hands, variants, Outlaw) stay HAND-limited.
-- **CALL / RAISE / ALL IN** replaces the free bet + promise dials:
+- **CALL / RAISE / ALL IN** replaces the free bet dial:
   each room has a SET bet amount. CALL = play the room as offered.
   RAISE = bigger bet AND the room gains an extra complication (a
   second modifier — extra hazards, a mixed second mode, tighter
@@ -436,10 +434,11 @@ saves).
 - Run length → 20–60 min, player-controlled via cash-out.
 - Card picks → after every room, skippable, removal in shops.
 - Premium buy-ins → harder AND richer (stake-style modifiers).
-- Bet UX → ante + free bet + promised hands: the ante is sunk, the bet
-  is chosen, and the hand count scales the odds (fewer hands promised
-  = fatter payout). Replaced bought-hands, which replaced forced
-  stakes, which replaced the free slider; per-room min bets
+- Bet UX → ante + free bet at posted odds: the ante is sunk, the bet
+  is chosen, the table fixes the hand/minute budget. Replaced promised
+  hands (odds dial, removed 2026-09-12 — difficulty comes from
+  progression instead), which replaced bought-hands, which replaced
+  forced stakes, which replaced the free slider; per-room min bets
   printed on the tarot cards.
 - Bosses → court cards revived (JoAT/Queen Bee/King Cobra) + Dealer
   finale as heads-up duel with mirror counter-rules.

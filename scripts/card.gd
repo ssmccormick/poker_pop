@@ -116,6 +116,8 @@ var suit := 0
 var grid_pos := Vector2i.ZERO
 var selected := false:
 	set(value):
+		if value and not selected and hazard == "stone" and is_inside_tree():
+			_stone_dust()
 		selected = value
 		queue_redraw()
 var chain_index := 0:
@@ -239,13 +241,15 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-## Every hazard smoulders, drips, sparks, or swirls constantly.
+## Fire, bombs, water and wind smoulder, spark, drip, or swirl
+## constantly. Stone sits solid and silent — it only sheds dust when
+## touched (see _stone_dust / _crumble_burst).
 func _update_ambient() -> void:
-	set_process(hazard != "")
+	set_process(hazard != "" and hazard != "stone")
 	if _ambient != null:
 		_ambient.queue_free()
 		_ambient = null
-	if hazard == "":
+	if hazard == "" or hazard == "stone":
 		return
 	var p := CPUParticles2D.new()
 	p.emitting = true
@@ -306,20 +310,6 @@ func _update_ambient() -> void:
 			p.scale_amount_min = 1.5
 			p.scale_amount_max = 3.0
 			p.color = Color(0.7, 0.8, 0.85, 0.6)
-		"stone":
-			p.position = Vector2(0, H / 2.0 - 10)
-			p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-			p.emission_rect_extents = Vector2(22, 4)
-			p.amount = 2
-			p.lifetime = 0.9
-			p.direction = Vector2.DOWN
-			p.spread = 15.0
-			p.gravity = Vector2(0, 260)
-			p.initial_velocity_min = 5.0
-			p.initial_velocity_max = 15.0
-			p.scale_amount_min = 1.5
-			p.scale_amount_max = 2.5
-			p.color = Color(0.5, 0.5, 0.55, 0.7)
 	_ambient = p
 	add_child(p)
 
@@ -779,6 +769,29 @@ func _fuse_tip() -> Vector2:
 func _fuse_point(s: float) -> Vector2:
 	var base := Vector2(-W / 2.0 + 16, H / 2.0 - 17) + Vector2(3, -11)
 	return base + Vector2(9.0 * s + 4.0 * sin(s * 6.5), -27.0 * s)
+
+
+## Picking the rock up: a soft puff of dust off the surface.
+func _stone_dust() -> void:
+	var p := CPUParticles2D.new()
+	p.one_shot = true
+	p.emitting = true
+	p.explosiveness = 1.0
+	p.amount = 7
+	p.lifetime = 0.55
+	p.z_index = 4
+	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	p.emission_rect_extents = Vector2(W * 0.4, H * 0.4)
+	p.direction = Vector2.UP
+	p.spread = 80.0
+	p.gravity = Vector2(0, 60)
+	p.initial_velocity_min = 10.0
+	p.initial_velocity_max = 30.0
+	p.scale_amount_min = 2.0
+	p.scale_amount_max = 3.5
+	p.color = Color(0.62, 0.6, 0.54, 0.7)
+	add_child(p)
+	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
 
 
 ## A scoring landed on the rock: grey shards break loose and fall.

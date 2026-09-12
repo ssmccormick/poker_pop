@@ -196,7 +196,6 @@ func _ready() -> void:
 						trail._choose_offer(offer, false)
 						break
 				if m != "trailbet":
-					trail._bet_hands = 8
 					trail._confirm_bet()
 				if m == "trailhazard":
 					_debug_seed_hazards()
@@ -206,7 +205,6 @@ func _ready() -> void:
 				trail._choose_offer({"kind": "play", "tarot": "THE MOON",
 						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
 						"min_bet": 10, "goal": "safe"}, false)
-				trail._bet_hands = 8
 				trail._confirm_bet()
 			"trailoutlaw":
 				menu_layer.visible = false
@@ -214,7 +212,6 @@ func _ready() -> void:
 				trail._choose_offer({"kind": "play", "tarot": "SHOWDOWN",
 						"label": "The Outlaw", "target": 0, "hands": 10, "odds": 2.5,
 						"min_bet": 10, "goal": "outlaw", "outlaw_hp": 6}, false)
-				trail._bet_hands = 8
 				trail._confirm_bet()
 			"trailboss":
 				menu_layer.visible = false

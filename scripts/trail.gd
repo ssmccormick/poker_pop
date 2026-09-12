@@ -27,8 +27,8 @@ const TABLES := [
 ]
 
 # Room risk tiers offered by the draw, named for poker betting
-# structures. "hands" is the reference budget the odds promise scales
-# against.
+# structures. "hands" is the budget the table deals you — it shrinks
+# as the trail deepens; the player doesn't haggle over it.
 const RISKS := [
 	{"tarot": "LIMIT TABLE", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10},
 	{"tarot": "POT LIMIT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8},
@@ -36,12 +36,9 @@ const RISKS := [
 ]
 
 # Entering a room costs its ANTE (the house keeps it, win or lose),
-# then you BET chips on yourself. Hands are free — but they're the
-# thing you're betting on: effective odds = base odds × reference
-# hands ÷ hands taken, so promising a fast clear fattens the payout
-# and taking lazy hands shrinks it.
+# then you BET chips on yourself at the table's posted odds. The hand
+# (or minute) budget is fixed by the table and tightens with depth.
 const MAX_HANDS_BUY := 12
-const MIN_HANDS_TAKE := 1
 
 # Hazards are AMBIENT: any play room (bosses included) can be seeded,
 # with the chance and count climbing with depth and table stakes. The
@@ -84,8 +81,8 @@ const REQUIRE_POOLS := [
 			[["Four of a Kind", 1], ["Pair", 4], ["Two Pair", 1]]],
 ]
 
-const BASE_TARGET := 400          # table 1 target before scaling
-const TARGET_STEP := 85           # + per table (21-table curve)
+const BASE_TARGET := 1000         # table 1 target before scaling
+const TARGET_STEP := 200          # + per table (21-table curve)
 const BLIND_BASE := 25            # table 1 ante / minimum bet
 const BLIND_STEP := 8             # + per table cleared — the floor climbs
 const SHOP_CARD_PRICE := 40       # plain card
@@ -184,8 +181,6 @@ var _tarot_info: Label
 var _tarot_cards_box: Control
 var _bet_info: Label
 var _bet_stake_label: Label
-var _bet_hands := 8
-var _bet_hands_label: Label
 var _bet_amount := 0
 var _bet_amount_label: Label
 var _bet_deal_btn: Button
@@ -802,10 +797,6 @@ func _show_bet() -> void:
 	# A pending room bars the way — no backing out to a fresh draw.
 	_bet_back_btn.visible = pending_retry.is_empty()
 	_bet_amount = int(o.min_bet)
-	# Hands (or minutes, at a timed table) are free — they're what
-	# you're betting ON. Start at the tier's reference count.
-	var reference := int(o.get("minutes", 4)) if _is_timed(o) else int(o.hands)
-	_bet_hands = clampi(reference, MIN_HANDS_TAKE, _promise_cap())
 	_refresh_bet_labels()
 	bet_layer.visible = true
 
@@ -817,20 +808,6 @@ func _is_timed(o: Dictionary) -> bool:
 ## Rooms that run on the clock instead of a hand budget.
 func room_on_clock() -> bool:
 	return room_limit == "time"
-
-
-## The most of the promise currency (hands or minutes) a table sells.
-func _promise_cap() -> int:
-	return TIMED_MAX_MINUTES if _is_timed(current_offer) else MAX_HANDS_BUY
-
-
-## Promise a faster clear, get fatter odds: base odds scaled by the
-## tier's reference budget over what you actually take (hands, or
-## minutes at a timed table).
-func _eff_odds() -> float:
-	var o := current_offer
-	var reference := float(o.get("minutes", 4)) if _is_timed(o) else float(o.hands)
-	return float(o.odds) * reference / float(maxi(MIN_HANDS_TAKE, _bet_hands))
 
 
 func _max_bet() -> int:
@@ -875,13 +852,12 @@ func _refresh_bet_labels() -> void:
 	var unit := "min" if _is_timed(o) else "hands"
 	var reference := int(o.get("minutes", 4)) if _is_timed(o) else int(o.hands)
 	_bet_amount = clampi(_bet_amount, blind, _max_bet())
-	_bet_info.text = "%s — %s table\n%s   ·   base odds %s at %d %s\nAnte %d — the house keeps it\nYour chips: %d%s" % [
+	_bet_info.text = "%s — %s table\n%s   ·   odds %s   ·   %d %s to do it\nAnte %d — the house keeps it\nYour chips: %d%s" % [
 		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), reference,
 		unit, blind, chips, retry_line]
 	_bet_amount_label.text = "BET  %d" % _bet_amount
-	_bet_hands_label.text = "%d %s" % [_bet_hands, unit.to_upper()]
 	_bet_stake_label.text = "Odds ×%.2f      clearing pays back %d" % [
-		_eff_odds(), _bet_amount + int(_bet_amount * _eff_odds())]
+		float(o.odds), _bet_amount + int(_bet_amount * float(o.odds))]
 
 
 func _confirm_bet() -> void:
@@ -889,12 +865,8 @@ func _confirm_bet() -> void:
 	var o := current_offer
 	var blind := int(o.min_bet)
 	stake = clampi(_bet_amount, blind, maxi(blind, chips - blind))
-	stake_odds = _eff_odds()
+	stake_odds = float(o.odds)
 	chips -= blind + stake
-	if _is_timed(o):
-		o["minutes_bought"] = _bet_hands
-	else:
-		o["hands_bought"] = _bet_hands
 	bet_layer.visible = false
 	_start_room()
 
@@ -1810,19 +1782,7 @@ func build_ui() -> void:
 	bet_allin.pressed.connect(func() -> void:
 		_bet_amount = _max_bet()
 		_refresh_bet_labels())
-	var minus: Button = main._button(bet_layer, "−", Vector2(700, 510), Vector2(100, 70))
-	minus.add_theme_font_size_override("font_size", 40)
-	minus.pressed.connect(func() -> void:
-		_bet_hands = maxi(MIN_HANDS_TAKE, _bet_hands - 1)
-		_refresh_bet_labels())
-	_bet_hands_label = _center(bet_layer, "", 528, 34, main.OFFWHITE)
-	var plus: Button = main._button(bet_layer, "+", Vector2(1120, 510), Vector2(100, 70))
-	plus.add_theme_font_size_override("font_size", 40)
-	plus.pressed.connect(func() -> void:
-		_bet_hands = mini(_promise_cap(), _bet_hands + 1)
-		_refresh_bet_labels())
-	_center(bet_layer, "Hands are free — fewer hands promised, fatter odds on your bet.", 600, 18, main.DIM)
-	_bet_stake_label = _center(bet_layer, "", 640, 36, main.GOLD)
+	_bet_stake_label = _center(bet_layer, "", 560, 36, main.GOLD)
 	_bet_deal_btn = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70))
 	_bet_deal_btn.add_theme_font_size_override("font_size", 28)
 	_bet_deal_btn.pressed.connect(_confirm_bet)
