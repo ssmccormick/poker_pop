@@ -722,8 +722,12 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "chest":
 			goal_line = "OPEN %d CHESTS\nWIN A RELIC" % int(offer.get("chest_count", 1))
 		elif offer.get("goal", "") == "purge":
-			goal_line = "CLEAR %d %s CARDS" % [offer.purge_count,
-					String(offer.purge_kind).to_upper()]
+			if offer.purge_kind == "fire":
+				# Fire spreads: the seeded count is only where it starts.
+				goal_line = "CLEAR ALL FIRE CARDS\n(%d to start)" % offer.purge_count
+			else:
+				goal_line = "CLEAR %d %s CARDS" % [offer.purge_count,
+						String(offer.purge_kind).to_upper()]
 		elif offer.get("goal", "") == "mine":
 			goal_line = "BREAK %d STONES — FIND GOLD" % offer.stones
 		elif offer.get("goal", "") == "holdem":
@@ -841,6 +845,8 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Open %d chests — a RELIC rides in the strongbox" \
 					% int(o.get("chest_count", 1))
 		"purge":
+			if o.purge_kind == "fire":
+				return "Clear ALL fire cards — %d to start, and it spreads" % o.purge_count
 			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
 		"mine":
 			return "Break %d stones (gold in the rubble)" % o.stones
