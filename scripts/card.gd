@@ -139,7 +139,11 @@ var hazard := "":
 var fuse := 0:  # bomb: hands until detonation
 	set(value):
 		fuse = value
+		_fuse_max = maxi(_fuse_max, value)
+		if _ambient != null and hazard == "bomb":
+			_ambient.position = _fuse_tip()
 		queue_redraw()
+var _fuse_max := 0  # longest this fuse has been; burn length scales off it
 var stone_hits := 0:  # stone: scoring uses left
 	set(value):
 		if value < stone_hits and hazard == "stone" and is_inside_tree():
@@ -263,7 +267,7 @@ func _update_ambient() -> void:
 			p.scale_amount_max = 4.0
 			p.color = Color("e07830")
 		"bomb":
-			p.position = Vector2(-W / 2.0 + 22, H / 2.0 - 32)
+			p.position = _fuse_tip()
 			p.amount = 5
 			p.lifetime = 0.45
 			p.direction = Vector2.UP
@@ -435,8 +439,23 @@ func _draw() -> void:
 	match hazard:
 		"bomb":
 			var c := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
+			# The fuse rope, one notch shorter every hand.
+			var burn := float(fuse) / maxi(_fuse_max, 1)
+			var rope := PackedVector2Array()
+			var steps := maxi(ceili(burn * 8.0), 1)
+			for i in steps + 1:
+				rope.append(_fuse_point(burn * i / steps))
+			if rope.size() >= 2:
+				draw_polyline(rope, Color("8a6a42"), 3.0)
+			# The burning end: a flickering spark.
+			var tip := _fuse_point(burn)
+			var pulse := 0.5 + 0.5 * sin(_t * 16.0 + _phase)
+			for k in 4:
+				var ray := Vector2.RIGHT.rotated(_t * 7.0 + k * TAU / 4.0)
+				draw_line(tip + ray * 2.0, tip + ray * (5.0 + 3.0 * pulse),
+						Color("ffdf8a"), 2.0)
+			draw_circle(tip, 2.6 + 1.2 * pulse, Color(1.0, 0.95, 0.8))
 			draw_circle(c, 12, BOMB_BLACK)
-			draw_rect(Rect2(c + Vector2(6, -14), Vector2(4, 4)), ERROR_RED)
 			draw_string(font, c + Vector2(-10, 5), str(fuse),
 					HORIZONTAL_ALIGNMENT_CENTER, 20, 14, Color.WHITE)
 		"fire":
@@ -748,6 +767,18 @@ func _draw_rock(rect: Rect2) -> void:
 					cos(_phase + c * 1.3 + s * 2.7) * 5.0)
 			pts.append(p)
 		draw_polyline(pts, Color(0.12, 0.12, 0.15, 0.8), 2.0)
+
+
+## Where the burning end of the fuse currently sits.
+func _fuse_tip() -> Vector2:
+	return _fuse_point(float(fuse) / maxi(_fuse_max, 1))
+
+
+## A point along the fuse rope: s = 0 at the bomb, 1 = the full,
+## freshly-lit length. Curls up and to the right with a wiggle.
+func _fuse_point(s: float) -> Vector2:
+	var base := Vector2(-W / 2.0 + 16, H / 2.0 - 17) + Vector2(3, -11)
+	return base + Vector2(9.0 * s + 4.0 * sin(s * 6.5), -27.0 * s)
 
 
 ## A scoring landed on the rock: grey shards break loose and fall.
