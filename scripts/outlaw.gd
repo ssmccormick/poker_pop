@@ -16,6 +16,7 @@ const HP_BACK := Color("2a2a2a")
 var hp := 5
 var max_hp := 5
 var dying := false
+var _home := Vector2.ZERO  # placement in the panel, captured at ready
 var _flash := 0.0:
 	set(value):
 		_flash = value
@@ -24,6 +25,7 @@ var _idle_tween: Tween
 
 
 func _ready() -> void:
+	_home = position
 	_start_idle()
 
 
@@ -43,7 +45,7 @@ func appear(new_max: int) -> void:
 	hp = new_max
 	dying = false
 	modulate = Color(1, 1, 1, 1)
-	position.y = 0.0
+	position = _home  # back to his spot (die() drops him out of frame)
 	scale = Vector2.ONE
 	_start_idle()
 	queue_redraw()
@@ -55,13 +57,15 @@ func set_hp(new_hp: int) -> void:
 
 
 ## He takes a bullet: a sharp sideways jolt and a red blink.
+## Absolute around home, so repeated hits can never drift him.
 func flinch() -> void:
 	if dying:
 		return
+	position.x = _home.x
 	var tw := create_tween()
-	tw.tween_property(self, "position:x", 14.0, 0.05).as_relative()
+	tw.tween_property(self, "position:x", _home.x + 14.0, 0.05)
 	tw.parallel().tween_property(self, "modulate", Color(1.6, 0.6, 0.6), 0.08)
-	tw.tween_property(self, "position:x", -14.0, 0.09).as_relative()
+	tw.tween_property(self, "position:x", _home.x, 0.09)
 	tw.tween_property(self, "modulate", Color(1, 1, 1), 0.25)
 
 
