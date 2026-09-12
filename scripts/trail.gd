@@ -66,26 +66,26 @@ const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 # GOLD MINE instead (its own room type).
 const PURGE_TAROTS := {"bomb": "POWDER KEG", "fire": "WILDFIRE",
 		"wind": "DUST STORM", "water": "FLASH FLOOD"}
-const GOLD_MINE_STONES_BASE := 3   # stones to break, +1 per region
+const GOLD_MINE_STONES_BASE := 4   # stones to break, +1 per region
 const GOLD_MINE_STONE_SEED := 12   # stones seeded (about half the board)
 # Called-hands templates by region: [hand name, count] — exact hands
 # only (this game scores exact compositions, so a Full House is NOT
 # three Pairs).
 const REQUIRE_POOLS := [
-	[[["Pair", 4], ["Two Pair", 1]], [["Pair", 3], ["Three of a Kind", 2]],
-			[["Pair", 5]]],
-	[[["Two Pair", 2], ["Pair", 2], ["Three of a Kind", 1]],
-			[["Three of a Kind", 3], ["Pair", 2]],
-			[["Straight", 1], ["Pair", 3], ["Two Pair", 1]],
-			[["Flush", 1], ["Pair", 3]]],
-	[[["Flush", 2], ["Pair", 2], ["Two Pair", 1]],
-			[["Full House", 1], ["Three of a Kind", 2], ["Pair", 2]],
-			[["Straight", 2], ["Two Pair", 2]],
-			[["Four of a Kind", 1], ["Pair", 3]]],
+	[[["Pair", 5], ["Two Pair", 1]], [["Pair", 4], ["Three of a Kind", 2]],
+			[["Pair", 6]]],
+	[[["Two Pair", 2], ["Pair", 3], ["Three of a Kind", 1]],
+			[["Three of a Kind", 3], ["Pair", 3]],
+			[["Straight", 1], ["Pair", 4], ["Two Pair", 1]],
+			[["Flush", 1], ["Pair", 4], ["Two Pair", 1]]],
+	[[["Flush", 2], ["Pair", 3], ["Two Pair", 2]],
+			[["Full House", 1], ["Three of a Kind", 2], ["Pair", 3]],
+			[["Straight", 2], ["Two Pair", 3], ["Pair", 2]],
+			[["Four of a Kind", 1], ["Pair", 4], ["Two Pair", 1]]],
 ]
 
-const BASE_TARGET := 300          # table 1 target before scaling
-const TARGET_STEP := 65           # + per table (21-table curve)
+const BASE_TARGET := 400          # table 1 target before scaling
+const TARGET_STEP := 85           # + per table (21-table curve)
 const BLIND_BASE := 25            # table 1 ante / minimum bet
 const BLIND_STEP := 8             # + per table cleared — the floor climbs
 const SHOP_CARD_PRICE := 40       # plain card
@@ -154,7 +154,7 @@ var room_outlaw_hp := 5          # showdown: the Outlaw's health...
 var room_outlaw_max := 5
 var room_grit := 3               # ...and yours
 const OUTLAW_GRIT := 3
-const OUTLAW_BAR_BASE := 60      # score under this and he fires (+ per region)
+const OUTLAW_BAR_BASE := 75      # score under this and he fires (+ per region)
 var relics: Array = []   # relic ids held this run
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
@@ -602,7 +602,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 2.0 if kind in ["bomb", "fire"] else 1.5
 				offer["goal"] = "purge"
 				offer["purge_kind"] = kind
-				offer["purge_count"] = mini(3 + region, 6)
+				offer["purge_count"] = mini(4 + region, 7)
 				offer.hands = maxi(1, 8 - region)
 				offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE:
@@ -619,9 +619,9 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 1.5 if region == 0 else 2.0
 				var pool: Array = REQUIRE_POOLS[mini(region, REQUIRE_POOLS.size() - 1)]
 				offer["require"] = (pool.pick_random() as Array).duplicate(true)
-			# ~5 called hands on a tight 8-hand budget: every hand
-			# should be working toward a demand.
-			offer.hands = 8
+			# ~6-7 called hands on a 9-hand reference: barely any
+			# hands to waste — every play works toward a demand.
+			offer.hands = 9
 			offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
 				+ HOLDEM_CHANCE:
@@ -647,8 +647,8 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer.label = "Twenty-One"
 			offer.odds = 2.0
 			offer["goal"] = "blackjack"
-			offer["wins"] = 3 + region
-			offer.hands = mini(MAX_HANDS_BUY, 3 * (3 + region))
+			offer["wins"] = 4 + region
+			offer.hands = mini(MAX_HANDS_BUY, 2 * (4 + region) + 1)
 			offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
 				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
@@ -658,7 +658,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer.label = "The Outlaw"
 			offer.odds = 2.5
 			offer["goal"] = "outlaw"
-			offer["outlaw_hp"] = 5 + region
+			offer["outlaw_hp"] = 6 + region
 			offer.hands = 10
 			offer.target = 0
 	# Every job deals as either a HAND BUDGET or a COUNTDOWN (50/50).
@@ -666,7 +666,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 	if randf() < 0.5:
 		offer["limit"] = "time"
 		if not offer.has("minutes"):
-			offer["minutes"] = clampi(roundi(int(offer.hands) * 0.4), 2,
+			offer["minutes"] = clampi(roundi(int(offer.hands) * 0.35), 2,
 					TIMED_MAX_MINUTES)
 		if offer.get("goal", "") == "":
 			offer.tarot = "HIGH NOON"
