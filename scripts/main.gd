@@ -910,7 +910,7 @@ const TUTOR := {
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
-	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house. Chain cards summing as close to 21 as you dare (faces 10, aces 11 or 1): beat the DEALER'S TOTAL without busting to win the round. Win enough rounds to clear."],
+	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house. Chain cards summing as close to 21 as you dare (faces 10, aces 11 or 1): beat the DEALER'S TOTAL without busting to win the round. Win enough rounds to clear — and the house deals dirty: hazards stay in play the whole table."],
 	"goal_outlaw": ["SHOWDOWN", "The Outlaw waits. Clear YOUR bullets (gold) in scoring hands to shoot him; touch HIS bullets (red) and he shoots you. Weak hands under the posted score give him a free shot too. Run out of GRIT and you're done — gun him down first."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
 }

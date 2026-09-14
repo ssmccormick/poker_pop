@@ -105,7 +105,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | HIGH NOON | Timed table: score the target before the clock dies (shipped) |
 | TEXAS HOLD'EM | Variant: persistent 5-card community, pick 2 hole cards, best playable subset of the 7 scores; RE-DEAL card refreshes the community (shipped) |
 | CRAZY 8s | Variant: every 8 is WILD, but the board crawls with a mixed hazard storm (8 + region seeded, replenished each hand); score target (shipped) |
-| BLACKJACK | Variant: poker off — chains score their pip sum (faces 10, aces 11/1); beat the dealer's 16–20 without busting, 3+region wins to clear (shipped) |
+| BLACKJACK | Variant: poker off — chains score their pip sum (faces 10, aces 11/1); beat the dealer's 16–20 without busting, 3+region wins to clear; hazard storm of 5 + region, replenished (shipped) |
 | SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (5+region HP), HIS red bullets shoot you, weak hands under the posted score give him free shots; 3 GRIT (shipped) |
 
 **Goal vs limit**: every non-boss room now rolls its challenge type
@@ -165,7 +165,10 @@ quarter clockwise every hand.
 - **BLACKJACK**: poker hands OFF; you play against the house. Each
   round the dealer draws a total (17–21); select a chain whose PIP SUM
   (faces 10, ace 11/1) beats the dealer without exceeding 21 to win
-  the round. Bust = rejected. Beat the dealer N times to clear.
+  the round. Bust = rejected. Beat the dealer N times to clear. The
+  house deals dirty: a guaranteed mixed hazard storm of 5 (+1 per
+  region), replenished each hand like Crazy 8s — exempt from the
+  ambient roll.
 - **SHOWDOWN — the Outlaw**: an Outlaw portrait with HP beside the
   board. YOUR bullet cards and HIS bullet cards spawn among the deals.
   Clear YOUR bullets in scoring hands → shots that damage him. Clear
