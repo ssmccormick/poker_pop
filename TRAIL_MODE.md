@@ -104,7 +104,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | ROYAL HUNT | Make a Royal Flush, 5:1 (shipped, rare) |
 | HIGH NOON | Timed table: score the target before the clock dies (shipped) |
 | TEXAS HOLD'EM | Variant: persistent 5-card community, pick 2 hole cards, best playable subset of the 7 scores; RE-DEAL card refreshes the community (shipped) |
-| CRAZY 8s | Variant: every 8 on the board is WILD; score target (shipped) |
+| CRAZY 8s | Variant: every 8 is WILD, but the board crawls with a mixed hazard storm (8 + region seeded, replenished each hand); score target (shipped) |
 | BLACKJACK | Variant: poker off — chains score their pip sum (faces 10, aces 11/1); beat the dealer's 16–20 without busting, 3+region wins to clear (shipped) |
 | SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (5+region HP), HIS red bullets shoot you, weak hands under the posted score give him free shots; 3 GRIT (shipped) |
 
@@ -157,7 +157,11 @@ quarter clockwise every hand.
   hold'em). A RE-DEAL card has a chance to be dealt to the board;
   scoring it refreshes the community 5.
 - **CRAZY 8s**: every 8 on the board is WILD (counts as any rank and
-  suit). Otherwise a normal score room.
+  suit) — and the house evens the odds with a TON of hazards: a mixed
+  storm of 8 (+1 per region) seeded at the deal, and whenever clears
+  drop the board below that level, a fresh hazard rolls in on the
+  next hand. Exempt from the normal ambient hazard roll (the storm IS
+  the roll).
 - **BLACKJACK**: poker hands OFF; you play against the house. Each
   round the dealer draws a total (17–21); select a chain whose PIP SUM
   (faces 10, ace 11/1) beats the dealer without exceeding 21 to win

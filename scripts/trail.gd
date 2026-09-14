@@ -49,6 +49,7 @@ const HAZARD_ROOM_STEP := 0.04   # + per room index
 const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
 const OBJECTIVE_CHANCE := 0.12   # heist/treasure rooms, from room 2 on
 const PURGE_CHANCE := 0.14       # purge rooms: board of one hazard, clear them all
+const CRAZY8_HAZARDS_BASE := 8   # crazy-8s hazard storm (+1 per region)
 const REQUIRE_CHANCE := 0.12     # called-hands rooms: play the demanded hands
 const ROYAL_CHANCE := 0.10       # of called-hands rooms (region 2+): THE WORLD
 const TIMED_MAX_MINUTES := 6     # the most time a clock table will sell
@@ -728,7 +729,7 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "holdem":
 			goal_line = "TARGET %d — HOLD'EM RULES" % offer.target
 		elif offer.get("goal", "") == "crazy8":
-			goal_line = "TARGET %d — 8s ARE WILD" % offer.target
+			goal_line = "TARGET %d — 8s WILD, HAZARDS EVERYWHERE" % offer.target
 		elif offer.get("goal", "") == "blackjack":
 			goal_line = "BEAT THE DEALER %d TIMES" % offer.wins
 		elif offer.get("goal", "") == "outlaw":
@@ -830,7 +831,7 @@ func _bet_goal_text(o: Dictionary) -> String:
 		"holdem":
 			return "Target %d — pick 2 hole cards, best 5 of 7 with the community" % o.target
 		"crazy8":
-			return "Target %d — every 8 on the board is WILD" % o.target
+			return "Target %d — every 8 is WILD, but the board crawls with hazards" % o.target
 		"blackjack":
 			return "Beat the dealer %d times — sum to 21, don't bust" % o.wins
 		"outlaw":
@@ -960,6 +961,11 @@ func _seed_room_specials() -> void:
 		main.board.eights_wild = true
 		PlayingCard.eights_wild = true
 		main.board.apply_theme()  # repaint so the 8s show their W
+		# The house evens the odds: wild 8s, but the board CRAWLS with
+		# hazards — a mixed storm far past any ambient roll.
+		var storm := CRAZY8_HAZARDS_BASE + room_index / REGION_SIZE
+		for i in storm:
+			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
 	elif room_goal == "blackjack":
 		_deal_dealer()
 	elif room_goal == "outlaw":
@@ -977,8 +983,9 @@ func _seed_room_specials() -> void:
 			main.board.spawn_key_and_chest()
 	# Hazards are ambient in EVERY play room — bosses included — and
 	# get more frequent and more numerous with depth and stakes.
-	# Purge rooms are exempt: their hazards ARE the room.
-	if room_goal != "purge":
+	# Purge rooms are exempt (their hazards ARE the room), and so are
+	# Crazy 8s tables (their storm is already seeded above).
+	if room_goal != "purge" and room_goal != "crazy8":
 		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * room_index
 				+ HAZARD_TIER_STEP * table_tier, 0.0, 0.95)
 		if randf() < hz_chance:
@@ -1079,6 +1086,16 @@ func on_hand_played(result: Dictionary) -> void:
 		return
 	if room_goal == "holdem":
 		_holdem_upkeep()
+	if room_goal == "crazy8":
+		# The storm doesn't blow over: whenever the board calms below
+		# its seeded level, a fresh hazard rolls in.
+		var floor_count := CRAZY8_HAZARDS_BASE + room_index / REGION_SIZE
+		var live := 0
+		for p in main.board.grid:
+			if main.board.grid[p].hazard != "":
+				live += 1
+		if live < floor_count:
+			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
 	if room_goal == "blackjack" and result.get("blackjack_win", false):
 		room_wins += 1
 		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
