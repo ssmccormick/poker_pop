@@ -99,6 +99,8 @@ const SUIT_PIXELS := [SPADE_PX, HEART_PX, DIAMOND_PX, CLUB_PX]
 
 # Magnifying Glass relic: soaked cards still reveal their suit.
 static var washed_show_suit := false
+# Weathervane relic: hazards telegraph the card they strike next.
+static var show_hazard_intent := false
 # CRAZY 8s room: every 8 on the board is wild (drawn with a W badge).
 static var eights_wild := false
 
@@ -159,6 +161,12 @@ var wind_dir := Vector2i.RIGHT:
 		wind_dir = value
 		if _ambient != null and hazard == "wind":
 			_ambient.direction = Vector2(wind_dir)
+		queue_redraw()
+# Fire/water: the neighbor this hazard strikes next (re-rolled each
+# tick by the board). Only ever shown through the Weathervane.
+var next_dir := Vector2i.RIGHT:
+	set(value):
+		next_dir = value
 		queue_redraw()
 var washed := false:  # splashed: rank/suit hidden from the player
 	set(value):
@@ -450,21 +458,22 @@ func _draw() -> void:
 					HORIZONTAL_ALIGNMENT_CENTER, 20, 14, Color.WHITE)
 		"fire":
 			_draw_fire(rect)
+			if show_hazard_intent:
+				_draw_intent_arrow(next_dir, Color(1.0, 0.85, 0.5))
 		"wind":
 			_draw_wind_swirl()
-			# The direction arrow — the part that matters for planning.
-			var base := Vector2(W / 2.0 - 18, H / 2.0 - 17)
-			var v := Vector2(wind_dir) * 11.0
-			var perp := Vector2(-v.y, v.x).normalized() * 6.0
-			draw_line(base - v, base + v, WIND_BLUE, 4.0)
-			draw_colored_polygon(PackedVector2Array([
-				base + v * 1.5, base + v * 0.5 + perp, base + v * 0.5 - perp]), WIND_BLUE)
+			# Which way it blows is a secret — unless you carry the
+			# Weathervane.
+			if show_hazard_intent:
+				_draw_intent_arrow(wind_dir, WIND_BLUE)
 		"stone":
 			_draw_rock(rect)
 			for i in stone_hits:
 				draw_rect(Rect2(-13.0 + i * 10.0, H / 2.0 - 16.0, 7, 7), Color("3a3a40"))
 		"water":
 			_draw_water(rect)
+			if show_hazard_intent:
+				_draw_intent_arrow(next_dir, Color(0.85, 0.95, 1.0))
 
 	var mod_anchor := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
 	match mod:
@@ -757,6 +766,17 @@ func _draw_rock(rect: Rect2) -> void:
 					cos(_phase + c * 1.3 + s * 2.7) * 5.0)
 			pts.append(p)
 		draw_polyline(pts, Color(0.12, 0.12, 0.15, 0.8), 2.0)
+
+
+## The Weathervane tell: an arrow toward the card this hazard
+## strikes next.
+func _draw_intent_arrow(dir: Vector2i, col: Color) -> void:
+	var base := Vector2(W / 2.0 - 18, H / 2.0 - 17)
+	var v := Vector2(dir) * 11.0
+	var perp := Vector2(-v.y, v.x).normalized() * 6.0
+	draw_line(base - v, base + v, col, 4.0)
+	draw_colored_polygon(PackedVector2Array([
+		base + v * 1.5, base + v * 0.5 + perp, base + v * 0.5 - perp]), col)
 
 
 ## Where the burning end of the fuse currently sits.

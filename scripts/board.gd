@@ -1611,6 +1611,18 @@ func _init_hazard(card: PlayingCard, kind: String) -> void:
 			card.stone_hits = STONE_HITS_START
 		"wind":
 			card.wind_dir = HAZARD_DIRS.pick_random()
+		"fire", "water":
+			card.next_dir = HAZARD_DIRS.pick_random()
+
+
+## Direction priority for a spreading hazard: the telegraphed intent
+## first, the rest shuffled behind it — so the Weathervane's arrow is
+## an honest promise whenever its target is takeable.
+func _intent_dirs(card: PlayingCard) -> Array:
+	var rest := HAZARD_DIRS.duplicate()
+	rest.erase(card.next_dir)
+	rest.shuffle()
+	return [card.next_dir] + rest
 
 
 func apply_room_hazards(kind: String, count: int) -> void:
@@ -1711,9 +1723,7 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		if grid[p].hazard == "water":
 			waters.append(p)
 	for p in waters:
-		var dirs := HAZARD_DIRS.duplicate()
-		dirs.shuffle()
-		for d in dirs:
+		for d in _intent_dirs(grid[p]):
 			var q: Vector2i = p + d
 			if not grid.has(q):
 				continue
@@ -1724,6 +1734,7 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 				victim.washed = true
 				soaked.append(q)
 				break
+		grid[p].next_dir = HAZARD_DIRS.pick_random()
 	var fires: Array = []
 	if tick_fire:
 		for p in grid:
@@ -1734,9 +1745,7 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	# Fresh fires start spreading and burning down on the NEXT tick.
 	var ignited: Array = []
 	for p in fires:
-		var fdirs := HAZARD_DIRS.duplicate()
-		fdirs.shuffle()
-		for d in fdirs:
+		for d in _intent_dirs(grid[p]):
 			var q: Vector2i = p + d
 			if not grid.has(q):
 				continue
@@ -1745,8 +1754,10 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 					and card.boss == "" and not card.is_safe \
 					and not card.snake_tail and card.objective == "":
 				card.hazard = "fire"
+				card.next_dir = HAZARD_DIRS.pick_random()
 				ignited.append(q)
 				break
+		grid[p].next_dir = HAZARD_DIRS.pick_random()
 	# Then the fire eats: rank drops, and below 2 the card burns up
 	# (unscored) — the spreading already happened above.
 	var burned: Array = []

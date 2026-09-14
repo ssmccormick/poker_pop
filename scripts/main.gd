@@ -856,7 +856,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"fire":
 			lines.append("FIRE — spreads every hand and burns its rank down. Play it to douse it.")
 		"wind":
-			lines.append("WIND — play it and everything along the arrow blows off the board. The arrow turns each hand.")
+			lines.append("WIND — play it and everything in the wind's direction blows off the board. The direction turns each hand — and stays hidden unless you carry the Weathervane.")
 		"stone":
 			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
 					"" if card.stone_hits == 1 else "s"])
@@ -896,7 +896,7 @@ const TUTOR := {
 	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
 	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero, the table is lost."],
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. Play burning cards to put them out — and if EVERY card on the table catches fire, the table is LOST."],
-	"hazard_wind": ["WIND CARD", "Play it and every card in the arrow's direction is blown clean off the board — unscored. The arrow turns a quarter every hand, so time your gust. Aim it at junk... or at trouble."],
+	"hazard_wind": ["WIND CARD", "Play it and every card in the wind's direction is blown clean off the board — unscored. The direction turns a quarter every hand, and the wind keeps its secret: without a WEATHERVANE relic you won't know which way it blows until it does."],
 	"hazard_stone": ["STONE CARD", "Solid rock: it takes THREE scoring hands to break. It scores its rank every time you include it."],
 	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],

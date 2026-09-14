@@ -119,6 +119,7 @@ const RELICS := {
 	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
 	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
 	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
+	"weathervane": {"name": "Weathervane", "rarity": 1, "desc": "Hazards reveal what they strike next"},
 	"magnifying_glass": {"name": "Magnifying Glass", "rarity": 1, "desc": "Soaked cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
@@ -326,6 +327,7 @@ func _apply_relic_effects() -> void:
 	main.board.chip_bonus = Board.CHIP_BONUS * (2 if has_relic("gold_tooth") else 1)
 	main.board.mult_factor = 2.0 if has_relic("mirror_shades") else Board.MULT_FACTOR
 	PlayingCard.washed_show_suit = has_relic("magnifying_glass")
+	PlayingCard.show_hazard_intent = has_relic("weathervane")
 
 
 func _gain_relic(id: String) -> void:
