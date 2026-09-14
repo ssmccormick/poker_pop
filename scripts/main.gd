@@ -421,6 +421,23 @@ func _unhandled_input(event: InputEvent) -> void:
 				_refresh_hand_display()
 
 
+## The tail of the score preview: what the selected mod cards add —
+## the stacked multiplier, bonus chips, and gold cash.
+func _preview_mod_text(result: Dictionary) -> String:
+	var parts := ""
+	var mults := 0
+	for card in board.selected:
+		if card.mod == "mult":
+			mults += 1
+	if mults > 0:
+		parts += "  ×%s MULT" % String.num(pow(board.mult_factor, mults), 2)
+	if result.has("bonus_chips"):
+		parts += "  +%d chips" % int(result.bonus_chips)
+	if result.has("cash_earned"):
+		parts += "  +$%d" % int(result.cash_earned)
+	return parts
+
+
 func _update_preview() -> void:
 	if menu_open or not game_started:
 		preview_label.text = ""
@@ -456,7 +473,10 @@ func _update_preview() -> void:
 				preview_label.text = "No hand in those seven — try different hole cards."
 				preview_label.add_theme_color_override("font_color", RED)
 			else:
-				preview_label.text = "%s  —  %d pts" % [best.name, best.score]
+				var shown: Dictionary = best.duplicate()
+				board._apply_card_mods(shown)
+				preview_label.text = "%s  —  %d pts%s" % [shown.name, shown.score,
+						_preview_mod_text(shown)]
 				preview_label.add_theme_color_override("font_color", GOLD)
 		return
 	if data.is_empty():
@@ -475,8 +495,10 @@ func _update_preview() -> void:
 				return
 		var result := Poker.evaluate(data)
 		if result.playable:
-			preview_label.text = "%s  —  %d pts   (base %d + pips %d)" % \
-					[result.name, result.score, result.base, result.pips]
+			board._apply_card_mods(result)
+			preview_label.text = "%s  —  %d pts   (base %d + pips %d%s)" % \
+					[result.name, result.score, result.base, result.pips,
+					_preview_mod_text(result)]
 			preview_label.add_theme_color_override("font_color", GOLD)
 		elif result.name == "High Card":
 			preview_label.text = "High Card — not playable, you need at least a Pair."
