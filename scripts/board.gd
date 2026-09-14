@@ -71,6 +71,10 @@ var suppress_refill := false
 # Gold-mine rooms: broken stones can uncover gold cards in the rubble.
 var gold_rush := false
 const GOLD_FIND_CHANCE := 0.35
+# Trail rooms: each freshly dealt refill card may arrive already
+# hazarded (set per room by trail; 0 everywhere else).
+var refill_hazard_chance := 0.0
+const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
 
 # Particle helper (set by main; null on detached test boards).
 var fx: Fx
@@ -227,6 +231,7 @@ func reset() -> void:
 	busy = true
 	suppress_refill = false
 	gold_rush = false
+	refill_hazard_chance = 0.0
 	jack_bar = 0
 	holdem_community.clear()
 	blackjack_target = 0
@@ -971,6 +976,10 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.boom = data.get("boom", false) or data.get("mod", "") == "chipsplode"
 			if card.mod in ["plus", "minus", "bumper"]:
 				card.boost_dir = HAZARD_DIRS.pick_random()
+			# Danger off the deck: refills can deal a live hazard.
+			if not initial_deal and not card.cursed \
+					and randf() < refill_hazard_chance:
+				_init_hazard(card, HAZARD_KINDS.pick_random())
 			var p := Vector2i(x, row)
 			card.grid_pos = p
 			grid[p] = card
@@ -1592,6 +1601,18 @@ func tick_boss() -> void:
 # --- Trail hazard engine --------------------------------------------------
 
 ## Seeds `count` random plain cards with a hazard state (trail rooms).
+## Turns one card into a live hazard with its fields initialised.
+func _init_hazard(card: PlayingCard, kind: String) -> void:
+	card.hazard = kind
+	match kind:
+		"bomb":
+			card.fuse = BOMB_FUSE
+		"stone":
+			card.stone_hits = STONE_HITS_START
+		"wind":
+			card.wind_dir = HAZARD_DIRS.pick_random()
+
+
 func apply_room_hazards(kind: String, count: int) -> void:
 	var candidates: Array = []
 	for p in grid:
@@ -1600,15 +1621,7 @@ func apply_room_hazards(kind: String, count: int) -> void:
 			candidates.append(card)
 	candidates.shuffle()
 	for i in mini(count, candidates.size()):
-		var card: PlayingCard = candidates[i]
-		card.hazard = kind
-		match kind:
-			"bomb":
-				card.fuse = BOMB_FUSE
-			"stone":
-				card.stone_hits = STONE_HITS_START
-			"wind":
-				card.wind_dir = HAZARD_DIRS.pick_random()
+		_init_hazard(candidates[i], kind)
 	# The room announces its danger.
 	if count > 0 and not candidates.is_empty():
 		if kind == "bomb":

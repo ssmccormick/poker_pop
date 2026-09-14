@@ -45,8 +45,15 @@ const MAX_HANDS_BUY := 12
 # tarot decides only the room's GOAL.
 const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
 const HAZARD_BASE_CHANCE := 0.20
-const HAZARD_ROOM_STEP := 0.04   # + per room index
+const HAZARD_ROOM_STEP := 0.08   # + per room index — deep tables always bite
 const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
+const HAZARD_COUNT_ROOMS := 4    # seed count grows every N tables
+const HAZARD_COUNT_MAX := 6
+# Every refill can deal danger: chance per fresh card, climbing with
+# depth. Purge rooms are exempt (extra hazards would warp the goal).
+const REFILL_HAZARD_BASE := 0.03
+const REFILL_HAZARD_STEP := 0.008  # + per room index
+const REFILL_HAZARD_MAX := 0.20
 const OBJECTIVE_CHANCE := 0.12   # heist/treasure rooms, from room 2 on
 const PURGE_CHANCE := 0.14       # purge rooms: board of one hazard, clear them all
 const CRAZY8_HAZARDS_BASE := 8   # crazy-8s hazard storm (+1 per region)
@@ -989,12 +996,17 @@ func _seed_room_specials() -> void:
 		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * room_index
 				+ HAZARD_TIER_STEP * table_tier, 0.0, 0.95)
 		if randf() < hz_chance:
-			var count := 1 + room_index / REGION_SIZE
+			var count := 1 + room_index / HAZARD_COUNT_ROOMS
 			if table_tier == 2 and randf() < 0.5:
 				count += 1
-			count = mini(count, 4)
+			count = mini(count, HAZARD_COUNT_MAX)
 			for i in count:
 				main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
+	# And the deck itself turns mean: every refilled card has a chance
+	# to arrive hazarded, climbing the deeper you ride.
+	if room_goal != "purge":
+		main.board.refill_hazard_chance = clampf(REFILL_HAZARD_BASE
+				+ REFILL_HAZARD_STEP * room_index, 0.0, REFILL_HAZARD_MAX)
 	# Relic adjustments to freshly-seeded hazards (purge seeds included).
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]

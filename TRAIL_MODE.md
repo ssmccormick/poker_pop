@@ -203,12 +203,16 @@ detection/reshuffles will lie.
 Hazards are AMBIENT: the tarot decides only a room's GOAL (target /
 heist / treasure / boss), while hazards seed randomly into EVERY play
 room — bosses included — with no warning and no odds compensation.
-Chance = 20% + 4%/room + 15%/buy-in tier (cap 95%); count = 1 + 1 per
-region (High Roller adds another half the time, cap 4), with mixed
-hazard types coexisting. The old hazard tarot cards (DEATH etc.) are
+Chance = 20% + 8%/room + 15%/buy-in tier (cap 95%); count = 1 + 1 per
+4 tables (High Roller adds another half the time, cap 6), with mixed
+hazard types coexisting. On top of the seed, THE DECK TURNS MEAN:
+every refilled card has a chance to arrive already hazarded — 3% +
+0.8%/room per card (cap 20%) — so deep tables never stay calm. Purge
+rooms are exempt from both (their hazards ARE the room); storm tables
+(Crazy 8s / Blackjack) swap the seed roll for their guaranteed floor
+but keep the mean deck. The old hazard tarot cards (DEATH etc.) are
 retired. Hazards are states on normal rank/suit cards, one per card;
-refill-dealt cards are never hazarded; ticks happen only on scoring
-hands, after the board settles.
+ticks happen only on scoring hands, after the board settles.
 
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |
