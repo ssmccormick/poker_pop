@@ -999,6 +999,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 		if a.cell.y != b.cell.y:
 			return a.cell.y < b.cell.y
 		return a.cell.x < b.cell.x)
+	# Fresh cards may have landed hazarded (or as new targets): re-aim.
+	_aim_spreaders()
 
 	_refill_finals = settle_moves + deals
 	_refill_active = true
@@ -1634,6 +1636,7 @@ func apply_room_hazards(kind: String, count: int) -> void:
 	candidates.shuffle()
 	for i in mini(count, candidates.size()):
 		_init_hazard(candidates[i], kind)
+	_aim_spreaders()
 	# The room announces its danger.
 	if count > 0 and not candidates.is_empty():
 		if kind == "bomb":
@@ -1725,16 +1728,10 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	for p in waters:
 		for d in _intent_dirs(grid[p]):
 			var q: Vector2i = p + d
-			if not grid.has(q):
-				continue
-			var victim: PlayingCard = grid[q]
-			if victim.hazard == "" and not victim.cursed and not victim.washed \
-					and victim.boss == "" and not victim.is_safe \
-					and not victim.snake_tail and victim.objective == "":
-				victim.washed = true
+			if _victim_ok(q):
+				grid[q].washed = true
 				soaked.append(q)
 				break
-		grid[p].next_dir = HAZARD_DIRS.pick_random()
 	var fires: Array = []
 	if tick_fire:
 		for p in grid:
@@ -1747,17 +1744,10 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	for p in fires:
 		for d in _intent_dirs(grid[p]):
 			var q: Vector2i = p + d
-			if not grid.has(q):
-				continue
-			var card: PlayingCard = grid[q]
-			if card.hazard == "" and not card.cursed and not card.washed \
-					and card.boss == "" and not card.is_safe \
-					and not card.snake_tail and card.objective == "":
-				card.hazard = "fire"
-				card.next_dir = HAZARD_DIRS.pick_random()
+			if _victim_ok(q):
+				grid[q].hazard = "fire"
 				ignited.append(q)
 				break
-		grid[p].next_dir = HAZARD_DIRS.pick_random()
 	# Then the fire eats: rank drops, and below 2 the card burns up
 	# (unscored) — the spreading already happened above.
 	var burned: Array = []
@@ -1771,8 +1761,38 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 			grid[p].fuse -= 1
 			if grid[p].fuse <= 0:
 				exploded = true
+	_aim_spreaders()
 	return {"burned": burned, "ignited": ignited, "exploded": exploded,
 			"soaked": soaked}
+
+
+## A cell fire can spread to or water can soak: on the board, plain,
+## and unclaimed by anything special.
+func _victim_ok(q: Vector2i) -> bool:
+	if not grid.has(q):
+		return false
+	var c: PlayingCard = grid[q]
+	return c.hazard == "" and not c.cursed and not c.washed \
+			and c.boss == "" and not c.is_safe and not c.snake_tail \
+			and c.objective == ""
+
+
+## Points every fire/water card's next strike at a neighbor it can
+## actually hit — no telegraphing (or whiffing) at cards that are
+## already hazarded. Keeps a still-valid aim; re-rolls a spent one.
+func _aim_spreaders() -> void:
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if card.hazard != "fire" and card.hazard != "water":
+			continue
+		if _victim_ok(p + card.next_dir):
+			continue
+		var dirs := HAZARD_DIRS.duplicate()
+		dirs.shuffle()
+		for d in dirs:
+			if _victim_ok(p + d):
+				card.next_dir = d
+				break
 
 
 ## Runs the per-hand hazard tick with animations: called by trail after

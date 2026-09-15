@@ -110,7 +110,21 @@ const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
 
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
 const MAX_RELICS := 5
-const RELIC_PRICES := [60, 120, 250]  # by rarity C/R/L
+const RELIC_PRICES := [90, 180, 375]  # by rarity C/R/L
+
+# Traveling merchants: each shop stop is a different trader, rolled
+# per room, with their own stock — some deal only in relics.
+const MERCHANTS := [
+	{"id": "peddler", "name": "THE PEDDLER'S WAGON",
+		"line": "A little of everything, friend — cards, trinkets, and a hot forge.",
+		"cards": 8, "relics": 2, "forge": true},
+	{"id": "collector", "name": "THE COLLECTOR",
+		"line": "No cardboard here. Only trinkets of real power.",
+		"cards": 0, "relics": 4, "forge": false},
+	{"id": "sharp", "name": "THE CARD SHARP",
+		"line": "Finest cardboard on the trail — and a forge for your regrets.",
+		"cards": 10, "relics": 0, "forge": true},
+]
 const RELICS := {
 	"horseshoe": {"name": "Horseshoe", "rarity": 0, "desc": "+1 hand in every room"},
 	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks offer 4 choices"},
@@ -169,7 +183,8 @@ var _second_wind_used := false
 var _fire_tick_flip := false
 var _shop_stock: Array = []      # this shop room's shelves (no restocking)
 var _shop_stock_room := -1
-var _shop_stock_relic := ""
+var _shop_stock_relics: Array = []   # [{id, bought}] on this merchant's shelf
+var _shop_merchant: Dictionary = MERCHANTS[0]
 var _shop_burned_here := false   # one burn per shop
 var pending_retry := {}          # a room that MUST be played next
 var pending_is_retry := true     # true = failed there (scarred); false = just stepped away
@@ -209,7 +224,9 @@ var _remove_info: Label
 var _deck_tip: PanelContainer
 var _deck_tip_label: Label
 var _end_label: Label
-var _shop_relic_btn: Button
+var _shop_title: Label
+var _shop_flavor: Label
+var _shop_relic_box: Control
 var _shop_burn_btn: Button
 var _bet_back_btn: Button
 var _tarot_relics: Label
@@ -714,56 +731,95 @@ func _render_tarot() -> void:
 		# The Fool: face-down fate.
 		var fool: Button = main._button(_tarot_cards_box, "",
 				Vector2(start_x + _offers.size() * 330, 0), Vector2(300, 380))
-		fool.text = "LUCK OF THE DRAW\n\n?\n\nLet fate decide\n(+%d chips)" % FATE_KICKER
-		fool.add_theme_font_size_override("font_size", 22)
+		_tarot_face(fool, "LUCK OF THE DRAW", "Face-down fate", "?",
+				"Let fate decide\n+%d chips" % FATE_KICKER, false, 64)
 		fool.pressed.connect(func() -> void:
 			_choose_offer(_fate_offer, true))
 
 
 func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 	var b: Button = main._button(_tarot_cards_box, "", Vector2(x, 0), Vector2(300, 380))
-	b.add_theme_font_size_override("font_size", 22)
 	if offer.kind == "shop":
-		b.text = "GENERAL STORE\n\nSHOP\n\nBuy cards\nBurn cards\n\nNo bet"
+		_tarot_face(b, "GENERAL STORE", "Safe haven",
+				"Buy new cards for your deck, or burn one at the forge.",
+				"No bet — browse free")
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
 			goal_line = "BOSS FIGHT"
 		elif offer.get("goal", "") == "safe":
-			goal_line = "CRACK THE SAFE"
+			goal_line = "Crack the safe"
 		elif offer.get("goal", "") == "chest":
-			goal_line = "OPEN %d CHESTS\nWIN A RELIC" % int(offer.get("chest_count", 1))
+			goal_line = "Open %d chests — win a RELIC" % int(offer.get("chest_count", 1))
 		elif offer.get("goal", "") == "purge":
 			if offer.purge_kind == "fire":
 				# Fire spreads: the seeded count is only where it starts.
-				goal_line = "CLEAR ALL FIRE CARDS\n(%d to start)" % offer.purge_count
+				goal_line = "Clear ALL fire cards (%d to start)" % offer.purge_count
 			else:
-				goal_line = "CLEAR %d %s CARDS" % [offer.purge_count,
+				goal_line = "Clear all %d %s cards" % [offer.purge_count,
 						String(offer.purge_kind).to_upper()]
 		elif offer.get("goal", "") == "mine":
-			goal_line = "BREAK %d STONES — FIND GOLD" % offer.stones
+			goal_line = "Break %d stones — gold in the rubble" % offer.stones
 		elif offer.get("goal", "") == "holdem":
-			goal_line = "TARGET %d — HOLD'EM RULES" % offer.target
+			goal_line = "Target %d — HOLD'EM rules" % offer.target
 		elif offer.get("goal", "") == "crazy8":
-			goal_line = "TARGET %d — 8s WILD, HAZARDS EVERYWHERE" % offer.target
+			goal_line = "Target %d — 8s WILD, hazards everywhere" % offer.target
 		elif offer.get("goal", "") == "blackjack":
-			goal_line = "BEAT THE DEALER %d TIMES — HAZARDS IN PLAY" % offer.wins
+			goal_line = "Beat the dealer %d times — hazards in play" % offer.wins
 		elif offer.get("goal", "") == "outlaw":
-			goal_line = "GUN DOWN THE OUTLAW (%d HP)" % offer.outlaw_hp
+			goal_line = "Gun down the Outlaw (%d HP)" % offer.outlaw_hp
 		elif offer.get("goal", "") == "hands":
-			goal_line = "PLAY  " + _require_text(offer.require)
+			goal_line = "Play " + _require_text(offer.require)
 		elif offer.get("goal", "") == "timed":
-			goal_line = "TARGET %d — BEAT THE CLOCK" % offer.target
-		var bet_line := "Ante  %d  ·  ~%d hands" % [offer.min_bet, offer.hands]
+			goal_line = "Target %d — beat the clock" % offer.target
+		var bet_line := "Ante %d  ·  ~%d hands" % [offer.min_bet, offer.hands]
 		if offer.get("limit", "hands") == "time":
-			bet_line = "Ante  %d\nON THE CLOCK — ~%d min" % [offer.min_bet,
+			bet_line = "Ante %d  ·  on the clock, ~%d min" % [offer.min_bet,
 					offer.get("minutes", 4)]
 		if offer.has("boss"):
 			bet_line = "ALL IN"
-		b.text = "%s\n\n%s table\n%s\nOdds  %s\n\n%s" % [
-			offer.tarot, offer.label, goal_line,
-			_odds_text(offer.odds), bet_line]
+		_tarot_face(b, offer.tarot, "%s table" % offer.label, goal_line,
+				"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line],
+				offer.has("boss"))
 	return b
+
+
+## Lays a clean face over a tarot button: gold name, a hairline rule,
+## the table type, the wrapped goal (never clipped), and the stakes
+## pinned at the foot.
+func _tarot_face(b: Button, head: String, sub: String, body: String,
+		foot: String, danger := false, body_size := 20) -> void:
+	var title := _face_label(b, head, 14.0, 60.0, 24, main.RED if danger else main.GOLD)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var rule := ColorRect.new()
+	rule.color = Color(main.GOLD.r, main.GOLD.g, main.GOLD.b, 0.35)
+	rule.position = Vector2(50, 84)
+	rule.size = Vector2(200, 2)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(rule)
+	var subl := _face_label(b, sub, 96.0, 30.0, 19, main.DIM)
+	subl.uppercase = true
+	var bodyl := _face_label(b, body, 138.0, 160.0, body_size, main.OFFWHITE)
+	bodyl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var footl := _face_label(b, foot, 302.0, 66.0, 18, main.GOLD)
+	footl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+
+## One centered, autowrapping, click-transparent label on a card face.
+func _face_label(b: Button, text: String, y: float, h: float, size: int,
+		col: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.position = Vector2(16, y)
+	l.size = Vector2(268, h)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.clip_text = true
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", col)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(l)
+	return l
 
 
 func _odds_text(odds: float) -> String:
@@ -1614,30 +1670,34 @@ func _show_shop() -> void:
 	if not re_render:
 		main.board._play_sound(Board.SFX_SALOON_DOORS[0], 1.0, -8.0)
 	main.play_music("shop")
-	# Stock is fixed per shop room: no restocking by leaving/burning.
+	# The merchant and their stock are fixed per shop room: no
+	# restocking by leaving/burning, no re-rolling the trader.
 	if _shop_stock_room != room_index:
+		_shop_merchant = MERCHANTS.pick_random()
 		_shop_stock = []
-		for i in 10:
+		for i in int(_shop_merchant.cards):
 			var o := _shop_card_offer()
 			o["bought"] = false
 			_shop_stock.append(o)
-		_shop_stock_relic = _unowned_relic()
+		var pool: Array = []
+		for id in RELICS:
+			if not relics.has(id):
+				pool.append(id)
+		pool.shuffle()
+		_shop_stock_relics = []
+		for i in mini(int(_shop_merchant.relics), pool.size()):
+			_shop_stock_relics.append({"id": pool[i], "bought": false})
 		_shop_burned_here = false
 		_shop_stock_room = room_index
+	_shop_title.text = _shop_merchant.name
+	_shop_flavor.text = _shop_merchant.line
 	_shop_info.text = _shop_chips_line()
+	_shop_burn_btn.visible = _shop_merchant.forge
 	_shop_burn_btn.text = "BURN A CARD — %d chips" % _burn_price()
 	_shop_burn_btn.disabled = _shop_burned_here
 	if _shop_burned_here:
 		_shop_burn_btn.text = "THE FORGE IS COLD (one burn per shop)"
-	if _shop_stock_relic == "" or relics.size() >= MAX_RELICS \
-			or relics.has(_shop_stock_relic):
-		_shop_relic_btn.text = "NO RELICS IN STOCK"
-		_shop_relic_btn.disabled = true
-	else:
-		var r: Dictionary = RELICS[_shop_stock_relic]
-		_shop_relic_btn.text = "RELIC: %s — %d chips\n%s" % [r.name,
-				_price(RELIC_PRICES[r.rarity]), r.desc]
-		_shop_relic_btn.disabled = false
+	_render_shop_relics()
 	for child in _shop_box.get_children():
 		child.queue_free()
 	for i in _shop_stock.size():
@@ -1645,7 +1705,7 @@ func _show_shop() -> void:
 		var col := i % 5
 		var row := i / 5
 		var holder: Button = main._button(_shop_box, "",
-				Vector2(445 + col * 220, row * 280), Vector2(170, 250))
+				Vector2(265 + col * 220, row * 280), Vector2(170, 250))
 		var pc := PlayingCard.new()
 		pc.rank = offer.data.rank
 		pc.suit = offer.data.suit
@@ -1674,15 +1734,82 @@ func _show_shop() -> void:
 				price_tag.text = "SOLD"
 				_shop_info.text = _shop_chips_line()
 				_save_run())
-		# Hover: the same stat breakdown the pick screen gives.
+		# Hover: the same stat breakdown the pick screen gives,
+		# floated beside the shelf card.
 		holder.mouse_entered.connect(func() -> void:
 			_shop_tip_label.text = _deck_stat_text(slot.data)
 			_shop_tip.reset_size()
+			var r := holder.get_global_rect()
+			var tip_size := _shop_tip.get_combined_minimum_size()
+			var tx := r.end.x + 10.0
+			if tx + tip_size.x > 1890.0:
+				tx = r.position.x - tip_size.x - 10.0
+			_shop_tip.position = Vector2(tx,
+					clampf(r.position.y, 150.0, 1060.0 - tip_size.y))
 			_shop_tip.visible = true)
 		holder.mouse_exited.connect(func() -> void:
 			_shop_tip.visible = false)
 	_shop_tip.visible = false
 	shop_layer.visible = true
+
+
+## The merchant's relic shelf: icon, name, effect, and price per slot.
+func _render_shop_relics() -> void:
+	for child in _shop_relic_box.get_children():
+		child.queue_free()
+	if _shop_stock_relics.is_empty():
+		return
+	var header := Label.new()
+	header.text = "RELICS"
+	header.position = Vector2(0, 0)
+	header.size = Vector2(400, 34)
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_theme_font_size_override("font_size", 24)
+	header.add_theme_color_override("font_color", main.GOLD)
+	_shop_relic_box.add_child(header)
+	for i in _shop_stock_relics.size():
+		var slot: Dictionary = _shop_stock_relics[i]
+		var r: Dictionary = RELICS[slot.id]
+		var cost := _price(RELIC_PRICES[r.rarity])
+		var btn: Button = main._button(_shop_relic_box, "",
+				Vector2(0, 44 + i * 172), Vector2(400, 158))
+		var icon := RelicIcon.new()
+		icon.relic_id = slot.id
+		icon.position = Vector2(50, 79)
+		btn.add_child(icon)
+		var name_l := _face_label(btn, r.name, 14.0, 30.0, 20, main.GOLD)
+		name_l.position.x = 96
+		name_l.size.x = 292
+		var desc_l := _face_label(btn, r.desc, 46.0, 64.0, 16, main.OFFWHITE)
+		desc_l.position.x = 96
+		desc_l.size.x = 292
+		var price_l := _face_label(btn, "%d chips" % cost, 116.0, 30.0, 18, main.GOLD)
+		price_l.position.x = 96
+		price_l.size.x = 292
+		if slot.bought:
+			btn.disabled = true
+			price_l.text = "SOLD"
+		elif relics.has(slot.id):
+			btn.disabled = true
+			price_l.text = "ALREADY CARRIED"
+		elif relics.size() >= MAX_RELICS:
+			btn.disabled = true
+			price_l.text = "%d chips — SATCHEL FULL" % cost
+		var pressed_slot := slot
+		var pressed_price := price_l
+		btn.pressed.connect(func() -> void:
+			if pressed_slot.bought or relics.size() >= MAX_RELICS:
+				return
+			var c := _price(RELIC_PRICES[RELICS[pressed_slot.id].rarity])
+			if chips >= c and not _would_bust(c):
+				chips -= c
+				pressed_slot.bought = true
+				_gain_relic(pressed_slot.id)
+				main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
+				btn.disabled = true
+				pressed_price.text = "SOLD"
+				_shop_info.text = _shop_chips_line()
+				_save_run())
 
 
 ## One gold-bordered card-stat tooltip, parented to a screen layer.
@@ -1915,28 +2042,19 @@ func build_ui() -> void:
 	_pick_tip_label = _pick_tip.get_child(0) as Label
 
 	shop_layer = _layer()
-	_screen_title(shop_layer, "THE GENERAL STORE")
-	_shop_info = _center(shop_layer, "", 178, 28, main.GOLD)
+	shop_layer.add_child(ShopBackdrop.new())
+	_shop_title = _center(shop_layer, "", 100, 64, main.GOLD)
+	_shop_flavor = _center(shop_layer, "", 170, 20, main.DIM)
+	_shop_info = _center(shop_layer, "", 200, 26, main.GOLD)
 	_shop_box = Control.new()
 	_shop_box.position = Vector2(0, 240)
 	shop_layer.add_child(_shop_box)
-	# Hover tooltip for the shelves, parked in the left gutter.
+	_shop_relic_box = Control.new()
+	_shop_relic_box.position = Vector2(1480, 250)
+	shop_layer.add_child(_shop_relic_box)
+	# Hover tooltip for the shelves, floated beside the hovered card.
 	_shop_tip = _make_stat_tip(shop_layer)
 	_shop_tip_label = _shop_tip.get_child(0) as Label
-	_shop_tip.position = Vector2(50, 330)
-	_shop_relic_btn = main._button(shop_layer, "", Vector2(125, 840), Vector2(380, 76))
-	_shop_relic_btn.add_theme_font_size_override("font_size", 16)
-	_shop_relic_btn.pressed.connect(func() -> void:
-		if _shop_stock_relic == "":
-			return
-		var cost := _price(RELIC_PRICES[RELICS[_shop_stock_relic].rarity])
-		if chips >= cost and relics.size() < MAX_RELICS and not _would_bust(cost):
-			chips -= cost
-			_gain_relic(_shop_stock_relic)
-			main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
-			_shop_stock_relic = ""
-			_shop_relic_btn.disabled = true
-			_shop_info.text = _shop_chips_line())
 	_shop_burn_btn = main._button(shop_layer, "", Vector2(555, 850), Vector2(380, 56))
 	_shop_burn_btn.add_theme_font_size_override("font_size", 20)
 	_shop_burn_btn.pressed.connect(_show_remove)

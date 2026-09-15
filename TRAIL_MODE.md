@@ -92,7 +92,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | LIMIT TABLE | Normal, steady tier 1:1 (shipped) |
 | POT LIMIT | Normal, risky tier 3:2 (shipped) |
 | NO LIMIT | Normal, dangerous tier 2:1 (shipped) |
-| GENERAL STORE | Shop (shipped) |
+| TRAVELING MERCHANT | Shop — Peddler / Collector / Card Sharp, rolled per stop (shipped) |
 | POWDER KEG | Purge room: bombs (shipped) |
 | WILDFIRE | Purge room: fire (shipped) |
 | DUST STORM | Purge room: wind (shipped) |
@@ -301,7 +301,7 @@ Starter catalog (names/numbers draft):
 | Bomb Squad Badge | C | Bombs start with +2 fuse |
 | Chisel | C | Stones need one fewer use |
 | Fire Blanket | R | Fire ticks every 2nd hand |
-| Weathervane | R | Hazards telegraph their next victim: wind shows its direction, fire and water show an arrow toward the card they strike next |
+| Weathervane | R | Hazards telegraph their next victim: wind shows its direction, fire and water show an arrow toward the card they strike next. Spreaders aim only at hittable neighbors (never at another hazard), re-aiming after every tick, seed, and refill — the arrow is an honest promise |
 | Magnifying Glass | R | Washed cards still show their suit |
 | Gold Tooth | R | Chip cards pay double |
 | Mirror Shades | R | Mult cards ×2 instead of ×1.5 |
@@ -310,11 +310,24 @@ Starter catalog (names/numbers draft):
 | Dowsing Rod | R | Safe combos use only ranks 2–6 |
 | Lucky Chip | L | 10% chance a played hand costs no hand |
 
-## Shop v2 (SHIPPED)
+## Shop v3 — traveling merchants (SHIPPED)
 
-The Hermit sells **10 cards** (2 rows of 5): plain cards 40 chips,
-duplicates-of-owned 50, modified (chip/mult) 80 — plus **1 relic slot**
-and the burn-a-card service (30). No reroll in v1.
+Each shop stop is a different trader, rolled per room (stock and
+merchant fixed — no re-rolling by leaving):
+
+| Merchant | Cards | Relics | Forge |
+| --- | --- | --- | --- |
+| THE PEDDLER'S WAGON | 8 | 2 | yes |
+| THE COLLECTOR | 0 | 4 | no |
+| THE CARD SHARP | 10 | 0 | yes |
+
+Card prices: plain 40 chips, duplicates-of-owned 50, modified 80.
+Relic prices by rarity: C 90 / R 180 / L 375 (Snake Oil still −25%).
+Relic slots show a code-drawn icon (RelicIcon), name, effect, and
+price; burn-a-card starts at 30 and climbs per use, one per shop.
+The screen is dressed as a roadside camp (ShopBackdrop): covered
+wagon, lantern rope, crates, packed dirt. Hover any shelf card for
+the standard stat tooltip.
 
 ## Card modifiers (further drafts — need our own names/flavor)
 
