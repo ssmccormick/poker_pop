@@ -677,8 +677,15 @@ func play_hand() -> void:
 			var c: PlayingCard = grid[q]
 			if not c.is_safe and c.boss == "" and not c.snake_tail \
 					and not c.cursed:
-				c.rank = mini(14, c.rank + 1) if adata.mod == "plus" \
-						else maxi(2, c.rank - 1)
+				if adata.mod == "plus" and c.rank >= 14:
+					# Nowhere up from an Ace: it wraps into a lucky
+					# 2+ that DOUBLES any hand it scores in.
+					c.rank = 2
+					c.two_plus = true
+				elif adata.mod == "plus":
+					c.rank += 1
+				else:
+					c.rank = maxi(2, c.rank - 1)
 				_play_sound(SFX_FLIP, 1.4 if adata.mod == "plus" else 0.7, -8.0)
 				_fx(cell_center(q), "sparks")
 	# Bumpers shove their line one step; the far card can go off the
@@ -1252,6 +1259,7 @@ func _apply_card_mods(result: Dictionary) -> void:
 	var mults := 0
 	var chip_cards := 0
 	var gold_cards := 0
+	var doublers := 0
 	for card in selected:
 		if card.mod == "mult":
 			mults += 1
@@ -1259,8 +1267,13 @@ func _apply_card_mods(result: Dictionary) -> void:
 			chip_cards += 1
 		elif card.mod == "gold":
 			gold_cards += 1
+		if card.two_plus:
+			doublers += 1
 	if mults > 0:
 		result.score = int(result.score * pow(mult_factor, mults))
+	if doublers > 0:
+		# Lucky 2+ deuces (wrapped Aces) double the hand, stacking.
+		result.score = int(result.score * pow(2.0, doublers))
 	if chip_cards > 0:
 		result["bonus_chips"] = chip_cards * chip_bonus
 	if gold_cards > 0:

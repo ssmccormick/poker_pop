@@ -272,12 +272,17 @@ overlay and a hover panel explaining the hovered card.
 | --- | --- |
 | Chip card | Pays bonus chips every time it's played in a scoring hand |
 | Mult card | Multiplies the score of any hand it's part of (×1.5; multiple mults stack multiplicatively) |
-| Gold card | Pays $1 of real, bankable cash every time it's played (gold nugget glyph) |
-| Plus card | When cleared, the card its arrow points at gains +1 rank (cap 14). The arrow turns a quarter clockwise every hand — time the clear to aim it |
+| Gold card | Pays $1 of real, bankable cash every time it's played. Drawn SOLID GOLD, face and all |
+| Plus card | When cleared, the card its arrow points at gains +1 rank. Boosting an ACE wraps it into a LUCKY 2+ (green-framed deuce) that DOUBLES any hand it scores in (stacking). The arrow turns a quarter clockwise every hand — time the clear to aim it |
 | Minus card | Mirror of Plus: the aimed card drops −1 rank (floor 2) — sculpt a King down to match your Queens |
 | Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand). A gap absorbs the push; safes/bosses/tails block it; a card pushed past the edge is removed unscored |
 | Wild card | Counts as ANY rank and suit; the evaluator takes the best assignment. The rarest roll (~3%) |
 | EXPLOSIVE (rider) | Not a mod — a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
+
+Enhanced cards wear their power as their identity: a full-face color
+wash + frame in the mod's color, and the mod's emblem drawn LARGE in
+the center where the suit pip normally sits (suit stays readable in
+the corner). Gold cards are solid gold head to toe.
 
 Roll weights: Mult 26% · Chip 26% · Plus 14% · Minus 10% · Bumper 11%
 · Gold 10% · Wild 3%, with the Explosive rider rolled separately.

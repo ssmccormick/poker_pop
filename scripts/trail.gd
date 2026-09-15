@@ -1929,7 +1929,7 @@ func _deck_stat_text(d: Dictionary) -> String:
 		"gold":
 			text += "GOLD\nPays $1 of real, bankable cash when played."
 		"plus":
-			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it."
+			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it. Boosting an ACE wraps it into a lucky 2+ that DOUBLES any hand it scores in."
 		"minus":
 			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank. The arrow turns a quarter every hand — time it."
 		"bumper":

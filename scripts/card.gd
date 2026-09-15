@@ -113,6 +113,14 @@ static var _shadow_box: StyleBoxFlat
 var rank := 2:
 	set(value):
 		rank = value
+		if rank != 2:
+			two_plus = false
+		queue_redraw()
+# The wrapped Ace: a PLUS boost past Ace turns the card into a lucky
+# "2+" deuce — scoring it DOUBLES the whole hand.
+var two_plus := false:
+	set(value):
+		two_plus = value
 		queue_redraw()
 var suit := 0
 var grid_pos := Vector2i.ZERO
@@ -351,6 +359,8 @@ static func _make_boxes() -> void:
 
 
 func rank_text() -> String:
+	if two_plus:
+		return "2+"
 	match rank:
 		11: return "J"
 		12: return "Q"
@@ -428,11 +438,23 @@ func _draw() -> void:
 		if washed_show_suit:  # Magnifying Glass
 			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	else:
+		_draw_mod_face(rect)
+		if two_plus:
+			# The wrapped Ace announces its luck.
+			draw_rect(rect.grow(-5), Color(BOOST_GREEN.r, BOOST_GREEN.g,
+					BOOST_GREEN.b, 0.55), false, 2.5)
 		var col := suit_color()
 		draw_string(font, Vector2(-W / 2.0 + 8, -H / 2.0 + 27), rank_text(),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 24, col)
 		_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
-		_draw_suit(Vector2(0, 6), 5.0)
+		if mod != "":
+			# Enhanced cards wear their power as the center art.
+			_draw_mod_art(font)
+		elif eights_wild and rank == 8:
+			draw_string(font, Vector2(-24, 22), "W",
+					HORIZONTAL_ALIGNMENT_CENTER, 48, 46, WILD_PURPLE)
+		else:
+			_draw_suit(Vector2(0, 6), 5.0)
 
 	match hazard:
 		"bomb":
@@ -474,62 +496,6 @@ func _draw() -> void:
 			_draw_water(rect)
 			if show_hazard_intent:
 				_draw_intent_arrow(next_dir, Color(0.85, 0.95, 1.0))
-
-	var mod_anchor := Vector2(W / 2.0 - 13, -H / 2.0 + 36)
-	match mod:
-		"chip":
-			draw_circle(mod_anchor, 9, GOLD)
-			draw_circle(mod_anchor, 5, Color("a8842c"))
-		"mult":
-			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "×",
-					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, ERROR_RED)
-		"gold":
-			# A nugget: rough gold lump with a glint.
-			draw_colored_polygon(PackedVector2Array([
-				mod_anchor + Vector2(-8, 3), mod_anchor + Vector2(-5, -6),
-				mod_anchor + Vector2(2, -8), mod_anchor + Vector2(8, -2),
-				mod_anchor + Vector2(6, 6), mod_anchor + Vector2(-3, 8)]), GOLD)
-			draw_rect(Rect2(mod_anchor + Vector2(-2, -4), Vector2(3, 3)),
-					Color(1.0, 0.95, 0.7))
-		"wild":
-			draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "W",
-					HORIZONTAL_ALIGNMENT_CENTER, 22, 24, WILD_PURPLE)
-		"bumper":
-			var bb := Vector2(W / 2.0 - 15, -H / 2.0 + 38)
-			var bv := Vector2(boost_dir) * 9.0
-			var bperp := Vector2(-bv.y, bv.x).normalized()
-			# The pad, then the shove arrow.
-			draw_line(bb - bv * 0.6 + bperp * 8.0, bb - bv * 0.6 - bperp * 8.0,
-					WIND_BLUE, 5.0)
-			var btip := bb + bv * 1.4
-			draw_line(bb - bv * 0.2, btip, WIND_BLUE, 3.0)
-			draw_colored_polygon(PackedVector2Array([
-				btip + bv * 0.35, btip - bv * 0.25 + bperp * 4.0,
-				btip - bv * 0.25 - bperp * 4.0]), WIND_BLUE)
-		"plus", "minus":
-			var base := Vector2(W / 2.0 - 15, -H / 2.0 + 38)
-			var col := BOOST_GREEN if mod == "plus" else ERROR_RED
-			# The sign...
-			draw_rect(Rect2(base + Vector2(-7, -2), Vector2(10, 4)), col)
-			if mod == "plus":
-				draw_rect(Rect2(base + Vector2(-4, -5), Vector2(4, 10)), col)
-			# ...and the aim arrow, turning each hand.
-			var v := Vector2(boost_dir) * 9.0
-			var perp := Vector2(-v.y, v.x).normalized() * 4.0
-			var tip := base + v * 1.6
-			draw_line(base + v * 0.8, tip, col, 3.0)
-			draw_colored_polygon(PackedVector2Array([
-				tip + v * 0.4, tip - v * 0.3 + perp, tip - v * 0.3 - perp]), col)
-	if eights_wild and rank == 8 and mod == "" and not washed:
-		# Crazy 8s: every 8 is wild tonight.
-		draw_string(font, Vector2(W / 2.0 - 24, -H / 2.0 + 45), "W",
-				HORIZONTAL_ALIGNMENT_CENTER, 22, 24, WILD_PURPLE)
-	if boom and mod != "":
-		# Explosion rider: rays around whatever the mod glyph is.
-		for k in 8:
-			var ray := Vector2.RIGHT.rotated(k * PI / 4.0 + PI / 8.0)
-			draw_line(mod_anchor + ray * 11.0, mod_anchor + ray * 15.0,
-					FIRE_ORANGE, 2.5)
 
 	match objective:
 		"key":
@@ -593,6 +559,101 @@ func _draw() -> void:
 		draw_circle(badge_center, 10, badge_color)
 		draw_string(font, badge_center + Vector2(-10, 5.5), str(chain_index),
 				HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
+
+
+## Full-face identity for enhanced cards: gold cards go solid gold;
+## everything else gets a wash of its color and an inner frame so the
+## power reads at a glance.
+func _draw_mod_face(rect: Rect2) -> void:
+	if mod == "":
+		return
+	var inner := rect.grow(-3)
+	if mod == "gold":
+		# Solid gold through and through, with a top shine.
+		draw_rect(inner, Color("d9b83f"))
+		draw_rect(Rect2(inner.position, Vector2(inner.size.x, 9)),
+				Color(1.0, 0.95, 0.72, 0.5))
+		draw_rect(inner.grow(-2), Color("8a6a1e"), false, 2.0)
+		return
+	var tint := _mod_color()
+	tint.a = 0.13
+	draw_rect(inner, tint)
+	var frame := _mod_color()
+	frame.a = 0.55
+	draw_rect(inner.grow(-2), frame, false, 3.0)
+
+
+func _mod_color() -> Color:
+	match mod:
+		"chip": return GOLD
+		"mult": return ERROR_RED
+		"wild": return WILD_PURPLE
+		"plus": return BOOST_GREEN
+		"minus": return ERROR_RED
+		"bumper": return WIND_BLUE
+	return GOLD
+
+
+## The big center emblem that replaces the suit pip on enhanced
+## cards: the card IS its power now.
+func _draw_mod_art(font: Font) -> void:
+	var c := Vector2(0, 6)
+	match mod:
+		"chip":
+			# A fat poker chip.
+			draw_circle(c, 24, GOLD)
+			for k in 8:
+				var mid := Vector2.RIGHT.rotated(TAU * k / 8.0) * 21.0
+				draw_line(c + mid * 0.86, c + mid * 1.12, Color("faf3dc"), 6.0)
+			draw_circle(c, 14, Color("a8842c"))
+			draw_circle(c, 6, GOLD)
+		"mult":
+			draw_string(font, c + Vector2(-24, 18), "×",
+					HORIZONTAL_ALIGNMENT_CENTER, 48, 54, ERROR_RED)
+		"gold":
+			# A hefty nugget with a glint on the gold face.
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-20, 8), c + Vector2(-13, -15), c + Vector2(5, -20),
+				c + Vector2(20, -5), c + Vector2(15, 15), c + Vector2(-8, 20)]),
+				Color("b8901f"))
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-14, 5), c + Vector2(-9, -10), c + Vector2(4, -13),
+				c + Vector2(13, -2), c + Vector2(9, 10), c + Vector2(-5, 13)]),
+				Color("f5d76e"))
+			draw_rect(Rect2(c + Vector2(-4, -8), Vector2(6, 6)),
+					Color(1.0, 0.98, 0.85))
+		"wild":
+			draw_string(font, c + Vector2(-24, 17), "W",
+					HORIZONTAL_ALIGNMENT_CENTER, 48, 46, WILD_PURPLE)
+		"plus", "minus":
+			var col := BOOST_GREEN if mod == "plus" else ERROR_RED
+			# The big sign...
+			draw_rect(Rect2(c + Vector2(-13, -4), Vector2(26, 8)), col)
+			if mod == "plus":
+				draw_rect(Rect2(c + Vector2(-4, -13), Vector2(8, 26)), col)
+			# ...and the aim arrow, sweeping a quarter-turn each hand.
+			var v := Vector2(boost_dir) * 22.0
+			var perp := Vector2(-v.y, v.x).normalized() * 7.0
+			var tip := c + v * 1.4
+			draw_line(c + v * 0.8, tip, col, 5.0)
+			draw_colored_polygon(PackedVector2Array([
+				tip + v * 0.32, tip - v * 0.2 + perp, tip - v * 0.2 - perp]), col)
+		"bumper":
+			# The pad and the big shove arrow.
+			var bv := Vector2(boost_dir) * 20.0
+			var bperp := Vector2(-bv.y, bv.x).normalized()
+			draw_line(c - bv * 0.5 + bperp * 18.0, c - bv * 0.5 - bperp * 18.0,
+					WIND_BLUE, 8.0)
+			var btip := c + bv * 1.35
+			draw_line(c - bv * 0.1, btip, WIND_BLUE, 5.0)
+			draw_colored_polygon(PackedVector2Array([
+				btip + bv * 0.35, btip - bv * 0.2 + bperp * 8.0,
+				btip - bv * 0.2 - bperp * 8.0]), WIND_BLUE)
+	if boom:
+		# Explosion rider: rays around the emblem.
+		for k in 8:
+			var ray := Vector2.RIGHT.rotated(k * PI / 4.0 + PI / 8.0)
+			draw_line(c + ray * 28.0, c + ray * 35.0, FIRE_ORANGE, 3.0)
 
 
 ## Draws the suit pixel map centered on `center`, one pixel = `px`.

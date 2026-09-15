@@ -426,11 +426,16 @@ func _unhandled_input(event: InputEvent) -> void:
 func _preview_mod_text(result: Dictionary) -> String:
 	var parts := ""
 	var mults := 0
+	var doublers := 0
 	for card in board.selected:
 		if card.mod == "mult":
 			mults += 1
+		if card.two_plus:
+			doublers += 1
 	if mults > 0:
 		parts += "  ×%s MULT" % String.num(pow(board.mult_factor, mults), 2)
+	if doublers > 0:
+		parts += "  ×%d LUCKY 2+" % int(pow(2.0, doublers))
 	if result.has("bonus_chips"):
 		parts += "  +%d chips" % int(result.bonus_chips)
 	if result.has("cash_earned"):
@@ -870,13 +875,15 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"gold":
 			lines.append("GOLD — pays $1 of permanent cash when played.")
 		"plus":
-			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand.")
+			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand. Boosting an ACE wraps it into a lucky 2+ that DOUBLES any hand it scores in.")
 		"minus":
 			lines.append("MINUS — clearing it drops the aimed card one rank. The arrow turns each hand.")
 		"bumper":
 			lines.append("BUMPER — clearing it shoves the line beside it one step along the arrow; past the edge is gone. The arrow turns each hand.")
 		"wild":
 			lines.append("WILD — counts as ANY rank and suit.")
+	if card.two_plus:
+		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
 	if card.boom:
 		lines.append("EXPLOSIVE — clearing it spreads its enhancement to every neighbor.")
 	if card.objective == "key":
