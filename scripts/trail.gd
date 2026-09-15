@@ -39,6 +39,7 @@ const RISKS := [
 # then you BET chips on yourself at the table's posted odds. The hand
 # (or minute) budget is fixed by the table and tightens with depth.
 const MAX_HANDS_BUY := 12
+const WIN_LINGER_SECS := 2.5  # savour a cleared table before the pick
 
 # Hazards are AMBIENT: any play room (bosses included) can be seeded,
 # with the chance and count climbing with depth and table stakes. The
@@ -198,6 +199,8 @@ var _deck_view_burn := true   # deck viewer doubles as the shop's burn picker
 var _deck_stat: Label
 var stake_odds := 1.0    # effective odds locked in when the bet is placed
 var _pick_box: Control
+var _pick_tip: PanelContainer
+var _pick_tip_label: Label
 var _shop_info: Label
 var _shop_box: Control
 var _remove_grid: GridContainer
@@ -1411,6 +1414,11 @@ func _room_cleared() -> void:
 			_trail_complete()
 		else:
 			_save_run()
+			# Let the win sink in — confetti, chips, the cleared table —
+			# before fate deals the next card.
+			await get_tree().create_timer(WIN_LINGER_SECS).timeout
+			if main.menu_open:
+				return  # stepped out meanwhile; resume picks up from here
 			_show_pick())
 
 
@@ -1532,6 +1540,16 @@ func _show_pick() -> void:
 			main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
 			_save_run()
 			_show_tarot())
+		# Hover: the card's full story in a tooltip beneath it.
+		holder.mouse_entered.connect(func() -> void:
+			_pick_tip_label.text = _deck_stat_text(data)
+			_pick_tip.reset_size()
+			_pick_tip.position = Vector2(
+					clampf(holder.position.x + 85.0 - 195.0, 20.0, 1510.0), 620.0)
+			_pick_tip.visible = true)
+		holder.mouse_exited.connect(func() -> void:
+			_pick_tip.visible = false)
+	_pick_tip.visible = false
 	pick_layer.visible = true
 
 
@@ -1843,6 +1861,28 @@ func build_ui() -> void:
 	skip.add_theme_font_size_override("font_size", 24)
 	skip.pressed.connect(func() -> void:
 		_show_tarot())
+	# Hover tooltip for the offered cards: stats, mods, and what they do.
+	_pick_tip = PanelContainer.new()
+	var pick_sb := StyleBoxFlat.new()
+	pick_sb.bg_color = Color("1b1b1b")
+	pick_sb.border_color = main.GOLD
+	pick_sb.set_border_width_all(2)
+	pick_sb.set_corner_radius_all(4)
+	pick_sb.content_margin_left = 14
+	pick_sb.content_margin_right = 14
+	pick_sb.content_margin_top = 10
+	pick_sb.content_margin_bottom = 10
+	_pick_tip.add_theme_stylebox_override("panel", pick_sb)
+	_pick_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pick_tip.visible = false
+	_pick_tip_label = Label.new()
+	_pick_tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_pick_tip_label.custom_minimum_size = Vector2(360, 0)
+	_pick_tip_label.add_theme_font_size_override("font_size", 19)
+	_pick_tip_label.add_theme_color_override("font_color", main.OFFWHITE)
+	_pick_tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pick_tip.add_child(_pick_tip_label)
+	pick_layer.add_child(_pick_tip)
 
 	shop_layer = _layer()
 	_screen_title(shop_layer, "THE GENERAL STORE")
