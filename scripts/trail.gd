@@ -201,6 +201,8 @@ var stake_odds := 1.0    # effective odds locked in when the bet is placed
 var _pick_box: Control
 var _pick_tip: PanelContainer
 var _pick_tip_label: Label
+var _shop_tip: PanelContainer
+var _shop_tip_label: Label
 var _shop_info: Label
 var _shop_box: Control
 var _remove_grid: GridContainer
@@ -1671,7 +1673,42 @@ func _show_shop() -> void:
 				price_tag.text = "SOLD"
 				_shop_info.text = _shop_chips_line()
 				_save_run())
+		# Hover: the same stat breakdown the pick screen gives.
+		holder.mouse_entered.connect(func() -> void:
+			_shop_tip_label.text = _deck_stat_text(slot.data)
+			_shop_tip.reset_size()
+			_shop_tip.visible = true)
+		holder.mouse_exited.connect(func() -> void:
+			_shop_tip.visible = false)
+	_shop_tip.visible = false
 	shop_layer.visible = true
+
+
+## One gold-bordered card-stat tooltip, parented to a screen layer.
+## The label is its first (only) child.
+func _make_stat_tip(layer: Control) -> PanelContainer:
+	var tip := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("1b1b1b")
+	sb.border_color = main.GOLD
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(4)
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
+	tip.add_theme_stylebox_override("panel", sb)
+	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip.visible = false
+	var lbl := Label.new()
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.custom_minimum_size = Vector2(360, 0)
+	lbl.add_theme_font_size_override("font_size", 19)
+	lbl.add_theme_color_override("font_color", main.OFFWHITE)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip.add_child(lbl)
+	layer.add_child(tip)
+	return tip
 
 
 func _leave_shop() -> void:
@@ -1862,27 +1899,8 @@ func build_ui() -> void:
 	skip.pressed.connect(func() -> void:
 		_show_tarot())
 	# Hover tooltip for the offered cards: stats, mods, and what they do.
-	_pick_tip = PanelContainer.new()
-	var pick_sb := StyleBoxFlat.new()
-	pick_sb.bg_color = Color("1b1b1b")
-	pick_sb.border_color = main.GOLD
-	pick_sb.set_border_width_all(2)
-	pick_sb.set_corner_radius_all(4)
-	pick_sb.content_margin_left = 14
-	pick_sb.content_margin_right = 14
-	pick_sb.content_margin_top = 10
-	pick_sb.content_margin_bottom = 10
-	_pick_tip.add_theme_stylebox_override("panel", pick_sb)
-	_pick_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pick_tip.visible = false
-	_pick_tip_label = Label.new()
-	_pick_tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_pick_tip_label.custom_minimum_size = Vector2(360, 0)
-	_pick_tip_label.add_theme_font_size_override("font_size", 19)
-	_pick_tip_label.add_theme_color_override("font_color", main.OFFWHITE)
-	_pick_tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pick_tip.add_child(_pick_tip_label)
-	pick_layer.add_child(_pick_tip)
+	_pick_tip = _make_stat_tip(pick_layer)
+	_pick_tip_label = _pick_tip.get_child(0) as Label
 
 	shop_layer = _layer()
 	_screen_title(shop_layer, "THE GENERAL STORE")
@@ -1890,6 +1908,10 @@ func build_ui() -> void:
 	_shop_box = Control.new()
 	_shop_box.position = Vector2(0, 240)
 	shop_layer.add_child(_shop_box)
+	# Hover tooltip for the shelves, parked in the left gutter.
+	_shop_tip = _make_stat_tip(shop_layer)
+	_shop_tip_label = _shop_tip.get_child(0) as Label
+	_shop_tip.position = Vector2(50, 330)
 	_shop_relic_btn = main._button(shop_layer, "", Vector2(125, 840), Vector2(380, 76))
 	_shop_relic_btn.add_theme_font_size_override("font_size", 16)
 	_shop_relic_btn.pressed.connect(func() -> void:
