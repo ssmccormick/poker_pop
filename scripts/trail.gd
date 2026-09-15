@@ -196,7 +196,6 @@ var _bet_amount := 0
 var _bet_amount_label: Label
 var _bet_deal_btn: Button
 var _deck_view_burn := true   # deck viewer doubles as the shop's burn picker
-var _deck_stat: Label
 var stake_odds := 1.0    # effective odds locked in when the bet is placed
 var _pick_box: Control
 var _pick_tip: PanelContainer
@@ -207,6 +206,8 @@ var _shop_info: Label
 var _shop_box: Control
 var _remove_grid: GridContainer
 var _remove_info: Label
+var _deck_tip: PanelContainer
+var _deck_tip_label: Label
 var _end_label: Label
 var _shop_relic_btn: Button
 var _shop_burn_btn: Button
@@ -1737,7 +1738,7 @@ func _show_deck() -> void:
 
 
 func _populate_deck_view() -> void:
-	_deck_stat.text = "Hover a card\nfor details."
+	_deck_tip.visible = false
 	for child in _remove_grid.get_children():
 		child.queue_free()
 	for i in deck.size():
@@ -1756,11 +1757,22 @@ func _populate_deck_view() -> void:
 		holder.add_child(pc)
 		var idx := i
 		holder.mouse_entered.connect(func() -> void:
-			if idx < deck.size():
-				_deck_stat.text = _deck_stat_text(deck[idx]))
+			if idx >= deck.size():
+				return
+			_deck_tip_label.text = _deck_stat_text(deck[idx])
+			_deck_tip.reset_size()
+			# Beside the hovered card: right of it, or left near the edge.
+			var r := holder.get_global_rect()
+			var tip_size := _deck_tip.get_combined_minimum_size()
+			var tx := r.end.x + 10.0
+			if tx + tip_size.x > 1890.0:
+				tx = r.position.x - tip_size.x - 10.0
+			_deck_tip.position = Vector2(tx,
+					clampf(r.position.y, 150.0, 1060.0 - tip_size.y))
+			_deck_tip.visible = true)
+		holder.mouse_exited.connect(func() -> void:
+			_deck_tip.visible = false)
 		holder.pressed.connect(func() -> void:
-			if idx < deck.size():
-				_deck_stat.text = _deck_stat_text(deck[idx])
 			if _deck_view_burn and chips >= _burn_price() \
 					and not _shop_burned_here and not _would_bust(_burn_price()):
 				chips -= _burn_price()
@@ -1942,13 +1954,8 @@ func build_ui() -> void:
 	_remove_grid = GridContainer.new()
 	_remove_grid.columns = 10
 	scroll.add_child(_remove_grid)
-	_deck_stat = Label.new()
-	_deck_stat.position = Vector2(1400, 290)
-	_deck_stat.size = Vector2(440, 580)
-	_deck_stat.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_deck_stat.add_theme_font_size_override("font_size", 24)
-	_deck_stat.add_theme_color_override("font_color", main.GOLD)
-	remove_layer.add_child(_deck_stat)
+	_deck_tip = _make_stat_tip(remove_layer)
+	_deck_tip_label = _deck_tip.get_child(0) as Label
 	var remove_back := func() -> void:
 		remove_layer.visible = false
 		if _deck_view_burn:
