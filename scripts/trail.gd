@@ -1349,12 +1349,12 @@ func _present_blackjack_round(result: Dictionary) -> void:
 		await get_tree().create_timer(1.4).timeout
 		while _blackjack_live() \
 				and main.board.blackjack_revealed < main.board.blackjack_dealer_cards.size():
-			var showing := main.board.reveal_dealer_card()
+			var showing: int = main.board.reveal_dealer_card()
 			main._announce("DEALER HITS — %d" % showing, main.OFFWHITE)
 			await get_tree().create_timer(1.4).timeout
 		if not _blackjack_live():
 			return
-		var dealer := main.board.blackjack_target
+		var dealer: int = main.board.blackjack_target
 		if outcome == "win":
 			room_wins += 1
 			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
