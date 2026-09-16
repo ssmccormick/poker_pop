@@ -1185,31 +1185,7 @@ func on_hand_played(result: Dictionary) -> void:
 		if live < floor_count:
 			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
 	if room_goal == "blackjack" and result.has("blackjack_outcome"):
-		var outcome := String(result.blackjack_outcome)
-		var player := int(result.get("blackjack_player", 0))
-		var dealer := int(result.get("blackjack_dealer", 0))
-		# Every hand turns over a little more of the table.
-		main.board.reveal_random_card()
-		if outcome == "win":
-			room_wins += 1
-			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
-			if room_wins >= room_wins_needed:
-				_room_cleared()
-				return
-			var how := "DEALER BUSTS AT %d" % dealer if dealer > 21 \
-					else "YOUR %d TAKES IT" % player
-			_announce_after_settle("%s — ROUND WON  %d / %d"
-					% [how, room_wins, room_wins_needed])
-		elif outcome == "bust":
-			_announce_after_settle("BUST AT %d — THE DEALER TAKES IT" % player)
-		elif outcome == "push":
-			_announce_after_settle("PUSH AT %d — NOBODY WINS" % player)
-		else:
-			_announce_after_settle("DEALER STANDS AT %d — ROUND LOST" % dealer)
-		# Let his played-out hand sit on show before the next round.
-		get_tree().create_timer(2.2).timeout.connect(func() -> void:
-			if in_room and room_goal == "blackjack":
-				_deal_dealer())
+		_present_blackjack_round(result)
 	if room_goal == "outlaw":
 		var hits := int(result.get("bullets_you", 0))
 		var caught := int(result.get("bullets_his", 0))
@@ -1349,6 +1325,58 @@ func _open_chest() -> void:
 		deck.append(enhanced)
 		_announce_after_settle("CHEST  AN ENHANCED CARD!")
 	_save_run()
+
+
+## The round plays out at a human pace: your stand announced, the
+## hole card flipped, each dealer hit landing one at a time, then the
+## verdict — so the player can follow every beat.
+func _present_blackjack_round(result: Dictionary) -> void:
+	var outcome := String(result.blackjack_outcome)
+	var player := int(result.get("blackjack_player", 0))
+	# Every hand turns over a little more of the table.
+	main.board.reveal_random_card()
+	if outcome == "bust":
+		# Nothing for the dealer to do — you handed him the round.
+		_announce_after_settle("BUST AT %d — THE DEALER TAKES IT" % player)
+		await get_tree().create_timer(2.2).timeout
+	else:
+		await get_tree().create_timer(1.0).timeout
+		if not _blackjack_live():
+			return
+		main.board.flip_hole()
+		main._announce("YOU STAND AT %d — DEALER FLIPS: %d"
+				% [player, main.board.blackjack_target], main.OFFWHITE)
+		await get_tree().create_timer(1.4).timeout
+		while _blackjack_live() \
+				and main.board.blackjack_revealed < main.board.blackjack_dealer_cards.size():
+			var showing := main.board.reveal_dealer_card()
+			main._announce("DEALER HITS — %d" % showing, main.OFFWHITE)
+			await get_tree().create_timer(1.4).timeout
+		if not _blackjack_live():
+			return
+		var dealer := main.board.blackjack_target
+		if outcome == "win":
+			room_wins += 1
+			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+			if room_wins >= room_wins_needed:
+				_room_cleared()
+				return
+			main._announce("DEALER BUSTS AT %d — ROUND WON  %d / %d"
+					% [dealer, room_wins, room_wins_needed])
+		elif outcome == "push":
+			main._announce("PUSH AT %d — NOBODY WINS" % player, main.OFFWHITE)
+		else:
+			main._announce("DEALER STANDS AT %d — ROUND LOST" % dealer, main.RED)
+		await get_tree().create_timer(1.8).timeout
+	if _blackjack_live():
+		_deal_dealer()
+
+
+## Still at this blackjack table? (Guards the paced presentation
+## against abandons, busts of the room, and menu exits mid-await.)
+func _blackjack_live() -> bool:
+	return in_room and room_goal == "blackjack" \
+			and not main.board.blackjack_dealer_cards.is_empty()
 
 
 ## Fresh dealer hand for the next blackjack round.

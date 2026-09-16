@@ -86,8 +86,10 @@ var holdem_community: Array = []
 # BLACKJACK (0 = poker rules): while the hole card is hidden this is
 # the dealer's UP card; once he plays out, his full total.
 var blackjack_target := 0
-var blackjack_dealer_cards: Array = []  # the dealer's hand in the panel
+var blackjack_dealer_cards: Array = []  # the dealer's FULL hand (pre-computed)
 var blackjack_hole_hidden := true       # second card face-down until you commit
+var blackjack_revealed := 2             # how many of his cards the panel shows
+var blackjack_presenting := false       # he's playing his hand out — table locked
 var blackjack_facedown := false         # this table deals its refills face-down
 # CRAZY 8s: every 8 on the board counts as wild.
 var eights_wild := false
@@ -118,8 +120,30 @@ func deal_blackjack_dealer() -> void:
 		{"rank": randi_range(2, 14), "suit": randi_range(0, 3)},
 		{"rank": randi_range(2, 14), "suit": randi_range(0, 3)}]
 	blackjack_hole_hidden = true
+	blackjack_presenting = false
+	blackjack_revealed = 2
 	blackjack_target = Poker.blackjack_sum([blackjack_dealer_cards[0]])
 	community_changed.emit()
+
+
+## Presentation step: the dealer turns over his hole card.
+func flip_hole() -> void:
+	blackjack_hole_hidden = false
+	blackjack_target = Poker.blackjack_sum(
+			blackjack_dealer_cards.slice(0, blackjack_revealed))
+	_play_sound(SFX_FLIP, 1.1, -8.0)
+	community_changed.emit()
+
+
+## Presentation step: one more of the dealer's drawn cards hits the
+## felt. Returns his revealed total.
+func reveal_dealer_card() -> int:
+	blackjack_revealed = mini(blackjack_revealed + 1, blackjack_dealer_cards.size())
+	blackjack_target = Poker.blackjack_sum(
+			blackjack_dealer_cards.slice(0, blackjack_revealed))
+	_play_sound(SFX_FLIP, randf_range(1.0, 1.2), -8.0)
+	community_changed.emit()
+	return blackjack_target
 
 
 ## Flips the table for a blackjack room: everything face-down except
@@ -153,9 +177,10 @@ func reveal_random_card() -> void:
 
 
 ## Whatever card row the current variant wants shown in the panel.
+## The dealer's drawn cards appear one by one as he plays them.
 func panel_cards() -> Array:
 	if not blackjack_dealer_cards.is_empty():
-		return blackjack_dealer_cards
+		return blackjack_dealer_cards.slice(0, blackjack_revealed)
 	return holdem_community
 
 
@@ -268,6 +293,8 @@ func reset(deal_facedown := false) -> void:
 	blackjack_target = 0
 	blackjack_dealer_cards.clear()
 	blackjack_hole_hidden = true
+	blackjack_presenting = false
+	blackjack_revealed = 2
 	blackjack_facedown = deal_facedown
 	eights_wild = false
 	PlayingCard.eights_wild = false
@@ -421,8 +448,8 @@ func _toggle_select(card: PlayingCard) -> void:
 		if not selected.is_empty() and not _is_adjacent(card.grid_pos, selected.back().grid_pos):
 			return
 		if blackjack_target > 0:
-			if not blackjack_hole_hidden:
-				return  # between rounds — the dealer is still dealing
+			if not blackjack_hole_hidden or blackjack_presenting:
+				return  # the dealer is playing his hand out
 			if selected.is_empty() and card.face_down:
 				# Every hand starts from a face-up card.
 				_play_sound(SFX_FLIP, 0.7, -10.0)
@@ -513,7 +540,8 @@ func _update_hand_validity() -> void:
 		valid = true
 	elif blackjack_target > 0:
 		# Any chain can stand — hits are binding, busts self-resolve.
-		valid = selected.size() >= 1 and blackjack_hole_hidden
+		valid = selected.size() >= 1 and blackjack_hole_hidden \
+				and not blackjack_presenting
 	elif not holdem_community.is_empty():
 		valid = selected.size() == 2 and not holdem_result().is_empty()
 	elif not selected.is_empty():
@@ -562,13 +590,14 @@ func play_hand() -> void:
 	if blackjack_target > 0:
 		# BLACKJACK: your hits flip face-up, then the dealer turns his
 		# hole card and draws until he beats you, ties you, or busts.
-		if not blackjack_hole_hidden:
+		if not blackjack_hole_hidden or blackjack_presenting:
 			_reject_hand()  # between rounds: the dealer is still dealing
 			return
 		var total := Poker.blackjack_sum(get_selected_data())
 		var outcome := "bust"
-		blackjack_hole_hidden = false
 		if total <= 21:
+			# His full hand is decided now; the reveal is paced by the
+			# presentation (flip_hole / reveal_dealer_card).
 			while Poker.blackjack_sum(blackjack_dealer_cards) < total:
 				blackjack_dealer_cards.append(
 						{"rank": randi_range(2, 14), "suit": randi_range(0, 3)})
@@ -579,14 +608,13 @@ func play_hand() -> void:
 				outcome = "push"
 			else:
 				outcome = "lose"
-		blackjack_target = Poker.blackjack_sum(blackjack_dealer_cards)
-		community_changed.emit()
+		blackjack_presenting = true
 		var won := outcome == "win"
 		result = {"name": "Twenty-One!" if total == 21 and won else "Blackjack Round",
 				"base": 0, "pips": total, "score": (total * 3) if won else 0,
 				"playable": true, "blackjack_win": won,
 				"blackjack_outcome": outcome, "blackjack_player": total,
-				"blackjack_dealer": blackjack_target}
+				"blackjack_dealer": Poker.blackjack_sum(blackjack_dealer_cards)}
 	elif not holdem_community.is_empty():
 		# HOLD'EM: exactly 2 hole cards; best 5 of 7 with the community.
 		if selected.size() != 2:

@@ -464,10 +464,10 @@ func _update_preview() -> void:
 	var data := board.get_selected_data()
 	if board.blackjack_target > 0:
 		if data.is_empty():
-			if board.blackjack_hole_hidden:
-				preview_label.text = "Dealer shows %d. Start from a face-up card and hit one card at a time — flip past 21 and you bust on the spot." % board.blackjack_target
+			if board.blackjack_presenting or not board.blackjack_hole_hidden:
+				preview_label.text = "The dealer plays out his hand…"
 			else:
-				preview_label.text = "The dealer is dealing the next round…"
+				preview_label.text = "Dealer shows %d. Start from a face-up card and hit one card at a time — flip past 21 and you bust on the spot." % board.blackjack_target
 			preview_label.add_theme_color_override("font_color", DIM)
 		else:
 			var total := Poker.blackjack_sum(data)
