@@ -142,10 +142,18 @@ var cursed := false:  # trail-mode dead weight: unselectable, blocks chains
 	set(value):
 		cursed = value
 		queue_redraw()
+# Blackjack tables: the card sits face-down until revealed — chaining
+# it is a blind hit. Hazards always burn through the card back.
+var face_down := false:
+	set(value):
+		face_down = value
+		queue_redraw()
 # Trail hazards: "", "bomb", "fire", "wind", "stone", "water".
 var hazard := "":
 	set(value):
 		hazard = value
+		if hazard != "":
+			face_down = false
 		_update_ambient()
 		queue_redraw()
 var fuse := 0:  # bomb: hands until detonation
@@ -408,6 +416,16 @@ func _draw() -> void:
 				Vector2(2, rect.size.y - 6)), Color(0, 0, 0, 0.10))
 
 	var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
+	if face_down:
+		# A blind hit waiting to happen: the card back, nothing more.
+		_draw_card_back(rect)
+		if selected and chain_index > 0:
+			var fd_badge := GOLD if not error_flash else ERROR_RED
+			var fd_center := Vector2(W / 2.0 - 13, -H / 2.0 + 13)
+			draw_circle(fd_center, 10, fd_badge)
+			draw_string(font, fd_center + Vector2(-10, 5.5), str(chain_index),
+					HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
+		return
 	if snake_tail:
 		# Cobra body: a scaled green wall.
 		draw_rect(rect.grow(-3), SNAKE_GREEN)
@@ -559,6 +577,25 @@ func _draw() -> void:
 		draw_circle(badge_center, 10, badge_color)
 		draw_string(font, badge_center + Vector2(-10, 5.5), str(chain_index),
 				HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
+
+
+## The card back: deep red field, a diamond lattice, and a center pip.
+func _draw_card_back(rect: Rect2) -> void:
+	var inner := rect.grow(-5)
+	draw_rect(inner, Color("6e2620"))
+	draw_rect(inner.grow(-3), Color("8a3a30"), false, 2.0)
+	var lat := Color(0.95, 0.85, 0.65, 0.2)
+	for gy in 6:
+		for gx in 4:
+			var c := inner.position + Vector2(9.0 + gx * 16.0, 12.0 + gy * 14.0)
+			draw_line(c + Vector2(0, -6), c + Vector2(7, 0), lat, 1.5)
+			draw_line(c + Vector2(7, 0), c + Vector2(0, 6), lat, 1.5)
+			draw_line(c + Vector2(0, 6), c + Vector2(-7, 0), lat, 1.5)
+			draw_line(c + Vector2(-7, 0), c + Vector2(0, -6), lat, 1.5)
+	# Center diamond pip.
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(0, -12), Vector2(9, 0), Vector2(0, 12), Vector2(-9, 0)]),
+		Color(0.95, 0.85, 0.65, 0.55))
 
 
 ## Full-face identity for enhanced cards: gold cards go solid gold;

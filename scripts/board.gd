@@ -83,9 +83,12 @@ var fx: Fx
 signal community_changed
 # TEXAS HOLD'EM: 5 shared cards; you pick exactly 2 hole cards.
 var holdem_community: Array = []
-# BLACKJACK: > this dealer total without busting 21 (0 = poker rules).
+# BLACKJACK (0 = poker rules): while the hole card is hidden this is
+# the dealer's UP card; once he plays out, his full total.
 var blackjack_target := 0
-var blackjack_dealer_cards: Array = []  # the dealer's actual hand, on show
+var blackjack_dealer_cards: Array = []  # the dealer's hand in the panel
+var blackjack_hole_hidden := true       # second card face-down until you commit
+var blackjack_facedown := false         # this table deals its refills face-down
 # CRAZY 8s: every 8 on the board counts as wild.
 var eights_wild := false
 
@@ -108,19 +111,45 @@ func holdem_result() -> Dictionary:
 	return Poker.best_of(get_selected_data() + holdem_community)
 
 
-## The dealer draws a real hand to 17+, standing at 20 or under (a 21
-## would be unbeatable). His cards go on show in the panel.
+## A fresh blackjack round: the dealer takes two cards — one on show,
+## the hole card face-down until the player commits a hand.
 func deal_blackjack_dealer() -> void:
-	while true:
-		var cards: Array = []
-		while Poker.blackjack_sum(cards) < 17:
-			cards.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3)})
-		var total := Poker.blackjack_sum(cards)
-		if total <= 20:
-			blackjack_dealer_cards = cards
-			blackjack_target = total
-			break
+	blackjack_dealer_cards = [
+		{"rank": randi_range(2, 14), "suit": randi_range(0, 3)},
+		{"rank": randi_range(2, 14), "suit": randi_range(0, 3)}]
+	blackjack_hole_hidden = true
+	blackjack_target = Poker.blackjack_sum([blackjack_dealer_cards[0]])
 	community_changed.emit()
+
+
+## Flips the table for a blackjack room: everything face-down except
+## the four corner starting points; refills arrive face-down too.
+## Hazards always burn through the card back.
+func set_blackjack_facedown() -> void:
+	blackjack_facedown = true
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		if card.hazard == "" and not card.is_safe and card.boss == "":
+			card.face_down = true
+	for corner in [Vector2i(0, 0), Vector2i(cols - 1, 0),
+			Vector2i(0, rows - 1), Vector2i(cols - 1, rows - 1)]:
+		if grid.has(corner):
+			grid[corner].face_down = false
+
+
+## One random face-down card turns over (blackjack rooms: one reveal
+## per submitted hand).
+func reveal_random_card() -> void:
+	var hidden: Array = []
+	for p in grid:
+		if grid[p].face_down:
+			hidden.append(grid[p])
+	if hidden.is_empty():
+		return
+	var card: PlayingCard = hidden.pick_random()
+	card.face_down = false
+	_play_sound(SFX_FLIP, 1.2, -10.0)
+	_fx(card.position, "sparks")
 
 
 ## Whatever card row the current variant wants shown in the panel.
@@ -236,6 +265,8 @@ func reset() -> void:
 	holdem_community.clear()
 	blackjack_target = 0
 	blackjack_dealer_cards.clear()
+	blackjack_hole_hidden = true
+	blackjack_facedown = false
 	eights_wild = false
 	PlayingCard.eights_wild = false
 	for card in grid.values():
@@ -446,8 +477,8 @@ func _update_hand_validity() -> void:
 		# The safe can only have joined via its full combo — crackable.
 		valid = true
 	elif blackjack_target > 0:
-		var total := Poker.blackjack_sum(get_selected_data())
-		valid = selected.size() >= 2 and total <= 21 and total > blackjack_target
+		# Any 2+ chain is a legal commit — busting is the gamble.
+		valid = selected.size() >= 2 and blackjack_hole_hidden
 	elif not holdem_community.is_empty():
 		valid = selected.size() == 2 and not holdem_result().is_empty()
 	elif not selected.is_empty():
@@ -494,14 +525,35 @@ func play_hand() -> void:
 				return
 	var result: Dictionary
 	if blackjack_target > 0:
-		# BLACKJACK: beat the dealer's total without busting 21.
-		var total := Poker.blackjack_sum(get_selected_data())
-		if selected.size() < 2 or total > 21 or total <= blackjack_target:
-			_reject_hand()
+		# BLACKJACK: your hits flip face-up, then the dealer turns his
+		# hole card and draws until he beats you, ties you, or busts.
+		if selected.size() < 2 or not blackjack_hole_hidden:
+			_reject_hand()  # between rounds: the dealer is still dealing
 			return
-		result = {"name": "Twenty-One!" if total == 21 else "Beat the Dealer",
-				"base": 0, "pips": total, "score": total * 3, "playable": true,
-				"blackjack_win": true}
+		for card in selected:
+			card.face_down = false
+		var total := Poker.blackjack_sum(get_selected_data())
+		var outcome := "bust"
+		blackjack_hole_hidden = false
+		if total <= 21:
+			while Poker.blackjack_sum(blackjack_dealer_cards) < total:
+				blackjack_dealer_cards.append(
+						{"rank": randi_range(2, 14), "suit": randi_range(0, 3)})
+			var dealer := Poker.blackjack_sum(blackjack_dealer_cards)
+			if dealer > 21:
+				outcome = "win"
+			elif dealer == total:
+				outcome = "push"
+			else:
+				outcome = "lose"
+		blackjack_target = Poker.blackjack_sum(blackjack_dealer_cards)
+		community_changed.emit()
+		var won := outcome == "win"
+		result = {"name": "Twenty-One!" if total == 21 and won else "Blackjack Round",
+				"base": 0, "pips": total, "score": (total * 3) if won else 0,
+				"playable": true, "blackjack_win": won,
+				"blackjack_outcome": outcome, "blackjack_player": total,
+				"blackjack_dealer": blackjack_target}
 	elif not holdem_community.is_empty():
 		# HOLD'EM: exactly 2 hole cards; best 5 of 7 with the community.
 		if selected.size() != 2:
@@ -987,6 +1039,9 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			if not initial_deal and not card.cursed \
 					and randf() < refill_hazard_chance:
 				_init_hazard(card, HAZARD_KINDS.pick_random())
+			# Blackjack tables deal their refills face-down.
+			if blackjack_facedown and card.hazard == "":
+				card.face_down = true
 			var p := Vector2i(x, row)
 			card.grid_pos = p
 			grid[p] = card

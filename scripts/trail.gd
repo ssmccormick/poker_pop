@@ -905,7 +905,7 @@ func _bet_goal_text(o: Dictionary) -> String:
 		"crazy8":
 			return "Target %d — every 8 is WILD, but the board crawls with hazards" % o.target
 		"blackjack":
-			return "Beat the dealer %d times — sum to 21, don't bust, mind the hazards" % o.wins
+			return "Beat the dealer %d times — a face-down table, blind hits, and a real dealer playing out his hand" % o.wins
 		"outlaw":
 			return "Duel: shoot the Outlaw %d times before your grit runs out" % o.outlaw_hp
 		"hands":
@@ -1035,6 +1035,7 @@ func _seed_room_specials() -> void:
 		main.board.apply_theme()  # repaint so the 8s show their W
 	elif room_goal == "blackjack":
 		_deal_dealer()
+		main.board.set_blackjack_facedown()
 	elif room_goal == "outlaw":
 		main.outlaw.appear(room_outlaw_hp)
 		for i in 2:
@@ -1183,15 +1184,32 @@ func on_hand_played(result: Dictionary) -> void:
 				live += 1
 		if live < floor_count:
 			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
-	if room_goal == "blackjack" and result.get("blackjack_win", false):
-		room_wins += 1
-		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
-		if room_wins >= room_wins_needed:
-			_room_cleared()
-			return
-		_deal_dealer()
-		_announce_after_settle("ROUND WON  %d / %d — DEALER SHOWS %d"
-				% [room_wins, room_wins_needed, main.board.blackjack_target])
+	if room_goal == "blackjack" and result.has("blackjack_outcome"):
+		var outcome := String(result.blackjack_outcome)
+		var player := int(result.get("blackjack_player", 0))
+		var dealer := int(result.get("blackjack_dealer", 0))
+		# Every hand turns over a little more of the table.
+		main.board.reveal_random_card()
+		if outcome == "win":
+			room_wins += 1
+			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+			if room_wins >= room_wins_needed:
+				_room_cleared()
+				return
+			var how := "DEALER BUSTS AT %d" % dealer if dealer > 21 \
+					else "YOUR %d TAKES IT" % player
+			_announce_after_settle("%s — ROUND WON  %d / %d"
+					% [how, room_wins, room_wins_needed])
+		elif outcome == "bust":
+			_announce_after_settle("BUST AT %d — THE DEALER TAKES IT" % player)
+		elif outcome == "push":
+			_announce_after_settle("PUSH AT %d — NOBODY WINS" % player)
+		else:
+			_announce_after_settle("DEALER STANDS AT %d — ROUND LOST" % dealer)
+		# Let his played-out hand sit on show before the next round.
+		get_tree().create_timer(2.2).timeout.connect(func() -> void:
+			if in_room and room_goal == "blackjack":
+				_deal_dealer())
 	if room_goal == "outlaw":
 		var hits := int(result.get("bullets_you", 0))
 		var caught := int(result.get("bullets_his", 0))

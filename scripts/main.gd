@@ -206,6 +206,13 @@ func _ready() -> void:
 						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
 						"min_bet": 10, "goal": "safe"}, false)
 				trail._confirm_bet()
+			"trailbj":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail._choose_offer({"kind": "play", "tarot": "BLACKJACK",
+						"label": "Twenty-One", "target": 0, "hands": 8, "odds": 1.5,
+						"min_bet": 10, "goal": "blackjack", "wins": 3}, false)
+				trail._confirm_bet()
 			"trailoutlaw":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -308,8 +315,11 @@ func _update_labels() -> void:
 	_community_label.visible = show_community
 	community_display.visible = show_community
 	if show_community:
-		_community_label.text = "DEALER SHOWS %d" % board.blackjack_target \
-				if board.blackjack_target > 0 else "COMMUNITY"
+		if board.blackjack_target > 0:
+			_community_label.text = ("DEALER SHOWS %d" if board.blackjack_hole_hidden
+					else "DEALER HAS %d") % board.blackjack_target
+		else:
+			_community_label.text = "COMMUNITY"
 	var show_arcade := mode_kind == "arcade" and game_started and not menu_open
 	var show_trail := mode_kind == "trail" and game_started and not menu_open and trail.in_room
 	meter_back.visible = show_arcade
@@ -454,18 +464,32 @@ func _update_preview() -> void:
 	var data := board.get_selected_data()
 	if board.blackjack_target > 0:
 		if data.is_empty():
-			preview_label.text = "Chain cards toward 21 — beat the dealer's %d." % board.blackjack_target
+			if board.blackjack_hole_hidden:
+				preview_label.text = "Dealer shows %d. Chain your hits — a face-down card is a blind draw." % board.blackjack_target
+			else:
+				preview_label.text = "The dealer is dealing the next round…"
 			preview_label.add_theme_color_override("font_color", DIM)
 		else:
-			var total := Poker.blackjack_sum(data)
-			if total > 21:
-				preview_label.text = "SUM %d — BUST!" % total
+			var known: Array = []
+			var hidden := 0
+			for card in board.selected:
+				if card.face_down:
+					hidden += 1
+				else:
+					known.append({"rank": card.rank, "suit": card.suit})
+			var total := Poker.blackjack_sum(known)
+			if hidden > 0:
+				preview_label.text = "SUM %d + %d blind hit%s — press your luck?" \
+						% [total, hidden, "" if hidden == 1 else "s"]
+				preview_label.add_theme_color_override("font_color", GOLD)
+			elif total > 21:
+				preview_label.text = "SUM %d — that's a BUST if you play it." % total
 				preview_label.add_theme_color_override("font_color", RED)
-			elif total > board.blackjack_target and data.size() >= 2:
-				preview_label.text = "SUM %d beats the dealer's %d — play it!" % [total, board.blackjack_target]
+			elif data.size() >= 2:
+				preview_label.text = "SUM %d vs the dealer's %d showing — play it and he draws." % [total, board.blackjack_target]
 				preview_label.add_theme_color_override("font_color", GOLD)
 			else:
-				preview_label.text = "SUM %d — the dealer shows %d." % [total, board.blackjack_target]
+				preview_label.text = "SUM %d — chain at least two cards." % total
 				preview_label.add_theme_color_override("font_color", DIM)
 		return
 	if not board.holdem_community.is_empty():
@@ -839,6 +863,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		return "COBRA TAIL\nA wall. Clear the head's face to make him cough it back up."
 	var rank_names := {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
 	var lines: Array[String] = []
+	if card.face_down:
+		return "FACE DOWN\nA blind hit — chain it and find out. Every played hand turns another card over."
 	if card.washed:
 		lines.append("SOAKED — face hidden. It still is what it was… if you remember.")
 	else:
@@ -917,7 +943,7 @@ const TUTOR := {
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
-	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house. Chain cards summing as close to 21 as you dare (faces 10, aces 11 or 1): beat the DEALER'S TOTAL without busting to win the round. Win enough rounds to clear — and the house deals dirty: hazards stay in play the whole table."],
+	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house, and the table is dealt FACE-DOWN with only the corners showing. Chain your hits (faces 10, aces 11 or 1): a face-down card is a blind draw. The dealer shows one card and hides his hole card; commit your hand and he flips it, then draws to beat you or bust — over 21 and the round is his. Every hand played turns another card face-up. Win enough rounds to clear — and mind the hazards burning through the card backs."],
 	"goal_outlaw": ["SHOWDOWN", "The Outlaw waits. Clear YOUR bullets (gold) in scoring hands to shoot him; touch HIS bullets (red) and he shoots you. Weak hands under the posted score give him a free shot too. Run out of GRIT and you're done — gun him down first."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
 }
@@ -1205,6 +1231,10 @@ func _refresh_community() -> void:
 		var mc := PlayingCard.new()
 		mc.rank = data.rank
 		mc.suit = data.suit
+		# Real-blackjack style: the dealer's hole card stays face-down
+		# until the player commits a hand.
+		mc.face_down = i == 1 and board.blackjack_hole_hidden \
+				and not board.blackjack_dealer_cards.is_empty()
 		mc.position = Vector2(i * 74.0 + 46.0, 0)
 		mc.material = Themes.current_material()
 		community_display.add_child(mc)
@@ -1841,7 +1871,7 @@ func _debug_seed_hazards() -> void:
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss":
+		"trailhazard", "trailheist", "trailboss", "trailbj":
 			await get_tree().create_timer(4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
