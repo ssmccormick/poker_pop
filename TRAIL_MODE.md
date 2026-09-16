@@ -165,16 +165,19 @@ quarter clockwise every hand.
 - **BLACKJACK**: poker hands OFF; you play against the house at a
   FACE-DOWN table. The whole board is dealt face-down except the four
   corner cards; refills arrive face-down; every submitted hand turns
-  one more random card face-up. Chaining a face-down card is a BLIND
-  HIT — its pips count, you just don't know them yet. The dealer
-  shows one card in the panel with his hole card face-down (real
-  blackjack style); when you commit a chain (any 2+ cards — busting
-  is allowed and loses the round), your hits flip, he reveals the
-  hole card and DRAWS until he beats you, ties you (push), or busts
-  over 21. His played-out hand lingers ~2s, then a fresh round is
-  dealt. Beat the dealer N times (3 + region) to clear. Hazards burn
-  through the card backs (a hazarded card is always face-up), and the
-  storm rules still apply — 5 + region, replenished, no ambient roll.
+  one more random card face-up. Chains must START from a face-up
+  card. Each face-down card you select is a HIT: it flips ON THE SPOT
+  and its pips join your running sum. Hits are BINDING — no deselect,
+  no clear (the clear button/right-click are refused mid-chain) — and
+  if a flip carries the sum past 21 the round busts immediately, no
+  submit needed. PLAY HAND (any 1+ cards) is standing: the dealer
+  reveals his hole card (one is face-down in the panel, real
+  blackjack style) and DRAWS until he beats you, ties you (push), or
+  busts over 21. His played-out hand lingers ~2s, then a fresh round
+  is dealt. Beat the dealer N times (3 + region) to clear. Hazards
+  burn through the card backs (a hazarded card is always face-up),
+  and the storm rules still apply — 5 + region, replenished, no
+  ambient roll.
 - **SHOWDOWN — the Outlaw**: an Outlaw portrait with HP beside the
   board. YOUR bullet cards and HIS bullet cards spawn among the deals.
   Clear YOUR bullets in scoring hands → shots that damage him. Clear

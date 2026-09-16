@@ -419,7 +419,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					board.play_hand()
 			KEY_C:
 				if not game_over:
-					board.clear_selection()
+					board.player_clear()
 			KEY_R:
 				_restart()
 			KEY_M:
@@ -465,32 +465,18 @@ func _update_preview() -> void:
 	if board.blackjack_target > 0:
 		if data.is_empty():
 			if board.blackjack_hole_hidden:
-				preview_label.text = "Dealer shows %d. Chain your hits — a face-down card is a blind draw." % board.blackjack_target
+				preview_label.text = "Dealer shows %d. Start from a face-up card and hit one card at a time — flip past 21 and you bust on the spot." % board.blackjack_target
 			else:
 				preview_label.text = "The dealer is dealing the next round…"
 			preview_label.add_theme_color_override("font_color", DIM)
 		else:
-			var known: Array = []
-			var hidden := 0
-			for card in board.selected:
-				if card.face_down:
-					hidden += 1
-				else:
-					known.append({"rank": card.rank, "suit": card.suit})
-			var total := Poker.blackjack_sum(known)
-			if hidden > 0:
-				preview_label.text = "SUM %d + %d blind hit%s — press your luck?" \
-						% [total, hidden, "" if hidden == 1 else "s"]
-				preview_label.add_theme_color_override("font_color", GOLD)
-			elif total > 21:
-				preview_label.text = "SUM %d — that's a BUST if you play it." % total
-				preview_label.add_theme_color_override("font_color", RED)
-			elif data.size() >= 2:
-				preview_label.text = "SUM %d vs the dealer's %d showing — play it and he draws." % [total, board.blackjack_target]
+			var total := Poker.blackjack_sum(data)
+			if total == 21:
+				preview_label.text = "TWENTY-ONE — play it!"
 				preview_label.add_theme_color_override("font_color", GOLD)
 			else:
-				preview_label.text = "SUM %d — chain at least two cards." % total
-				preview_label.add_theme_color_override("font_color", DIM)
+				preview_label.text = "SUM %d vs the dealer's %d showing — hit on (no take-backs), or play to stand." % [total, board.blackjack_target]
+				preview_label.add_theme_color_override("font_color", GOLD)
 		return
 	if not board.holdem_community.is_empty():
 		if data.size() != 2:
@@ -864,7 +850,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	var rank_names := {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
 	var lines: Array[String] = []
 	if card.face_down:
-		return "FACE DOWN\nA blind hit — chain it and find out. Every played hand turns another card over."
+		return "FACE DOWN\nSelect it to HIT: it flips on the spot and its pips join your sum. No take-backs — flip past 21 and you bust the round."
 	if card.washed:
 		lines.append("SOAKED — face hidden. It still is what it was… if you remember.")
 	else:
@@ -943,7 +929,7 @@ const TUTOR := {
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
-	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house, and the table is dealt FACE-DOWN with only the corners showing. Chain your hits (faces 10, aces 11 or 1): a face-down card is a blind draw. The dealer shows one card and hides his hole card; commit your hand and he flips it, then draws to beat you or bust — over 21 and the round is his. Every hand played turns another card face-up. Win enough rounds to clear — and mind the hazards burning through the card backs."],
+	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house at a FACE-DOWN table, corners showing. Start a chain from a face-up card, then HIT one card at a time: each face-down card you select flips ON THE SPOT and its pips join your sum (faces 10, aces 11 or 1). Hits are binding — no clearing, no take-backs — and if a flip carries you past 21 you BUST right there. PLAY HAND to stand: the dealer flips his hole card and draws to beat you or bust. Every hand turns another random card face-up. Win enough rounds to clear."],
 	"goal_outlaw": ["SHOWDOWN", "The Outlaw waits. Clear YOUR bullets (gold) in scoring hands to shoot him; touch HIS bullets (red) and he shoots you. Weak hands under the posted score give him a free shot too. Run out of GRIT and you're done — gun him down first."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
 }
@@ -1311,7 +1297,7 @@ func _build_ui() -> void:
 	clear_btn.add_theme_font_size_override("font_size", 24)
 	clear_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
-			board.clear_selection())
+			board.player_clear())
 	var menu_btn := _button(hud_root, "MENU", Vector2(PANEL_X + 155, 388), Vector2(145, 48))
 	menu_btn.add_theme_font_size_override("font_size", 18)
 	menu_btn.pressed.connect(func() -> void:

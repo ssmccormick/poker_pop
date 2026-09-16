@@ -334,7 +334,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				dragging = true
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			clear_selection()
+			player_clear()
 	elif event is InputEventMouseMotion and dragging:
 		_drag_over(_card_under_mouse(false))
 
@@ -370,8 +370,10 @@ func _drag_over(card: PlayingCard) -> void:
 	if card == selected.back():
 		return
 	if selected.size() >= 2 and card == selected[-2]:
-		# Dragging back over the previous card undoes the last step.
-		_toggle_select(selected.back())
+		# Dragging back over the previous card undoes the last step —
+		# except at the blackjack table, where a hit is binding.
+		if blackjack_target == 0:
+			_toggle_select(selected.back())
 	elif not card.selected:
 		if selected.size() < _select_cap() and _is_adjacent(card.grid_pos, selected.back().grid_pos):
 			_toggle_select(card)
@@ -401,6 +403,10 @@ func _toggle_select(card: PlayingCard) -> void:
 			_play_sound(SFX_FLIP, 0.7, -10.0)
 		return
 	if card.selected:
+		if blackjack_target > 0:
+			# A hit is binding — no take-backs at the blackjack table.
+			_play_sound(SFX_FLIP, 0.7, -10.0)
+			return
 		# Remove this card and everything chained after it.
 		var idx := selected.find(card)
 		for i in range(selected.size() - 1, idx - 1, -1):
@@ -412,15 +418,33 @@ func _toggle_select(card: PlayingCard) -> void:
 			return
 		if not selected.is_empty() and not _is_adjacent(card.grid_pos, selected.back().grid_pos):
 			return
+		if blackjack_target > 0:
+			if not blackjack_hole_hidden:
+				return  # between rounds — the dealer is still dealing
+			if selected.is_empty() and card.face_down:
+				# Every hand starts from a face-up card.
+				_play_sound(SFX_FLIP, 0.7, -10.0)
+				return
 		card.selected = true
 		selected.append(card)
-		# Random select sample; pitch climbs as the chain grows.
-		_play_sound(SFX_SELECTS.pick_random(),
-				1.0 + 0.07 * (selected.size() - 1) + randf_range(-0.02, 0.02), -6.0)
+		if blackjack_target > 0 and card.face_down:
+			# The hit: flip it and find out.
+			card.face_down = false
+			_play_sound(SFX_FLIP, 1.2, -8.0)
+			_fx(card.position, "sparks")
+		else:
+			# Random select sample; pitch climbs as the chain grows.
+			_play_sound(SFX_SELECTS.pick_random(),
+					1.0 + 0.07 * (selected.size() - 1) + randf_range(-0.02, 0.02), -6.0)
 	_sync_chain_indices()
 	_update_hand_validity()
 	_update_safe_progress()
 	selection_changed.emit()
+	# The hit that breaks you: flip past 21 and the round resolves on
+	# the spot — no submit needed to bust.
+	if blackjack_target > 0 and blackjack_hole_hidden \
+			and Poker.blackjack_sum(get_selected_data()) > 21:
+		play_hand()
 
 
 ## True when the current chain's ranks equal `safe.combo` exactly.
@@ -452,6 +476,15 @@ func _sync_chain_indices() -> void:
 		selected[i].chain_index = i + 1
 
 
+## Player-initiated clear (button, key, right-click): refused at the
+## blackjack table, where a hit is binding.
+func player_clear() -> void:
+	if blackjack_target > 0 and not selected.is_empty():
+		_play_sound(SFX_FLIP, 0.7, -10.0)
+		return
+	clear_selection()
+
+
 func clear_selection() -> void:
 	if selected.is_empty():
 		return
@@ -477,8 +510,8 @@ func _update_hand_validity() -> void:
 		# The safe can only have joined via its full combo — crackable.
 		valid = true
 	elif blackjack_target > 0:
-		# Any 2+ chain is a legal commit — busting is the gamble.
-		valid = selected.size() >= 2 and blackjack_hole_hidden
+		# Any chain can stand — hits are binding, busts self-resolve.
+		valid = selected.size() >= 1 and blackjack_hole_hidden
 	elif not holdem_community.is_empty():
 		valid = selected.size() == 2 and not holdem_result().is_empty()
 	elif not selected.is_empty():
@@ -527,11 +560,9 @@ func play_hand() -> void:
 	if blackjack_target > 0:
 		# BLACKJACK: your hits flip face-up, then the dealer turns his
 		# hole card and draws until he beats you, ties you, or busts.
-		if selected.size() < 2 or not blackjack_hole_hidden:
+		if not blackjack_hole_hidden:
 			_reject_hand()  # between rounds: the dealer is still dealing
 			return
-		for card in selected:
-			card.face_down = false
 		var total := Poker.blackjack_sum(get_selected_data())
 		var outcome := "bust"
 		blackjack_hole_hidden = false
