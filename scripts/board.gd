@@ -75,6 +75,10 @@ const GOLD_FIND_CHANCE := 0.35
 # hazarded (set per room by trail; 0 everywhere else).
 var refill_hazard_chance := 0.0
 const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
+# Ledger of every hazard ever put on this board, by kind. Purge rooms
+# read cleared = spawned − still standing, which is exact no matter
+# HOW a hazard left (played, burned out, gusted, shoved, blown up).
+var hazards_spawned := {}
 
 # Particle helper (set by main; null on detached test boards).
 var fx: Fx
@@ -288,6 +292,7 @@ func reset(deal_facedown := false) -> void:
 	suppress_refill = false
 	gold_rush = false
 	refill_hazard_chance = 0.0
+	hazards_spawned.clear()
 	jack_bar = 0
 	holdem_community.clear()
 	blackjack_target = 0
@@ -1732,8 +1737,13 @@ func tick_boss() -> void:
 # --- Trail hazard engine --------------------------------------------------
 
 ## Seeds `count` random plain cards with a hazard state (trail rooms).
+func spawned_count(kind: String) -> int:
+	return int(hazards_spawned.get(kind, 0))
+
+
 ## Turns one card into a live hazard with its fields initialised.
 func _init_hazard(card: PlayingCard, kind: String) -> void:
+	hazards_spawned[kind] = spawned_count(kind) + 1
 	card.hazard = kind
 	match kind:
 		"bomb":
@@ -1875,6 +1885,7 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 			var q: Vector2i = p + d
 			if _victim_ok(q):
 				grid[q].hazard = "fire"
+				hazards_spawned["fire"] = spawned_count("fire") + 1
 				ignited.append(q)
 				break
 	# Then the fire eats: rank drops, and below 2 the card burns up

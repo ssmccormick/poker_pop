@@ -56,7 +56,12 @@ const REFILL_HAZARD_BASE := 0.03
 const REFILL_HAZARD_STEP := 0.008  # + per room index
 const REFILL_HAZARD_MAX := 0.20
 const OBJECTIVE_CHANCE := 0.12   # heist/treasure rooms, from room 2 on
-const PURGE_CHANCE := 0.14       # purge rooms: board of one hazard, clear them all
+const PURGE_CHANCE := 0.14       # purge rooms: clear a QUOTA of one hazard kind
+const PURGE_SEED := 4            # hazards on the table at the deal
+const PURGE_QUOTA_BASE := 10     # total to clear (+ per region below)
+const PURGE_QUOTA_REGION := 3    # deeper tables demand more
+const PURGE_FLOOR := 4           # trickle keeps at least this many on board
+const PURGE_TRICKLE := 2         # at most this many arrive per hand
 const CRAZY8_HAZARDS_BASE := 8   # crazy-8s hazard storm (+1 per region)
 const BLACKJACK_HAZARDS_BASE := 5  # blackjack table hazards (+1 per region)
 const REQUIRE_CHANCE := 0.12     # called-hands rooms: play the demanded hands
@@ -566,16 +571,23 @@ func _make_offers() -> Array:
 	risk_pool.shuffle()
 	for i in 3:
 		if want_shop and i == 1:
-			offers.append({"kind": "shop", "tarot": "GENERAL STORE"})
+			offers.append(_make_shop_offer())
 		else:
 			offers.append(_make_one_offer(false, risk_pool[i % risk_pool.size()]))
 	return offers
 
 
+## A shop offer names its merchant up front, so the tarot card shows
+## WHO is waiting before you commit to the stop.
+func _make_shop_offer() -> Dictionary:
+	return {"kind": "shop", "tarot": "TRAVELING MERCHANT",
+			"merchant": randi() % MERCHANTS.size()}
+
+
 func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 	if random_risk:
 		if randf() < 0.15:
-			return {"kind": "shop", "tarot": "GENERAL STORE"}
+			return _make_shop_offer()
 		risk = RISKS.pick_random()
 	var region := room_index / REGION_SIZE
 	var offer := {
@@ -625,14 +637,16 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.hands = mini(MAX_HANDS_BUY, 3 * (GOLD_MINE_STONES_BASE + region))
 				offer.target = 0
 			else:
-				# Purge rooms: a board full of one hazard — remove them all.
+				# Purge rooms: clear a QUOTA of one hazard kind — a few
+				# seeded at the deal, the rest trickling in as you play.
 				offer.tarot = String(PURGE_TAROTS[kind])
 				offer.label = "Purge"
 				offer.odds = 2.0 if kind in ["bomb", "fire"] else 1.5
 				offer["goal"] = "purge"
 				offer["purge_kind"] = kind
-				offer["purge_count"] = mini(4 + region, 7)
-				offer.hands = maxi(1, 8 - region)
+				offer["purge_count"] = PURGE_SEED
+				offer["purge_quota"] = PURGE_QUOTA_BASE + PURGE_QUOTA_REGION * region
+				offer.hands = mini(MAX_HANDS_BUY, 9 + region)
 				offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE:
 			# Called hands: play exactly what the table demands.
@@ -740,9 +754,16 @@ func _render_tarot() -> void:
 func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 	var b: Button = main._button(_tarot_cards_box, "", Vector2(x, 0), Vector2(300, 380))
 	if offer.kind == "shop":
-		_tarot_face(b, "GENERAL STORE", "Safe haven",
-				"Buy new cards for your deck, or burn one at the forge.",
-				"No bet — browse free")
+		var m: Dictionary = MERCHANTS[int(offer.get("merchant", 0))]
+		var wares := PackedStringArray()
+		if int(m.cards) > 0:
+			wares.append("%d cards" % int(m.cards))
+		if int(m.relics) > 0:
+			wares.append("%d relics" % int(m.relics))
+		if m.forge:
+			wares.append("forge")
+		_tarot_face(b, String(m.name), "Safe haven", String(m.line),
+				"%s\nNo bet — browse free" % "  ·  ".join(wares))
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
@@ -752,12 +773,9 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "chest":
 			goal_line = "Open %d chests — win a RELIC" % int(offer.get("chest_count", 1))
 		elif offer.get("goal", "") == "purge":
-			if offer.purge_kind == "fire":
-				# Fire spreads: the seeded count is only where it starts.
-				goal_line = "Clear ALL fire cards (%d to start)" % offer.purge_count
-			else:
-				goal_line = "Clear all %d %s cards" % [offer.purge_count,
-						String(offer.purge_kind).to_upper()]
+			goal_line = "Clear %d %s cards — %d seeded, more keep coming" % [
+					int(offer.get("purge_quota", PURGE_QUOTA_BASE)),
+					String(offer.purge_kind).to_upper(), offer.purge_count]
 		elif offer.get("goal", "") == "mine":
 			goal_line = "Break %d stones — gold in the rubble" % offer.stones
 		elif offer.get("goal", "") == "holdem":
@@ -896,8 +914,10 @@ func _bet_goal_text(o: Dictionary) -> String:
 					% int(o.get("chest_count", 1))
 		"purge":
 			if o.purge_kind == "fire":
-				return "Clear ALL fire cards — %d to start, and it spreads" % o.purge_count
-			return "Clear all %d %s cards" % [o.purge_count, o.purge_kind]
+				return "Clear %d fire cards — %d to start, it spreads, and more keep catching" \
+						% [int(o.get("purge_quota", PURGE_QUOTA_BASE)), o.purge_count]
+			return "Clear %d %s cards — %d seeded, more arrive as you play" \
+					% [int(o.get("purge_quota", PURGE_QUOTA_BASE)), o.purge_kind, o.purge_count]
 		"mine":
 			return "Break %d stones (gold in the rubble)" % o.stones
 		"holdem":
@@ -1211,9 +1231,18 @@ func on_hand_played(result: Dictionary) -> void:
 				return
 			_announce_after_settle("THE OUTLAW FIRES — GRIT %d" % room_grit)
 		_replenish_bullets()
-	if room_goal == "purge" and int(result.get("hazards_left", -1)) == 0:
-		_room_cleared()
-		return
+	if room_goal == "purge":
+		if purged_count() >= purge_quota():
+			_room_cleared()
+			return
+		# The infestation keeps coming until the full quota has hit
+		# the table — a couple per hand, keeping the floor stocked.
+		var kind := String(current_offer.get("purge_kind", "fire"))
+		var add := mini(PURGE_TRICKLE,
+				purge_quota() - main.board.spawned_count(kind))
+		add = mini(add, PURGE_FLOOR - purge_left())
+		if add > 0:
+			main.board.apply_room_hazards(kind, add)
 	if room_goal == "mine":
 		room_stones_broken += int(result.get("stones_broken", 0))
 		if room_stones_broken >= room_stones_needed:
@@ -1423,6 +1452,18 @@ func purge_left() -> int:
 	return n
 
 
+## The room's total clearing quota.
+func purge_quota() -> int:
+	return int(current_offer.get("purge_quota", PURGE_QUOTA_BASE))
+
+
+## Hazards of the room's kind cleared so far, however they left:
+## everything ever spawned minus everything still standing.
+func purged_count() -> int:
+	var kind := String(current_offer.get("purge_kind", ""))
+	return maxi(0, main.board.spawned_count(kind) - purge_left())
+
+
 func _require_left() -> int:
 	var left := 0
 	for r in room_require:
@@ -1483,8 +1524,8 @@ func _tick_room_hazards() -> void:
 		# Every card burning: nothing left to save.
 		_room_failed("THE WHOLE TABLE'S ABLAZE")
 		return
-	# A fire can burn ITSELF out on the tick — that finishes a purge too.
-	if room_goal == "purge" and in_room and purge_left() == 0:
+	# A fire can burn ITSELF out on the tick — that counts too.
+	if room_goal == "purge" and in_room and purged_count() >= purge_quota():
 		_room_cleared()
 
 
@@ -1719,7 +1760,9 @@ func _show_shop() -> void:
 	# The merchant and their stock are fixed per shop room: no
 	# restocking by leaving/burning, no re-rolling the trader.
 	if _shop_stock_room != room_index:
-		_shop_merchant = MERCHANTS.pick_random()
+		# The tarot card already introduced the merchant — same trader.
+		_shop_merchant = MERCHANTS[int(current_offer.get("merchant",
+				randi() % MERCHANTS.size()))]
 		_shop_stock = []
 		for i in int(_shop_merchant.cards):
 			var o := _shop_card_offer()

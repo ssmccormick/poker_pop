@@ -376,13 +376,12 @@ func _update_labels() -> void:
 					1.0 - float(trail.room_outlaw_hp) / float(maxi(trail.room_outlaw_max, 1)),
 					0.0, 1.0)
 		elif trail.room_goal == "purge":
-			var left := trail.purge_left()
-			target_label.text = "TABLE %d / %d      PURGE  %d HAZARD%s LEFT" % \
-					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, left,
-					"" if left == 1 else "S"]
-			var seeded := maxi(int(trail.current_offer.get("purge_count", 1)), 1)
+			var quota := trail.purge_quota()
+			target_label.text = "TABLE %d / %d      PURGE  %d / %d CLEARED  ·  %d ON THE TABLE" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
+					trail.purged_count(), quota, trail.purge_left()]
 			target_bar_fill.size.x = BAR_W * clampf(
-					1.0 - float(left) / float(seeded), 0.0, 1.0)
+					float(trail.purged_count()) / float(maxi(quota, 1)), 0.0, 1.0)
 		elif trail.room_goal == "hands":
 			target_label.text = "TABLE %d / %d      PLAY  %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.require_status()]
@@ -920,7 +919,7 @@ const TUTOR := {
 	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
 	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Playing a piece without its partner isn't fatal: a new one turns up elsewhere, but the seconds keep draining. The hardest job on the trail — the strongbox holds a RELIC."],
-	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested. Remove every hazard card to clear the table."],
+	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],
 	"goal_mine": ["GOLD MINE", "The board is choked with stone. Break the asked number of stones (three scoring hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble. The plain cards between the rocks keep popping and shifting, so keep finding new seams."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],

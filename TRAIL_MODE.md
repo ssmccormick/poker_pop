@@ -120,7 +120,7 @@ quarter clockwise every hand.
 | Room | Rule | Notes |
 | --- | --- | --- |
 | Normal | Score target within the hands you bought | The baseline |
-| Purge | Board seeded with 3–6 of ONE hazard kind (bomb/fire/wind/water); remove them all (no score target) | Shipped. Fire that spreads must be put out too; a gust that blows hazards off the board counts; a fire burning itself out counts. No ambient extras — the hazards ARE the room |
+| Purge | A QUOTA hunt: 4 of ONE hazard kind (bomb/fire/wind/water) seeded at the deal, clear 10 (+3 per region) total; up to 2 more trickle in per hand keeping ≥4 on the table until the quota is spawned (no score target) | Shipped. Cleared = spawned − standing, so ANY exit counts: played, gusted off, shoved off, burned out, blown up. Fire spread adds to the spawned ledger (fire fights the quota FOR you if you let it burn — but all-ablaze still loses the table). No ambient extras — the hazards ARE the room |
 | Gold Mine | ~12 of 25 cards are stone; break N stones (3 + region) to clear | Shipped. NOT a solid board — the plain cards between stones pop and refill so the mine shifts every hand (a solid board let one hand repeat 3×). Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash, room-local) |
 | Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
 | Royal Hunt | Make one Royal Flush | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
@@ -326,8 +326,10 @@ Starter catalog (names/numbers draft):
 
 ## Shop v3 — traveling merchants (SHIPPED)
 
-Each shop stop is a different trader, rolled per room (stock and
-merchant fixed — no re-rolling by leaving):
+Each shop stop is a different trader, rolled when the tarot offer is
+drawn — the selector card names the merchant and lists their wares
+before you commit (stock and merchant fixed per room — no re-rolling
+by leaving):
 
 | Merchant | Cards | Relics | Forge |
 | --- | --- | --- | --- |
