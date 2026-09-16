@@ -101,6 +101,8 @@ var profile := 1
 var profile_layer: ColorRect
 var _profile_menu_btn: Button
 var _profile_slot_btns: Array = []
+var stats_layer: ColorRect
+var _stats_cols: Array = []  # 3 × [names Label, values Label]
 
 # First-time tutorials, tracked per profile.
 var tutor_seen := {}
@@ -179,6 +181,8 @@ func _ready() -> void:
 				pass
 			"options":
 				_open_options()
+			"stats":
+				_open_stats()
 			"trail":
 				trail.open_buyin()
 			"trailshop":
@@ -254,6 +258,8 @@ func _process(delta: float) -> void:
 				time_left = 0.0
 				game_over = true
 				board.locked = true
+				stat_bump("time_games")
+				stat_max("time_best", score)
 				_show_game_over("TIME'S UP\n\nFinal score: %d\n\nR — play again    M — menu" % score)
 		elif mode_kind == "arcade" and not level_transition:
 			meter -= _arcade_drain() * delta
@@ -261,6 +267,9 @@ func _process(delta: float) -> void:
 				meter = 0.0
 				game_over = true
 				board.locked = true
+				stat_bump("arcade_games")
+				stat_max("arcade_best_level", level)
+				stat_max("arcade_best", score)
 				_show_game_over("THE BAR HIT BOTTOM\n\nYou made it to level %d.\nTotal score: %d\n\nR — play again    M — menu" % [level, score])
 		elif mode_kind == "trail" and trail.in_room and trail.room_on_clock():
 			trail.room_time_left -= delta
@@ -525,6 +534,13 @@ func _update_preview() -> void:
 func _on_hand_played(result: Dictionary) -> void:
 	score += result.score
 	hands_played += 1
+	if mode_kind != "tutorial":
+		# The ledger remembers everything.
+		stat_bump("hands_played")
+		stat_bump("cards_popped", int(result.get("count", 0)))
+		stat_max("best_hand", int(result.score))
+		if result.get("playable", false) and not result.has("blackjack_outcome"):
+			stat_hand(String(result.name))
 	_announce("%s  +%d" % [String(result.name).to_upper(), result.score])
 	# The wagon rolls on: the scenery surges with every scored hand.
 	parallax.lurch(1.0 + result.get("count", 0) * 0.15)
@@ -582,7 +598,10 @@ func _on_dead_board() -> void:
 	board.locked = true
 	var msg: String
 	if mode_kind == "single":
+		stat_bump("single_games")
+		stat_max("single_best", score)
 		if board.grid.is_empty():
+			stat_bump("perfect_clears")
 			msg = "PERFECT CLEAR\n\nYou played out the entire deck!\nFinal score: %d" % score
 		else:
 			msg = "OUT OF HANDS\n\nThe deck is spent — that's the run.\nFinal score: %d" % score
@@ -592,6 +611,7 @@ func _on_dead_board() -> void:
 
 
 func _show_game_over(message: String) -> void:
+	_stats_save()
 	# Let the last pop/refill animation play out before covering the board.
 	await get_tree().create_timer(1.4, false).timeout
 	if not game_over or menu_open:
@@ -742,12 +762,66 @@ func _load_settings() -> void:
 	profile = clampi(int(cf.get_value("profile", "current", 1)), 1, 3)
 	_migrate_legacy_saves()
 	_tutor_load()
+	_stats_load()
 	fullscreen_on = cf.get_value("video", "fullscreen", true)
 	res_index = clampi(cf.get_value("video", "resolution", 2), 0, RESOLUTIONS.size() - 1)
 	music_vol = clampf(cf.get_value("audio", "music", 0.8), 0.0, 1.0)
 	sfx_vol = clampf(cf.get_value("audio", "sfx", 0.8), 0.0, 1.0)
 	_apply_video()
 	_apply_audio()
+
+
+# --- Profile stats: the Ledger ---------------------------------------------
+
+## Lifetime numbers for the active profile: counters, records, and a
+## tally of every poker hand ever scored. Saved to pN_stats.cfg at
+## natural break points (game over, menu, trail milestones).
+var stats := {}
+var stats_hands := {}
+var _stats_dirty := false
+
+
+func stat_bump(key: String, n := 1) -> void:
+	stats[key] = int(stats.get(key, 0)) + n
+	_stats_dirty = true
+
+
+func stat_max(key: String, v: int) -> void:
+	if v > int(stats.get(key, 0)):
+		stats[key] = v
+		_stats_dirty = true
+
+
+func stat_hand(hand_name: String) -> void:
+	stats_hands[hand_name] = int(stats_hands.get(hand_name, 0)) + 1
+	_stats_dirty = true
+
+
+func _stats_load() -> void:
+	stats = {}
+	stats_hands = {}
+	_stats_dirty = false
+	var cf := ConfigFile.new()
+	if cf.load(profile_path("stats.cfg")) != OK:
+		return
+	if cf.has_section("stats"):
+		for key in cf.get_section_keys("stats"):
+			stats[key] = cf.get_value("stats", key, 0)
+	if cf.has_section("hands"):
+		for key in cf.get_section_keys("hands"):
+			stats_hands[key] = cf.get_value("hands", key, 0)
+
+
+func _stats_save() -> void:
+	if not _stats_dirty or OS.get_environment("POKERPOP_SHOT") != "":
+		return
+	_stats_dirty = false
+	var cf := ConfigFile.new()
+	for key in stats:
+		cf.set_value("stats", key, stats[key])
+	for key in stats_hands:
+		cf.set_value("hands", key, stats_hands[key])
+	cf.save(profile_path("stats.cfg"))
 
 
 # --- Profiles -------------------------------------------------------------
@@ -770,6 +844,7 @@ func _select_profile(n: int) -> void:
 	profile = clampi(n, 1, 3)
 	_save_settings()
 	_tutor_load()
+	_stats_load()
 	trail.run_active = false
 	trail.pending_retry = {}
 	trail._load_meta()
@@ -778,10 +853,11 @@ func _select_profile(n: int) -> void:
 
 
 func _erase_profile(n: int) -> void:
-	for base in ["trail_meta.cfg", "trail_run.cfg", "tutorial.cfg"]:
+	for base in ["trail_meta.cfg", "trail_run.cfg", "tutorial.cfg", "stats.cfg"]:
 		DirAccess.remove_absolute("user://p%d_%s" % [n, base])
 	if n == profile:
 		_tutor_load()
+		_stats_load()
 		trail.run_active = false
 		trail.pending_retry = {}
 		trail._load_meta()
@@ -1110,6 +1186,7 @@ func _apply_audio() -> void:
 
 
 func _open_menu() -> void:
+	_stats_save()
 	if mode_kind == "trail":
 		trail.on_abandon_room()  # mid-room exit counts as a fail
 		trail._hide_all()
@@ -1523,6 +1600,9 @@ func _build_menu() -> void:
 	_profile_menu_btn.pressed.connect(func() -> void:
 		_refresh_profile_ui()
 		profile_layer.visible = true)
+	var stats_btn := _button(menu_layer, "STATS", Vector2(60, 124), Vector2(240, 54))
+	stats_btn.add_theme_font_size_override("font_size", 20)
+	stats_btn.pressed.connect(_open_stats)
 	var how_btn := _button(menu_layer, "HOW TO PLAY", Vector2(1620, 60), Vector2(240, 54))
 	how_btn.add_theme_font_size_override("font_size", 20)
 	how_btn.pressed.connect(_start_tutorial)
@@ -1619,6 +1699,32 @@ func _build_profiles_and_tutor() -> void:
 	pback.pressed.connect(func() -> void:
 		profile_layer.visible = false)
 	_refresh_profile_ui()
+
+	# The Ledger: lifetime stats for the active profile.
+	stats_layer = ColorRect.new()
+	stats_layer.color = BG
+	stats_layer.size = VIEW
+	stats_layer.visible = false
+	ui_root.add_child(stats_layer)
+	var st := _label(stats_layer, "THE LEDGER", Vector2(0, 110), 64, GOLD)
+	st.size = Vector2(VIEW.x, 90)
+	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var headers := ["AT THE TABLES", "ON THE TRAIL", "OTHER SADDLES"]
+	for i in 3:
+		var hx := 150.0 + i * 580.0
+		var h := _label(stats_layer, headers[i], Vector2(hx, 260), 28, GOLD)
+		h.size = Vector2(500, 40)
+		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var names := _label(stats_layer, "", Vector2(hx, 330), 22, OFFWHITE)
+		names.size = Vector2(500, 560)
+		var values := _label(stats_layer, "", Vector2(hx, 330), 22, GOLD)
+		values.size = Vector2(500, 560)
+		values.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_stats_cols.append([names, values])
+	var sback := _button(stats_layer, "BACK", Vector2(860, 950), Vector2(200, 54))
+	sback.add_theme_font_size_override("font_size", 20)
+	sback.pressed.connect(func() -> void:
+		stats_layer.visible = false)
 
 	# The one-time explainer popup, above everything in-game.
 	tutor_layer = ColorRect.new()
@@ -1748,6 +1854,60 @@ func _refresh_options_buttons() -> void:
 	if resolution_btn:
 		var r := RESOLUTIONS[res_index]
 		resolution_btn.text = "WINDOW SIZE — %d × %d" % [r.x, r.y]
+
+
+func _open_stats() -> void:
+	var s := func(key: String) -> int:
+		return int(stats.get(key, 0))
+	# Favorite hand: the poker hand scored most often.
+	var fav := "—"
+	var fav_n := 0
+	for hand_name in stats_hands:
+		if int(stats_hands[hand_name]) > fav_n:
+			fav_n = int(stats_hands[hand_name])
+			fav = "%s ×%d" % [hand_name, fav_n]
+	var tables: Array = [
+		["Hands played", str(s.call("hands_played"))],
+		["Cards popped", str(s.call("cards_popped"))],
+		["Best hand", "%d pts" % s.call("best_hand")],
+		["Favorite hand", fav],
+		["Flushes", str(int(stats_hands.get("Flush", 0)))],
+		["Full Houses", str(int(stats_hands.get("Full House", 0)))],
+		["Straight Flushes", str(int(stats_hands.get("Straight Flush", 0)))],
+		["Royal Flushes", str(int(stats_hands.get("Royal Flush", 0)))],
+	]
+	var the_trail: Array = [
+		["Runs saddled up", str(s.call("trail_runs"))],
+		["Trails completed", str(s.call("trail_wins"))],
+		["Busted out", str(s.call("trail_busts"))],
+		["Deepest table", "%d / %d" % [s.call("deepest_table"), TrailMode.ROOMS_TOTAL]],
+		["Tables cleared", str(s.call("tables_cleared"))],
+		["Bosses beaten", str(s.call("bosses_beaten"))],
+		["Duels won", str(s.call("duels_won"))],
+		["Blackjack rounds won", str(s.call("blackjack_rounds"))],
+		["Relics found", str(s.call("relics_found"))],
+		["Cash banked", "$%d" % trail.cash],
+	]
+	var other: Array = [
+		["Arcade runs", str(s.call("arcade_games"))],
+		["Best arcade level", str(s.call("arcade_best_level"))],
+		["Best arcade score", str(s.call("arcade_best"))],
+		["Time trials ridden", str(s.call("time_games"))],
+		["Best time-trial score", str(s.call("time_best"))],
+		["Single decks played", str(s.call("single_games"))],
+		["Best single-deck score", str(s.call("single_best"))],
+		["Perfect clears", str(s.call("perfect_clears"))],
+	]
+	var cols: Array = [tables, the_trail, other]
+	for i in 3:
+		var names := PackedStringArray()
+		var values := PackedStringArray()
+		for row: Array in cols[i]:
+			names.append(String(row[0]))
+			values.append(String(row[1]))
+		(_stats_cols[i][0] as Label).text = "\n".join(names)
+		(_stats_cols[i][1] as Label).text = "\n".join(values)
+	stats_layer.visible = true
 
 
 func _open_options() -> void:

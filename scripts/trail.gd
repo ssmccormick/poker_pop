@@ -362,6 +362,7 @@ func _gain_relic(id: String) -> void:
 	if relics.size() >= MAX_RELICS or relics.has(id):
 		return
 	main.tutor_show("relics")
+	main.stat_bump("relics_found")
 	relics.append(id)
 	_apply_relic_effects()
 	_save_run()
@@ -491,6 +492,7 @@ func _start_run(tier: int) -> void:
 	if cash < cost:
 		return
 	cash -= cost
+	main.stat_bump("trail_runs")
 	_save_meta()
 	main.menu_open = false
 	table_tier = tier
@@ -828,11 +830,14 @@ func _face_label(b: Button, text: String, y: float, h: float, size: int,
 		col: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.position = Vector2(16, y)
-	l.size = Vector2(268, h)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Autowrap must be on BEFORE size is set: a Label refuses a size
+	# below its minimum, and without wrapping the minimum is the full
+	# unwrapped line — which is how text escapes the card.
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.clip_text = true
+	l.position = Vector2(16, y)
+	l.size = Vector2(268, h)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -968,6 +973,7 @@ func _confirm_bet() -> void:
 
 func _start_room() -> void:
 	in_room = true
+	main.stat_max("deepest_table", room_index + 1)
 	room_score = 0
 	room_target = current_offer.target
 	room_goal = current_offer.get("goal", "")
@@ -1386,6 +1392,7 @@ func _present_blackjack_round(result: Dictionary) -> void:
 		var dealer: int = main.board.blackjack_target
 		if outcome == "win":
 			room_wins += 1
+			main.stat_bump("blackjack_rounds")
 			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
 			if room_wins >= room_wins_needed:
 				_room_cleared()
@@ -1532,6 +1539,11 @@ func _tick_room_hazards() -> void:
 func _room_cleared() -> void:
 	in_room = false
 	pending_retry = {}
+	main.stat_bump("tables_cleared")
+	if current_offer.has("boss"):
+		main.stat_bump("bosses_beaten")
+	elif room_goal == "outlaw":
+		main.stat_bump("duels_won")
 	main.board.locked = true
 	main.board.suppress_refill = true
 	if main.board._refill_active:
@@ -1627,6 +1639,8 @@ func on_abandon_room() -> void:
 
 
 func _trail_complete() -> void:
+	main.stat_bump("trail_wins")
+	main._stats_save()
 	main.board._play_sound(Board.SFX_STING_COMPLETE, 1.0, -5.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.5)
 	var payout := _cashout_value(COMPLETE_RATE_BONUS) + COMPLETE_PURSE * (table_tier + 1)
@@ -2039,11 +2053,13 @@ func _end_run(title: String, body: String, _payout: int) -> void:
 	run_active = false
 	main.game_started = false
 	if title in ["BUSTED OUT", "BLINDED OUT"]:
+		main.stat_bump("trail_busts")
 		main.play_music("lost")
 		# A lone howl over the sad harmonica.
 		main.board._play_sound(Board.SFX_LOSS_HOWLS.pick_random(), 1.0, -8.0, 0.8)
 	else:
 		main.play_music("menu")
+	main._stats_save()
 	if title == "BUSTED OUT":
 		_clear_run_save()
 	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nCash: $%d" % [title, body, main.score, cash]
