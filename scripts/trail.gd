@@ -995,7 +995,7 @@ func _start_room() -> void:
 		var looks := ["trail_day", "trail_dusk", "trail_night"]
 		main.parallax.set_scene(looks[clampi(room_index / REGION_SIZE, 0, 2)])
 	main.board.visible = true
-	main.board.reset()
+	main.board.reset(room_goal == "blackjack")
 	main._begin_countdown()
 	_seed_room_specials()
 

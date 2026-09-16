@@ -253,7 +253,9 @@ const SFX_STING_BOSS := preload("res://assets/sfx/west/sting_boss.mp3")
 const SFX_STING_COMPLETE := preload("res://assets/sfx/west/sting_complete.mp3")
 
 
-func reset() -> void:
+## `deal_facedown` deals the fresh board card-backs-up from the very
+## first flick (blackjack tables).
+func reset(deal_facedown := false) -> void:
 	if busy:
 		return
 	locked = false
@@ -266,7 +268,7 @@ func reset() -> void:
 	blackjack_target = 0
 	blackjack_dealer_cards.clear()
 	blackjack_hole_hidden = true
-	blackjack_facedown = false
+	blackjack_facedown = deal_facedown
 	eights_wild = false
 	PlayingCard.eights_wild = false
 	for card in grid.values():

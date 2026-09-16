@@ -579,23 +579,11 @@ func _draw() -> void:
 				HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
 
 
-## The card back: deep red field, a diamond lattice, and a center pip.
+## The card back: a plain deep-red field with a lighter border.
 func _draw_card_back(rect: Rect2) -> void:
 	var inner := rect.grow(-5)
 	draw_rect(inner, Color("6e2620"))
 	draw_rect(inner.grow(-3), Color("8a3a30"), false, 2.0)
-	var lat := Color(0.95, 0.85, 0.65, 0.2)
-	for gy in 6:
-		for gx in 4:
-			var c := inner.position + Vector2(9.0 + gx * 16.0, 12.0 + gy * 14.0)
-			draw_line(c + Vector2(0, -6), c + Vector2(7, 0), lat, 1.5)
-			draw_line(c + Vector2(7, 0), c + Vector2(0, 6), lat, 1.5)
-			draw_line(c + Vector2(0, 6), c + Vector2(-7, 0), lat, 1.5)
-			draw_line(c + Vector2(-7, 0), c + Vector2(0, -6), lat, 1.5)
-	# Center diamond pip.
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(0, -12), Vector2(9, 0), Vector2(0, 12), Vector2(-9, 0)]),
-		Color(0.95, 0.85, 0.65, 0.55))
 
 
 ## Full-face identity for enhanced cards: gold cards go solid gold;
