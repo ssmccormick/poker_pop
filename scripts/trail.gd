@@ -192,6 +192,7 @@ var _shop_stock_relics: Array = []   # [{id, bought}] on this merchant's shelf
 var _shop_merchant: Dictionary = MERCHANTS[0]
 var _shop_burned_here := false   # one burn per shop
 var pending_retry := {}          # a room that MUST be played next
+var _outlaw_dead_pending := false  # killing slug in flight; clear on impact
 var pending_is_retry := true     # true = failed there (scarred); false = just stepped away
 var current_offer := {}
 var stake := 0
@@ -1063,6 +1064,7 @@ func _seed_room_specials() -> void:
 		_deal_dealer()
 		main.board.set_blackjack_facedown()
 	elif room_goal == "outlaw":
+		_outlaw_dead_pending = false
 		main.outlaw.appear(room_outlaw_hp)
 		for i in 2:
 			main.board.spawn_objective("bullet")
@@ -1212,17 +1214,21 @@ func on_hand_played(result: Dictionary) -> void:
 			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
 	if room_goal == "blackjack" and result.has("blackjack_outcome"):
 		_present_blackjack_round(result)
-	if room_goal == "outlaw":
+	if room_goal == "outlaw" and not _outlaw_dead_pending:
 		var hits := int(result.get("bullets_you", 0))
 		var caught := int(result.get("bullets_his", 0))
 		if hits > 0:
 			room_outlaw_hp -= hits
-			main.outlaw.set_hp(room_outlaw_hp)
-			main.outlaw.flinch()
-			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 1.0, -6.0)
+			# Each scored bullet forms up and ZOOMS into him — the
+			# flinch, the HP tick, and the bang land on impact.
+			var points: Array = result.get("bullet_points", [])
+			for i in hits:
+				var from: Vector2 = points[i] if i < points.size() \
+						else main.board.global_position + Vector2(580, 450)
+				_fire_bullet(from, 0.18 * i, room_outlaw_hp + (hits - 1 - i),
+						i == hits - 1 and room_outlaw_hp <= 0)
 		if room_outlaw_hp <= 0:
-			main.outlaw.die()
-			_room_cleared()
+			_outlaw_dead_pending = true
 			return
 		# Weak hands (and touching HIS bullets) give him a free shot.
 		if result.score < _outlaw_bar():
@@ -1408,6 +1414,52 @@ func _present_blackjack_round(result: Dictionary) -> void:
 		_deal_dealer()
 
 
+## One scored bullet, made flesh: a gold slug that forms at the card
+## it came from, zooms across the table, and slams into the Outlaw —
+## flinch, HP tick, and gunshot all landing on impact.
+func _fire_bullet(from: Vector2, delay: float, hp_after: int, kills: bool) -> void:
+	var slug := Node2D.new()
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([
+		Vector2(-12, -5), Vector2(5, -5), Vector2(13, 0),
+		Vector2(5, 5), Vector2(-12, 5)])
+	body.color = main.GOLD
+	slug.add_child(body)
+	var trail_line := Polygon2D.new()
+	trail_line.polygon = PackedVector2Array([
+		Vector2(-34, -2), Vector2(-12, -3), Vector2(-12, 3), Vector2(-34, 2)])
+	trail_line.color = Color(main.GOLD.r, main.GOLD.g, main.GOLD.b, 0.4)
+	slug.add_child(trail_line)
+	slug.z_index = 60
+	slug.visible = false
+	main.hud_root.add_child(slug)
+	slug.global_position = from
+	var to: Vector2 = main.outlaw.global_position + Vector2(4, -18)
+	slug.rotation = (to - from).angle()
+	var tw := slug.create_tween()
+	tw.tween_interval(delay)
+	tw.tween_callback(func() -> void:
+		slug.visible = true
+		main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 1.15, -8.0))
+	tw.tween_property(slug, "global_position", to, 0.22) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func() -> void:
+		slug.queue_free()
+		if not in_room or room_goal != "outlaw":
+			# The player left the table mid-flight: no impact, no clear.
+			_outlaw_dead_pending = false
+			return
+		main.outlaw.set_hp(hp_after)
+		if main.board.fx != null:
+			main.board.fx.burst(main.board.fx.to_local(to), "sparks")
+		if kills:
+			main.outlaw.die()
+			_outlaw_dead_pending = false
+			_room_cleared()
+		else:
+			main.outlaw.flinch())
+
+
 ## Still at this blackjack table? (Guards the paced presentation
 ## against abandons, busts of the room, and menu exits mid-await.)
 func _blackjack_live() -> bool:
@@ -1509,8 +1561,8 @@ func _announce_after_settle(text: String) -> void:
 
 
 ## After the hand fully resolves, hazards act: fires tick and spread,
-## bomb fuses drop. A detonation loses the room. In boss rooms the boss
-## takes his turn instead.
+## bomb fuses drop. A detonation loses the room. In boss rooms the
+## boss takes his turn FIRST — then the hazards act all the same.
 func _tick_room_hazards() -> void:
 	while main.board.busy:
 		await get_tree().process_frame
@@ -1518,7 +1570,8 @@ func _tick_room_hazards() -> void:
 		return
 	if room_goal == "boss":
 		await main.board.tick_boss()
-		return
+		if not in_room:
+			return
 	var tick_fire := true
 	if has_relic("fire_blanket"):
 		_fire_tick_flip = not _fire_tick_flip

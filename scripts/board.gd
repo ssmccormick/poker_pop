@@ -648,6 +648,9 @@ func play_hand() -> void:
 				has_chest = true
 			"bullet":
 				result["bullets_you"] = int(result.get("bullets_you", 0)) + 1
+				if not result.has("bullet_points"):
+					result["bullet_points"] = []
+				result.bullet_points.append(card.global_position)
 			"hisbullet":
 				result["bullets_his"] = int(result.get("bullets_his", 0)) + 1
 			"redeal":
