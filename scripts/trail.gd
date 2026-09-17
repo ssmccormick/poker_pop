@@ -209,6 +209,7 @@ var remove_layer: ColorRect
 var end_layer: ColorRect
 var _buyin_cash_label: Label
 var _buyin_resume_btn: Button
+var _buyin_tier_btns: Array = []
 var _tarot_info: Label
 var _tarot_cards_box: Control
 var _bet_info: Label
@@ -479,7 +480,16 @@ func open_buyin() -> void:
 	main.menu_open = false
 	_hide_all()
 	_buyin_cash_label.text = "CASH  $%d" % cash
-	_buyin_resume_btn.visible = _has_saved_run()
+	# A ride in progress takes top billing; fresh saddles move down.
+	var riding := _has_saved_run()
+	_buyin_resume_btn.visible = riding
+	if riding:
+		_buyin_resume_btn.position = Vector2(660, 320)
+		for i in _buyin_tier_btns.size():
+			(_buyin_tier_btns[i] as Button).position = Vector2(660, 470 + i * 130)
+	else:
+		for i in _buyin_tier_btns.size():
+			(_buyin_tier_btns[i] as Button).position = Vector2(660, 330 + i * 130)
 	buyin_layer.visible = true
 
 
@@ -2137,6 +2147,7 @@ func build_ui() -> void:
 			label = "%s — $%d\n%d chips · payout ×%.1f · harder" % [t.name, t.cost, t.chips, t.rate]
 		var b: Button = main._button(buyin_layer, label, Vector2(660, 330 + i * 130), Vector2(600, 100))
 		b.add_theme_font_size_override("font_size", 24)
+		_buyin_tier_btns.append(b)
 		var tier := i
 		b.pressed.connect(func() -> void:
 			_start_run(tier))
