@@ -56,17 +56,25 @@ func set_hp(new_hp: int) -> void:
 	queue_redraw()
 
 
-## He takes a bullet: a sharp sideways jolt and a red blink.
-## Absolute around home, so repeated hits can never drift him.
+## A slug lands: knocked clean off his footing — back and up with a
+## recoil twist — then he squares back up. Absolute around home, so
+## repeated hits can never drift him.
 func flinch() -> void:
 	if dying:
 		return
-	position.x = _home.x
+	if _idle_tween != null and _idle_tween.is_valid():
+		_idle_tween.kill()
+	position = _home
 	var tw := create_tween()
-	tw.tween_property(self, "position:x", _home.x + 14.0, 0.05)
+	tw.tween_property(self, "position", _home + Vector2(-26, -8), 0.08) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(self, "rotation", -0.18, 0.08)
 	tw.parallel().tween_property(self, "modulate", Color(1.6, 0.6, 0.6), 0.08)
-	tw.tween_property(self, "position:x", _home.x, 0.09)
-	tw.tween_property(self, "modulate", Color(1, 1, 1), 0.25)
+	tw.tween_property(self, "position", _home, 0.34) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(self, "rotation", 0.0, 0.34)
+	tw.parallel().tween_property(self, "modulate", Color(1, 1, 1), 0.3)
+	tw.tween_callback(_start_idle)
 
 
 ## He fires: a lean toward the table and a muzzle flash.

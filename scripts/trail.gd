@@ -1244,7 +1244,9 @@ func on_hand_played(result: Dictionary) -> void:
 			_announce_after_settle("THE OUTLAW FIRES — GRIT %d" % room_grit)
 		_replenish_bullets()
 	if room_goal == "purge":
-		if purged_count() >= purge_quota():
+		# Quota met AND the table clean — a wildfire can overshoot its
+		# ledger while flames still stand, and those must go out too.
+		if purged_count() >= purge_quota() and purge_left() == 0:
 			_room_cleared()
 			return
 		# The infestation keeps coming until the full quota has hit
@@ -1585,7 +1587,8 @@ func _tick_room_hazards() -> void:
 		_room_failed("THE WHOLE TABLE'S ABLAZE")
 		return
 	# A fire can burn ITSELF out on the tick — that counts too.
-	if room_goal == "purge" and in_room and purged_count() >= purge_quota():
+	if room_goal == "purge" and in_room \
+			and purged_count() >= purge_quota() and purge_left() == 0:
 		_room_cleared()
 
 
