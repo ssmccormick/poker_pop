@@ -55,6 +55,10 @@ bosses, regions.
 - **Odds by room**: Steady 1:1 · Risky/Treasure/soft-Purge 3:2 ·
   Dangerous/Heist/hard-Purge/Called-Hands 2:1 · Royal Hunt 5:1 ·
   Boss 3:1.
+- **The big league**: beyond the Jack (table 8 on), EVERY cost runs
+  10× — antes, bets, shop cards, relics, the forge, the Fool's
+  kicker. An all-in rider clears region 1 with a five-figure stack,
+  and the numbers keep pace from there.
 - **Blinds escalate**: the blind rises each room (poker blinds
   structure) — late trail, you can't limp. Can't cover a table's
   **cheapest seat** (ante + minimum bet) = **BLINDED OUT**: the run is

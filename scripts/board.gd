@@ -848,7 +848,8 @@ func play_hand() -> void:
 		for cell in wind_line_cells(g.cell, g.dir):
 			blown[cell] = g.dir
 	if not blown.is_empty():
-		_play_sound(SFX_WINDS.pick_random(), randf_range(1.0, 1.2), -5.0)
+		# Clipped short with a fast fade — a gust, not a storm front.
+		_play_sound(SFX_WINDS.pick_random(), randf_range(1.0, 1.2), -5.0, 0.0, 0.9)
 		for g in gusts:
 			_fx(cell_center(g.cell), "dust", Color.WHITE, Vector2(g.dir))
 		var gtw := create_tween().set_parallel(true)
@@ -2025,8 +2026,10 @@ func _play_pop(pitch: float) -> void:
 
 
 ## Fire-and-forget one-shot player, with an optional delay. Safe on a
-## detached board (headless tests): it just stays silent.
-func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0.0) -> void:
+## detached board (headless tests): it just stays silent. A max_len
+## clips long samples: play ~60% of the window, fade fast, stop.
+func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0.0,
+		max_len := 0.0) -> void:
 	if not is_inside_tree():
 		return
 	if delay > 0.0:
@@ -2041,5 +2044,10 @@ func _play_sound(stream: AudioStream, pitch: float, volume_db: float, delay := 0
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
+	if max_len > 0.0:
+		var tw := player.create_tween()
+		tw.tween_interval(max_len * 0.6)
+		tw.tween_property(player, "volume_db", -40.0, max_len * 0.4)
+		tw.tween_callback(player.queue_free)
 
 

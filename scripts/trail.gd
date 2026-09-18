@@ -12,6 +12,11 @@ const ROOMS_TOTAL := 21
 const REGION_SIZE := 7
 # Every 7th room is a boss; the tarot deals a single court card.
 const BOSS_ROOMS := {6: "jack", 13: "queen", 20: "cobra"}
+const JACK_ROOM := 6
+# Beyond the Jack the trail plays for real money: every cost — antes,
+# bets, shop goods, relics, the forge — runs 10×. A rider going all
+# in through region 1 arrives with a five-figure stack to match.
+const POST_JACK_COST_MULT := 10
 const BOSSES := {
 	"jack": {"tarot": "THE JACK", "name": "Jack of All Trades", "hands": 18},
 	"queen": {"tarot": "THE QUEEN", "name": "Queen Bee", "hands": 14},
@@ -347,8 +352,13 @@ func has_relic(id: String) -> bool:
 
 
 ## Shop pricing with Snake Oil applied.
+func _cost_mult(room: int) -> int:
+	return POST_JACK_COST_MULT if room > JACK_ROOM else 1
+
+
 func _price(base: int) -> int:
-	return int(base * 0.75) if has_relic("snake_oil") else base
+	var p := base * _cost_mult(room_index)
+	return int(p * 0.75) if has_relic("snake_oil") else p
 
 
 ## Pushes relic-driven settings into the board/card layer. Call at run
@@ -380,7 +390,8 @@ func _unowned_relic() -> String:
 
 
 func _blind_for(room: int) -> int:
-	return int((BLIND_BASE + BLIND_STEP * room) * _table().blind_mult)
+	return int((BLIND_BASE + BLIND_STEP * room) * _table().blind_mult) \
+			* _cost_mult(room)
 
 
 ## The least a seat at this table can cost: the ante plus the minimum
@@ -759,7 +770,8 @@ func _render_tarot() -> void:
 		var fool: Button = main._button(_tarot_cards_box, "",
 				Vector2(start_x + _offers.size() * 330, 0), Vector2(300, 380))
 		_tarot_face(fool, "LUCK OF THE DRAW", "Face-down fate", "?",
-				"Let fate decide\n+%d chips" % FATE_KICKER, false, 64)
+				"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)),
+				false, 64)
 		fool.pressed.connect(func() -> void:
 			_choose_offer(_fate_offer, true))
 
@@ -871,7 +883,7 @@ func _require_text(req: Array) -> String:
 
 func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
 	if from_fate:
-		chips += FATE_KICKER
+		chips += FATE_KICKER * _cost_mult(room_index)
 	current_offer = offer
 	tarot_layer.visible = false
 	if offer.kind == "shop":
@@ -1623,6 +1635,8 @@ func _room_cleared() -> void:
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
 	main._announce("TABLE CLEARED  +%d CHIPS" % winnings)
 	main.board.confetti()
+	if current_offer.has("boss") and room_index == JACK_ROOM:
+		_announce_after_settle("BIG LEAGUE NOW — EVERYTHING COSTS 10× FROM HERE")
 	if room_goal == "chest":
 		# The stagecoach strongbox: a relic for the hardest job around.
 		var relic_id := _unowned_relic()
