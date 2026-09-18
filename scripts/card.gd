@@ -148,6 +148,9 @@ var face_down := false:
 	set(value):
 		face_down = value
 		queue_redraw()
+# Set when the hazard lands; a fresh hazard sits out its first tick
+# (no spread, soak, or fuse burn the round it arrived).
+var hazard_fresh := false
 # Trail hazards: "", "bomb", "fire", "wind", "stone", "water".
 var hazard := "":
 	set(value):

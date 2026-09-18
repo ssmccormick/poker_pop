@@ -226,7 +226,10 @@ rooms are exempt from both (their hazards ARE the room); storm tables
 (Crazy 8s / Blackjack) swap the seed roll for their guaranteed floor
 but keep the mean deck. The old hazard tarot cards (DEATH etc.) are
 retired. Hazards are states on normal rank/suit cards, one per card;
-ticks happen only on scoring hands, after the board settles.
+ticks happen only on scoring hands, after the board settles. A fresh
+hazard sits out the round it arrived: no spread, soak, or fuse burn
+until the NEXT hand — however it landed (seed, storm, trickle, or
+refill deal).
 
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |

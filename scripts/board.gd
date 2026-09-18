@@ -1749,6 +1749,7 @@ func spawned_count(kind: String) -> int:
 func _init_hazard(card: PlayingCard, kind: String) -> void:
 	hazards_spawned[kind] = spawned_count(kind) + 1
 	card.hazard = kind
+	card.hazard_fresh = true
 	match kind:
 		"bomb":
 			card.fuse = BOMB_FUSE
@@ -1869,6 +1870,8 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		if grid[p].hazard == "water":
 			waters.append(p)
 	for p in waters:
+		if grid[p].hazard_fresh:
+			continue  # landed this round — it starts dripping next one
 		for d in _intent_dirs(grid[p]):
 			var q: Vector2i = p + d
 			if _victim_ok(q):
@@ -1878,7 +1881,7 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	var fires: Array = []
 	if tick_fire:
 		for p in grid:
-			if grid[p].hazard == "fire":
+			if grid[p].hazard == "fire" and not grid[p].hazard_fresh:
 				fires.append(p)
 	# Each fire spreads every tick: one random orthogonal neighbor that
 	# isn't already burning (or otherwise off-limits) catches fire.
@@ -1901,10 +1904,13 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 			burned.append(p)
 	var exploded := false
 	for p in grid:
-		if grid[p].hazard == "bomb":
+		if grid[p].hazard == "bomb" and not grid[p].hazard_fresh:
 			grid[p].fuse -= 1
 			if grid[p].fuse <= 0:
 				exploded = true
+	# Every hazard that sat this round out is seasoned for the next.
+	for p in grid:
+		grid[p].hazard_fresh = false
 	_aim_spreaders()
 	return {"burned": burned, "ignited": ignited, "exploded": exploded,
 			"soaked": soaked}
