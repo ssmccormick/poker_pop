@@ -13,10 +13,12 @@ const REGION_SIZE := 7
 # Every 7th room is a boss; the tarot deals a single court card.
 const BOSS_ROOMS := {6: "jack", 13: "queen", 20: "cobra"}
 const JACK_ROOM := 6
+const QUEEN_ROOM := 13
 # Beyond the Jack the trail plays for real money: every cost — antes,
-# bets, shop goods, relics, the forge — runs 10×. A rider going all
-# in through region 1 arrives with a five-figure stack to match.
-const POST_JACK_COST_MULT := 10
+# bets, shop goods, relics, the forge — runs 10×, and beyond the
+# Queen it jumps 10× again (100× the frontier prices). All-in riders
+# carry stacks that keep pace.
+const POST_BOSS_COST_MULT := 10
 const BOSSES := {
 	"jack": {"tarot": "THE JACK", "name": "Jack of All Trades", "hands": 18},
 	"queen": {"tarot": "THE QUEEN", "name": "Queen Bee", "hands": 14},
@@ -353,7 +355,11 @@ func has_relic(id: String) -> bool:
 
 ## Shop pricing with Snake Oil applied.
 func _cost_mult(room: int) -> int:
-	return POST_JACK_COST_MULT if room > JACK_ROOM else 1
+	if room > QUEEN_ROOM:
+		return POST_BOSS_COST_MULT * POST_BOSS_COST_MULT
+	if room > JACK_ROOM:
+		return POST_BOSS_COST_MULT
+	return 1
 
 
 func _price(base: int) -> int:
@@ -1637,6 +1643,8 @@ func _room_cleared() -> void:
 	main.board.confetti()
 	if current_offer.has("boss") and room_index == JACK_ROOM:
 		_announce_after_settle("BIG LEAGUE NOW — EVERYTHING COSTS 10× FROM HERE")
+	elif current_offer.has("boss") and room_index == QUEEN_ROOM:
+		_announce_after_settle("HIGH SOCIETY — PRICES JUMP ANOTHER 10×")
 	if room_goal == "chest":
 		# The stagecoach strongbox: a relic for the hardest job around.
 		var relic_id := _unowned_relic()

@@ -971,6 +971,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("WILD — counts as ANY rank and suit.")
 	if card.two_plus:
 		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
+	if card.incoming != "" and PlayingCard.show_hazard_intent:
+		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
 	if card.boom:
 		lines.append("EXPLOSIVE — clearing it spreads its enhancement to every neighbor.")
 	if card.objective == "key":

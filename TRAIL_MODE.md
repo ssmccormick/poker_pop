@@ -57,8 +57,9 @@ bosses, regions.
   Boss 3:1.
 - **The big league**: beyond the Jack (table 8 on), EVERY cost runs
   10× — antes, bets, shop cards, relics, the forge, the Fool's
-  kicker. An all-in rider clears region 1 with a five-figure stack,
-  and the numbers keep pace from there.
+  kicker — and beyond the Queen (table 15 on) it jumps 10× AGAIN
+  (100× frontier prices). An all-in rider clears each region with a
+  stack that keeps pace.
 - **Blinds escalate**: the blind rises each room (poker blinds
   structure) — late trail, you can't limp. Can't cover a table's
   **cheapest seat** (ante + minimum bet) = **BLINDED OUT**: the run is
@@ -319,7 +320,7 @@ Starter catalog (names/numbers draft):
 | Bomb Squad Badge | C | Bombs start with +2 fuse |
 | Chisel | C | Stones need one fewer use |
 | Fire Blanket | R | Fire ticks every 2nd hand |
-| Weathervane | R | Hazards telegraph their next victim: wind shows its direction, fire and water show an arrow toward the card they strike next. Spreaders aim only at hittable neighbors (never at another hazard), re-aiming after every tick, seed, and refill — the arrow is an honest promise |
+| Weathervane | R | Hazards telegraph their next victim: wind shows its direction arrow, and the card fire/water will strike next wears a faint preview of the effect itself — flames barely licking its bottom edge, a thin line of water seeping in. Spreaders aim only at hittable neighbors (never at another hazard), re-aiming after every tick, seed, and refill — the tell is an honest promise |
 | Magnifying Glass | R | Washed cards still show their suit |
 | Gold Tooth | R | Chip cards pay double |
 | Mirror Shades | R | Mult cards ×2 instead of ×1.5 |

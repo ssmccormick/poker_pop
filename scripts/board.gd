@@ -1924,19 +1924,24 @@ func _victim_ok(q: Vector2i) -> bool:
 ## Points every fire/water card's next strike at a neighbor it can
 ## actually hit — no telegraphing (or whiffing) at cards that are
 ## already hazarded. Keeps a still-valid aim; re-rolls a spent one.
+## The chosen victims are marked (card.incoming) so the Weathervane
+## can show the effect creeping onto them.
 func _aim_spreaders() -> void:
+	for p in grid:
+		grid[p].incoming = ""
 	for p in grid:
 		var card: PlayingCard = grid[p]
 		if card.hazard != "fire" and card.hazard != "water":
 			continue
+		if not _victim_ok(p + card.next_dir):
+			var dirs := HAZARD_DIRS.duplicate()
+			dirs.shuffle()
+			for d in dirs:
+				if _victim_ok(p + d):
+					card.next_dir = d
+					break
 		if _victim_ok(p + card.next_dir):
-			continue
-		var dirs := HAZARD_DIRS.duplicate()
-		dirs.shuffle()
-		for d in dirs:
-			if _victim_ok(p + d):
-				card.next_dir = d
-				break
+			grid[p + card.next_dir].incoming = card.hazard
 
 
 ## Runs the per-hand hazard tick with animations: called by trail after

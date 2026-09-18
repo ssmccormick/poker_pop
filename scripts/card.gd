@@ -184,6 +184,13 @@ var next_dir := Vector2i.RIGHT:
 	set(value):
 		next_dir = value
 		queue_redraw()
+# Weathervane: the hazard about to strike THIS card ("", fire, water)
+# — drawn as a faint preview of the effect creeping in at the bottom.
+var incoming := "":
+	set(value):
+		incoming = value
+		_update_processing()
+		queue_redraw()
 var washed := false:  # splashed: rank/suit hidden from the player
 	set(value):
 		washed = value
@@ -258,18 +265,24 @@ var _phase := randf() * TAU
 
 
 func _process(delta: float) -> void:
-	if hazard == "":
+	if hazard == "" and incoming == "":
 		set_process(false)
 		return
 	_t += delta
 	queue_redraw()
 
 
+## Animate only while something on this card moves: a live hazard
+## (stone sits still) or an incoming-strike preview.
+func _update_processing() -> void:
+	set_process((hazard != "" and hazard != "stone") or incoming != "")
+
+
 ## Fire, bombs, water and wind smoulder, spark, drip, or swirl
 ## constantly. Stone sits solid and silent — it only sheds dust when
 ## touched (see _stone_dust / _crumble_burst).
 func _update_ambient() -> void:
-	set_process(hazard != "" and hazard != "stone")
+	_update_processing()
 	if _ambient != null:
 		_ambient.queue_free()
 		_ambient = null
@@ -498,8 +511,6 @@ func _draw() -> void:
 					HORIZONTAL_ALIGNMENT_CENTER, 20, 14, Color.WHITE)
 		"fire":
 			_draw_fire(rect)
-			if show_hazard_intent:
-				_draw_intent_arrow(next_dir, Color(1.0, 0.85, 0.5))
 		"wind":
 			_draw_wind_swirl()
 			# Which way it blows is a secret — unless you carry the
@@ -512,8 +523,9 @@ func _draw() -> void:
 				draw_rect(Rect2(-13.0 + i * 10.0, H / 2.0 - 16.0, 7, 7), Color("3a3a40"))
 		"water":
 			_draw_water(rect)
-			if show_hazard_intent:
-				_draw_intent_arrow(next_dir, Color(0.85, 0.95, 1.0))
+
+	if show_hazard_intent and incoming != "" and hazard == "":
+		_draw_incoming(rect)
 
 	match objective:
 		"key":
@@ -854,8 +866,29 @@ func _draw_rock(rect: Rect2) -> void:
 		draw_polyline(pts, Color(0.12, 0.12, 0.15, 0.8), 2.0)
 
 
-## The Weathervane tell: an arrow toward the card this hazard
-## strikes next.
+## The Weathervane tell on the TARGET: a whisper of the hazard that
+## strikes here next — flames barely licking the bottom edge, or a
+## thin line of water seeping in.
+func _draw_incoming(rect: Rect2) -> void:
+	match incoming:
+		"fire":
+			_draw_flame_layer(rect, 14.0, 5, 6.0, Color(0.9, 0.46, 0.16, 0.5))
+			_draw_flame_layer(rect, 8.0, 6, 7.5, Color(1.0, 0.85, 0.5, 0.5))
+		"water":
+			var level := rect.end.y - 9.0
+			var pts := PackedVector2Array()
+			for i in 11:
+				var x := rect.position.x + 2.0 + (rect.size.x - 4.0) * i / 10.0
+				pts.append(Vector2(x, level + 2.0 * sin(x * 0.2 + _t * 2.6 + _phase)))
+			var fill := pts.duplicate()
+			fill.append(Vector2(rect.end.x - 2.0, rect.end.y - 2.0))
+			fill.append(Vector2(rect.position.x + 2.0, rect.end.y - 2.0))
+			draw_colored_polygon(fill,
+					Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.3))
+			draw_polyline(pts, Color(0.82, 0.93, 1.0, 0.5), 1.5)
+
+
+## The Weathervane tell on the wind card itself: its blow direction.
 func _draw_intent_arrow(dir: Vector2i, col: Color) -> void:
 	var base := Vector2(W / 2.0 - 18, H / 2.0 - 17)
 	var v := Vector2(dir) * 11.0
