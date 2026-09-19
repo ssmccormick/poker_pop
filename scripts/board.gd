@@ -1916,6 +1916,14 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 			"soaked": soaked}
 
 
+## Hazards on the table from the deal fight from hand one — only
+## mid-room arrivals sit out their first round. Trail calls this once
+## the room's opening seeds are all placed.
+func season_hazards() -> void:
+	for p in grid:
+		grid[p].hazard_fresh = false
+
+
 ## A cell fire can spread to or water can soak: on the board, plain,
 ## and unclaimed by anything special.
 func _victim_ok(q: Vector2i) -> bool:

@@ -1135,6 +1135,9 @@ func _seed_room_specials() -> void:
 			card.fuse = Board.BOMB_FUSE + 2
 		elif card.hazard == "stone" and has_relic("chisel"):
 			card.stone_hits = Board.STONE_HITS_START - 1
+	# Opening seeds fight from hand one — spreading, soaking, burning
+	# down, fuses lit. Only mid-room arrivals sit a round out.
+	main.board.season_hazards()
 	_tutor_room_intros()
 
 
