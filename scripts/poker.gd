@@ -82,19 +82,55 @@ static func blackjack_sum(cards: Array) -> int:
 static func evaluate(cards: Array) -> Dictionary:
 	if cards.is_empty():
 		return {}
+	var wild_idx: Array = []
 	for i in cards.size():
 		if cards[i].get("wild", false):
-			var work := cards.duplicate()
-			var best := {}
-			for r in range(2, 15):
-				for s in 4:
-					work[i] = {"rank": r, "suit": s}
-					var res := evaluate(work)
-					if best.is_empty() \
-							or (res.playable and not best.playable) \
-							or (res.playable == best.playable and res.score > best.score):
-						best = res
-			return best
+			wild_idx.append(i)
+	if wild_idx.is_empty():
+		return _eval_concrete(cards)
+	# Suits reduce cleanly: a flush is only possible when every REAL
+	# card shares one suit, and then handing every wild that suit is
+	# never worse than any other choice (flush upgrades only help).
+	# So only RANKS need brute force — 13^wilds, not 52^wilds.
+	var flush_suit := 0
+	var first_real := true
+	for i in cards.size():
+		if cards[i].get("wild", false):
+			continue
+		if first_real:
+			flush_suit = cards[i].suit
+			first_real = false
+	if first_real:
+		# Every card is wild: all aces in one suit is unbeatable.
+		var aces: Array = []
+		for i in cards.size():
+			aces.append({"rank": 14, "suit": 0})
+		return _eval_concrete(aces)
+	var work: Array = []
+	for c in cards:
+		if c.get("wild", false):
+			work.append({"rank": 2, "suit": flush_suit})
+		else:
+			work.append({"rank": c.rank, "suit": c.suit})
+	var w := wild_idx.size()
+	var total := 1
+	for k in w:
+		total *= 13
+	var best := {}
+	for combo in total:
+		var c := combo
+		for k in w:
+			(work[wild_idx[k]] as Dictionary)["rank"] = 2 + c % 13
+			c /= 13
+		var res := _eval_concrete(work)
+		if best.is_empty() \
+				or (res.playable and not best.playable) \
+				or (res.playable == best.playable and res.score > best.score):
+			best = res
+	return best
+
+
+static func _eval_concrete(cards: Array) -> Dictionary:
 	var n := cards.size()
 	var rank_counts := {}
 	var suit_set := {}
