@@ -1179,8 +1179,10 @@ func _tutor_room_intros() -> void:
 		var card: PlayingCard = main.board.grid[p]
 		if card.hazard != "":
 			main.tutor_show("hazard_" + card.hazard)
-		if card.objective != "":
-			main.tutor_show("goal_chest")
+		if card.objective in ["key", "chest"] and room_goal != "chest":
+			# Ambient loot in an ordinary room — the lighter popup, not
+			# the treasure-room briefing.
+			main.tutor_show("loot_chest")
 		if card.is_safe:
 			main.tutor_show("goal_safe")
 		if card.boss != "":

@@ -1008,6 +1008,7 @@ const TUTOR := {
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
 	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house at a FACE-DOWN table, corners showing. Start a chain from a face-up card, then HIT one card at a time: each face-down card you select flips ON THE SPOT and its pips join your sum (faces 10, aces 11 or 1). Hits are binding — no clearing, no take-backs — and if a flip carries you past 21 you BUST right there. PLAY HAND to stand: the dealer flips his hole card and draws to beat you or bust. Every hand turns another random card face-up. Win enough rounds to clear."],
 	"goal_outlaw": ["SHOWDOWN", "The Outlaw waits. Clear YOUR bullets (gold) in scoring hands to shoot him; touch HIS bullets (red) and he shoots you. Weak hands under the posted score give him a free shot too. Run out of GRIT and you're done — gun him down first."],
+	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand and the strongbox pays bonus chips. Purely optional — the room's real goal still rules."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
