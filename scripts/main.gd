@@ -395,6 +395,19 @@ func _update_labels() -> void:
 			target_label.text = "TABLE %d / %d      PLAY  %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.require_status()]
 			target_bar_fill.size.x = BAR_W * clampf(trail.require_frac(), 0.0, 1.0)
+		elif trail.room_goal == "collect":
+			target_label.text = "TABLE %d / %d      %s" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.collect_status()]
+			target_bar_fill.size.x = BAR_W * clampf(
+					float(trail.room_collect_done)
+					/ float(maxi(trail.room_collect_need, 1)), 0.0, 1.0)
+		elif trail.room_goal == "landrush":
+			var plots := board.cols * board.rows
+			target_label.text = "TABLE %d / %d      PLOTS CLAIMED  %d / %d" % \
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
+					board.landrush_marks.size(), plots]
+			target_bar_fill.size.x = BAR_W * clampf(
+					float(board.landrush_marks.size()) / float(plots), 0.0, 1.0)
 		else:
 			target_label.text = "TABLE %d / %d      %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
@@ -920,6 +933,9 @@ func _update_tooltip(delta: float) -> void:
 func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.is_safe:
 		return "THE SAFE\nChain its combination in order, add the safe, and play to crack it."
+	if card.hazard == "stone":
+		return "STONE\nA blocker — no rank, no suit, can't be played. Clear cards BESIDE it to chip it: %d chip%s left. Broken rock sometimes bares GOLD." \
+				% [card.stone_hits, "" if card.stone_hits == 1 else "s"]
 	if card.snake_tail:
 		return "COBRA TAIL\nA wall. Clear the head's face to make him cough it back up."
 	var rank_names := {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
@@ -993,12 +1009,12 @@ const TUTOR := {
 	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero, the table is lost."],
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. Play burning cards to put them out — and if EVERY card on the table catches fire, the table is LOST."],
 	"hazard_wind": ["WIND CARD", "Play it and every card in the wind's direction is blown clean off the board — unscored. The direction turns a quarter every hand, and the wind keeps its secret: without a WEATHERVANE relic you won't know which way it blows until it does."],
-	"hazard_stone": ["STONE CARD", "Solid rock: it takes THREE scoring hands to break. It scores its rank every time you include it."],
+	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
 	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
 	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Playing a piece without its partner isn't fatal: a new one turns up elsewhere, but the seconds keep draining. The hardest job on the trail — the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],
-	"goal_mine": ["GOLD MINE", "The board is choked with stone. Break the asked number of stones (three scoring hands each) to clear — and broken rock has a chance of leaving GOLD cards in the rubble. The plain cards between the rocks keep popping and shifting, so keep finding new seams."],
+	"goal_mine": ["GOLD MINE", "The board is choked with stone. Chip the rocks by clearing cards BESIDE them (three chips each) and break the asked number to clear — broken rock has a chance of leaving GOLD cards in the rubble. The plain cards between the rocks keep popping and shifting, so keep finding new seams."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
 	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to wound him, but only hands that BEAT HIS BAR count — and the bar rises with every hit. Ten wounds puts him away."],
@@ -1008,6 +1024,8 @@ const TUTOR := {
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
 	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house at a FACE-DOWN table, corners showing. Start a chain from a face-up card, then HIT one card at a time: each face-down card you select flips ON THE SPOT and its pips join your sum (faces 10, aces 11 or 1). Hits are binding — no clearing, no take-backs — and if a flip carries you past 21 you BUST right there. PLAY HAND to stand: the dealer flips his hole card and draws to beat you or bust. Every hand turns another random card face-up. Win enough rounds to clear."],
 	"goal_outlaw": ["SHOWDOWN", "The Outlaw waits. Clear YOUR bullets (gold) in scoring hands to shoot him; touch HIS bullets (red) and he shoots you. Weak hands under the posted score give him a free shot too. Run out of GRIT and you're done — gun him down first."],
+	"goal_collect": ["THE ROUNDUP", "The table calls for particular cardboard: a count of one SUIT, a stack of one RANK, or cards of many DIFFERENT ranks. Only cards actually cleared in scoring hands count — the banner tracks the tally."],
+	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot: clear a card from each of the 25 cells. A claimed plot wears a gold ring — fill the whole homestead to take the table."],
 	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand and the strongbox pays bonus chips. Purely optional — the room's real goal still rules."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
 }

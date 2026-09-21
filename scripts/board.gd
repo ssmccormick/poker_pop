@@ -68,9 +68,12 @@ var dragging := false
 # Set by main when a level-up is pending: the post-hand refill is
 # pointless (the board resets immediately), so skip dealing it.
 var suppress_refill := false
-# Gold-mine rooms: broken stones can uncover gold cards in the rubble.
-var gold_rush := false
+# Broken stones can uncover gold cards in the rubble — everywhere.
 const GOLD_FIND_CHANCE := 0.35
+# LAND RUSH rooms: cells a scored card has been cleared from (drawn
+# as claim stakes under the cards).
+var landrush_marks := {}
+var landrush_active := false
 # Trail rooms: each freshly dealt refill card may arrive already
 # hazarded (set per room by trail; 0 everywhere else).
 var refill_hazard_chance := 0.0
@@ -290,9 +293,11 @@ func reset(deal_facedown := false) -> void:
 	locked = false
 	busy = true
 	suppress_refill = false
-	gold_rush = false
 	refill_hazard_chance = 0.0
 	hazards_spawned.clear()
+	landrush_marks.clear()
+	landrush_active = false
+	queue_redraw()
 	jack_bar = 0
 	holdem_community.clear()
 	blackjack_target = 0
@@ -419,7 +424,7 @@ static func _is_adjacent(a: Vector2i, b: Vector2i) -> bool:
 
 
 func _toggle_select(card: PlayingCard) -> void:
-	if card.cursed or card.snake_tail:
+	if card.cursed or card.snake_tail or card.hazard == "stone":
 		_play_sound(SFX_FLIP, 0.7, -10.0)
 		return
 	if card.is_safe and not card.selected:
@@ -679,14 +684,7 @@ func play_hand() -> void:
 		result["boss_defeated"] = true
 	# Purge rooms watch this: hazards surviving the pops and gusts.
 	result["hazards_left"] = predicted_hazards_left()
-	# Gold-mine rooms watch this: stones this hand grinds to dust.
-	var breaking := 0
-	for card in selected:
-		if card.hazard == "stone" and card.stone_hits <= 1:
-			breaking += 1
-	result["stones_broken"] = breaking
 	busy = true
-	hand_played.emit(result)
 
 	var played := selected.duplicate()
 	selected.clear()
@@ -696,13 +694,9 @@ func play_hand() -> void:
 	for card in played:
 		center += card.position
 	center /= played.size()
-	var float_txt := "+%d" % result.score
-	if result.get("bonus_chips", 0) > 0:
-		float_txt += "  +%d CHIPS" % result.bonus_chips
-	_spawn_float_text(float_txt, center)
 
-	# Partition: stones with uses left stay on the board; wind and water
-	# effects are snapshotted before their cells change.
+	# Partition: wind and water effects are snapshotted before their
+	# cells change.
 	var poppers: Array = []
 	var gusts: Array = []     # {"cell", "dir"}
 	var boomers: Array = []   # {"cell", "mod"} — exploding mods spread
@@ -733,11 +727,6 @@ func play_hand() -> void:
 			else:
 				_cobra_revert(card)
 			continue
-		if card.hazard == "stone" and card.stone_hits > 1:
-			card.stone_hits -= 1
-			_play_sound(SFX_KNIVES.pick_random(), randf_range(0.9, 1.1), -8.0)
-			_fx(card.position, "rock")
-			continue  # cracked, not cleared — keeps its cell
 		if card.hazard == "wind":
 			gusts.append({"cell": card.grid_pos, "dir": card.wind_dir})
 		if card.boom and card.mod != "":
@@ -748,6 +737,44 @@ func play_hand() -> void:
 		elif card.mod == "bumper":
 			bumps.append({"cell": card.grid_pos, "dir": card.boost_dir})
 		poppers.append(card)
+
+	# The new goals watch what actually cleared: identities for the
+	# roundups, cells for the land rush.
+	var cleared_cards: Array = []
+	var cleared_cells: Array = []
+	for card in poppers:
+		cleared_cards.append({"rank": card.rank, "suit": card.suit})
+		cleared_cells.append(card.grid_pos)
+	result["cleared_cards"] = cleared_cards
+	result["cleared_cells"] = cleared_cells
+
+	# Stones are blockers now: every cleared card chips each stone
+	# beside it, and a stone out of chips crumbles with the pops.
+	var breaking := 0
+	var broke: Array = []
+	for card in poppers:
+		for d in HAZARD_DIRS:
+			var q: Vector2i = card.grid_pos + d
+			if not grid.has(q) or grid[q].hazard != "stone":
+				continue
+			var st: PlayingCard = grid[q]
+			if st.stone_hits <= 0:
+				continue
+			st.stone_hits -= 1
+			_play_sound(SFX_KNIVES.pick_random(), randf_range(0.9, 1.1), -8.0)
+			_fx(st.position, "rock")
+			if st.stone_hits <= 0:
+				breaking += 1
+				broke.append(st)
+	result["stones_broken"] = breaking
+	for st in broke:
+		poppers.append(st)
+
+	hand_played.emit(result)
+	var float_txt := "+%d" % result.score
+	if result.get("bonus_chips", 0) > 0:
+		float_txt += "  +%d CHIPS" % result.bonus_chips
+	_spawn_float_text(float_txt, center)
 
 	if not poppers.is_empty():
 		var tw := create_tween().set_parallel(true)
@@ -784,7 +811,8 @@ func play_hand() -> void:
 					continue
 				var c: PlayingCard = grid[q]
 				if c.mod == "" and not c.cursed and not c.is_safe \
-						and c.boss == "" and not c.snake_tail:
+						and c.boss == "" and not c.snake_tail \
+						and c.hazard != "stone":
 					c.mod = bdata.mod
 					if c.mod in ["plus", "minus", "bumper"]:
 						c.boost_dir = HAZARD_DIRS.pick_random()
@@ -797,7 +825,7 @@ func play_hand() -> void:
 		if grid.has(q):
 			var c: PlayingCard = grid[q]
 			if not c.is_safe and c.boss == "" and not c.snake_tail \
-					and not c.cursed:
+					and not c.cursed and c.hazard != "stone":
 				if adata.mod == "plus" and c.rank >= 14:
 					# Nowhere up from an Ace: it wraps into a lucky
 					# 2+ that DOUBLES any hand it scores in.
@@ -893,8 +921,8 @@ func play_hand() -> void:
 		busy = false
 		return
 	await _fall_and_fill(false)
-	# Gold-mine rooms: every stone ground to dust may leave gold behind.
-	if gold_rush and breaking > 0:
+	# Every stone ground to dust may leave gold behind — mining pays.
+	if breaking > 0:
 		for i in breaking:
 			if randf() >= GOLD_FIND_CHANCE:
 				continue
@@ -1240,19 +1268,21 @@ func has_playable_hand() -> bool:
 	# or join any chain.
 	for p in grid:
 		var card: PlayingCard = grid[p]
-		if card.cursed or card.is_safe or card.snake_tail:
+		if card.cursed or card.is_safe or card.snake_tail or card.hazard == "stone":
 			continue
 		if _group_chain_exists(p, {p: true}, {card.rank: 1}):
 			return true
 	# 5-card flush chains.
 	for p in grid:
-		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail:
+		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail \
+				or grid[p].hazard == "stone":
 			continue
 		if _suit_chain_exists(p, {p: true}, 1):
 			return true
 	# 5-card straight chains (any pick order along the chain).
 	for p in grid:
-		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail:
+		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail \
+				or grid[p].hazard == "stone":
 			continue
 		if _straight_chain_exists(p, {p: true}, {grid[p].rank: true}):
 			return true
@@ -1275,7 +1305,9 @@ func _group_chain_exists(p: Vector2i, visited: Dictionary, rank_counts: Dictiona
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe or grid[q].snake_tail:
+			if not grid.has(q) or visited.has(q) or grid[q].cursed \
+					or grid[q].is_safe or grid[q].snake_tail \
+					or grid[q].hazard == "stone":
 				continue
 			var r: int = grid[q].rank
 			# A third distinct rank can never resolve into an exact hand.
@@ -1301,7 +1333,9 @@ func _suit_chain_exists(p: Vector2i, visited: Dictionary, depth: int) -> bool:
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if grid.has(q) and not visited.has(q) and not grid[q].cursed and not grid[q].is_safe and not grid[q].snake_tail \
+			if grid.has(q) and not visited.has(q) and not grid[q].cursed \
+					and not grid[q].is_safe and not grid[q].snake_tail \
+					and grid[q].hazard != "stone" \
 					and grid[q].suit == suit:
 				visited[q] = true
 				if _suit_chain_exists(q, visited, depth + 1):
@@ -1322,7 +1356,9 @@ func _straight_chain_exists(p: Vector2i, visited: Dictionary, ranks: Dictionary)
 			if dx == 0 and dy == 0:
 				continue
 			var q := p + Vector2i(dx, dy)
-			if not grid.has(q) or visited.has(q) or grid[q].cursed or grid[q].is_safe or grid[q].snake_tail:
+			if not grid.has(q) or visited.has(q) or grid[q].cursed \
+					or grid[q].is_safe or grid[q].snake_tail \
+					or grid[q].hazard == "stone":
 				continue
 			var r: int = grid[q].rank
 			if ranks.has(r):
@@ -1638,8 +1674,6 @@ func predicted_hazards_left() -> int:
 	for card in selected:
 		if card.boss != "":
 			continue
-		if card.hazard == "stone" and card.stone_hits > 1:
-			continue
 		gone[card.grid_pos] = true
 	for card in selected:
 		if card.hazard == "wind":
@@ -1741,6 +1775,18 @@ func tick_boss() -> void:
 # --- Trail hazard engine --------------------------------------------------
 
 ## Seeds `count` random plain cards with a hazard state (trail rooms).
+## LAND RUSH: claimed plots wear a gold halo under their cards.
+func _draw() -> void:
+	if not landrush_active:
+		return
+	for cell: Vector2i in landrush_marks:
+		var c := cell_center(cell)
+		draw_rect(Rect2(
+				c - Vector2(PlayingCard.W / 2.0 + 4.0, PlayingCard.H / 2.0 + 4.0),
+				Vector2(PlayingCard.W + 8.0, PlayingCard.H + 8.0)),
+				Color(0.91, 0.77, 0.28, 0.5), false, 3.0)
+
+
 func spawned_count(kind: String) -> int:
 	return int(hazards_spawned.get(kind, 0))
 

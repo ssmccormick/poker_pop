@@ -63,7 +63,9 @@ const REFILL_HAZARD_BASE := 0.03
 const REFILL_HAZARD_STEP := 0.008  # + per room index
 const REFILL_HAZARD_MAX := 0.20
 const OBJECTIVE_CHANCE := 0.12   # heist/treasure rooms, from room 2 on
-const PURGE_CHANCE := 0.14       # purge rooms: clear a QUOTA of one hazard kind
+const PURGE_CHANCE := 0.12       # purge rooms: clear a QUOTA of one hazard kind
+const COLLECT_CHANCE := 0.08     # roundup rooms: clear called suits/ranks
+const LANDRUSH_CHANCE := 0.07    # land rush: clear a card from every cell
 const PURGE_SEED := 4            # hazards on the table at the deal
 const PURGE_QUOTA_BASE := 10     # total to clear (+ per region below)
 const PURGE_QUOTA_REGION := 3    # deeper tables demand more
@@ -71,7 +73,7 @@ const PURGE_FLOOR := 4           # trickle keeps at least this many on board
 const PURGE_TRICKLE := 2         # at most this many arrive per hand
 const CRAZY8_HAZARDS_BASE := 8   # crazy-8s hazard storm (+1 per region)
 const BLACKJACK_HAZARDS_BASE := 5  # blackjack table hazards (+1 per region)
-const REQUIRE_CHANCE := 0.12     # called-hands rooms: play the demanded hands
+const REQUIRE_CHANCE := 0.10     # called-hands rooms: play the demanded hands
 const ROYAL_CHANCE := 0.10       # of called-hands rooms (region 2+): THE WORLD
 const TIMED_MAX_MINUTES := 6     # the most time a clock table will sell
 # Variant rooms that play by DIFFERENT rules (from room 2 on):
@@ -182,6 +184,9 @@ var room_chests_needed := 1      # treasure rooms: pairs to open
 var room_chests_opened := 0
 var room_stones_needed := 1      # gold mine: stones to grind to dust
 var room_stones_broken := 0
+var room_collect_need := 0       # roundup rooms: cards demanded
+var room_collect_done := 0
+var room_collect_kinds := {}     # census variant: distinct ranks seen
 var room_wins_needed := 3        # blackjack: rounds to take off the dealer
 var room_wins := 0
 var room_outlaw_hp := 5          # showdown: the Outlaw's health...
@@ -734,6 +739,43 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer["outlaw_hp"] = 6 + region
 			offer.hands = 10
 			offer.target = 0
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
+				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
+				+ OUTLAW_CHANCE + COLLECT_CHANCE:
+			# Roundup family: clear a called count of one suit, one
+			# rank, or many DIFFERENT ranks.
+			offer["goal"] = "collect"
+			offer.odds = 1.5
+			offer.target = 0
+			offer.hands = mini(MAX_HANDS_BUY, 9 + region)
+			match randi() % 3:
+				0:
+					offer.tarot = "THE ROUNDUP"
+					offer.label = "Roundup"
+					offer["collect_suit"] = randi_range(0, 3)
+					offer["collect_need"] = 8 + 2 * region
+				1:
+					offer.tarot = "WANTED"
+					offer.label = "Wanted"
+					offer.odds = 2.0
+					offer["collect_rank"] = randi_range(2, 14)
+					offer["collect_need"] = 3 + region
+				_:
+					offer.tarot = "THE CENSUS"
+					offer.label = "Census"
+					offer["collect_kinds"] = true
+					offer["collect_need"] = 9 + region
+		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
+				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
+				+ OUTLAW_CHANCE + COLLECT_CHANCE + LANDRUSH_CHANCE:
+			# Land rush: stake a claim on every plot — clear a card
+			# from each of the 25 cells.
+			offer.tarot = "LAND RUSH"
+			offer.label = "Land Rush"
+			offer.odds = 2.0
+			offer["goal"] = "landrush"
+			offer.hands = MAX_HANDS_BUY
+			offer.target = 0
 	# Every job deals as either a HAND BUDGET or a COUNTDOWN (50/50).
 	# Plain score tables that draw the clock take the HIGH NOON name.
 	if randf() < 0.5:
@@ -817,6 +859,10 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			goal_line = "Beat the dealer %d times — hazards in play" % offer.wins
 		elif offer.get("goal", "") == "outlaw":
 			goal_line = "Gun down the Outlaw (%d HP)" % offer.outlaw_hp
+		elif offer.get("goal", "") == "collect":
+			goal_line = _collect_goal_text(offer)
+		elif offer.get("goal", "") == "landrush":
+			goal_line = "Claim all 25 plots — clear a card from every cell"
 		elif offer.get("goal", "") == "hands":
 			goal_line = "Play " + _require_text(offer.require)
 		elif offer.get("goal", "") == "timed":
@@ -872,6 +918,17 @@ func _face_label(b: Button, text: String, y: float, h: float, size: int,
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(l)
 	return l
+
+
+## One line describing a roundup offer's demand.
+func _collect_goal_text(o: Dictionary) -> String:
+	if o.has("collect_suit"):
+		return "Clear %d %s" % [int(o.collect_need),
+				String(PlayingCard.SUIT_NAMES[int(o.collect_suit)]).to_upper()]
+	if o.has("collect_rank"):
+		return "WANTED: bring in %d %s" % [int(o.collect_need),
+				_rank_plural(int(o.collect_rank))]
+	return "Clear cards of %d different ranks" % int(o.get("collect_need", 0))
 
 
 func _odds_text(odds: float) -> String:
@@ -962,6 +1019,10 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Beat the dealer %d times — a face-down table, blind hits, and a real dealer playing out his hand" % o.wins
 		"outlaw":
 			return "Duel: shoot the Outlaw %d times before your grit runs out" % o.outlaw_hp
+		"collect":
+			return _collect_goal_text(o)
+		"landrush":
+			return "Stake a claim on all 25 plots — clear a card from every cell of the grid"
 		"hands":
 			return "Play " + _require_text(o.require)
 		"timed":
@@ -1023,6 +1084,9 @@ func _start_room() -> void:
 	room_chests_opened = 0
 	room_stones_needed = int(current_offer.get("stones", 1))
 	room_stones_broken = 0
+	room_collect_need = int(current_offer.get("collect_need", 0))
+	room_collect_done = 0
+	room_collect_kinds = {}
 	room_wins_needed = int(current_offer.get("wins", 3))
 	room_wins = 0
 	room_outlaw_hp = int(current_offer.get("outlaw_hp", 5))
@@ -1079,7 +1143,9 @@ func _seed_room_specials() -> void:
 		# between the stones pop and refill, so the mine keeps shifting
 		# and the same hand can't just be replayed three times.
 		main.board.apply_room_hazards("stone", GOLD_MINE_STONE_SEED)
-		main.board.gold_rush = true
+	elif room_goal == "landrush":
+		main.board.landrush_active = true
+		main.board.queue_redraw()
 	elif room_goal == "holdem":
 		main.board.deal_community()
 		if randf() < 0.5:
@@ -1173,6 +1239,10 @@ func _tutor_room_intros() -> void:
 			main.tutor_show("goal_blackjack")
 		"outlaw":
 			main.tutor_show("goal_outlaw")
+		"collect":
+			main.tutor_show("goal_collect")
+		"landrush":
+			main.tutor_show("goal_landrush")
 	if room_on_clock():
 		main.tutor_show("goal_timed")
 	for p in main.board.grid:
@@ -1293,6 +1363,32 @@ func on_hand_played(result: Dictionary) -> void:
 	if room_goal == "mine":
 		room_stones_broken += int(result.get("stones_broken", 0))
 		if room_stones_broken >= room_stones_needed:
+			_room_cleared()
+			return
+	if room_goal == "collect":
+		for cc in result.get("cleared_cards", []):
+			if current_offer.has("collect_suit"):
+				if int(cc.suit) == int(current_offer.collect_suit):
+					room_collect_done += 1
+			elif current_offer.has("collect_rank"):
+				if int(cc.rank) == int(current_offer.collect_rank):
+					room_collect_done += 1
+			else:
+				room_collect_kinds[int(cc.rank)] = true
+		if current_offer.has("collect_kinds"):
+			room_collect_done = room_collect_kinds.size()
+		if room_collect_need > 0 and room_collect_done >= room_collect_need:
+			_room_cleared()
+			return
+	if room_goal == "landrush":
+		var newly := false
+		for cell in result.get("cleared_cells", []):
+			if not main.board.landrush_marks.has(cell):
+				main.board.landrush_marks[cell] = true
+				newly = true
+		if newly:
+			main.board.queue_redraw()
+		if main.board.landrush_marks.size() >= main.board.cols * main.board.rows:
 			_room_cleared()
 			return
 	if room_goal == "hands":
@@ -1544,6 +1640,28 @@ func purge_left() -> int:
 		if main.board.grid[p].hazard != "":
 			n += 1
 	return n
+
+
+func _rank_plural(r: int) -> String:
+	match r:
+		11: return "JACKS"
+		12: return "QUEENS"
+		13: return "KINGS"
+		14: return "ACES"
+	return "%ds" % r
+
+
+## Roundup progress line for the banner.
+func collect_status() -> String:
+	var o := current_offer
+	if o.has("collect_suit"):
+		return "CLEAR %s  %d / %d" % [
+			String(PlayingCard.SUIT_NAMES[int(o.collect_suit)]).to_upper(),
+			room_collect_done, room_collect_need]
+	if o.has("collect_rank"):
+		return "WANTED: %s  %d / %d" % [_rank_plural(int(o.collect_rank)),
+				room_collect_done, room_collect_need]
+	return "DIFFERENT RANKS  %d / %d" % [room_collect_done, room_collect_need]
 
 
 ## The room's total clearing quota.

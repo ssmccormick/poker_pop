@@ -472,6 +472,14 @@ func _draw() -> void:
 		if washed_show_suit:  # Magnifying Glass
 			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	else:
+		if hazard == "stone":
+			# A slab of rock: no rank, no suit — just a blocker. Clear
+			# cards beside it to chip it away.
+			_draw_rock(rect)
+			for i in stone_hits:
+				draw_rect(Rect2(-13.0 + i * 10.0, H / 2.0 - 16.0, 7, 7),
+						Color("3a3a40"))
+			return
 		_draw_mod_face(rect)
 		if two_plus:
 			# The wrapped Ace announces its luck.
@@ -520,10 +528,6 @@ func _draw() -> void:
 			# Weathervane.
 			if show_hazard_intent:
 				_draw_intent_arrow(wind_dir, WIND_BLUE)
-		"stone":
-			_draw_rock(rect)
-			for i in stone_hits:
-				draw_rect(Rect2(-13.0 + i * 10.0, H / 2.0 - 16.0, 7, 7), Color("3a3a40"))
 		"water":
 			_draw_water(rect)
 
@@ -827,6 +831,8 @@ func _draw_rock(rect: Rect2) -> void:
 	var total := maxi(_stone_max, 1)
 	var dmg := 1.0 - float(stone_hits) / total
 	var inner := rect.grow(-3)
+	# Solid base — there's no card face under the rock any more.
+	draw_rect(inner, Color(0.30, 0.30, 0.34))
 	var cols := 3
 	var rows := 4
 	var cw := inner.size.x / cols
@@ -845,7 +851,7 @@ func _draw_rock(rect: Rect2) -> void:
 			corners[j] += Vector2(sin(_phase * 3.0 + i * 1.7 + j * 2.3),
 					cos(_phase * 2.0 + i * 2.9 + j * 1.1)) * 3.0
 		var shade := 0.4 + 0.07 * float((i * 7 + int(_phase * 10.0)) % 3)
-		draw_colored_polygon(corners, Color(shade, shade, shade + 0.04, 0.55))
+		draw_colored_polygon(corners, Color(shade, shade, shade + 0.04, 0.9))
 	# Facet seams give it depth even when whole.
 	for cx in range(1, cols):
 		var x := inner.position.x + cx * cw
