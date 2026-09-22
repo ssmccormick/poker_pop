@@ -110,6 +110,8 @@ static var _valid_box: StyleBoxFlat
 static var _error_box: StyleBoxFlat
 static var _shadow_far: StyleBoxFlat
 static var _shadow_near: StyleBoxFlat
+static var _hover_ring: StyleBoxFlat
+static var _hover_glow: StyleBoxFlat
 
 var rank := 2:
 	set(value):
@@ -400,6 +402,18 @@ static func _make_boxes() -> void:
 	_shadow_near.bg_color = Color(0, 0, 0, 0.24)
 	_shadow_near.set_corner_radius_all(7)
 
+	# Hover ring + glow: rounded to match the card corners.
+	_hover_ring = StyleBoxFlat.new()
+	_hover_ring.draw_center = false
+	_hover_ring.border_color = Color(GOLD.r, GOLD.g, GOLD.b, 0.95)
+	_hover_ring.set_border_width_all(3)
+	_hover_ring.set_corner_radius_all(7)
+	_hover_glow = StyleBoxFlat.new()
+	_hover_glow.draw_center = false
+	_hover_glow.border_color = Color(GOLD.r, GOLD.g, GOLD.b, 0.35)
+	_hover_glow.set_border_width_all(4)
+	_hover_glow.set_corner_radius_all(9)
+
 
 func rank_text() -> String:
 	if two_plus:
@@ -443,9 +457,8 @@ func _draw() -> void:
 		_face_box.draw(get_canvas_item(), rect)
 		if hovered:
 			# A clear gold ring under the cursor, with a soft outer glow.
-			draw_rect(rect.grow(2), Color(GOLD.r, GOLD.g, GOLD.b, 0.35),
-					false, 4.0)
-			draw_rect(rect, Color(GOLD.r, GOLD.g, GOLD.b, 0.95), false, 3.0)
+			_hover_glow.draw(get_canvas_item(), rect.grow(3))
+			_hover_ring.draw(get_canvas_item(), rect)
 	# Optional per-theme card-base art (drop into assets/cards/).
 	var face_tex := Themes.face_texture()
 	if face_tex != null:

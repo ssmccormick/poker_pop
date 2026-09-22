@@ -481,9 +481,11 @@ func _toggle_select(card: PlayingCard) -> void:
 			_play_sound(SFX_FLIP, 1.2, -8.0)
 			_fx(card.position, "sparks")
 		else:
-			# Random select sample; pitch climbs as the chain grows.
+			# Random select sample; pitch climbs as the chain grows —
+			# with a whisper of card lifting off the felt underneath.
 			_play_sound(SFX_SELECTS.pick_random(),
 					1.0 + 0.07 * (selected.size() - 1) + randf_range(-0.02, 0.02), -6.0)
+			_play_sound(SFX_FLIP, 1.5, -18.0)
 	_sync_chain_indices()
 	_update_hand_validity()
 	_update_safe_progress()

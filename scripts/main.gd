@@ -1438,6 +1438,8 @@ func _apply_board_layout() -> void:
 ## Rattles the table (never the HUD): a decaying random jitter around
 ## the board's resting spot, restored exactly at the end.
 func shake(strength: float) -> void:
+	# A low thump under the rattle — pops pitched down to a body blow.
+	board._play_sound(Board.SFX_POPS.pick_random(), 0.42, -6.0)
 	if _shake_tween and _shake_tween.is_valid():
 		_shake_tween.kill()
 	board.position = _board_home
