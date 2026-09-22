@@ -2130,16 +2130,8 @@ func _render_shop_relics() -> void:
 ## The label is its first (only) child.
 func _make_stat_tip(layer: Control) -> PanelContainer:
 	var tip := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("1b1b1b")
-	sb.border_color = main.GOLD
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(4)
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	sb.content_margin_top = 10
-	sb.content_margin_bottom = 10
-	tip.add_theme_stylebox_override("panel", sb)
+	tip.add_theme_stylebox_override("panel",
+			UiKit.panel_box(UiKit.PANEL_BG, UiKit.PANEL_EDGE, 4, 2, 6))
 	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tip.visible = false
 	var lbl := Label.new()

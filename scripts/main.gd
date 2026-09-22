@@ -64,6 +64,9 @@ var hand_display: Node2D
 var community_display: Node2D
 var _community_label: Label
 var outlaw: OutlawPortrait
+var _community_plate: Panel
+var _payout_names: Label
+var _payout_values: Label
 var _damage_flash: ColorRect
 var splash_layer: ColorRect
 var countdown_overlay: ColorRect
@@ -323,6 +326,7 @@ func _update_labels() -> void:
 			and game_started and not menu_open
 	_community_label.visible = show_community
 	community_display.visible = show_community
+	_community_plate.visible = show_community
 	if show_community:
 		if board.blackjack_target > 0:
 			_community_label.text = ("DEALER SHOWS %d" if board.blackjack_hole_hidden
@@ -1361,8 +1365,17 @@ func _build_ui() -> void:
 	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(hud_root)
 
+	# Leather plates behind the HUD columns — added FIRST so every
+	# label and button draws on top of them.
+	UiKit.plate(hud_root, Rect2(PANEL_X - 18, 118, 336, 322))
+	UiKit.plate(hud_root, Rect2(PANEL_X - 18, 450, 336, 180))
+	_community_plate = UiKit.plate(hud_root, Rect2(PANEL_X - 18, 636, 336, 170))
+	UiKit.plate(hud_root, Rect2(PANEL_R - 18, 126, 336, 384))
+	UiKit.plate(hud_root, Rect2(PANEL_R - 18, 840, 336, 236))
+
 	_label(hud_root, "POKER", Vector2(PANEL_X, 28), 42, RED)
 	_label(hud_root, "POP", Vector2(PANEL_X + 168, 28), 42, OFFWHITE)
+	UiKit.hrule(hud_root, Vector2(PANEL_X, 96), 300)
 
 	score_label = _label(hud_root, "", Vector2(PANEL_X, 140), 40, GOLD)
 	status_label = _label(hud_root, "", Vector2(PANEL_X, 204), 28, OFFWHITE)
@@ -1407,6 +1420,7 @@ func _build_ui() -> void:
 
 	# Selected cards, shown sorted by rank so straights are easy to read.
 	_label(hud_root, "YOUR HAND", Vector2(PANEL_X, 460), 18, DIM)
+	UiKit.hrule(hud_root, Vector2(PANEL_X, 488), 300)
 	hand_display = Node2D.new()
 	hand_display.position = Vector2(PANEL_X + 30, 532)
 	hand_display.scale = Vector2(0.8, 0.8)
@@ -1447,13 +1461,21 @@ func _build_ui() -> void:
 	hud_root.add_child(meter_fill)
 
 	_label(hud_root, "PAYOUTS", Vector2(PANEL_R, 140), 22, DIM)
+	UiKit.hrule(hud_root, Vector2(PANEL_R, 170), 300)
+	# A proper two-column table: hand names left, prices right in gold.
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
-	var lines := PackedStringArray()
+	var name_lines := PackedStringArray()
+	var value_lines := PackedStringArray()
 	for hand_name in names:
-		lines.append("%s   %d" % [hand_name, Poker.BASE_SCORES[hand_name]])
-	var payouts := _label(hud_root, "\n".join(lines), Vector2(PANEL_R, 176), 18, OFFWHITE)
-	payouts.add_theme_constant_override("line_spacing", 2)
+		name_lines.append(hand_name)
+		value_lines.append(str(Poker.BASE_SCORES[hand_name]))
+	_payout_names = _label(hud_root, "\n".join(name_lines), Vector2(PANEL_R, 180), 18, OFFWHITE)
+	_payout_names.add_theme_constant_override("line_spacing", 2)
+	_payout_values = _label(hud_root, "\n".join(value_lines), Vector2(PANEL_R, 180), 18, GOLD)
+	_payout_values.size = Vector2(300, 400)
+	_payout_values.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_payout_values.add_theme_constant_override("line_spacing", 2)
 
 	_label(hud_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
 			Vector2(PANEL_R, 860), 16, DIM)
@@ -1558,6 +1580,7 @@ func _make_volume_slider(parent: Control, pos: Vector2, setter: Callable) -> HSl
 	s.step = 0.05
 	s.position = pos
 	s.size = Vector2(430, 36)
+	UiKit.style_slider(s)
 	parent.add_child(s)
 	s.value_changed.connect(func(v: float) -> void:
 		setter.call(v)
@@ -1754,20 +1777,27 @@ func _build_profiles_and_tutor() -> void:
 	tutor_layer.visible = false
 	tutor_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	ui_root.add_child(tutor_layer)
-	var panel := ColorRect.new()
-	panel.color = Color("242424")
+	# A wanted poster: paper stock, heavy edge, nail heads, ink type.
+	var panel := Panel.new()
 	panel.position = Vector2(560, 300)
 	panel.size = Vector2(800, 440)
+	panel.add_theme_stylebox_override("panel",
+			UiKit.panel_box(UiKit.POSTER_PAPER, UiKit.POSTER_EDGE, 2, 4, 14))
 	tutor_layer.add_child(panel)
-	var strip := ColorRect.new()
-	strip.color = GOLD
-	strip.position = Vector2(560, 300)
-	strip.size = Vector2(800, 4)
-	tutor_layer.add_child(strip)
-	_tutor_title = _label(tutor_layer, "", Vector2(560, 330), 40, GOLD)
+	var nails := UiKit.Rivets.new()
+	nails.plate_size = Vector2(800, 440)
+	panel.add_child(nails)
+	_tutor_title = _label(tutor_layer, "", Vector2(560, 324), 40, RED)
 	_tutor_title.size = Vector2(800, 60)
 	_tutor_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_tutor_body = _label(tutor_layer, "", Vector2(620, 415), 26, OFFWHITE)
+	for rule_y in [382.0, 388.0]:
+		var rule := ColorRect.new()
+		rule.color = UiKit.POSTER_EDGE
+		rule.position = Vector2(660, rule_y)
+		rule.size = Vector2(600, 2)
+		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tutor_layer.add_child(rule)
+	_tutor_body = _label(tutor_layer, "", Vector2(620, 415), 26, UiKit.POSTER_INK)
 	_tutor_body.size = Vector2(680, 220)
 	_tutor_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var ok := _button(tutor_layer, "GOT IT", Vector2(810, 660), Vector2(300, 60))
@@ -1776,16 +1806,8 @@ func _build_profiles_and_tutor() -> void:
 
 	# Hover tooltip for board cards — above the HUD, ignores the mouse.
 	_tooltip = PanelContainer.new()
-	var tip_sb := StyleBoxFlat.new()
-	tip_sb.bg_color = Color("1b1b1b")
-	tip_sb.border_color = GOLD
-	tip_sb.set_border_width_all(2)
-	tip_sb.set_corner_radius_all(4)
-	tip_sb.content_margin_left = 14
-	tip_sb.content_margin_right = 14
-	tip_sb.content_margin_top = 10
-	tip_sb.content_margin_bottom = 10
-	_tooltip.add_theme_stylebox_override("panel", tip_sb)
+	_tooltip.add_theme_stylebox_override("panel",
+			UiKit.panel_box(UiKit.PANEL_BG, UiKit.PANEL_EDGE, 4, 2, 6))
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip.visible = false
 	_tooltip_label = Label.new()
@@ -1844,6 +1866,7 @@ func _build_options() -> void:
 	music_slider.value = music_vol
 	music_slider.position = Vector2(830, 626)
 	music_slider.size = Vector2(430, 36)
+	UiKit.style_slider(music_slider)
 	options_layer.add_child(music_slider)
 	music_slider.value_changed.connect(func(v: float) -> void:
 		music_vol = v
@@ -1858,6 +1881,7 @@ func _build_options() -> void:
 	sfx_slider.value = sfx_vol
 	sfx_slider.position = Vector2(830, 700)
 	sfx_slider.size = Vector2(430, 36)
+	UiKit.style_slider(sfx_slider)
 	options_layer.add_child(sfx_slider)
 	sfx_slider.value_changed.connect(func(v: float) -> void:
 		sfx_vol = v
@@ -1999,22 +2023,43 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 	# simple consistent sound.
 	b.pressed.connect(func() -> void:
 		board._play_sound(Board.SFX_CLICK, 1.15, -14.0))
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("2a2a2a")
-	sb.border_color = GOLD
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(4)
+	# Leather and brass: resting buttons wear the dimmed edge, gold
+	# arrives on hover, and the pressed state sits down flat.
+	var sb := UiKit.panel_box(UiKit.PANEL_BG, UiKit.PANEL_EDGE, 4, 2, 4)
+	sb.shadow_offset = Vector2(0, 3)
+	sb.content_margin_top = 0
+	sb.content_margin_bottom = 0
 	b.add_theme_stylebox_override("normal", sb)
 	var hover: StyleBoxFlat = sb.duplicate()
-	hover.bg_color = Color("3d3a2c")
+	hover.bg_color = UiKit.PANEL_BG_HOVER
+	hover.border_color = GOLD
 	b.add_theme_stylebox_override("hover", hover)
-	var pressed: StyleBoxFlat = sb.duplicate()
-	pressed.bg_color = Color("55503a")
+	var pressed: StyleBoxFlat = hover.duplicate()
+	pressed.bg_color = UiKit.PANEL_BG_PRESSED
+	pressed.shadow_size = 0
 	b.add_theme_stylebox_override("pressed", pressed)
+	var disabled: StyleBoxFlat = sb.duplicate()
+	disabled.bg_color = UiKit.PANEL_BG_DISABLED
+	disabled.border_color = Color(DIM.r, DIM.g, DIM.b, 0.4)
+	disabled.shadow_size = 0
+	b.add_theme_stylebox_override("disabled", disabled)
 	b.add_theme_color_override("font_color", OFFWHITE)
 	b.add_theme_color_override("font_hover_color", GOLD)
 	b.add_theme_color_override("font_pressed_color", GOLD)
+	b.add_theme_color_override("font_disabled_color", DIM)
 	b.add_theme_font_size_override("font_size", 17)
+	if FontLib.display != null:
+		b.add_theme_font_override("font", FontLib.display)
+	# A small lean-in on hover.
+	b.pivot_offset = btn_size / 2.0
+	b.mouse_entered.connect(func() -> void:
+		var tw := b.create_tween()
+		tw.tween_property(b, "scale", Vector2(1.04, 1.04), 0.08) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT))
+	b.mouse_exited.connect(func() -> void:
+		var tw := b.create_tween()
+		tw.tween_property(b, "scale", Vector2.ONE, 0.08) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT))
 	parent.add_child(b)
 	return b
 
