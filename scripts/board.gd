@@ -43,6 +43,14 @@ var _refill_shadows: Array = []  # in-flight shadow blobs, freed on land/skip
 
 var cols := 5
 var rows := 5
+# The drawn table under the cards (wood rim, felt, cell slots).
+var table: TableSurface
+
+
+func _init() -> void:
+	table = TableSurface.new()
+	table.retheme()
+	add_child(table)
 var single_deck := false  # deck never reshuffles; the board runs dry
 # Trail mode: when non-empty, the deck refills from this custom card
 # list ({rank, suit, cursed}) instead of a standard 52.
@@ -2058,6 +2066,7 @@ func tick_hazards(tick_fire := true) -> bool:
 ## Restyles every card on the board for the current theme.
 func apply_theme() -> void:
 	PlayingCard.rebuild_theme()
+	table.retheme()
 	var mat := Themes.current_material()
 	for card in grid.values():
 		card.material = mat

@@ -914,6 +914,10 @@ func _update_tooltip(delta: float) -> void:
 			and not tutor_layer.visible
 	var card: PlayingCard = board._card_under_mouse(true) if can else null
 	if card != _hover_card:
+		if _hover_card != null and is_instance_valid(_hover_card):
+			_hover_card.hovered = false
+		if card != null:
+			card.hovered = true
 		_hover_card = card
 		_hover_time = 0.0
 		_tooltip.visible = false
@@ -1340,10 +1344,13 @@ func _announce(text: String, color: Color = GOLD) -> void:
 
 ## Centers the board inside the play area, scaling up or down to fit.
 func _apply_board_layout() -> void:
-	var px := board.board_px_size()
+	# Reserve room for the table rim around the card grid.
+	var margin := TableSurface.RIM_W + TableSurface.FELT_PAD
+	var px := board.board_px_size() + Vector2.ONE * margin * 2.0
 	var s: float = minf(BOARD_AREA_SIZE.x / px.x, BOARD_AREA_SIZE.y / px.y)
 	board.scale = Vector2(s, s)
-	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0
+	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0 \
+			+ Vector2.ONE * margin * s
 
 
 # --- UI construction ------------------------------------------------------

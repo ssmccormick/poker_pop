@@ -108,7 +108,8 @@ static var _face_box: StyleBoxFlat
 static var _selected_box: StyleBoxFlat
 static var _valid_box: StyleBoxFlat
 static var _error_box: StyleBoxFlat
-static var _shadow_box: StyleBoxFlat
+static var _shadow_far: StyleBoxFlat
+static var _shadow_near: StyleBoxFlat
 
 var rank := 2:
 	set(value):
@@ -128,7 +129,22 @@ var selected := false:
 	set(value):
 		if value and not selected and hazard == "stone" and is_inside_tree():
 			_stone_dust()
+		var changed := value != selected
 		selected = value
+		if changed and is_inside_tree():
+			# A little pick-up: the card grows in the hand.
+			if _sel_tween != null and _sel_tween.is_valid():
+				_sel_tween.kill()
+			_sel_tween = create_tween()
+			_sel_tween.tween_property(self, "scale",
+					Vector2(1.06, 1.06) if selected else Vector2.ONE, 0.12) \
+					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		queue_redraw()
+var _sel_tween: Tween
+# Under the mouse (set by main's hover tracking): a quiet gold ring.
+var hovered := false:
+	set(value):
+		hovered = value
 		queue_redraw()
 var chain_index := 0:
 	set(value):
@@ -377,9 +393,12 @@ static func _make_boxes() -> void:
 	_error_box = _selected_box.duplicate()
 	_error_box.border_color = ERROR_RED
 
-	_shadow_box = StyleBoxFlat.new()
-	_shadow_box.bg_color = Color(0, 0, 0, 0.35)
-	_shadow_box.set_corner_radius_all(6)
+	_shadow_far = StyleBoxFlat.new()
+	_shadow_far.bg_color = Color(0, 0, 0, 0.13)
+	_shadow_far.set_corner_radius_all(11)
+	_shadow_near = StyleBoxFlat.new()
+	_shadow_near.bg_color = Color(0, 0, 0, 0.24)
+	_shadow_near.set_corner_radius_all(7)
 
 
 func rank_text() -> String:
@@ -401,12 +420,18 @@ func suit_color() -> Color:
 func _draw() -> void:
 	if _face_box == null:
 		_make_boxes()
-	if selected:
-		# Lift the whole card slightly while selected.
-		draw_set_transform(Vector2(0, -8))
-
 	var rect := Rect2(-W / 2.0, -H / 2.0, W, H)
-	_shadow_box.draw(get_canvas_item(), rect.grow_individual(-2, -2, 4, 6))
+	# Shadows stay on the felt while the face lifts — wider when the
+	# card is raised, so selection reads as real height.
+	var far_off := Vector2(5, 10) if selected else Vector2(3, 6)
+	var near_off := Vector2(4, 7) if selected else Vector2(2, 4)
+	_shadow_far.draw(get_canvas_item(),
+			Rect2(rect.position + far_off, rect.size).grow(2))
+	_shadow_near.draw(get_canvas_item(),
+			Rect2(rect.position + near_off, rect.size))
+	if selected:
+		# Lift the whole face slightly while selected.
+		draw_set_transform(Vector2(0, -8))
 	if selected:
 		var box := _selected_box
 		if error_flash:
@@ -416,6 +441,10 @@ func _draw() -> void:
 		box.draw(get_canvas_item(), rect)
 	else:
 		_face_box.draw(get_canvas_item(), rect)
+		if hovered:
+			# A quiet gold ring under the cursor.
+			draw_rect(rect.grow(-1), Color(GOLD.r, GOLD.g, GOLD.b, 0.45),
+					false, 2.0)
 	# Optional per-theme card-base art (drop into assets/cards/).
 	var face_tex := Themes.face_texture()
 	if face_tex != null:

@@ -9,6 +9,7 @@ extends RefCounted
 const LIST := [
 	{
 		"name": "Classic",
+		"felt": "25201a", "rim": "3a2a1c",
 		"bg": Color("1a1a1a"),
 		"face": Color("e8e0c8"),
 		"edge": Color("a89c7d"),
@@ -22,6 +23,7 @@ const LIST := [
 	},
 	{
 		"name": "Felt Table",
+		"felt": "234030", "rim": "2e2018",
 		"bg": Color("1d3326"),
 		"face": Color("ece4cd"),
 		"edge": Color("94a086"),
@@ -35,6 +37,7 @@ const LIST := [
 	},
 	{
 		"name": "Sketchbook",
+		"felt": "353028", "rim": "4a3d2c",
 		"bg": Color("2b2723"),
 		"face": Color("f1ead6"),
 		"edge": Color("8f8672"),
@@ -48,6 +51,7 @@ const LIST := [
 	},
 	{
 		"name": "Crosshatch Noir",
+		"felt": "16131a", "rim": "241f28",
 		"bg": Color("121014"),
 		"face": Color("d9d2bb"),
 		"edge": Color("6e6858"),
