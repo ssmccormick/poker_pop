@@ -604,6 +604,7 @@ func _on_hand_played(result: Dictionary) -> void:
 	parallax.lurch(1.0 + result.get("count", 0) * 0.15)
 	if result.get("base", 0) >= 1200:
 		board.confetti()  # straight flush or better earns the parade
+		board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -7.0, 0.25)
 	if mode_kind == "tutorial":
 		_tut_on_hand(String(result.name))
 		return
@@ -961,6 +962,9 @@ func _update_tooltip(delta: float) -> void:
 			_hover_card.hovered = false
 		if card != null:
 			card.hovered = true
+			if not card.selected:
+				# A whisper of cardboard as the cursor crosses it.
+				board._play_sound(Board.SFX_CLICK, 1.7, -30.0)
 		_hover_card = card
 		_hover_time = 0.0
 		_tooltip.visible = false
@@ -1265,6 +1269,8 @@ func transition(swap: Callable, dur := 0.16) -> void:
 		return
 	if _fade_tween and _fade_tween.is_valid():
 		_fade_tween.kill()
+	# A soft whoosh under the curtain.
+	board._play_sound(Board.SFX_SWOOSH, 1.25, -20.0)
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	_fade_tween = create_tween()
 	_fade_tween.tween_property(_fade_rect, "color:a", 1.0, dur)
@@ -1857,9 +1863,12 @@ func _build_profiles_and_tutor() -> void:
 	var headers := ["AT THE TABLES", "ON THE TRAIL", "OTHER SADDLES"]
 	for i in 3:
 		var hx := 150.0 + i * 580.0
-		var h := _label(stats_layer, headers[i], Vector2(hx, 260), 28, GOLD)
+		# Each column on its own leather plate.
+		UiKit.plate(stats_layer, Rect2(hx - 26, 240, 552, 640))
+		var h := _label(stats_layer, headers[i], Vector2(hx, 262), 28, GOLD)
 		h.size = Vector2(500, 40)
 		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UiKit.hrule(stats_layer, Vector2(hx + 50, 308), 400)
 		var names := _label(stats_layer, "", Vector2(hx, 330), 22, OFFWHITE)
 		names.size = Vector2(500, 560)
 		var values := _label(stats_layer, "", Vector2(hx, 330), 22, GOLD)
@@ -2200,6 +2209,9 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 	# A small lean-in on hover.
 	b.pivot_offset = btn_size / 2.0
 	b.mouse_entered.connect(func() -> void:
+		if not b.disabled:
+			# The faintest tick — presence, not noise.
+			board._play_sound(Board.SFX_CLICK, 1.45, -26.0)
 		var tw := b.create_tween()
 		tw.tween_property(b, "scale", Vector2(1.04, 1.04), 0.08) \
 				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT))

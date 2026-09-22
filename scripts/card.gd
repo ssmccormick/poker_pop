@@ -442,9 +442,10 @@ func _draw() -> void:
 	else:
 		_face_box.draw(get_canvas_item(), rect)
 		if hovered:
-			# A quiet gold ring under the cursor.
-			draw_rect(rect.grow(-1), Color(GOLD.r, GOLD.g, GOLD.b, 0.45),
-					false, 2.0)
+			# A clear gold ring under the cursor, with a soft outer glow.
+			draw_rect(rect.grow(2), Color(GOLD.r, GOLD.g, GOLD.b, 0.35),
+					false, 4.0)
+			draw_rect(rect, Color(GOLD.r, GOLD.g, GOLD.b, 0.95), false, 3.0)
 	# Optional per-theme card-base art (drop into assets/cards/).
 	var face_tex := Themes.face_texture()
 	if face_tex != null:
