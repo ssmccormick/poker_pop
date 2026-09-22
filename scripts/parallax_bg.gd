@@ -138,20 +138,57 @@ func _add_layer(speed: float, tint: Color, polys: Array) -> void:
 
 
 ## HUD gutters + play-area dim, above every silhouette.
+static var _gutter_grad: GradientTexture2D
+
+
 func _add_overlays() -> void:
-	for gutter: Rect2 in [Rect2(0, 0, 370, VIEW.y), Rect2(1550, 0, 370, VIEW.y)]:
+	# Hard gutters narrowed, with a soft gradient shoulder facing the
+	# play area — no more razor seam against the scenery.
+	if _gutter_grad == null:
+		var grad := Gradient.new()
+		grad.set_color(0, GUTTER_COLOR)
+		grad.set_color(1, Color(GUTTER_COLOR.r, GUTTER_COLOR.g,
+				GUTTER_COLOR.b, DIM_ALPHA))
+		_gutter_grad = GradientTexture2D.new()
+		_gutter_grad.gradient = grad
+		_gutter_grad.width = 128
+		_gutter_grad.height = 8
+	for side in 2:
 		var g := ColorRect.new()
 		g.color = GUTTER_COLOR
-		g.position = gutter.position
-		g.size = gutter.size
+		g.position = Vector2(0 if side == 0 else 1620, 0)
+		g.size = Vector2(300, VIEW.y)
 		g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(g)
+		var shoulder := TextureRect.new()
+		shoulder.texture = _gutter_grad
+		shoulder.stretch_mode = TextureRect.STRETCH_SCALE
+		shoulder.flip_h = side == 1
+		shoulder.position = Vector2(300 if side == 0 else 1510, 0)
+		shoulder.size = Vector2(110, VIEW.y)
+		shoulder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(shoulder)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, DIM_ALPHA)
-	dim.position = Vector2(370, 0)
-	dim.size = Vector2(1180, VIEW.y)
+	dim.position = Vector2(410, 0)
+	dim.size = Vector2(1100, VIEW.y)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dim)
+
+
+## The scene's light, for tinting the table and dust — day is warm,
+## night runs cool, storms go green-gray.
+func ambient_tint() -> Color:
+	match kind:
+		"trail_day", "canyon", "plains":
+			return Color(1.0, 0.95, 0.84)
+		"trail_dusk", "homestead":
+			return Color(1.0, 0.88, 0.8)
+		"trail_night", "stars":
+			return Color(0.82, 0.86, 1.0)
+		"storm":
+			return Color(0.8, 0.88, 0.85)
+	return Color.WHITE
 
 
 # --- Silhouette generators (all span 0..TILE_W, seam-safe) ----------------

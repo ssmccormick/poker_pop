@@ -10,6 +10,22 @@ const CONFETTI_RAMP := ["e8c547", "e05252", "52d67e", "9ec9d8", "b06fd8", "e8e0c
 
 var _pool: Array = []
 
+# Particle scale over life: shrink away for debris, swell for smoke.
+static var _shrink_curve: Curve
+static var _grow_curve: Curve
+
+
+static func _curves() -> void:
+	if _shrink_curve != null:
+		return
+	_shrink_curve = Curve.new()
+	_shrink_curve.add_point(Vector2(0.0, 1.0))
+	_shrink_curve.add_point(Vector2(0.65, 0.8))
+	_shrink_curve.add_point(Vector2(1.0, 0.0))
+	_grow_curve = Curve.new()
+	_grow_curve.add_point(Vector2(0.0, 0.55))
+	_grow_curve.add_point(Vector2(1.0, 1.0))
+
 
 func _emitter() -> CPUParticles2D:
 	for p: CPUParticles2D in _pool:
@@ -27,9 +43,11 @@ func _emitter() -> CPUParticles2D:
 func burst(pos: Vector2, kind: String, tint := Color.WHITE, dir := Vector2.UP) -> void:
 	if not is_inside_tree():
 		return
+	_curves()
 	var p := _emitter()
 	p.position = pos
-	# Common baseline; presets override below.
+	# Common baseline; presets override below. Every property ANY
+	# preset touches must be reset here — the pool reuses emitters.
 	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_POINT
 	p.amount = 12
 	p.lifetime = 0.65
@@ -41,6 +59,9 @@ func burst(pos: Vector2, kind: String, tint := Color.WHITE, dir := Vector2.UP) -
 	p.initial_velocity_max = 260.0
 	p.scale_amount_min = 3.0
 	p.scale_amount_max = 6.0
+	p.scale_amount_curve = _shrink_curve
+	p.angular_velocity_min = 0.0
+	p.angular_velocity_max = 0.0
 	p.color = tint
 	p.color_initial_ramp = null
 	p.damping_min = 0.0
@@ -77,6 +98,7 @@ func burst(pos: Vector2, kind: String, tint := Color.WHITE, dir := Vector2.UP) -
 			p.scale_amount_max = 14.0
 			p.damping_min = 20.0
 			p.damping_max = 40.0
+			p.scale_amount_curve = _grow_curve
 			p.color = Color(0.35, 0.33, 0.3, 0.8) if tint == Color.WHITE else tint
 		"embers":
 			p.amount = 8
@@ -115,9 +137,14 @@ func burst(pos: Vector2, kind: String, tint := Color.WHITE, dir := Vector2.UP) -
 			p.amount = 10
 			p.gravity = Vector2(0, 950)
 			p.lifetime = 0.7
+			p.angular_velocity_min = -420.0
+			p.angular_velocity_max = 420.0
 			p.color = Color(0.5, 0.5, 0.55)
 		"confetti":
 			p.amount = 70
+			p.angular_velocity_min = -420.0
+			p.angular_velocity_max = 420.0
+			p.scale_amount_curve = null  # confetti falls whole
 			p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 			p.emission_rect_extents = Vector2(560, 12)
 			p.direction = Vector2.DOWN

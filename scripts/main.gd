@@ -74,6 +74,7 @@ var _board_home := Vector2.ZERO
 var _shake_tween: Tween
 var _shown_score := 0.0
 var _score_pop_tween: Tween
+var _dust: CPUParticles2D
 var splash_layer: ColorRect
 var countdown_overlay: ColorRect
 var parallax: ParallaxScene
@@ -342,6 +343,13 @@ func _update_labels() -> void:
 
 	outlaw.visible = outlaw.dying or (mode_kind == "trail" and game_started \
 			and not menu_open and trail.in_room and trail.room_goal == "outlaw")
+	# The scene's light falls on the table and the dust, never on the
+	# cards or the HUD.
+	var tint := parallax.ambient_tint()
+	board.table.modulate = tint.lerp(Color.WHITE, 0.5)
+	_dust.visible = game_started and not menu_open
+	_dust.emitting = _dust.visible
+	_dust.color = Color(tint.r * 0.85, tint.g * 0.8, tint.b * 0.62, 0.10)
 	var show_community := not board.panel_cards().is_empty() \
 			and game_started and not menu_open
 	_community_label.visible = show_community
@@ -1912,6 +1920,45 @@ func _build_profiles_and_tutor() -> void:
 	_tooltip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip.add_child(_tooltip_label)
 	hud_root.add_child(_tooltip)
+
+	# A soft radial vignette framing play — above the HUD, below every
+	# full-screen layer (menus/trail screens are built after this).
+	var vin_grad := Gradient.new()
+	vin_grad.set_color(0, Color(0, 0, 0, 0))
+	vin_grad.add_point(0.62, Color(0, 0, 0, 0))
+	vin_grad.set_color(vin_grad.get_point_count() - 1, Color(0, 0, 0, 0.32))
+	var vin_tex := GradientTexture2D.new()
+	vin_tex.gradient = vin_grad
+	vin_tex.fill = GradientTexture2D.FILL_RADIAL
+	vin_tex.fill_from = Vector2(0.5, 0.5)
+	vin_tex.fill_to = Vector2(0.5, -0.15)
+	vin_tex.width = 512
+	vin_tex.height = 512
+	var vignette := TextureRect.new()
+	vignette.texture = vin_tex
+	vignette.stretch_mode = TextureRect.STRETCH_SCALE
+	vignette.size = VIEW
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_root.add_child(vignette)
+
+	# Dust motes drifting over the table while a game is on.
+	_dust = CPUParticles2D.new()
+	_dust.position = Vector2(960, 540)
+	_dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	_dust.emission_rect_extents = Vector2(600, 520)
+	_dust.amount = 22
+	_dust.lifetime = 9.0
+	_dust.preprocess = 9.0
+	_dust.explosiveness = 0.0
+	_dust.direction = Vector2(-1, 0.3)
+	_dust.spread = 30.0
+	_dust.gravity = Vector2(-3, 2)
+	_dust.initial_velocity_min = 6.0
+	_dust.initial_velocity_max = 18.0
+	_dust.scale_amount_min = 1.5
+	_dust.scale_amount_max = 2.5
+	_dust.color = Color(0.85, 0.78, 0.6, 0.10)
+	add_child(_dust)
 
 
 func _build_options() -> void:
