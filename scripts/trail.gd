@@ -493,6 +493,10 @@ func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 # --- Flow: entry ----------------------------------------------------------
 
 func open_buyin() -> void:
+	main.transition(_open_buyin_now)
+
+
+func _open_buyin_now() -> void:
 	# A brand-new profile learns the game before hitting the trail.
 	if main.tutor_needs("core"):
 		main._start_tutorial()
@@ -570,6 +574,10 @@ func back_to_menu() -> void:
 # --- Flow: tarot (between rooms) -----------------------------------------
 
 func _show_tarot() -> void:
+	main.transition(_show_tarot_now)
+
+
+func _show_tarot_now() -> void:
 	_hide_all()
 	in_room = false
 	main.game_started = false
@@ -945,6 +953,11 @@ func _require_text(req: Array) -> String:
 
 
 func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
+	main.transition(func() -> void:
+		_choose_offer_now(offer, from_fate))
+
+
+func _choose_offer_now(offer: Dictionary, from_fate: bool) -> void:
 	if from_fate:
 		chips += FATE_KICKER * _cost_mult(room_index)
 	current_offer = offer
@@ -1886,6 +1899,10 @@ func boss_status() -> String:
 # --- Flow: card pick ------------------------------------------------------
 
 func _show_pick() -> void:
+	main.transition(_show_pick_now)
+
+
+func _show_pick_now() -> void:
 	_hide_all()
 	main.game_started = false
 	main.play_music("tarot")
@@ -2164,6 +2181,10 @@ func _show_remove() -> void:
 
 ## Read-only deck browser, reachable from the tarot screen.
 func _show_deck() -> void:
+	main.transition(_show_deck_now)
+
+
+func _show_deck_now() -> void:
 	_hide_all()
 	_deck_view_burn = false
 	_remove_info.text = "Your deck — %d cards. Hover a card for its story." % deck.size()

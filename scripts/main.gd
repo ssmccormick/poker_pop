@@ -68,6 +68,12 @@ var _community_plate: Panel
 var _payout_names: Label
 var _payout_values: Label
 var _damage_flash: ColorRect
+var _fade_rect: ColorRect
+var _fade_tween: Tween
+var _board_home := Vector2.ZERO
+var _shake_tween: Tween
+var _shown_score := 0.0
+var _score_pop_tween: Tween
 var splash_layer: ColorRect
 var countdown_overlay: ColorRect
 var parallax: ParallaxScene
@@ -151,6 +157,7 @@ func _ready() -> void:
 	board.fx = Fx.new()
 	board.add_child(board.fx)
 	board.hand_played.connect(_on_hand_played)
+	board.shake_requested.connect(shake)
 	board.hand_rejected.connect(func() -> void:
 		_announce("NOT A VALID HAND", RED))
 	board.dead_board.connect(_on_dead_board)
@@ -166,6 +173,12 @@ func _ready() -> void:
 	_build_ui()
 	trail.build_ui()  # trail screens sit above the HUD, below the menu
 	_build_menu()
+	# The transition curtain rides above every screen except the splash.
+	_fade_rect = ColorRect.new()
+	_fade_rect.color = Color(0, 0, 0, 0)
+	_fade_rect.size = VIEW
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_root.add_child(_fade_rect)
 	_build_splash()
 
 	# Music (Western Audio Bundle): one jukebox player, fed a random
@@ -293,7 +306,14 @@ func _arcade_drain() -> float:
 
 func _update_labels() -> void:
 	hud_root.visible = not menu_open
-	score_label.text = "SCORE  %d" % score
+	# The score ticks up to its true value rather than teleporting
+	# (a drop means a fresh run — snap straight there).
+	if score < int(_shown_score):
+		_shown_score = score
+	elif score > _shown_score:
+		_shown_score = move_toward(_shown_score, score,
+				maxf((score - _shown_score) * 8.0, 90.0) * get_process_delta_time())
+	score_label.text = "SCORE  %d" % int(_shown_score)
 	deck_label.text = "DECK  %d" % board.deck.size()
 	meta_label.text = "%s  ·  Theme: %s (T)" % [mode_label_text, Themes.current().name]
 	match mode_kind:
@@ -551,6 +571,19 @@ func _update_preview() -> void:
 func _on_hand_played(result: Dictionary) -> void:
 	score += result.score
 	hands_played += 1
+	if result.score > 0:
+		# The score plate feels the win.
+		score_label.pivot_offset = Vector2(score_label.size.x / 2.0, 24.0)
+		if _score_pop_tween and _score_pop_tween.is_valid():
+			_score_pop_tween.kill()
+		score_label.scale = Vector2.ONE
+		_score_pop_tween = create_tween()
+		_score_pop_tween.tween_property(score_label, "scale",
+				Vector2(1.14, 1.14), 0.08).set_trans(Tween.TRANS_QUAD)
+		_score_pop_tween.tween_property(score_label, "scale", Vector2.ONE, 0.18) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if int(result.get("base", 0)) >= 900:
+		shake(5.0)
 	if mode_kind != "tutorial":
 		# The ledger remembers everything.
 		stat_bump("hands_played")
@@ -634,7 +667,9 @@ func _show_game_over(message: String) -> void:
 	if not game_over or menu_open:
 		return
 	over_label.text = message
+	over_layer.modulate = Color(1, 1, 1, 0)
 	over_layer.visible = true
+	create_tween().tween_property(over_layer, "modulate:a", 1.0, 0.4)
 
 
 func _restart() -> void:
@@ -1214,7 +1249,28 @@ func _apply_audio() -> void:
 			linear_to_db(maxf(sfx_vol, 0.0001)))
 
 
+## A short curtain between screens: fade to black, swap, fade back.
+## Instant under screenshot capture so timed shots never race it.
+func transition(swap: Callable, dur := 0.16) -> void:
+	if _fade_rect == null or OS.get_environment("POKERPOP_SHOT") != "":
+		swap.call()
+		return
+	if _fade_tween and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_fade_rect, "color:a", 1.0, dur)
+	_fade_tween.tween_callback(swap)
+	_fade_tween.tween_property(_fade_rect, "color:a", 0.0, dur)
+	_fade_tween.tween_callback(func() -> void:
+		_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE)
+
+
 func _open_menu() -> void:
+	transition(_open_menu_now)
+
+
+func _open_menu_now() -> void:
 	_stats_save()
 	if mode_kind == "trail":
 		trail.on_abandon_room()  # mid-room exit counts as a fail
@@ -1237,6 +1293,11 @@ func _open_menu() -> void:
 
 
 func _start_mode(kind: String, seconds: float = 0.0) -> void:
+	transition(func() -> void:
+		_start_mode_now(kind, seconds))
+
+
+func _start_mode_now(kind: String, seconds: float = 0.0) -> void:
 	# A brand-new profile learns the game before its first mode.
 	if tutor_needs("core"):
 		_start_tutorial()
@@ -1334,11 +1395,17 @@ func _refresh_community() -> void:
 func _announce(text: String, color: Color = GOLD) -> void:
 	announcer.text = text
 	announcer.add_theme_color_override("font_color", color)
-	announcer.modulate = Color(1, 1, 1, 1)
 	if _announce_tween and _announce_tween.is_valid():
 		_announce_tween.kill()
+	# Punch in from oversized, hold, fade.
+	announcer.pivot_offset = announcer.size / 2.0
+	announcer.scale = Vector2(1.35, 1.35)
+	announcer.modulate = Color(1, 1, 1, 0)
 	_announce_tween = create_tween()
-	_announce_tween.tween_interval(0.9)
+	_announce_tween.tween_property(announcer, "scale", Vector2.ONE, 0.13) \
+			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+	_announce_tween.parallel().tween_property(announcer, "modulate:a", 1.0, 0.09)
+	_announce_tween.tween_interval(0.85)
 	_announce_tween.tween_property(announcer, "modulate:a", 0.0, 0.5)
 
 
@@ -1351,6 +1418,23 @@ func _apply_board_layout() -> void:
 	board.scale = Vector2(s, s)
 	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0 \
 			+ Vector2.ONE * margin * s
+	_board_home = board.position
+
+
+## Rattles the table (never the HUD): a decaying random jitter around
+## the board's resting spot, restored exactly at the end.
+func shake(strength: float) -> void:
+	if _shake_tween and _shake_tween.is_valid():
+		_shake_tween.kill()
+	board.position = _board_home
+	_shake_tween = create_tween()
+	var steps := 7
+	for i in steps:
+		var falloff := strength * (1.0 - float(i) / steps)
+		_shake_tween.tween_property(board, "position", _board_home
+				+ Vector2(randf_range(-falloff, falloff),
+				randf_range(-falloff, falloff)), 0.04)
+	_shake_tween.tween_property(board, "position", _board_home, 0.05)
 
 
 # --- UI construction ------------------------------------------------------
@@ -1649,8 +1733,9 @@ func _build_menu() -> void:
 	_profile_menu_btn = _button(menu_layer, "PROFILE %d" % profile, Vector2(60, 60), Vector2(240, 54))
 	_profile_menu_btn.add_theme_font_size_override("font_size", 20)
 	_profile_menu_btn.pressed.connect(func() -> void:
-		_refresh_profile_ui()
-		profile_layer.visible = true)
+		transition(func() -> void:
+			_refresh_profile_ui()
+			profile_layer.visible = true))
 	var stats_btn := _button(menu_layer, "STATS", Vector2(60, 124), Vector2(240, 54))
 	stats_btn.add_theme_font_size_override("font_size", 20)
 	stats_btn.pressed.connect(_open_stats)
@@ -1748,7 +1833,8 @@ func _build_profiles_and_tutor() -> void:
 	var pback := _button(profile_layer, "BACK", Vector2(860, 880), Vector2(200, 54))
 	pback.add_theme_font_size_override("font_size", 20)
 	pback.pressed.connect(func() -> void:
-		profile_layer.visible = false)
+		transition(func() -> void:
+			profile_layer.visible = false))
 	_refresh_profile_ui()
 
 	# The Ledger: lifetime stats for the active profile.
@@ -1775,7 +1861,8 @@ func _build_profiles_and_tutor() -> void:
 	var sback := _button(stats_layer, "BACK", Vector2(860, 950), Vector2(200, 54))
 	sback.add_theme_font_size_override("font_size", 20)
 	sback.pressed.connect(func() -> void:
-		stats_layer.visible = false)
+		transition(func() -> void:
+			stats_layer.visible = false))
 
 	# The one-time explainer popup, above everything in-game.
 	tutor_layer = ColorRect.new()
@@ -1909,6 +1996,10 @@ func _refresh_options_buttons() -> void:
 
 
 func _open_stats() -> void:
+	transition(_open_stats_now)
+
+
+func _open_stats_now() -> void:
 	var s := func(key: String) -> int:
 		return int(stats.get(key, 0))
 	# Favorite hand: the poker hand scored most often.
@@ -1963,13 +2054,15 @@ func _open_stats() -> void:
 
 
 func _open_options() -> void:
-	menu_layer.visible = false
-	options_layer.visible = true
+	transition(func() -> void:
+		menu_layer.visible = false
+		options_layer.visible = true)
 
 
 func _close_options() -> void:
-	options_layer.visible = false
-	menu_layer.visible = true
+	transition(func() -> void:
+		options_layer.visible = false
+		menu_layer.visible = true)
 
 
 func _build_splash() -> void:

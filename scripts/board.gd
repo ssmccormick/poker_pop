@@ -9,6 +9,7 @@ extends Node2D
 
 signal selection_changed
 signal hand_played(result: Dictionary)
+signal shake_requested(strength: float)
 signal hand_rejected
 signal dead_board
 signal card_dealt(card: PlayingCard)  # per-card audio hook, on deal arrival
@@ -782,7 +783,8 @@ func play_hand() -> void:
 	var float_txt := "+%d" % result.score
 	if result.get("bonus_chips", 0) > 0:
 		float_txt += "  +%d CHIPS" % result.bonus_chips
-	_spawn_float_text(float_txt, center)
+	var base: int = int(result.get("base", 0))
+	_spawn_float_text(float_txt, center, 3 if base >= 1200 else (2 if base >= 600 else 1))
 
 	if not poppers.is_empty():
 		var tw := create_tween().set_parallel(true)
@@ -2038,6 +2040,7 @@ func tick_hazards(tick_fire := true) -> bool:
 		_fx(cell_center(cell), "embers")
 	if res.exploded:
 		_play_sound(SFX_DYNAMITES.pick_random(), 1.0, -3.0)
+		shake_requested.emit(11.0)
 		for p in grid:
 			if grid[p].hazard == "bomb" and grid[p].fuse <= 0:
 				_fx(cell_center(p), "smoke")
@@ -2075,21 +2078,35 @@ func apply_theme() -> void:
 
 # --- Juice ----------------------------------------------------------------
 
-func _spawn_float_text(text: String, center: Vector2) -> void:
+## Tiered by how big the moment is: 0 = a side-payment trickle,
+## 1 = an ordinary hand, 2 = a strong hand, 3 = the parade.
+func _spawn_float_text(text: String, center: Vector2, tier := 1) -> void:
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", 34)
-	l.add_theme_color_override("font_color", PlayingCard.GOLD)
+	var sizes := [26, 34, 44, 58]
+	var colors := [Color("e8e0c8"), PlayingCard.GOLD, PlayingCard.GOLD,
+			Color("f0a24a")]
+	var fs: int = sizes[clampi(tier, 0, 3)]
+	l.add_theme_font_size_override("font_size", fs)
+	if fs >= 36 and FontLib.display != null:
+		l.add_theme_font_override("font", FontLib.display)
+	l.add_theme_color_override("font_color", colors[clampi(tier, 0, 3)])
 	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
 	l.add_theme_constant_override("shadow_offset_x", 2)
 	l.add_theme_constant_override("shadow_offset_y", 2)
-	l.size = Vector2(200, 44)
-	l.position = center - Vector2(100, 22)
+	l.size = Vector2(300, 60)
+	l.position = center - Vector2(150, 30)
 	l.z_index = 10
+	l.pivot_offset = l.size / 2.0
 	add_child(l)
 	var tw := create_tween().set_parallel(true)
-	tw.tween_property(l, "position:y", l.position.y - 80, 1.1) \
+	if tier >= 2:
+		l.scale = Vector2(1.35, 1.35)
+		tw.tween_property(l, "scale", Vector2.ONE, 0.14) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var rise := 110.0 if tier >= 3 else 80.0
+	tw.tween_property(l, "position:y", l.position.y - rise, 1.1) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(l, "modulate:a", 0.0, 0.45).set_delay(0.65)
 	tw.chain().tween_callback(l.queue_free)
