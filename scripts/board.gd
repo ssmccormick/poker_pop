@@ -60,6 +60,7 @@ var custom_deck: Array = []
 # --- Trail hazards --------------------------------------------------------
 const BOMB_FUSE := 5
 const STONE_HITS_START := 3
+const HISBULLET_ROUNDS := 3  # hands before the Outlaw's bullet fires
 const CHIP_BONUS := 8      # chips per played chip-mod card (trail)
 const MULT_FACTOR := 1.5   # per played mult-mod card, stacking
 # Relic-tunable copies (Gold Tooth / Mirror Shades adjust these).
@@ -667,8 +668,11 @@ func play_hand() -> void:
 				if not result.has("bullet_points"):
 					result["bullet_points"] = []
 				result.bullet_points.append(card.global_position)
+				card.objective = ""  # spent — it's about to pop
 			"hisbullet":
 				result["bullets_his"] = int(result.get("bullets_his", 0)) + 1
+				card.objective = ""  # defused before its fuse ticks
+				card.bullet_timer = 0
 			"redeal":
 				result["redeal"] = true
 	if has_key and has_chest:
@@ -1039,7 +1043,10 @@ func spawn_objective(kind: String) -> void:
 				and card.boss == "" and not card.snake_tail:
 			candidates.append(card)
 	if not candidates.is_empty():
-		candidates.pick_random().objective = kind
+		var chosen: PlayingCard = candidates.pick_random()
+		chosen.objective = kind
+		if kind == "hisbullet":
+			chosen.bullet_timer = HISBULLET_ROUNDS
 
 
 ## True if any card on the board carries the given objective mark.

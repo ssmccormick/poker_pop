@@ -1031,7 +1031,7 @@ func _bet_goal_text(o: Dictionary) -> String:
 		"blackjack":
 			return "Beat the dealer %d times — a face-down table, blind hits, and a real dealer playing out his hand" % o.wins
 		"outlaw":
-			return "Duel: shoot the Outlaw %d times before your grit runs out" % o.outlaw_hp
+			return "Duel: shoot the Outlaw %d times — and defuse his lit bullets before they fire" % o.outlaw_hp
 		"collect":
 			return _collect_goal_text(o)
 		"landrush":
@@ -1332,7 +1332,6 @@ func on_hand_played(result: Dictionary) -> void:
 		_present_blackjack_round(result)
 	if room_goal == "outlaw" and not _outlaw_dead_pending:
 		var hits := int(result.get("bullets_you", 0))
-		var caught := int(result.get("bullets_his", 0))
 		if hits > 0:
 			room_outlaw_hp -= hits
 			# Each scored bullet forms up and ZOOMS into him — the
@@ -1346,7 +1345,21 @@ func on_hand_played(result: Dictionary) -> void:
 		if room_outlaw_hp <= 0:
 			_outlaw_dead_pending = true
 			return
-		# Weak hands (and touching HIS bullets) give him a free shot.
+		# HIS bullets burn down: every hand ticks their fuses, and one
+		# that reaches zero fires at you and is spent. Clearing one in
+		# a hand DEFUSES it — no penalty (the board already unmarked
+		# the played ones before this runs).
+		var fired := 0
+		for p in main.board.grid:
+			var c: PlayingCard = main.board.grid[p]
+			if c.objective == "hisbullet" and c.bullet_timer > 0:
+				c.bullet_timer -= 1
+				if c.bullet_timer <= 0:
+					fired += 1
+					c.objective = ""
+					main.board._fx(c.position, "sparks", Color("e05252"))
+		var caught := fired
+		# Weak hands still give him a free shot.
 		if result.score < _outlaw_bar():
 			caught += 1
 		if caught > 0:
@@ -1357,7 +1370,8 @@ func on_hand_played(result: Dictionary) -> void:
 			if room_grit <= 0:
 				_room_failed("GUNNED DOWN AT THE SHOWDOWN")
 				return
-			_announce_after_settle("THE OUTLAW FIRES — GRIT %d" % room_grit)
+			_announce_after_settle(("HIS BULLET FIRES — GRIT %d" if fired > 0
+					else "THE OUTLAW FIRES — GRIT %d") % room_grit)
 		_replenish_bullets()
 	if room_goal == "purge":
 		# Quota met AND the table clean — a wildfire can overshoot its

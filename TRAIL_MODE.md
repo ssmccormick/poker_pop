@@ -111,7 +111,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | TEXAS HOLD'EM | Variant: persistent 5-card community, pick 2 hole cards, best playable subset of the 7 scores; RE-DEAL card refreshes the community (shipped) |
 | CRAZY 8s | Variant: every 8 is WILD, but the board crawls with a mixed hazard storm (8 + region seeded, replenished each hand); score target (shipped) |
 | BLACKJACK | Variant: poker off — the table is dealt FACE-DOWN (corners up); chain blind hits, then the dealer flips his hole card and draws out his hand like a real dealer; 3+region wins to clear; hazard storm of 5 + region, replenished (shipped) |
-| SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (5+region HP), HIS red bullets shoot you, weak hands under the posted score give him free shots; 3 GRIT (shipped) |
+| SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (6+region HP). HIS red bullets are LIT with a 3-hand fuse — at zero one fires and costs GRIT; clearing one in a scoring hand defuses it penalty-free. Weak hands under the posted score give him free shots; 3 GRIT (shipped) |
 
 **Goal vs limit**: every non-boss room now rolls its challenge type
 independently — 50% a HAND BUDGET, 50% ON THE CLOCK (plain score

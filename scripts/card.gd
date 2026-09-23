@@ -239,6 +239,11 @@ var objective := "":
 	set(value):
 		objective = value
 		queue_redraw()
+# The Outlaw's lit bullets: hands left before this one fires at you.
+var bullet_timer := 0:
+	set(value):
+		bullet_timer = value
+		queue_redraw()
 # The locked safe (trail heists): shows a 4-digit combination.
 var is_safe := false:
 	set(value):
@@ -593,6 +598,12 @@ func _draw() -> void:
 			_draw_bullet(GOLD)
 		"hisbullet":
 			_draw_bullet(ERROR_RED)
+			if bullet_timer > 0:
+				# The countdown to him pulling the trigger.
+				var bt := Vector2(W / 2.0 - 16, H / 2.0 - 44)
+				draw_circle(bt, 9, Color("141414"))
+				draw_string(font, bt + Vector2(-9, 5), str(bullet_timer),
+						HORIZONTAL_ALIGNMENT_CENTER, 18, 13, Color.WHITE)
 
 	if honey:
 		draw_rect(rect.grow(-2), HONEY_AMBER)
