@@ -1075,10 +1075,57 @@ func _reject_hand() -> void:
 			card.error_flash = false
 
 
-## Off-screen point the dealer throws from — bottom center, as if the
-## dealer sits on the player's side of the table.
+## Where the dealer throws from: a visible deck sitting just past the
+## table rim — usually the near edge, but sometimes he deals from the
+## far side. Rolled fresh for each deal.
+var deal_from_top := false
+
+
 func deck_origin() -> Vector2:
-	return Vector2(board_px_size().x * 0.5, board_px_size().y + PlayingCard.H * 2.0)
+	if deal_from_top:
+		return Vector2(board_px_size().x * 0.5, -PlayingCard.H * 0.9)
+	return Vector2(board_px_size().x * 0.5, board_px_size().y + PlayingCard.H * 0.9)
+
+
+## The deck itself, drawn as a small stack of card backs at the throw
+## point while a deal is in flight.
+class DeckStack extends Node2D:
+	func _draw() -> void:
+		for i in range(3, -1, -1):
+			var off := Vector2(i * 2.5, i * 2.5)
+			var r := Rect2(off + Vector2(-PlayingCard.W / 2.0, -PlayingCard.H / 2.0),
+					Vector2(PlayingCard.W, PlayingCard.H))
+			draw_rect(Rect2(r.position + Vector2(2, 4), r.size),
+					Color(0, 0, 0, 0.25))
+			draw_rect(r, Color("6e2620"))
+			draw_rect(r.grow(-3), Color("8a3a30"), false, 2.0)
+			draw_rect(r, Color("cab282"), false, 2.0)
+
+
+var _deck_stack: DeckStack
+
+
+## Shows the deck at the current throw point (created lazily).
+func _show_deck_stack() -> void:
+	if _deck_stack == null:
+		_deck_stack = DeckStack.new()
+		_deck_stack.z_index = 19  # under the flying cards
+		add_child(_deck_stack)
+	_deck_stack.position = deck_origin()
+	_deck_stack.modulate = Color(1, 1, 1, 1)
+	_deck_stack.visible = true
+
+
+func _hide_deck_stack() -> void:
+	if _deck_stack == null or not _deck_stack.visible:
+		return
+	if not is_inside_tree():
+		_deck_stack.visible = false
+		return
+	var tw := _deck_stack.create_tween()
+	tw.tween_property(_deck_stack, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(func() -> void:
+		_deck_stack.visible = false)
 
 
 ## Soft blob shadow that sits on the table at the card's landing slot,
@@ -1119,6 +1166,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 		t_stagger *= SETUP_STAGGER_SCALE
 
 	# Compute settle moves and new-card slots (unchanged game logic).
+	# The dealer picks a side for this whole deal.
+	deal_from_top = randf() < 0.4
 	var settle_moves: Array = []
 	var deals: Array = []
 	for x in cols:
@@ -1173,6 +1222,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			deals.append({"card": card, "pos": cell_center(p), "cell": p})
 	if settle_moves.is_empty() and deals.is_empty():
 		return
+	if not deals.is_empty():
+		_show_deck_stack()
 	# Presentation order for dealing: top-to-bottom, left-to-right.
 	deals.sort_custom(func(a, b) -> bool:
 		if a.cell.y != b.cell.y:
@@ -1240,6 +1291,7 @@ func _fall_and_fill(initial_deal: bool) -> void:
 		if _refill_active:
 			_refill_shadows.clear()
 			_refill_active = false
+			_hide_deck_stack()
 			refill_done.emit())
 	await refill_done
 
@@ -1258,6 +1310,7 @@ func _skip_refill() -> void:
 		return
 	if _refill_tween and _refill_tween.is_valid():
 		_refill_tween.kill()
+	_hide_deck_stack()
 	for e in _refill_finals:
 		if is_instance_valid(e.card):
 			e.card.position = e.pos
