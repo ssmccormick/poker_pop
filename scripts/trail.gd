@@ -2272,7 +2272,7 @@ func _deck_stat_text(d: Dictionary) -> String:
 		"plus":
 			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it. Boosting an ACE wraps it into a lucky 2+ that DOUBLES any hand it scores in."
 		"minus":
-			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank. The arrow turns a quarter every hand — time it."
+			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank — and a 2 ground lower is DESTROYED, unscored. The arrow turns a quarter every hand — time it."
 		"bumper":
 			text += "BUMPER\nWhen cleared, it shoves the whole line of cards beside it one step in the arrow's direction — a card pushed past the edge is gone. The arrow turns every hand."
 		"wild":

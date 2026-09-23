@@ -859,8 +859,19 @@ func play_hand() -> void:
 					c.two_plus = true
 				elif adata.mod == "plus":
 					c.rank += 1
+				elif c.rank <= 2:
+					# Ground below the deuce: the card wears away to
+					# nothing and leaves the table, unscored.
+					grid.erase(q)
+					_play_sound(SFX_POPS.pick_random(), 0.7, -6.0)
+					_fx(cell_center(q), "pop", c.suit_color())
+					var vtw := create_tween()
+					vtw.tween_property(c, "scale", Vector2.ZERO, 0.2) \
+							.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+					vtw.tween_callback(c.queue_free)
+					continue
 				else:
-					c.rank = maxi(2, c.rank - 1)
+					c.rank -= 1
 				_play_sound(SFX_FLIP, 1.4 if adata.mod == "plus" else 0.7, -8.0)
 				_fx(cell_center(q), "sparks")
 	# Bumpers shove their line one step; the far card can go off the
