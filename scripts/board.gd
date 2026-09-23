@@ -87,6 +87,15 @@ var landrush_active := false
 # Trail rooms: each freshly dealt refill card may arrive already
 # hazarded (set per room by trail; 0 everywhere else).
 var refill_hazard_chance := 0.0
+# Mid-room hazards (storm replenishes, purge trickles) queue here and
+# ride in ON the next refill's dealt cards — never appearing out of
+# nowhere on cards already sitting at the table.
+var _pending_refill_hazards: Array = []
+
+
+func queue_refill_hazards(kind: String, count: int) -> void:
+	for i in count:
+		_pending_refill_hazards.append(kind)
 const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
 # Ledger of every hazard ever put on this board, by kind. Purge rooms
 # read cleared = spawned − still standing, which is exact no matter
@@ -304,6 +313,7 @@ func reset(deal_facedown := false) -> void:
 	busy = true
 	suppress_refill = false
 	refill_hazard_chance = 0.0
+	_pending_refill_hazards.clear()
 	hazards_spawned.clear()
 	landrush_marks.clear()
 	landrush_active = false
@@ -1201,8 +1211,12 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.boom = data.get("boom", false) or data.get("mod", "") == "chipsplode"
 			if card.mod in ["plus", "minus", "bumper"]:
 				card.boost_dir = HAZARD_DIRS.pick_random()
-			# Danger off the deck: refills can deal a live hazard.
+			# Danger off the deck: queued room hazards ride the deal
+			# first, then the ambient per-card roll.
 			if not initial_deal and not card.cursed \
+					and not _pending_refill_hazards.is_empty():
+				_init_hazard(card, _pending_refill_hazards.pop_front())
+			elif not initial_deal and not card.cursed \
 					and randf() < refill_hazard_chance:
 				_init_hazard(card, HAZARD_KINDS.pick_random())
 			# Blackjack tables deal their refills face-down.
@@ -1299,6 +1313,23 @@ func _fall_and_fill(initial_deal: bool) -> void:
 func _on_card_dealt(card: PlayingCard) -> void:
 	if is_instance_valid(card):
 		card.z_index = 0  # back on the table with everyone else
+		if card.hazard != "":
+			# A new hazard announces itself on landing: a burst of its
+			# own element, unmistakably fresh trouble.
+			match card.hazard:
+				"fire":
+					_fx(card.position, "embers")
+					_play_sound(SFX_MATCHES.pick_random(), 1.0, -9.0)
+				"water":
+					_fx(card.position, "splash")
+					_play_sound(SFX_FLIP, 0.6, -9.0)
+				"bomb":
+					_fx(card.position, "sparks")
+					_play_sound(SFX_FUSE_START, 1.1, -12.0)
+				"stone":
+					_fx(card.position, "rock")
+				"wind":
+					_fx(card.position, "dust", Color.WHITE, Vector2(card.wind_dir))
 	card_dealt.emit(card)
 	_play_sound(SFX_DEALS.pick_random(), randf_range(0.95, 1.15), -13.0)
 

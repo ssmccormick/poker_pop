@@ -1042,7 +1042,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("WILD — counts as ANY rank and suit.")
 	if card.two_plus:
 		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
-	if card.incoming != "" and PlayingCard.show_hazard_intent:
+	if card.incoming != "":
 		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
 	if card.boom:
 		lines.append("EXPLOSIVE — clearing it spreads its enhancement to every neighbor.")
@@ -1066,10 +1066,10 @@ const TUTOR := {
 	"mode_zen": ["ZEN", "No timer, no limits, no losing. Just you, the cards, and the sound of the pops."],
 	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
 	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero, the table is lost."],
-	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. Play burning cards to put them out — and if EVERY card on the table catches fire, the table is LOST."],
+	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. The card it will strike next shows flames creeping in at its bottom edge — get it out of the path or douse the fire. If EVERY card on the table catches fire, the table is LOST."],
 	"hazard_wind": ["WIND CARD", "Play it and every card in the wind's direction is blown clean off the board — unscored. The direction turns a quarter every hand, and the wind keeps its secret: without a WEATHERVANE relic you won't know which way it blows until it does."],
 	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
-	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
+	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The card it will soak next shows water seeping in at its bottom edge. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
 	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Playing a piece without its partner isn't fatal: a new one turns up elsewhere, but the seconds keep draining. The hardest job on the trail — the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],

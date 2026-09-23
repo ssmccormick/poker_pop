@@ -148,7 +148,7 @@ const RELICS := {
 	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
 	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
 	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
-	"weathervane": {"name": "Weathervane", "rarity": 1, "desc": "Hazards reveal what they strike next"},
+	"weathervane": {"name": "Weathervane", "rarity": 1, "desc": "Wind cards show which way they blow"},
 	"magnifying_glass": {"name": "Magnifying Glass", "rarity": 1, "desc": "Soaked cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
@@ -1321,13 +1321,13 @@ func on_hand_played(result: Dictionary) -> void:
 	var floor_count := _hazard_floor()
 	if floor_count > 0:
 		# The storm doesn't blow over: whenever the board calms below
-		# its seeded level, a fresh hazard rolls in.
+		# its seeded level, a fresh hazard rides in on the next deal.
 		var live := 0
 		for p in main.board.grid:
 			if main.board.grid[p].hazard != "":
 				live += 1
 		if live < floor_count:
-			main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
+			main.board.queue_refill_hazards(HAZARD_KINDS.pick_random(), 1)
 	if room_goal == "blackjack" and result.has("blackjack_outcome"):
 		_present_blackjack_round(result)
 	if room_goal == "outlaw" and not _outlaw_dead_pending:
@@ -1380,13 +1380,13 @@ func on_hand_played(result: Dictionary) -> void:
 			_room_cleared()
 			return
 		# The infestation keeps coming until the full quota has hit
-		# the table — a couple per hand, keeping the floor stocked.
+		# the table — a couple per hand, riding in on the deal.
 		var kind := String(current_offer.get("purge_kind", "fire"))
 		var add := mini(PURGE_TRICKLE,
 				purge_quota() - main.board.spawned_count(kind))
 		add = mini(add, PURGE_FLOOR - purge_left())
 		if add > 0:
-			main.board.apply_room_hazards(kind, add)
+			main.board.queue_refill_hazards(kind, add)
 	if room_goal == "mine":
 		room_stones_broken += int(result.get("stones_broken", 0))
 		if room_stones_broken >= room_stones_needed:

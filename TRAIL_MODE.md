@@ -226,14 +226,20 @@ every refilled card has a chance to arrive already hazarded — 3% +
 0.8%/room per card (cap 20%) — so deep tables never stay calm. Purge
 rooms are exempt from both (their hazards ARE the room); storm tables
 (Crazy 8s / Blackjack) swap the seed roll for their guaranteed floor
-but keep the mean deck. The old hazard tarot cards (DEATH etc.) are
-retired. Hazards are states on normal rank/suit cards, one per card;
-ticks happen only on scoring hands, after the board settles. A
-hazard that arrives MID-ROOM (storm replenish, purge trickle, refill
-deal) sits out the round it landed — no spread, soak, rank burn, or
-fuse tick until the next hand. Hazards on the table from the deal
-get no such mercy: they spread, soak, burn down, and count down from
-hand one.
+but keep the mean deck. EVERY mid-room hazard (storm replenish,
+purge trickle, mean-deck roll) arrives ON a freshly dealt card —
+never stamped onto a card already sitting at the table — and lands
+with a burst of its element (splash, embers, sparks, rubble, dust)
+so new trouble is unmistakable. The card fire or water will strike
+next ALWAYS wears a faint preview of the effect creeping in at its
+bottom edge (spreaders aim only at hittable neighbors, re-aiming
+after every tick, seed, and refill). The old hazard tarot cards
+(DEATH etc.) are retired. Hazards are states on normal rank/suit
+cards, one per card; ticks happen only on scoring hands, after the
+board settles. A hazard that arrives mid-room sits out the round it
+landed — no spread, soak, rank burn, or fuse tick until the next
+hand. Hazards on the table from the deal get no such mercy: they
+spread, soak, burn down, and count down from hand one.
 
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |
@@ -327,7 +333,7 @@ Starter catalog (names/numbers draft):
 | Bomb Squad Badge | C | Bombs start with +2 fuse |
 | Chisel | C | Stones need one fewer use |
 | Fire Blanket | R | Fire ticks every 2nd hand |
-| Weathervane | R | Hazards telegraph their next victim: wind shows its direction arrow, and the card fire/water will strike next wears a faint preview of the effect itself — flames barely licking its bottom edge, a thin line of water seeping in. Spreaders aim only at hittable neighbors (never at another hazard), re-aiming after every tick, seed, and refill — the tell is an honest promise |
+| Weathervane | R | Wind cards show their direction arrow (hidden otherwise) |
 | Magnifying Glass | R | Washed cards still show their suit |
 | Gold Tooth | R | Chip cards pay double |
 | Mirror Shades | R | Mult cards ×2 instead of ×1.5 |

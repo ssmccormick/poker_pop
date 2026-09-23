@@ -579,7 +579,8 @@ func _draw() -> void:
 		"water":
 			_draw_water(rect)
 
-	if show_hazard_intent and incoming != "" and hazard == "":
+	if incoming != "" and hazard == "":
+		# Always on show: where the fire or water strikes next.
 		_draw_incoming(rect)
 
 	match objective:
