@@ -59,6 +59,7 @@ var meter_back: ColorRect
 var meter_fill: ColorRect
 var target_label: Label
 var target_bar_back: ColorRect
+var _boss_ticks: Control  # HP segment marks over the banner bar
 var target_bar_fill: ColorRect
 var hand_display: Node2D
 var community_display: Node2D
@@ -251,6 +252,7 @@ func _ready() -> void:
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail.room_index = 20  # King Cobra's table
+				trail.chips = 500000  # rich enough for the late-trail seat
 				trail._show_tarot()
 				trail._choose_offer(trail._offers[0], false)  # bosses auto all-in
 			"tutorial":
@@ -367,6 +369,7 @@ func _update_labels() -> void:
 					else "DEALER HAS %d") % board.blackjack_target
 		else:
 			_community_label.text = "COMMUNITY"
+	_style_boss_bar(0, 0)  # gold progress by default; boss rooms restyle it
 	var show_arcade := mode_kind == "arcade" and game_started and not menu_open
 	var show_trail := mode_kind == "trail" and game_started and not menu_open and trail.in_room
 	meter_back.visible = show_arcade
@@ -384,9 +387,36 @@ func _update_labels() -> void:
 		target_bar_fill.size.x = BAR_W * clampf(float(level_score) / float(target), 0.0, 1.0)
 	elif show_trail:
 		if trail.room_goal == "boss":
+			# The boss wears a segmented HEALTH bar in the banner slot.
+			var bcard: PlayingCard = null
+			for p in board.grid:
+				if board.grid[p].boss != "":
+					bcard = board.grid[p]
+					break
+			var bhp := 0
+			var bhp_max := 0
+			var bname := "THE BOSS IS DOWN"
+			if bcard != null:
+				match bcard.boss:
+					"jack":
+						bhp = bcard.boss_hp
+						bhp_max = Board.JACK_HP
+						bname = "JACK OF ALL TRADES  ·  BEAT %d TO WOUND" % board.jack_bar
+					"queen":
+						bhp = bcard.boss_hp
+						bhp_max = Board.QUEEN_STRIPES
+						bname = "QUEEN BEE  ·  2-3 CARD HANDS ONLY"
+					"cobra":
+						var tail := 0
+						for q in board.grid:
+							if board.grid[q].snake_tail:
+								tail += 1
+						bhp = tail + 1  # the head is his last life
+						bhp_max = Board.COBRA_START_TAIL + 1
+						bname = "KING COBRA  ·  STRIP THE TAIL"
 			target_label.text = "TABLE %d / %d      %s" % \
-					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.boss_status()]
-			target_bar_fill.size.x = 0.0
+					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, bname]
+			_style_boss_bar(bhp, bhp_max)
 		elif trail.room_goal == "safe":
 			var digits := PackedStringArray()
 			for d in trail.room_combo:
@@ -416,12 +446,10 @@ func _update_labels() -> void:
 					float(trail.room_wins) / float(maxi(trail.room_wins_needed, 1)),
 					0.0, 1.0)
 		elif trail.room_goal == "outlaw":
-			target_label.text = "TABLE %d / %d      OUTLAW HP %d  ·  GRIT %d  ·  SCORE %d+" % \
+			target_label.text = "TABLE %d / %d      THE OUTLAW  ·  GRIT %d  ·  SCORE %d+" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
-					trail.room_outlaw_hp, trail.room_grit, trail._outlaw_bar()]
-			target_bar_fill.size.x = BAR_W * clampf(
-					1.0 - float(trail.room_outlaw_hp) / float(maxi(trail.room_outlaw_max, 1)),
-					0.0, 1.0)
+					trail.room_grit, trail._outlaw_bar()]
+			_style_boss_bar(trail.room_outlaw_hp, trail.room_outlaw_max)
 		elif trail.room_goal == "purge":
 			var quota := trail.purge_quota()
 			target_label.text = "TABLE %d / %d      PURGE  %d / %d CLEARED  ·  %d ON THE TABLE" % \
@@ -452,6 +480,30 @@ func _update_labels() -> void:
 			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_preview()
+
+
+## Restyles the banner bar as a red segmented HEALTH bar (bosses and
+## the Outlaw). max_hp 0 restores the plain gold progress fill.
+func _style_boss_bar(hp: int, max_hp: int) -> void:
+	if max_hp <= 0:
+		target_bar_fill.color = GOLD
+		if _boss_ticks != null:
+			_boss_ticks.visible = false
+		return
+	target_bar_fill.color = RED
+	target_bar_fill.size.x = BAR_W * clampf(float(hp) / float(max_hp), 0.0, 1.0)
+	_boss_ticks.visible = true
+	# One notch per life; rebuild only when the segment count changes.
+	if _boss_ticks.get_child_count() != max_hp - 1:
+		for c in _boss_ticks.get_children():
+			c.queue_free()
+		for i in range(1, max_hp):
+			var t := ColorRect.new()
+			t.color = Color(0, 0, 0, 0.55)
+			t.position = Vector2(BAR_W * i / max_hp, 0.0)
+			t.size = Vector2(3, 10)
+			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_boss_ticks.add_child(t)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1046,6 +1098,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("BUMPER — clearing it shoves the line beside it one step along the arrow; past the edge is gone. The arrow turns each hand.")
 		"wild":
 			lines.append("WILD — counts as ANY rank and suit.")
+	if PlayingCard.eights_wild and card.rank == 8 and not card.washed:
+		lines.append("CRAZY 8s — this 8 counts as WILD: any rank, any suit.")
 	if card.two_plus:
 		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
 	if card.incoming != "":
@@ -1077,7 +1131,7 @@ const TUTOR := {
 	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
 	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The card it will soak next shows water seeping in at its bottom edge. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
-	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Playing a piece without its partner isn't fatal: a new one turns up elsewhere, but the seconds keep draining. The hardest job on the trail — the strongbox holds a RELIC."],
+	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Clear a piece WITHOUT its partner and it DROPS to the card below it — and off the bottom edge it falls back in from the top of that column. The hardest job on the trail — the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],
 	"goal_mine": ["GOLD MINE", "The board is choked with stone, and the seam runs 20 stones deep. Chip the rocks by clearing cards BESIDE them (three chips each) — broken rock has a chance of leaving GOLD cards in the rubble, and fresh rock rides in on the deal until the whole seam is on the table. Mine it DRY: the table clears only when every last stone is rubble."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
@@ -1514,6 +1568,9 @@ func _build_ui() -> void:
 	target_label.visible = false
 	target_bar_back.visible = false
 	target_bar_fill.visible = false
+	_boss_ticks = Control.new()
+	_boss_ticks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	target_bar_fill.add_child(_boss_ticks)
 
 	var play_btn := _button(hud_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60))
 	play_btn.add_theme_font_size_override("font_size", 24)

@@ -554,6 +554,10 @@ func _draw() -> void:
 		if mod != "":
 			# Enhanced cards wear their power as the center art.
 			_draw_mod_art(font)
+			if eights_wild and rank == 8:
+				# Still an 8 under the mod's face — still WILD.
+				draw_string(font, Vector2(W / 2.0 - 44, -H / 2.0 + 32), "W",
+						HORIZONTAL_ALIGNMENT_CENTER, 36, 28, WILD_PURPLE)
 		elif eights_wild and rank == 8:
 			draw_string(font, Vector2(-24, 22), "W",
 					HORIZONTAL_ALIGNMENT_CENTER, 48, 46, WILD_PURPLE)
