@@ -116,6 +116,28 @@ func _init() -> void:
 		card.free()
 	b.free()
 
+	# Bosses ride the shove — off the edge like anyone else (the caller
+	# turns that into a lost life); the Cobra stays anchored.
+	b = Board.new()
+	var bossc := PlayingCard.new()
+	bossc.boss = "jack"
+	bossc.boss_hp = 3
+	bossc.grid_pos = Vector2i(4, 0)
+	b.grid[Vector2i(4, 0)] = bossc
+	var bmoves: Array = b._apply_bump(Vector2i(3, 0), Vector2i.RIGHT)
+	failures += _check(bmoves.size() == 1 and bmoves[0].off,
+			"a jack boss is shoved off the edge by a bumper")
+	bossc.free()
+	var cobra := PlayingCard.new()
+	cobra.boss = "cobra"
+	cobra.grid_pos = Vector2i(4, 0)
+	b.grid[Vector2i(4, 0)] = cobra
+	bmoves = b._apply_bump(Vector2i(3, 0), Vector2i.RIGHT)
+	failures += _check(bmoves.is_empty() and b.grid.has(Vector2i(4, 0)),
+			"the cobra is anchored — his coils block the push")
+	cobra.free()
+	b.free()
+
 	# Old save ids map onto the current mod family.
 	failures += _check(Board.migrate_mod("cash") == "gold"
 			and Board.migrate_mod("boost") == "plus"

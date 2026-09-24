@@ -193,7 +193,9 @@ quarter clockwise every hand.
   HIS bullets → he shoots YOU. He also shoots if your scored hand is
   below a posted threshold. Shots cost DUEL HP (separate, ~3 grit for
   the room; 0 = room failed). Kill him to clear — a puzzle fight where
-  you'll trade some blood.
+  you'll trade some blood. His health lives in the banner as a RED
+  SEGMENTED HEALTH BAR (one notch per life), the same bar the bosses
+  wear — no more bare numbers at the top.
 
 Technical wrinkle flagged early: constraint rooms (Suit/Hand Locked)
 change what counts as a playable hand, so `Board.has_playable_hand()`
@@ -283,9 +285,13 @@ modified card.
   hands, reference ~1 minute per pair + 1, with minutes as the odds
   promise like HIGH NOON. Each opened chest pays its reward roll AND
   respawns a fresh key + chest until the count is met; clearing the
-  room awards a RELIC. Losing a piece (played without its partner,
-  burned, gusted, bumped off) is NOT a fail: the missing piece
-  respawns on a fresh card — it just cost you seconds.
+  room awards a RELIC. A piece cleared WITHOUT its partner DROPS off
+  its carrier to the card below in the same column — and past the
+  bottom edge it wraps, falling in from the top onto that column's
+  first card (skipping stones/safes/bosses/other pieces; if nothing
+  in the column can catch it, it respawns on a fresh card). Pieces
+  lost off the board entirely (burned, gusted, bumped) respawn on a
+  fresh card — it just cost you seconds.
 - **Ambient chests**: random chance in normal rooms as optional loot.
 - v1: objective spawns don't mix with hazard rooms.
 
@@ -304,7 +310,7 @@ overlay and a hover panel explaining the hovered card.
 | Gold card | Pays $1 of real, bankable cash every time it's played. Drawn SOLID GOLD, face and all |
 | Plus card | When cleared, the card its arrow points at gains +1 rank. Boosting an ACE wraps it into a LUCKY 2+ (green-framed deuce) that DOUBLES any hand it scores in (stacking). The arrow turns a quarter clockwise every hand — time the clear to aim it |
 | Minus card | Mirror of Plus: the aimed card drops −1 rank — and a 2 ground lower is DESTROYED, removed from the table unscored. Sculpt a King down to match your Queens, or grind junk to nothing |
-| Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand). A gap absorbs the push; safes/bosses/tails block it; a card pushed past the edge is removed unscored |
+| Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand) — the push lands FIRST, while the bumper still sits on the felt, then the scored cards pop and the board settles. A gap absorbs the push; safes and cobra coils block it; a card pushed past the edge is removed unscored. The Jack and Queen ride the shove like anyone else: off the edge costs the boss ONE LIFE, and he storms back onto the vacated cell |
 | Wild card | Counts as ANY rank and suit; the evaluator takes the best assignment. The rarest roll (~3%) |
 | EXPLOSIVE (rider) | Not a mod — a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
 
@@ -359,6 +365,11 @@ by leaving):
 
 Card prices: plain 40 chips, duplicates-of-owned 50, modified 80.
 Relic prices by rarity: C 90 / R 180 / L 375 (Snake Oil still −25%).
+Prices are computed at display time, so buying Snake Oil re-prices
+the rest of that same shop on the spot. Every purchase re-renders
+the shelves, and a refused purchase says WHY, loud and in red: not
+enough chips, satchel full, or "that would bust you" (spending below
+the next table's cheapest seat is blocked as a guaranteed bust).
 Relic slots show a code-drawn icon (RelicIcon), name, effect, and
 price; burn-a-card starts at 30 and climbs per use, one per shop.
 The screen is dressed as a roadside camp (ShopBackdrop): covered
@@ -421,6 +432,12 @@ which makes deck sculpting the boss prep (stock queens before room 14).
   count (starts 50, **+25 per wound**, shown in the banner); weaker
   hands make him scoff and stay. Do it ten times. HP badge on the
   card. A gust that blows him off the table still counts regardless.
+  A bumper shove off the edge costs him a life too — he storms back on.
+- **Boss feedback** — every wound lands as a visible SLUG: the scored
+  hand's pieces gather into a gold bullet that zooms from the hand's
+  center into the boss card (flinch + sparks + table shake). Boss
+  health is a RED SEGMENTED BAR in the banner slot (jack 10 notches,
+  queen 3 stripes, cobra tail+head), shared with the Outlaw duel.
 - **QUEEN BEE** (room 14) — **3 stripes** (HP); she and her honey can
   only be caught in **2–3 card hands** (the honey is sticky, and so is
   she — she's a Queen, so catching her means pairing queens). Her

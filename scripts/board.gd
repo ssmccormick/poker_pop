@@ -728,6 +728,7 @@ func play_hand() -> void:
 	var arrows: Array = []    # {"cell", "dir", "mod"} — plus/minus aims
 	var bumps: Array = []     # {"cell", "dir"} — bumper shoves
 	var defeated_boss := false
+	var boss_hits: Array = []  # wounded bosses catch a slug after the shoves
 	for card in played:
 		card.selected = false
 		card.chain_index = 0
@@ -740,7 +741,7 @@ func play_hand() -> void:
 			card.boss_hp -= 1
 			if card.boss == "jack":
 				jack_bar += JACK_BAR_STEP
-			_play_sound(SFX_REVOLVERS.pick_random(), randf_range(0.95, 1.1), -8.0)
+			boss_hits.append(card)  # the shot lands after the shoves
 			if card.boss_hp <= 0:
 				defeated_boss = true
 				poppers.append(card)  # down he goes
@@ -749,6 +750,7 @@ func play_hand() -> void:
 			if card.cobra_body.is_empty():
 				defeated_boss = true
 				poppers.append(card)
+				boss_hits.append(card)
 			else:
 				_cobra_revert(card)
 			continue
@@ -773,6 +775,15 @@ func play_hand() -> void:
 	result["cleared_cards"] = cleared_cards
 	result["cleared_cells"] = cleared_cells
 
+	# Stagecoach pieces cleared without their partner drop off the
+	# carrier and fall down the column (wrapping past the bottom).
+	if not result.get("chest_opened", false):
+		for card in poppers:
+			if card.objective in ["key", "chest"]:
+				var piece: String = card.objective
+				card.objective = ""
+				_drop_objective(piece, card.grid_pos, poppers)
+
 	# Stones are blockers now: every cleared card chips each stone
 	# beside it, and a stone out of chips crumbles with the pops.
 	var breaking := 0
@@ -796,6 +807,71 @@ func play_hand() -> void:
 		poppers.append(st)
 
 	hand_played.emit(result)
+
+	# Bumpers shove their line one step BEFORE anything pops, so the
+	# push visibly comes from the bumper while it still sits on the
+	# felt; the far card can go off the table entirely (unscored). A
+	# shoved-off BOSS pays a life and storms back onto the vacated cell.
+	for bdata in bumps:
+		var bumped := _apply_bump(bdata.cell, bdata.dir)
+		if bumped.is_empty():
+			continue
+		_play_sound(SFX_FLIP, 0.9, -7.0)
+		_fx(cell_center(bdata.cell + bdata.dir), "dust", Color.WHITE,
+				Vector2(bdata.dir))
+		var btw := create_tween().set_parallel(true)
+		var shoved_off: Array = []
+		var bounced_boss: PlayingCard = null
+		for m in bumped:
+			if m.off:
+				m.card.z_index = 15
+				btw.tween_property(m.card, "position",
+						cell_center(m.to) + Vector2(bdata.dir) * 260.0, 0.3) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				btw.tween_property(m.card, "modulate:a", 0.0, 0.3)
+				if m.card.boss != "":
+					bounced_boss = m.card
+				else:
+					shoved_off.append(m.card)
+					poppers.erase(m.card)  # gone over the edge, not popped
+			else:
+				btw.tween_property(m.card, "position", cell_center(m.to), 0.18) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		await btw.finished
+		for c in shoved_off:
+			c.queue_free()
+		if bounced_boss != null:
+			# Off the table costs him a life — then he storms right back.
+			bounced_boss.boss_hp -= 1
+			if bounced_boss.boss == "jack":
+				jack_bar += JACK_BAR_STEP
+			_play_sound(SFX_REVOLVERS.pick_random(), 1.0, -7.0)
+			shake_requested.emit(6.0)
+			if bounced_boss.boss_hp <= 0:
+				defeated_boss = true
+				bounced_boss.queue_free()
+			else:
+				var back: Vector2i = bdata.cell + bdata.dir
+				grid[back] = bounced_boss
+				bounced_boss.grid_pos = back
+				bounced_boss.modulate = Color(1, 1, 1, 1)
+				bounced_boss.z_index = 15
+				_fx(cell_center(back), "dust")
+				var rtw := create_tween()
+				rtw.tween_property(bounced_boss, "position", cell_center(back), 0.3) \
+						.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				rtw.tween_callback(func() -> void:
+					if is_instance_valid(bounced_boss):
+						bounced_boss.z_index = 0)
+
+	# Every wound lands as a slug: the scored hand's pieces gather into
+	# a bullet that zooms from the hand's center into the boss card.
+	for i in boss_hits.size():
+		var boss_card: PlayingCard = boss_hits[i]
+		if not is_instance_valid(boss_card):
+			continue
+		await _fire_boss_slug(center, boss_card)
+
 	var float_txt := "+%d" % result.score
 	if result.get("bonus_chips", 0) > 0:
 		float_txt += "  +%d CHIPS" % result.bonus_chips
@@ -874,32 +950,6 @@ func play_hand() -> void:
 					c.rank -= 1
 				_play_sound(SFX_FLIP, 1.4 if adata.mod == "plus" else 0.7, -8.0)
 				_fx(cell_center(q), "sparks")
-	# Bumpers shove their line one step; the far card can go off the
-	# table entirely (unscored, like a gust victim).
-	for bdata in bumps:
-		var bumped := _apply_bump(bdata.cell, bdata.dir)
-		if bumped.is_empty():
-			continue
-		_play_sound(SFX_FLIP, 0.9, -7.0)
-		_fx(cell_center(bdata.cell + bdata.dir), "dust", Color.WHITE,
-				Vector2(bdata.dir))
-		var btw := create_tween().set_parallel(true)
-		var shoved_off: Array = []
-		for m in bumped:
-			if m.off:
-				shoved_off.append(m.card)
-				m.card.z_index = 15
-				btw.tween_property(m.card, "position",
-						cell_center(m.to) + Vector2(bdata.dir) * 260.0, 0.3) \
-						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-				btw.tween_property(m.card, "modulate:a", 0.0, 0.3)
-			else:
-				btw.tween_property(m.card, "position", cell_center(m.to), 0.18) \
-						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		await btw.finished
-		for c in shoved_off:
-			c.queue_free()
-
 	# A transition (room clear / level clear) suppresses the refill, but
 	# a pending gust still blows — it may be the very thing that won the
 	# table, and the boss should visibly leave with it.
@@ -1040,6 +1090,107 @@ func spawn_safe(combo: Array) -> void:
 
 
 ## Marks two random plain cards as the key and the chest.
+## A falling key or chest, drawn from the card glyph pixel maps.
+class DropGlyph extends Node2D:
+	var kind := "key"
+
+	func _draw() -> void:
+		var map: Array = PlayingCard.KEY_PX if kind == "key" else PlayingCard.CHEST_PX
+		var col := Color("e8c547") if kind == "key" else Color("b07f3e")
+		var px := 3.0
+		var origin := Vector2(-map[0].length() * px / 2.0, -map.size() * px / 2.0)
+		for y in map.size():
+			var row: String = map[y]
+			for x in row.length():
+				if row[x] == "1":
+					draw_rect(Rect2(origin + Vector2(x * px, y * px),
+							Vector2(px, px)), col)
+
+
+## Stagecoach pieces don't vanish with their carrier: a key or chest
+## cleared without its partner DROPS to the card below in its column
+## — and off the bottom edge it wraps, falling in from the top onto
+## that column's first card. Returns false when no card can catch it.
+func _drop_objective(kind: String, from_cell: Vector2i, skip: Array) -> bool:
+	var target: PlayingCard = null
+	var cell := from_cell
+	for step in rows - 1:
+		cell = Vector2i(cell.x, (cell.y + 1) % rows)
+		if not grid.has(cell):
+			continue
+		var c: PlayingCard = grid[cell]
+		if skip.has(c) or c.cursed or c.is_safe or c.boss != "" \
+				or c.snake_tail or c.hazard == "stone" or c.objective != "":
+			continue
+		target = c
+		break
+	if target == null:
+		return false
+	target.objective = kind
+	if not is_inside_tree():
+		return true
+	# The piece visibly falls from the cleared card to its new home.
+	var g := DropGlyph.new()
+	g.kind = kind
+	g.z_index = 25
+	add_child(g)
+	g.position = cell_center(from_cell)
+	var wrapped: bool = target.grid_pos.y < from_cell.y
+	var tw := create_tween()
+	if wrapped:
+		tw.tween_property(g, "position:y", board_px_size().y + 70.0, 0.22) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_callback(func() -> void:
+			g.position.y = -70.0)
+	tw.tween_property(g, "position", cell_center(target.grid_pos), 0.28) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func() -> void:
+		_play_sound(SFX_FLIP, 1.1, -9.0)
+		_fx(g.position, "dust")
+		g.queue_free())
+	return true
+
+
+class Slug extends Node2D:
+	func _draw() -> void:
+		# A gold slug drawn nose-right; rotation aims it.
+		draw_rect(Rect2(-16, -4, 4, 8), Color("8a6d1f"))
+		draw_rect(Rect2(-14, -4, 20, 8), Color("c9a227"))
+		draw_circle(Vector2(6, 0), 4.0, Color("e8c547"))
+
+
+## The scored hand's pieces gather into a slug that zooms into the
+## boss card: flinch, sparks and a table shake on impact.
+func _fire_boss_slug(from: Vector2, target: PlayingCard) -> void:
+	if not is_inside_tree():
+		return
+	var s := Slug.new()
+	s.z_index = 30
+	add_child(s)
+	s.position = from
+	s.rotation = (target.position - from).angle()
+	s.scale = Vector2(0.4, 0.4)
+	var tw := create_tween()
+	tw.tween_property(s, "scale", Vector2.ONE, 0.08)
+	tw.parallel().tween_property(s, "position", target.position, 0.16) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw.finished
+	s.queue_free()
+	if not is_instance_valid(target):
+		return
+	_play_sound(SFX_REVOLVERS.pick_random(), randf_range(0.95, 1.1), -7.0)
+	_fx(target.position, "sparks")
+	shake_requested.emit(5.0)
+	if target.boss_hp > 0:
+		# Still standing — he flinches under the hit. (A downed boss is
+		# about to pop; leave his scale to the pop tween.)
+		var ptw := create_tween()
+		ptw.tween_property(target, "scale", Vector2(1.14, 1.14), 0.06) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		ptw.tween_property(target, "scale", Vector2.ONE, 0.14) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
 func spawn_key_and_chest() -> void:
 	var candidates: Array = []
 	for p in grid:
@@ -1969,8 +2120,9 @@ func apply_room_hazards(kind: String, count: int) -> void:
 
 
 ## The bumper's shove: pushes the contiguous run of cards next to
-## `cell` one step along `dir`. Safes, bosses, and cobra tails are too
-## heavy and block the whole push; a gap absorbs it; a run reaching
+## `cell` one step along `dir`. Safes and the Cobra's coils are too
+## heavy and block the whole push (the Jack and Queen ride the shove
+## — off the edge costs them a life); a gap absorbs it; a run reaching
 ## the edge shoves its far card off the table. Pure grid mutation —
 ## returns the moves as {card, to, off} for the caller to animate
 ## (an "off" card is already out of the grid and must be freed).
@@ -1979,7 +2131,9 @@ func _apply_bump(cell: Vector2i, dir: Vector2i) -> Array:
 	var p := cell + dir
 	while p.x >= 0 and p.x < cols and p.y >= 0 and p.y < rows and grid.has(p):
 		var c: PlayingCard = grid[p]
-		if c.is_safe or c.boss != "" or c.snake_tail:
+		# Safes are bolted down and the Cobra is anchored by his coils;
+		# the Jack and Queen shove like anyone else.
+		if c.is_safe or c.boss == "cobra" or c.snake_tail:
 			break
 		run.append(p)
 		p += dir
