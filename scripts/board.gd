@@ -1097,14 +1097,8 @@ func _reject_hand() -> void:
 
 
 ## Where the dealer throws from: a visible deck sitting just past the
-## table rim — usually the near edge, but sometimes he deals from the
-## far side. Rolled fresh for each deal.
-var deal_from_top := false
-
-
+## near edge of the table rim.
 func deck_origin() -> Vector2:
-	if deal_from_top:
-		return Vector2(board_px_size().x * 0.5, -PlayingCard.H * 0.9)
 	return Vector2(board_px_size().x * 0.5, board_px_size().y + PlayingCard.H * 0.9)
 
 
@@ -1187,8 +1181,6 @@ func _fall_and_fill(initial_deal: bool) -> void:
 		t_stagger *= SETUP_STAGGER_SCALE
 
 	# Compute settle moves and new-card slots (unchanged game logic).
-	# The dealer picks a side for this whole deal.
-	deal_from_top = randf() < 0.4
 	var settle_moves: Array = []
 	var deals: Array = []
 	for x in cols:
