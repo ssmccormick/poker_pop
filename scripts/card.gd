@@ -166,6 +166,12 @@ var face_down := false:
 	set(value):
 		face_down = value
 		queue_redraw()
+# Deal presentation: 0 = back-up on the deck, 1 = fully face-up.
+# Tweened over the flight so each card flips off the stack.
+var deal_flip := 1.0:
+	set(value):
+		deal_flip = value
+		queue_redraw()
 # Set when the hazard lands; a fresh hazard sits out its first tick
 # (no spread, soak, or fuse burn the round it arrived).
 var hazard_fresh := false
@@ -440,6 +446,14 @@ func _draw() -> void:
 	if _face_box == null:
 		_make_boxes()
 	var rect := Rect2(-W / 2.0, -H / 2.0, W, H)
+	if deal_flip < 1.0:
+		# Mid-flip off the deck: squash horizontally through the turn,
+		# back showing on the first half, face on the second.
+		var sx := maxf(absf(cos(deal_flip * PI)), 0.04)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(sx, 1.0))
+		if deal_flip < 0.5:
+			_draw_card_back(rect)
+			return
 	# Shadows stay on the felt while the face lifts — wider when the
 	# card is raised, so selection reads as real height.
 	var far_off := Vector2(5, 10) if selected else Vector2(3, 6)
@@ -936,8 +950,28 @@ func _draw_rock(rect: Rect2) -> void:
 func _draw_incoming(rect: Rect2) -> void:
 	match incoming:
 		"fire":
-			_draw_flame_layer(rect, 14.0, 5, 6.0, Color(0.9, 0.46, 0.16, 0.5))
-			_draw_flame_layer(rect, 8.0, 6, 7.5, Color(1.0, 0.85, 0.5, 0.5))
+			# Flint on tinder: bright little sparks snapping along the
+			# bottom edge, each blinking in at its own spot — the fire
+			# hasn't caught yet, but it's about to.
+			for k in 6:
+				var ph := _t * 6.0 + _phase + k * 1.7
+				if fposmod(ph, 1.0) > 0.38:
+					continue
+				var cycle := floorf(ph)
+				var jitter := fposmod(absf(sin(cycle * 12.9898 + k * 3.7)) * 437.585, 1.0)
+				var s := Vector2(rect.position.x + 8.0 + jitter * (rect.size.x - 16.0),
+						rect.end.y - 5.0 - fposmod(k * 5.3, 9.0))
+				var dir := Vector2.RIGHT.rotated(-0.5 - k * 0.4)
+				var col := Color(1.0, 0.92, 0.6, 0.95) if k % 2 == 0 \
+						else Color(1.0, 0.68, 0.3, 0.85)
+				draw_line(s, s + dir * (4.0 + 3.0 * absf(sin(ph * 9.0))), col, 1.8)
+				draw_circle(s, 1.2, col)
+			# Two embers smouldering in the tinder.
+			for k in 2:
+				var glow := 0.5 + 0.5 * sin(_t * 7.0 + _phase + k * 2.1)
+				draw_circle(Vector2(rect.position.x + 22.0 + k * 36.0
+						+ 5.0 * sin(_phase + k), rect.end.y - 5.0),
+						1.6 + glow, Color(1.0, 0.55, 0.2, 0.35 + 0.4 * glow))
 		"water":
 			var level := rect.end.y - 9.0
 			var pts := PackedVector2Array()

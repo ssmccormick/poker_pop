@@ -1240,9 +1240,14 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			# Flicked off the deck: mid-spin, big (up in the air, close to
 			# the screen), and drawn above every card already on the table.
 			# All cards spin the same way; only the amount/speed varies.
+			# Each waits INVISIBLE in the stack until its own throw, and
+			# leaves back-up, flipping face-up mid-flight.
 			card.rotation = -TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
 			card.scale = Vector2(DEAL_START_SCALE, DEAL_START_SCALE)
 			card.z_index = 20
+			card.visible = false
+			if not card.face_down:
+				card.deal_flip = 0.0
 			add_child(card)
 			deals.append({"card": card, "pos": cell_center(p), "cell": p})
 	if settle_moves.is_empty() and deals.is_empty():
@@ -1290,6 +1295,15 @@ func _fall_and_fill(initial_deal: bool) -> void:
 				card.position = from.lerp(ctrl, t).lerp(ctrl.lerp(to, t), t)
 		tw.tween_method(flight, 0.0, 1.0, t_deal) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
+		# The card appears the moment IT leaves the stack...
+		tw.tween_callback(func() -> void:
+			if is_instance_valid(card):
+				card.visible = true).set_delay(delay)
+		# ...and flips from back to face through the first arc.
+		if card.deal_flip < 1.0:
+			tw.tween_property(card, "deal_flip", 1.0, t_deal * 0.55) \
+					.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT) \
+					.set_delay(delay + t_deal * 0.12)
 		# Stays big (high) through mid-flight, then drops onto the table.
 		tw.tween_property(card, "scale", Vector2.ONE, t_deal) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
@@ -1324,6 +1338,8 @@ func _fall_and_fill(initial_deal: bool) -> void:
 func _on_card_dealt(card: PlayingCard) -> void:
 	if is_instance_valid(card):
 		card.z_index = 0  # back on the table with everyone else
+		card.visible = true
+		card.deal_flip = 1.0
 		if card.hazard != "":
 			# A new hazard announces itself on landing: a burst of its
 			# own element, unmistakably fresh trouble.
@@ -1359,6 +1375,8 @@ func _skip_refill() -> void:
 			e.card.rotation = 0.0
 			e.card.scale = Vector2.ONE
 			e.card.z_index = 0
+			e.card.visible = true
+			e.card.deal_flip = 1.0
 	for sh in _refill_shadows:
 		if is_instance_valid(sh):
 			sh.queue_free()
