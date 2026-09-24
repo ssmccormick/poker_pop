@@ -87,8 +87,10 @@ const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 # GOLD MINE instead (its own room type).
 const PURGE_TAROTS := {"bomb": "POWDER KEG", "fire": "WILDFIRE",
 		"wind": "DUST STORM", "water": "FLASH FLOOD"}
-const GOLD_MINE_STONES_BASE := 4   # stones to break, +1 per region
+const GOLD_MINE_QUOTA := 20        # break them ALL — the full seam
 const GOLD_MINE_STONE_SEED := 12   # stones seeded (about half the board)
+const GOLD_MINE_FLOOR := 6         # trickle keeps at least this many standing
+const GOLD_MINE_TRICKLE := 2       # at most this many ride in per hand
 # Called-hands templates by region: [hand name, count] — exact hands
 # only (this game scores exact compositions, so a Full House is NOT
 # three Pairs).
@@ -676,8 +678,8 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.label = "Gold Mine"
 				offer.odds = 2.0
 				offer["goal"] = "mine"
-				offer["stones"] = GOLD_MINE_STONES_BASE + region
-				offer.hands = mini(MAX_HANDS_BUY, 3 * (GOLD_MINE_STONES_BASE + region))
+				offer["stones"] = GOLD_MINE_QUOTA
+				offer.hands = MAX_HANDS_BUY
 				offer.target = 0
 			else:
 				# Purge rooms: clear a QUOTA of one hazard kind — a few
@@ -858,7 +860,7 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					int(offer.get("purge_quota", PURGE_QUOTA_BASE)),
 					String(offer.purge_kind).to_upper(), offer.purge_count]
 		elif offer.get("goal", "") == "mine":
-			goal_line = "Break %d stones — gold in the rubble" % offer.stones
+			goal_line = "Clear the whole seam: %d stones — gold in the rubble" % offer.stones
 		elif offer.get("goal", "") == "holdem":
 			goal_line = "Target %d — HOLD'EM rules" % offer.target
 		elif offer.get("goal", "") == "crazy8":
@@ -1023,7 +1025,7 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Clear %d %s cards — %d seeded, more arrive as you play" \
 					% [int(o.get("purge_quota", PURGE_QUOTA_BASE)), o.purge_kind, o.purge_count]
 		"mine":
-			return "Break %d stones (gold in the rubble)" % o.stones
+			return "Mine the seam dry: break all %d stones (gold in the rubble, more rock rides in as you dig)" % o.stones
 		"holdem":
 			return "Target %d — pick 2 hole cards, best 5 of 7 with the community" % o.target
 		"crazy8":
@@ -1389,9 +1391,21 @@ func on_hand_played(result: Dictionary) -> void:
 			main.board.queue_refill_hazards(kind, add)
 	if room_goal == "mine":
 		room_stones_broken += int(result.get("stones_broken", 0))
-		if room_stones_broken >= room_stones_needed:
+		# Standing rock, not counting stones crumbling with this hand.
+		var standing := 0
+		for p in main.board.grid:
+			var mc: PlayingCard = main.board.grid[p]
+			if mc.hazard == "stone" and mc.stone_hits > 0:
+				standing += 1
+		if room_stones_broken >= room_stones_needed and standing == 0:
 			_room_cleared()
 			return
+		# The seam runs deep: more rock rides in on the deal until the
+		# full count has hit the table.
+		var seam: int = room_stones_needed - main.board.spawned_count("stone")
+		if seam > 0 and standing < GOLD_MINE_FLOOR:
+			main.board.queue_refill_hazards("stone",
+					mini(GOLD_MINE_TRICKLE, seam))
 	if room_goal == "collect":
 		for cc in result.get("cleared_cards", []):
 			if current_offer.has("collect_suit"):
