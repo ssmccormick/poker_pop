@@ -47,8 +47,10 @@ bosses, regions.
   chips on yourself** at the table's posted odds (MIN / RAISE ×2 /
   ALL IN). The hand budget (or minute budget on clock tables) is
   FIXED by the table and tightens as the trail deepens — no haggling
-  over it. Clearing pays bet + bet × odds; failing loses ante and
-  bet. Bosses are ALL IN at base odds, fixed hand budget.
+  over it. Clearing pays bet + bet × odds, PLUS a swiftness bonus:
+  every spare hand (or every spare 10 seconds on a clock table) pays
+  blind÷5 chips. Failing loses ante and bet. Bosses are ALL IN at
+  base odds, fixed hand budget.
   *(The old promise dial — trading fewer hands/minutes for fatter
   odds — was removed 2026-09-12; difficulty now comes purely from
   progression.)*

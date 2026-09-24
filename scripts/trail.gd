@@ -1785,11 +1785,21 @@ func _room_cleared() -> void:
 	var winnings := stake + int(stake * stake_odds)
 	if has_relic("tin_star"):
 		winnings += 10
+	# Swift work pays: every spare hand (or every spare 10 seconds on
+	# a clock table) converts to chips, scaled to the table's blind.
+	var spare := int(room_time_left / 10.0) if room_on_clock() \
+			else maxi(room_hands_left, 0)
+	var bonus := spare * maxi(_blind_for(room_index) / 5, 1)
+	winnings += bonus
 	chips += winnings
 	main.board._play_sound(Board.SFX_STING_BOSS if current_offer.has("boss")
 			else Board.SFX_STING_WIN, 1.0, -6.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
 	main._announce("TABLE CLEARED  +%d CHIPS" % winnings)
+	if bonus > 0:
+		_announce_after_settle(("%d SECONDS TO SPARE  +%d CHIPS"
+				% [int(room_time_left), bonus]) if room_on_clock()
+				else ("%d HANDS TO SPARE  +%d CHIPS" % [spare, bonus]))
 	main.board.confetti()
 	if current_offer.has("boss") and room_index == JACK_ROOM:
 		_announce_after_settle("BIG LEAGUE NOW — EVERYTHING COSTS 10× FROM HERE")
