@@ -227,6 +227,12 @@ func _ready() -> void:
 						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
 						"min_bet": 10, "goal": "safe"}, false)
 				trail._confirm_bet()
+			"trailrelic":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail._hide_all()
+				trail._pending_relic_reward = "weathervane"
+				trail._show_relic_reward_now()
 			"trailbj":
 				menu_layer.visible = false
 				trail._start_run(0)

@@ -220,7 +220,12 @@ var bet_layer: ColorRect
 var pick_layer: ColorRect
 var shop_layer: ColorRect
 var remove_layer: ColorRect
+var relic_layer: ColorRect
 var end_layer: ColorRect
+var _relic_icon: RelicIcon
+var _relic_name: Label
+var _relic_desc: Label
+var _pending_relic_reward := ""
 var _buyin_cash_label: Label
 var _buyin_resume_btn: Button
 var _buyin_tier_btns: Array = []
@@ -1820,11 +1825,12 @@ func _room_cleared() -> void:
 	elif current_offer.has("boss") and room_index == QUEEN_ROOM:
 		_announce_after_settle("HIGH SOCIETY — PRICES JUMP ANOTHER 10×")
 	if room_goal == "chest":
-		# The stagecoach strongbox: a relic for the hardest job around.
+		# The stagecoach strongbox: a relic for the hardest job around,
+		# unveiled on its own reward screen after the settle.
 		var relic_id := _unowned_relic()
 		if relic_id != "" and relics.size() < MAX_RELICS:
 			_gain_relic(relic_id)
-			_announce_after_settle("STAGECOACH RELIC:  %s!" % RELICS[relic_id].name)
+			_pending_relic_reward = relic_id
 		else:
 			chips += 60
 			_announce_after_settle("STRONGBOX  +60 CHIPS (no relic room)")
@@ -1839,7 +1845,10 @@ func _room_cleared() -> void:
 			await get_tree().create_timer(WIN_LINGER_SECS).timeout
 			if main.menu_open:
 				return  # stepped out meanwhile; resume picks up from here
-			_show_pick())
+			if _pending_relic_reward != "":
+				_show_relic_reward()
+			else:
+				_show_pick())
 
 
 ## The timed table's clock ran dry (driven by main._process).
@@ -1932,6 +1941,23 @@ func boss_status() -> String:
 						tail += 1
 				return "KING COBRA   TAIL %d" % tail
 	return "THE BOSS IS DOWN"
+
+
+## The strongbox opens: the won relic on its own reward screen.
+func _show_relic_reward() -> void:
+	main.transition(_show_relic_reward_now)
+
+
+func _show_relic_reward_now() -> void:
+	_hide_all()
+	main.game_started = false
+	main.play_music("tarot")
+	var r: Dictionary = RELICS.get(_pending_relic_reward, {})
+	_relic_icon.relic_id = _pending_relic_reward
+	_relic_name.text = String(r.get("name", "")).to_upper()
+	_relic_desc.text = String(r.get("desc", ""))
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 0.9, -6.0)
+	relic_layer.visible = true
 
 
 # --- Flow: card pick ------------------------------------------------------
@@ -2430,6 +2456,22 @@ func build_ui() -> void:
 	leave.add_theme_font_size_override("font_size", 20)
 	leave.pressed.connect(_leave_shop)
 
+	relic_layer = _layer()
+	_screen_title(relic_layer, "THE STRONGBOX")
+	_center(relic_layer, "The stagecoach job pays in more than chips.", 210, 22, main.DIM)
+	UiKit.plate(relic_layer, Rect2(660, 300, 600, 480))
+	_relic_icon = RelicIcon.new()
+	_relic_icon.position = Vector2(960, 440)
+	_relic_icon.scale = Vector2(2.6, 2.6)
+	relic_layer.add_child(_relic_icon)
+	_relic_name = _center(relic_layer, "", 560, 40, main.GOLD)
+	_relic_desc = _center(relic_layer, "", 630, 24, main.OFFWHITE)
+	var take: Button = main._button(relic_layer, "TAKE IT", Vector2(810, 850), Vector2(300, 64))
+	take.add_theme_font_size_override("font_size", 26)
+	take.pressed.connect(func() -> void:
+		_pending_relic_reward = ""
+		_show_pick())
+
 	remove_layer = _layer()
 	_screen_title(remove_layer, "THE DECK")
 	_remove_info = _center(remove_layer, "", 210, 24, main.OFFWHITE)
@@ -2473,7 +2515,8 @@ func _layer() -> ColorRect:
 
 
 func _hide_all() -> void:
-	for l in [buyin_layer, tarot_layer, bet_layer, pick_layer, shop_layer, remove_layer, end_layer]:
+	for l in [buyin_layer, tarot_layer, bet_layer, pick_layer, shop_layer,
+			remove_layer, relic_layer, end_layer]:
 		if l:
 			l.visible = false
 
