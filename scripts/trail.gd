@@ -262,7 +262,12 @@ func _ready() -> void:
 	_load_meta()
 	main.board.safe_cracked.connect(on_safe_cracked)
 	main.board.boss_defeated.connect(func() -> void:
-		pass)  # handled via result.boss_defeated in on_hand_played
+		# Scored kills clear the room via result.boss_defeated inside
+		# on_hand_played (in_room is already false here). This catches
+		# the deaths that happen mid-animation instead: a boss GUSTED
+		# or SHOVED off the table on his last life.
+		if in_room and room_goal == "boss":
+			_room_cleared())
 
 
 # --- Persistence ----------------------------------------------------------
@@ -1924,25 +1929,6 @@ func _trail_complete() -> void:
 	_end_run("TRAIL COMPLETE", body, payout)
 
 
-## Room banner text for boss fights.
-func boss_status() -> String:
-	for p in main.board.grid:
-		var card: PlayingCard = main.board.grid[p]
-		match card.boss:
-			"jack":
-				return "JACK OF ALL TRADES   HP %d  ·  BEAT %d TO WOUND" \
-						% [card.boss_hp, main.board.jack_bar]
-			"queen":
-				return "QUEEN BEE   STRIPES %d   (2-3 card hands!)" % card.boss_hp
-			"cobra":
-				var tail := 0
-				for q in main.board.grid:
-					if main.board.grid[q].snake_tail:
-						tail += 1
-				return "KING COBRA   TAIL %d" % tail
-	return "THE BOSS IS DOWN"
-
-
 ## The strongbox opens: the won relic on its own reward screen.
 func _show_relic_reward() -> void:
 	main.transition(_show_relic_reward_now)
@@ -2007,20 +1993,22 @@ func _show_pick_now() -> void:
 
 # --- Flow: shop -----------------------------------------------------------
 
-## One shop slot: the card data plus its price tier.
+## One shop slot: the card data plus its price tier. The tier is
+## stored raw — `_price` runs at render time, so a Snake Oil bought
+## mid-shop discounts the rest of the shelf immediately.
 func _shop_card_offer() -> Dictionary:
 	if randf() < SHOP_MOD_CHANCE:
 		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": _random_mod(),
 				"boom": randf() < BOOM_CHANCE},
-				"price": _price(SHOP_MOD_PRICE)}
+				"base": SHOP_MOD_PRICE}
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
 		if not src.get("cursed", false):
 			return {"data": {"rank": src.rank, "suit": src.suit,
-					"cursed": false, "mod": ""}, "price": _price(SHOP_DUP_PRICE)}
+					"cursed": false, "mod": ""}, "base": SHOP_DUP_PRICE}
 	return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-			"cursed": false, "mod": ""}, "price": _price(SHOP_CARD_PRICE)}
+			"cursed": false, "mod": ""}, "base": SHOP_CARD_PRICE}
 
 
 ## The Hermit's price for the next burn — it climbs with every use.
@@ -2036,16 +2024,23 @@ func _shop_reserve() -> int:
 	return _cheapest_seat(room_index + 1)
 
 
+## A refused purchase gets a LOUD reason: error sting plus the message
+## in red on both shop info lines (reset on the next re-render).
+func _shop_refuse(msg: String) -> void:
+	main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+	_shop_info.text = msg
+	_shop_info.add_theme_color_override("font_color", main.RED)
+	_remove_info.text = msg
+	_remove_info.add_theme_color_override("font_color", main.RED)
+
+
 ## Blocks any purchase that would leave the player unable to sit down
 ## at the next table, and says so.
 func _would_bust(price: int) -> bool:
 	if chips - price >= _shop_reserve():
 		return false
-	main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-	var msg := "THAT WOULD BUST YOU — the next table's seat costs %d chips" \
-			% _shop_reserve()
-	_shop_info.text = msg
-	_remove_info.text = msg
+	_shop_refuse("THAT WOULD BUST YOU — the next table's seat costs %d chips (you'd have %d left)" \
+			% [_shop_reserve(), chips - price])
 	return true
 
 
@@ -2087,6 +2082,7 @@ func _show_shop() -> void:
 	_shop_title.text = _shop_merchant.name
 	_shop_flavor.text = _shop_merchant.line
 	_shop_info.text = _shop_chips_line()
+	_shop_info.add_theme_color_override("font_color", main.GOLD)
 	_shop_burn_btn.visible = _shop_merchant.forge
 	_shop_burn_btn.text = "BURN A CARD — %d chips" % _burn_price()
 	_shop_burn_btn.disabled = _shop_burned_here
@@ -2110,7 +2106,7 @@ func _show_shop() -> void:
 		pc.scale = Vector2(1.3, 1.3)
 		pc.position = Vector2(85, 95)
 		holder.add_child(pc)
-		var price: int = offer.price
+		var price: int = _price(int(offer.base))
 		var price_tag: Label = main._label(holder, "%d chips" % price,
 				Vector2(0, 212), 18, main.GOLD)
 		price_tag.size = Vector2(170, 30)
@@ -2120,15 +2116,22 @@ func _show_shop() -> void:
 			price_tag.text = "SOLD"
 		var slot := offer
 		holder.pressed.connect(func() -> void:
-			if not slot.bought and chips >= price and not _would_bust(price):
-				chips -= price
-				slot.bought = true
-				deck.append(slot.data)
-				main.board._play_sound(Board.SFX_DEALS.pick_random(), 1.0, -8.0)
-				holder.disabled = true
-				price_tag.text = "SOLD"
-				_shop_info.text = _shop_chips_line()
-				_save_run())
+			if slot.bought:
+				return
+			var c: int = _price(int(slot.base))
+			if chips < c:
+				_shop_refuse("NOT ENOUGH CHIPS — that card costs %d" % c)
+				return
+			if _would_bust(c):
+				return
+			chips -= c
+			slot.bought = true
+			deck.append(slot.data)
+			main.board._play_sound(Board.SFX_DEALS.pick_random(), 1.0, -8.0)
+			_save_run()
+			# Full re-render: prices, chips line and disabled states all
+			# move with the purchase (a fresh Snake Oil discounts the rest).
+			_show_shop())
 		# Hover: the same stat breakdown the pick screen gives,
 		# floated beside the shelf card.
 		holder.mouse_entered.connect(func() -> void:
@@ -2191,20 +2194,25 @@ func _render_shop_relics() -> void:
 			btn.disabled = true
 			price_l.text = "%d chips — SATCHEL FULL" % cost
 		var pressed_slot := slot
-		var pressed_price := price_l
 		btn.pressed.connect(func() -> void:
-			if pressed_slot.bought or relics.size() >= MAX_RELICS:
+			if pressed_slot.bought:
+				return
+			if relics.size() >= MAX_RELICS:
+				_shop_refuse("YOUR SATCHEL IS FULL — %d relics is the limit" % MAX_RELICS)
 				return
 			var c := _price(RELIC_PRICES[RELICS[pressed_slot.id].rarity])
-			if chips >= c and not _would_bust(c):
-				chips -= c
-				pressed_slot.bought = true
-				_gain_relic(pressed_slot.id)
-				main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
-				btn.disabled = true
-				pressed_price.text = "SOLD"
-				_shop_info.text = _shop_chips_line()
-				_save_run())
+			if chips < c:
+				_shop_refuse("NOT ENOUGH CHIPS — that relic costs %d" % c)
+				return
+			if _would_bust(c):
+				return
+			chips -= c
+			pressed_slot.bought = true
+			_gain_relic(pressed_slot.id)
+			main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
+			_save_run()
+			# Full re-render: a fresh Snake Oil discounts the whole shelf.
+			_show_shop())
 
 
 ## One gold-bordered card-stat tooltip, parented to a screen layer.
@@ -2240,6 +2248,7 @@ func _show_remove() -> void:
 	shop_layer.visible = false
 	_deck_view_burn = true
 	_remove_info.text = "Pick a card to burn — %d chips (one per shop)" % _burn_price()
+	_remove_info.add_theme_color_override("font_color", main.OFFWHITE)
 	_populate_deck_view()
 
 
@@ -2291,15 +2300,20 @@ func _populate_deck_view() -> void:
 		holder.mouse_exited.connect(func() -> void:
 			_deck_tip.visible = false)
 		holder.pressed.connect(func() -> void:
-			if _deck_view_burn and chips >= _burn_price() \
-					and not _shop_burned_here and not _would_bust(_burn_price()):
-				chips -= _burn_price()
-				burns_used += 1
-				_shop_burned_here = true
-				deck.remove_at(idx)
-				main.board._play_sound(Board.SFX_MATCHES.pick_random(), 1.0, -6.0)
-				_save_run()
-				_show_shop())
+			if not _deck_view_burn or _shop_burned_here:
+				return
+			if chips < _burn_price():
+				_shop_refuse("NOT ENOUGH CHIPS — the burn costs %d" % _burn_price())
+				return
+			if _would_bust(_burn_price()):
+				return
+			chips -= _burn_price()
+			burns_used += 1
+			_shop_burned_here = true
+			deck.remove_at(idx)
+			main.board._play_sound(Board.SFX_MATCHES.pick_random(), 1.0, -6.0)
+			_save_run()
+			_show_shop())
 		_remove_grid.add_child(holder)
 	remove_layer.visible = true
 
