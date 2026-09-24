@@ -1899,16 +1899,25 @@ func tick_boss() -> void:
 # --- Trail hazard engine --------------------------------------------------
 
 ## Seeds `count` random plain cards with a hazard state (trail rooms).
-## LAND RUSH: claimed plots wear a gold halo under their cards.
+## LAND RUSH: a claimed plot's whole slot fills gold under its card,
+## rounded to match the table's slot corners.
+static var _claim_box: StyleBoxFlat
+
+
 func _draw() -> void:
 	if not landrush_active:
 		return
+	if _claim_box == null:
+		_claim_box = StyleBoxFlat.new()
+		_claim_box.bg_color = Color(0.91, 0.77, 0.28, 0.38)
+		_claim_box.set_corner_radius_all(9)
+		_claim_box.border_color = Color(0.95, 0.82, 0.35, 0.85)
+		_claim_box.set_border_width_all(2)
 	for cell: Vector2i in landrush_marks:
 		var c := cell_center(cell)
-		draw_rect(Rect2(
-				c - Vector2(PlayingCard.W / 2.0 + 4.0, PlayingCard.H / 2.0 + 4.0),
-				Vector2(PlayingCard.W + 8.0, PlayingCard.H + 8.0)),
-				Color(0.91, 0.77, 0.28, 0.5), false, 3.0)
+		_claim_box.draw(get_canvas_item(), Rect2(
+				c - Vector2(PlayingCard.W / 2.0 + 5.0, PlayingCard.H / 2.0 + 5.0),
+				Vector2(PlayingCard.W + 10.0, PlayingCard.H + 10.0)))
 
 
 func spawned_count(kind: String) -> int:
