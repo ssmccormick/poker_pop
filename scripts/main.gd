@@ -498,12 +498,12 @@ func _update_kit() -> void:
 		return
 	_kit_plate.visible = show
 	_kit_title.visible = show
-	for b in _kit_btns:
-		b.visible = show
+	for i in _kit_btns.size():
+		_kit_btns[i].visible = show and i < trail.kit_size()
 	if not show:
 		_kit_sig = ""
 		return
-	var sig := str(trail.provisions) + str(trail._aiming_slot)
+	var sig := str(trail.provisions) + str(trail._aiming_slot) + str(trail.kit_size())
 	if sig == _kit_sig:
 		return
 	_kit_sig = sig
@@ -1191,7 +1191,7 @@ const TUTOR := {
 	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot: clear a card from each of the 25 cells. A claimed plot wears a gold ring — fill the whole homestead to take the table."],
 	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand and the strongbox pays bonus chips. Purely optional — the room's real goal still rules."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
-	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots, no more. Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
+	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots (good SADDLEBAGS add a fourth). Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
 # tooltip with its full story instead.)
@@ -1699,11 +1699,12 @@ func _build_ui() -> void:
 	_label(hud_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
 			Vector2(PANEL_R, 860), 16, DIM)
 
-	# The provision KIT: three one-shot slots, trail rooms only.
-	_kit_plate = UiKit.plate(hud_root, Rect2(PANEL_R - 18, 524, 336, 296))
+	# The provision KIT: three one-shot slots, four with Saddlebags,
+	# trail rooms only.
+	_kit_plate = UiKit.plate(hud_root, Rect2(PANEL_R - 18, 524, 336, 312))
 	_kit_title = _label(hud_root, "KIT", Vector2(PANEL_R, 536), 22, DIM)
-	for i in 3:
-		var kb := _button(hud_root, "—", Vector2(PANEL_R, 578 + i * 78), Vector2(300, 66))
+	for i in 4:
+		var kb := _button(hud_root, "—", Vector2(PANEL_R, 574 + i * 64), Vector2(300, 56))
 		kb.add_theme_font_size_override("font_size", 19)
 		var slot := i
 		kb.pressed.connect(func() -> void:

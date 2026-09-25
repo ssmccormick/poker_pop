@@ -248,7 +248,7 @@ spread, soak, burn down, and count down from hand one.
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |
 | Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward) | Include it in any scoring hand to defuse |
-| Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored). If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card |
+| Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored). The FLAMES GROW as the rank falls — barely above the bottom edge on an Ace, all but consuming the card at rank 2. If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card. The next card to catch wears small flames licking its bottom edge |
 | Wind | THE CHARIOT | When played, every card from its cell to the edge in the wind's direction is blown off (unscored); the direction turns each hand and is HIDDEN by default — only the Weathervane relic shows the arrow. Safes are too heavy to move | Still a tool for the bold — a blind gust can kill a BOSS (blowing one off the table counts; a gusted tail segment wounds the cobra), and the Weathervane turns it back into a precision weapon |
 | Stone | STRENGTH | A BLOCKER: no rank, no suit, unplayable, and chains can't pass through it. Every card cleared orthogonally beside it chips it (3 chips = crumble); broken rock has a 35% chance of baring a GOLD card in the refill — everywhere, not just mines | Mine around it: build hands that clear its neighbors, and cash the gold it leaves behind |
 | Water | — | It DRIPS: every scoring hand, an uncleared water card soaks one random orthogonal neighbor — that card's rank and suit are WASHED AWAY, hidden until played. It still is what it was; you just have to remember | Play the water card to stop the leak (clearing it is a clean disposal, like every other hazard) |
@@ -322,7 +322,7 @@ the corner). Gold cards are solid gold head to toe.
 Roll weights: Mult 26% · Chip 26% · Plus 14% · Minus 10% · Bumper 11%
 · Gold 10% · Wild 3%, with the Explosive rider rolled separately.
 
-## Relic system (SHIPPED — all 15 below are in)
+## Relic system (SHIPPED — all 17 below are in)
 
 Run-wide passive items, Balatro-joker/StS-relic style. Held for the
 run (max 5 — visible as a row on the tarot screen and a line in-room),
@@ -348,12 +348,13 @@ Starter catalog (names/numbers draft):
 | Second Wind | R | First failed room each run adds no cursed card |
 | Bankroll Clip | R | Cash-out rate +0.25× |
 | Dowsing Rod | R | Safe combos use only ranks 2–6 |
+| Saddlebags | R | A 4th slot in the provision kit |
 | Lucky Chip | L | 10% chance a played hand costs no hand |
 
 ## Provisions (SHIPPED)
 
 One-shot consumables in a 3-slot KIT (right HUD column, trail rooms
-only). Using one is a FREE action — it never costs a hand; the
+only; the Saddlebags relic opens a 4th slot). Using one is a FREE action — it never costs a hand; the
 provision itself is the price. Two kinds: TARGETED (click the kit
 button, then a card on the table; right-click or press again to
 holster) and INSTANT (fires on the spot). Refusals explain themselves;

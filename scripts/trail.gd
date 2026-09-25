@@ -180,6 +180,7 @@ const RELICS := {
 	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "First failed room adds no cursed card"},
 	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Trail completion pays +0.25x"},
 	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combos use only ranks 2-6"},
+	"saddlebags": {"name": "Saddlebags", "rarity": 1, "desc": "A 4th slot in your provision kit"},
 	"lucky_chip": {"name": "Lucky Chip", "rarity": 2, "desc": "10% chance a hand costs no hand"},
 }
 
@@ -441,9 +442,14 @@ func _gain_relic(id: String) -> void:
 
 # --- Provisions -----------------------------------------------------------
 
+## Kit capacity: three slots, four with the Saddlebags relic.
+func kit_size() -> int:
+	return MAX_PROVISIONS + (1 if has_relic("saddlebags") else 0)
+
+
 ## Adds a provision to the kit. False when the kit is full.
 func gain_provision(id: String) -> bool:
-	if provisions.size() >= MAX_PROVISIONS:
+	if provisions.size() >= kit_size():
 		return false
 	provisions.append(id)
 	main.tutor_show("provisions")
@@ -1698,7 +1704,7 @@ func on_safe_cracked() -> void:
 	main.board._play_sound(Board.SFX_BELL, 1.0, -8.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.3)
 	var msg := "SAFE LOOT  +%d CHIPS" % loot
-	if randf() < 0.35 and provisions.size() < MAX_PROVISIONS:
+	if randf() < 0.35 and provisions.size() < kit_size():
 		# Sometimes the safe holds supplies instead of just coin.
 		var pid := _random_provision()
 		gain_provision(pid)
@@ -1725,7 +1731,7 @@ func _open_chest() -> void:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": "gold", "boom": false})
 		_announce_after_settle("CHEST  A GOLD CARD!")
-	elif roll < 0.88 and provisions.size() < MAX_PROVISIONS:
+	elif roll < 0.88 and provisions.size() < kit_size():
 		var pid := _random_provision()
 		gain_provision(pid)
 		_announce_after_settle("CHEST  A %s!" % String(PROVISIONS[pid].name).to_upper())
@@ -2449,15 +2455,15 @@ func _render_shop_provisions() -> void:
 		if slot.bought:
 			btn.disabled = true
 			price_l.text = "SOLD"
-		elif provisions.size() >= MAX_PROVISIONS:
+		elif provisions.size() >= kit_size():
 			btn.disabled = true
 			price_l.text = "%d chips — KIT FULL" % cost
 		var pressed_slot := slot
 		btn.pressed.connect(func() -> void:
 			if pressed_slot.bought:
 				return
-			if provisions.size() >= MAX_PROVISIONS:
-				_shop_refuse("YOUR KIT IS FULL — %d provisions is the limit" % MAX_PROVISIONS)
+			if provisions.size() >= kit_size():
+				_shop_refuse("YOUR KIT IS FULL — %d provisions is the limit" % kit_size())
 				return
 			var c := _price(int(PROVISIONS[pressed_slot.id].price))
 			if chips < c:

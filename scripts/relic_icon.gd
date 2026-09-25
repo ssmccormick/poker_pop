@@ -111,6 +111,15 @@ func _draw() -> void:
 			draw_line(Vector2(0, 16), Vector2(0, 0), WOOD, 4.0)
 			draw_line(Vector2(0, 0), Vector2(-11, -14), WOOD, 4.0)
 			draw_line(Vector2(0, 0), Vector2(11, -14), WOOD, 4.0)
+		"saddlebags":
+			# Two leather pouches draped over the saddle line.
+			draw_line(Vector2(-19, -9), Vector2(19, -9), WOOD, 3.5)
+			draw_rect(Rect2(-17, -9, 14, 20), Color(0.45, 0.32, 0.2))
+			draw_rect(Rect2(3, -9, 14, 20), Color(0.45, 0.32, 0.2))
+			draw_rect(Rect2(-17, -2, 14, 4), WOOD)
+			draw_rect(Rect2(3, -2, 14, 4), WOOD)
+			draw_circle(Vector2(-10, 6), 2.2, GOLD)
+			draw_circle(Vector2(10, 6), 2.2, GOLD)
 		"lucky_chip":
 			draw_circle(Vector2.ZERO, 16, RED)
 			for k in 6:

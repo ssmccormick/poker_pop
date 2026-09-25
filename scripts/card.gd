@@ -833,15 +833,20 @@ func _draw_pixel_map(map: Array, center: Vector2, px: float, col: Color) -> void
 				draw_rect(Rect2(origin + Vector2(x * px, y * px), Vector2(px, px)), col)
 
 
-## The card is ablaze: a flickering heat tint over the whole face and
-## three layers of tongues climbing from the bottom — deep red at the
-## back, orange, then a bright core. Translucent so the rank survives.
+## The card is ablaze, and the fire GROWS as the rank burns down: on
+## an Ace the tongues barely clear the bottom edge; by rank 2 the card
+## is all but consumed. Three layers — deep red at the back, orange,
+## then a bright core — translucent so the rank survives.
 func _draw_fire(rect: Rect2) -> void:
+	var burn := clampf(1.0 - (float(rank) - 2.0) / 12.0, 0.0, 1.0)
 	var flicker := 0.05 * sin(_t * 9.0 + _phase)
-	draw_rect(rect.grow(-2), Color(0.95, 0.45, 0.1, 0.16 + flicker))
-	_draw_flame_layer(rect, rect.size.y * 0.72, 4, 5.1, Color(0.72, 0.16, 0.05, 0.75))
-	_draw_flame_layer(rect, rect.size.y * 0.5, 5, 6.3, Color(0.9, 0.46, 0.16, 0.8))
-	_draw_flame_layer(rect, rect.size.y * 0.3, 6, 7.9, Color(1.0, 0.85, 0.5, 0.8))
+	draw_rect(rect.grow(-2), Color(0.95, 0.45, 0.1, 0.08 + 0.14 * burn + flicker))
+	_draw_flame_layer(rect, rect.size.y * lerpf(0.26, 1.0, burn), 4, 5.1,
+			Color(0.72, 0.16, 0.05, 0.75))
+	_draw_flame_layer(rect, rect.size.y * lerpf(0.17, 0.74, burn), 5, 6.3,
+			Color(0.9, 0.46, 0.16, 0.8))
+	_draw_flame_layer(rect, rect.size.y * lerpf(0.10, 0.46, burn), 6, 7.9,
+			Color(1.0, 0.85, 0.5, 0.8))
 
 
 ## One strip of flame tongues along the bottom edge; peaks breathe
@@ -954,28 +959,10 @@ func _draw_rock(rect: Rect2) -> void:
 func _draw_incoming(rect: Rect2) -> void:
 	match incoming:
 		"fire":
-			# Flint on tinder: bright little sparks snapping along the
-			# bottom edge, each blinking in at its own spot — the fire
+			# Small flames barely licking the bottom edge — the fire
 			# hasn't caught yet, but it's about to.
-			for k in 6:
-				var ph := _t * 6.0 + _phase + k * 1.7
-				if fposmod(ph, 1.0) > 0.38:
-					continue
-				var cycle := floorf(ph)
-				var jitter := fposmod(absf(sin(cycle * 12.9898 + k * 3.7)) * 437.585, 1.0)
-				var s := Vector2(rect.position.x + 8.0 + jitter * (rect.size.x - 16.0),
-						rect.end.y - 5.0 - fposmod(k * 5.3, 9.0))
-				var dir := Vector2.RIGHT.rotated(-0.5 - k * 0.4)
-				var col := Color(1.0, 0.92, 0.6, 0.95) if k % 2 == 0 \
-						else Color(1.0, 0.68, 0.3, 0.85)
-				draw_line(s, s + dir * (4.0 + 3.0 * absf(sin(ph * 9.0))), col, 1.8)
-				draw_circle(s, 1.2, col)
-			# Two embers smouldering in the tinder.
-			for k in 2:
-				var glow := 0.5 + 0.5 * sin(_t * 7.0 + _phase + k * 2.1)
-				draw_circle(Vector2(rect.position.x + 22.0 + k * 36.0
-						+ 5.0 * sin(_phase + k), rect.end.y - 5.0),
-						1.6 + glow, Color(1.0, 0.55, 0.2, 0.35 + 0.4 * glow))
+			_draw_flame_layer(rect, 11.0, 5, 6.0, Color(0.9, 0.46, 0.16, 0.6))
+			_draw_flame_layer(rect, 6.5, 6, 7.6, Color(1.0, 0.85, 0.5, 0.65))
 		"water":
 			var level := rect.end.y - 9.0
 			var pts := PackedVector2Array()
