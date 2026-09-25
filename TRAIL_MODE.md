@@ -350,6 +350,31 @@ Starter catalog (names/numbers draft):
 | Dowsing Rod | R | Safe combos use only ranks 2–6 |
 | Lucky Chip | L | 10% chance a played hand costs no hand |
 
+## Provisions (SHIPPED)
+
+One-shot consumables in a 3-slot KIT (right HUD column, trail rooms
+only). Using one is a FREE action — it never costs a hand; the
+provision itself is the price. Two kinds: TARGETED (click the kit
+button, then a card on the table; right-click or press again to
+holster) and INSTANT (fires on the spot). Refusals explain themselves;
+saved with the run.
+
+| Provision | Kind | Price | Effect |
+| --- | --- | --- | --- |
+| Canteen | Targeted | 45 | Douses one card — removes any hazard or soak (not stone) |
+| Dynamite Stick | Targeted | 60 | Destroys one card outright, unscored — stones and curses included (bosses, safes, and cobra coils are too big). Blasted mine stones still count toward the seam; a blasted treasure carrier respawns its piece |
+| Branding Iron | Targeted | 70 | Brands a plain, dry card with a random enhancement |
+| Barber's Razor | Targeted | 50 | Re-rolls one card's rank and suit (mods survive the cut) |
+| Gold Pan | Targeted | 65 | Turns one plain card solid GOLD |
+| Fresh Deck | Instant | 55 | Re-deals every plain and enhanced card; anchored things (hazards, bosses, safes, treasure, curses, backs) hold their ground |
+| Pocket Flask | Instant | 60 | +2 hands at this table (+20 seconds on a timed one) |
+| Rattlesnake Tonic | Instant | 70 | The next scored hand counts DOUBLE (the preview shows it) |
+
+Sources: merchants stock a crate (Peddler 2 · Collector 2 · Sharp 1,
+prices ×league mult, Snake Oil applies), ambient safes add one to the
+loot 35% of the time, and the chest reward table rolls one in its
+0.80–0.88 band. Tutor popup fires on the first one found.
+
 ## Shop v3 — traveling merchants (SHIPPED)
 
 Each shop stop is a different trader, rolled when the tarot offer is

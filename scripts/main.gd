@@ -60,6 +60,10 @@ var meter_fill: ColorRect
 var target_label: Label
 var target_bar_back: ColorRect
 var _boss_ticks: Control  # HP segment marks over the banner bar
+var _kit_plate: Panel
+var _kit_title: Label
+var _kit_btns: Array = []  # three provision slot buttons
+var _kit_sig := ""         # last-rendered kit state, to skip rebuilds
 var target_bar_fill: ColorRect
 var hand_display: Node2D
 var community_display: Node2D
@@ -219,6 +223,9 @@ func _ready() -> void:
 						break
 				if m != "trailbet":
 					trail._confirm_bet()
+				if m == "trailroom":
+					# Show the KIT stocked in the room screenshot.
+					trail.provisions = ["canteen", "tonic", "dynamite"]
 				if m == "trailhazard":
 					_debug_seed_hazards()
 			"trailheist":
@@ -479,7 +486,44 @@ func _update_labels() -> void:
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
 			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
+	_update_kit()
 	_update_preview()
+
+
+## The provision kit: three slots in the right column, trail rooms only.
+func _update_kit() -> void:
+	var show := mode_kind == "trail" and game_started and not menu_open \
+			and trail.in_room
+	if _kit_plate == null:
+		return
+	_kit_plate.visible = show
+	_kit_title.visible = show
+	for b in _kit_btns:
+		b.visible = show
+	if not show:
+		_kit_sig = ""
+		return
+	var sig := str(trail.provisions) + str(trail._aiming_slot)
+	if sig == _kit_sig:
+		return
+	_kit_sig = sig
+	for i in _kit_btns.size():
+		var btn: Button = _kit_btns[i]
+		if i < trail.provisions.size():
+			var p: Dictionary = TrailMode.PROVISIONS[trail.provisions[i]]
+			btn.disabled = false
+			if trail._aiming_slot == i:
+				btn.text = "AIMING…"
+				btn.tooltip_text = "Pick a card on the table — right-click or press again to holster."
+			else:
+				btn.text = p.name
+				btn.tooltip_text = p.desc + (
+						"\nClick, then pick a card on the table. Free action."
+						if p.kind == "target" else "\nFires on the spot. Free action.")
+		else:
+			btn.disabled = true
+			btn.text = "—"
+			btn.tooltip_text = "An empty kit slot. Provisions turn up in shops, safes, and chests."
 
 
 ## Restyles the banner bar as a red segmented HEALTH bar (bosses and
@@ -1147,6 +1191,7 @@ const TUTOR := {
 	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot: clear a card from each of the 25 cells. A claimed plot wears a gold ring — fill the whole homestead to take the table."],
 	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand and the strongbox pays bonus chips. Purely optional — the room's real goal still rules."],
 	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
+	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots, no more. Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
 # tooltip with its full story instead.)
@@ -1653,6 +1698,21 @@ func _build_ui() -> void:
 
 	_label(hud_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
 			Vector2(PANEL_R, 860), 16, DIM)
+
+	# The provision KIT: three one-shot slots, trail rooms only.
+	_kit_plate = UiKit.plate(hud_root, Rect2(PANEL_R - 18, 524, 336, 296))
+	_kit_title = _label(hud_root, "KIT", Vector2(PANEL_R, 536), 22, DIM)
+	for i in 3:
+		var kb := _button(hud_root, "—", Vector2(PANEL_R, 578 + i * 78), Vector2(300, 66))
+		kb.add_theme_font_size_override("font_size", 19)
+		var slot := i
+		kb.pressed.connect(func() -> void:
+			trail.use_provision(slot))
+		_kit_btns.append(kb)
+	_kit_plate.visible = false
+	_kit_title.visible = false
+	for b in _kit_btns:
+		b.visible = false
 
 	preview_label = _label(hud_root, "", Vector2(380, 1026), 26, DIM)
 

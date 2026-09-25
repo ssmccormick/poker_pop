@@ -133,14 +133,37 @@ const RELIC_PRICES := [90, 180, 375]  # by rarity C/R/L
 const MERCHANTS := [
 	{"id": "peddler", "name": "THE PEDDLER'S WAGON",
 		"line": "A little of everything, friend — cards, trinkets, and a hot forge.",
-		"cards": 8, "relics": 2, "forge": true},
+		"cards": 8, "relics": 2, "provisions": 2, "forge": true},
 	{"id": "collector", "name": "THE COLLECTOR",
 		"line": "No cardboard here. Only trinkets of real power.",
-		"cards": 0, "relics": 4, "forge": false},
+		"cards": 0, "relics": 4, "provisions": 2, "forge": false},
 	{"id": "sharp", "name": "THE CARD SHARP",
 		"line": "Finest cardboard on the trail — and a forge for your regrets.",
-		"cards": 10, "relics": 0, "forge": true},
+		"cards": 10, "relics": 0, "provisions": 1, "forge": true},
 ]
+
+# Provisions: one-shot consumables in a 3-slot kit. "target" ones are
+# aimed at a card on the table; "instant" ones fire on the spot. Using
+# one is a free action — the provision itself is the price.
+const PROVISIONS := {
+	"canteen": {"name": "Canteen", "kind": "target", "price": 45,
+		"desc": "Douse one card: removes any hazard or soak"},
+	"dynamite": {"name": "Dynamite Stick", "kind": "target", "price": 60,
+		"desc": "Destroy one card outright, unscored - stones and curses included"},
+	"branding_iron": {"name": "Branding Iron", "kind": "target", "price": 70,
+		"desc": "Brand a plain card with a random enhancement"},
+	"razor": {"name": "Barber's Razor", "kind": "target", "price": 50,
+		"desc": "Re-roll one card's rank and suit"},
+	"gold_pan": {"name": "Gold Pan", "kind": "target", "price": 65,
+		"desc": "Turn one plain card solid GOLD"},
+	"fresh_deck": {"name": "Fresh Deck", "kind": "instant", "price": 55,
+		"desc": "Re-deal every plain and enhanced card on the table"},
+	"pocket_flask": {"name": "Pocket Flask", "kind": "instant", "price": 60,
+		"desc": "+2 hands at this table (+20s on a timed one)"},
+	"tonic": {"name": "Rattlesnake Tonic", "kind": "instant", "price": 70,
+		"desc": "Your next scored hand counts DOUBLE"},
+}
+const MAX_PROVISIONS := 3
 const RELICS := {
 	"horseshoe": {"name": "Horseshoe", "rarity": 0, "desc": "+1 hand in every room"},
 	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks offer 4 choices"},
@@ -197,6 +220,9 @@ var room_grit := 3               # ...and yours
 const OUTLAW_GRIT := 3
 const OUTLAW_BAR_BASE := 75      # score under this and he fires (+ per region)
 var relics: Array = []   # relic ids held this run
+var provisions: Array = []       # provision ids in the kit (max 3, dupes fine)
+var _aiming_slot := -1           # kit slot waiting on a target, -1 = none
+var _shop_stock_provisions: Array = []   # [{id, bought}] on the shelf
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
 var _fire_tick_flip := false
@@ -253,6 +279,7 @@ var _end_label: Label
 var _shop_title: Label
 var _shop_flavor: Label
 var _shop_relic_box: Control
+var _shop_prov_box: Control
 var _shop_burn_btn: Button
 var _bet_back_btn: Button
 var _tarot_relics: Label
@@ -261,6 +288,7 @@ var _tarot_relics: Label
 func _ready() -> void:
 	_load_meta()
 	main.board.safe_cracked.connect(on_safe_cracked)
+	main.board.provision_targeted.connect(_on_provision_target)
 	main.board.boss_defeated.connect(func() -> void:
 		# Scored kills clear the room via result.boss_defeated inside
 		# on_hand_played (in_room is already false here). This catches
@@ -314,6 +342,10 @@ func _save_run() -> void:
 	for id in relics:
 		relic_arr.append(id)
 	cf.set_value("run", "relics", relic_arr)
+	var prov_arr := PackedStringArray()
+	for id in provisions:
+		prov_arr.append(id)
+	cf.set_value("run", "provisions", prov_arr)
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
@@ -351,6 +383,10 @@ func _load_run() -> bool:
 	relics.clear()
 	for id in cf.get_value("run", "relics", PackedStringArray()):
 		relics.append(String(id))
+	provisions.clear()
+	for id in cf.get_value("run", "provisions", PackedStringArray()):
+		if PROVISIONS.has(String(id)):
+			provisions.append(String(id))
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
@@ -401,6 +437,150 @@ func _gain_relic(id: String) -> void:
 	relics.append(id)
 	_apply_relic_effects()
 	_save_run()
+
+
+# --- Provisions -----------------------------------------------------------
+
+## Adds a provision to the kit. False when the kit is full.
+func gain_provision(id: String) -> bool:
+	if provisions.size() >= MAX_PROVISIONS:
+		return false
+	provisions.append(id)
+	main.tutor_show("provisions")
+	main.stat_bump("provisions_found")
+	_save_run()
+	return true
+
+
+## Kit button pressed: instants fire on the spot, targeted ones arm the
+## cursor and wait for a card. Free action — no hand spent.
+func use_provision(slot: int) -> void:
+	if slot < 0 or slot >= provisions.size():
+		return
+	if _aiming_slot == slot:
+		# Second press holsters the aimed provision.
+		main.board.pending_provision = ""
+		_aiming_slot = -1
+		main._announce("HOLSTERED", main.DIM)
+		return
+	if not in_room or not main.game_started or main.board.busy \
+			or main.board.locked or main.board.blackjack_presenting:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	var id: String = provisions[slot]
+	var p: Dictionary = PROVISIONS[id]
+	if p.kind == "instant":
+		_spend_provision(slot)
+		_apply_instant_provision(id)
+		return
+	_aiming_slot = slot
+	main.board.pending_provision = id
+	main._announce("PICK A CARD FOR THE %s — right-click to holster"
+			% String(p.name).to_upper(), main.GOLD)
+
+
+func _spend_provision(slot: int) -> void:
+	provisions.remove_at(slot)
+	_aiming_slot = -1
+	main.board.pending_provision = ""
+	main.stat_bump("provisions_used")
+	_save_run()
+
+
+func _apply_instant_provision(id: String) -> void:
+	match id:
+		"fresh_deck":
+			main._announce("FRESH DECK — THE TABLE TURNS OVER")
+			main.board.provision_redeal()
+		"pocket_flask":
+			if room_limit == "time":
+				room_time_left += 20.0
+				main._announce("POCKET FLASK  +20 SECONDS")
+			else:
+				room_hands_left += 2
+				main._announce("POCKET FLASK  +2 HANDS")
+			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.2, -8.0)
+		"tonic":
+			main.board.next_hand_mult = 2.0
+			main.board._play_sound(Board.SFX_FLIP, 0.8, -8.0)
+			main._announce("RATTLESNAKE TONIC — NEXT HAND COUNTS DOUBLE")
+
+
+## The aimed provision picked a card (null = holstered by right-click).
+func _on_provision_target(card) -> void:
+	if _aiming_slot < 0 or _aiming_slot >= provisions.size():
+		_aiming_slot = -1
+		return
+	if card == null:
+		_aiming_slot = -1
+		main._announce("HOLSTERED", main.DIM)
+		return
+	var id: String = provisions[_aiming_slot]
+	var why := _provision_refusal(id, card)
+	if why != "":
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce(why, main.RED)
+		return  # still aiming — pick another card or holster
+	var slot := _aiming_slot
+	_spend_provision(slot)
+	_apply_target_provision(id, card)
+
+
+## Why this card can't take this provision — "" when it can.
+func _provision_refusal(id: String, card: PlayingCard) -> String:
+	if card.face_down:
+		return "IT'S FACE DOWN — no telling what you'd hit"
+	match id:
+		"canteen":
+			if card.hazard == "" and not card.washed:
+				return "NOTHING TO DOUSE THERE"
+			if card.hazard == "stone":
+				return "WATER WON'T MOVE STONE — try dynamite"
+		"dynamite":
+			if card.boss != "" or card.is_safe or card.snake_tail:
+				return "TOO BIG TO BLOW — pick something smaller"
+		"branding_iron", "gold_pan":
+			if card.boss != "" or card.is_safe or card.snake_tail \
+					or card.cursed or card.hazard != "" or card.washed \
+					or card.mod != "":
+				return "THE BRAND NEEDS A PLAIN, DRY CARD"
+		"razor":
+			if card.boss != "" or card.is_safe or card.snake_tail \
+					or card.cursed or card.hazard == "stone":
+				return "NOTHING THERE TO SHAVE"
+	return ""
+
+
+func _apply_target_provision(id: String, card: PlayingCard) -> void:
+	match id:
+		"canteen":
+			main._announce("DOUSED")
+			main.board.provision_clean(card)
+		"dynamite":
+			if card.hazard == "stone" and room_goal == "mine":
+				# Blasting the seam still counts toward the quota.
+				room_stones_broken += 1
+			var piece: String = card.objective if card.objective in ["key", "chest"] else ""
+			main._announce("DYNAMITE!")
+			await main.board.provision_destroy(card)
+			if piece != "" and room_goal == "chest" and in_room:
+				main.board.spawn_objective(piece)
+				main._announce("THE %s TURNS UP ELSEWHERE" % piece.to_upper())
+		"branding_iron":
+			var mod := _random_mod()
+			main._announce("BRANDED: %s" % mod.to_upper())
+			main.board.provision_enhance(card, mod)
+		"gold_pan":
+			main._announce("STRUCK GOLD")
+			main.board.provision_enhance(card, "gold")
+		"razor":
+			main._announce("A FRESH FACE")
+			main.board.provision_reroll(card)
+
+
+## A random provision id for shops and loot.
+func _random_provision() -> String:
+	return PROVISIONS.keys().pick_random()
 
 
 ## A random relic id the player doesn't own yet, or "" if none left.
@@ -549,6 +729,8 @@ func _start_run(tier: int) -> void:
 	deck = _fresh_deck()
 	room_index = 0
 	relics.clear()
+	provisions.clear()
+	_aiming_slot = -1
 	burns_used = 0
 	_second_wind_used = false
 	_fire_tick_flip = false
@@ -1515,7 +1697,13 @@ func on_safe_cracked() -> void:
 	chips += loot
 	main.board._play_sound(Board.SFX_BELL, 1.0, -8.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.3)
-	_announce_after_settle("SAFE LOOT  +%d CHIPS" % loot)
+	var msg := "SAFE LOOT  +%d CHIPS" % loot
+	if randf() < 0.35 and provisions.size() < MAX_PROVISIONS:
+		# Sometimes the safe holds supplies instead of just coin.
+		var pid := _random_provision()
+		gain_provision(pid)
+		msg += "  ·  %s" % String(PROVISIONS[pid].name).to_upper()
+	_announce_after_settle(msg)
 	_consume_hand()
 
 
@@ -1537,7 +1725,11 @@ func _open_chest() -> void:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": "gold", "boom": false})
 		_announce_after_settle("CHEST  A GOLD CARD!")
-	elif roll < 0.90 and relics.size() < MAX_RELICS and _unowned_relic() != "":
+	elif roll < 0.88 and provisions.size() < MAX_PROVISIONS:
+		var pid := _random_provision()
+		gain_provision(pid)
+		_announce_after_settle("CHEST  A %s!" % String(PROVISIONS[pid].name).to_upper())
+	elif roll < 0.95 and relics.size() < MAX_RELICS and _unowned_relic() != "":
 		var id := _unowned_relic()
 		_gain_relic(id)
 		_announce_after_settle("CHEST  RELIC: %s!" % RELICS[id].name)
@@ -1796,6 +1988,8 @@ func _tick_room_hazards() -> void:
 
 func _room_cleared() -> void:
 	in_room = false
+	_aiming_slot = -1
+	main.board.pending_provision = ""
 	pending_retry = {}
 	main.stat_bump("tables_cleared")
 	if current_offer.has("boss"):
@@ -1902,6 +2096,8 @@ func on_abandon_room() -> void:
 	if not in_room:
 		return
 	in_room = false
+	_aiming_slot = -1
+	main.board.pending_provision = ""
 	# No penalty for stepping away: the whole outlay comes back and the
 	# table is saved — returning restarts it like a fresh sit-down.
 	if current_offer.has("boss"):
@@ -2077,6 +2273,11 @@ func _show_shop() -> void:
 		_shop_stock_relics = []
 		for i in mini(int(_shop_merchant.relics), pool.size()):
 			_shop_stock_relics.append({"id": pool[i], "bought": false})
+		var ppool: Array = PROVISIONS.keys()
+		ppool.shuffle()
+		_shop_stock_provisions = []
+		for i in mini(int(_shop_merchant.get("provisions", 0)), ppool.size()):
+			_shop_stock_provisions.append({"id": ppool[i], "bought": false})
 		_shop_burned_here = false
 		_shop_stock_room = room_index
 	_shop_title.text = _shop_merchant.name
@@ -2089,6 +2290,7 @@ func _show_shop() -> void:
 	if _shop_burned_here:
 		_shop_burn_btn.text = "THE FORGE IS COLD (one burn per shop)"
 	_render_shop_relics()
+	_render_shop_provisions()
 	for child in _shop_box.get_children():
 		child.queue_free()
 	for i in _shop_stock.size():
@@ -2212,6 +2414,62 @@ func _render_shop_relics() -> void:
 			main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
 			_save_run()
 			# Full re-render: a fresh Snake Oil discounts the whole shelf.
+			_show_shop())
+
+
+## The merchant's provision crate: name, effect, and price per slot.
+func _render_shop_provisions() -> void:
+	for child in _shop_prov_box.get_children():
+		child.queue_free()
+	if _shop_stock_provisions.is_empty():
+		return
+	var header := Label.new()
+	header.text = "PROVISIONS"
+	header.position = Vector2(0, 0)
+	header.size = Vector2(210, 30)
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	header.add_theme_font_size_override("font_size", 22)
+	header.add_theme_color_override("font_color", main.GOLD)
+	_shop_prov_box.add_child(header)
+	for i in _shop_stock_provisions.size():
+		var slot: Dictionary = _shop_stock_provisions[i]
+		var p: Dictionary = PROVISIONS[slot.id]
+		var cost := _price(int(p.price))
+		var btn: Button = main._button(_shop_prov_box, "",
+				Vector2(0, 40 + i * 140), Vector2(210, 126))
+		var name_l := _face_label(btn, p.name, 10.0, 26.0, 18, main.GOLD)
+		name_l.position.x = 10
+		name_l.size.x = 190
+		var desc_l := _face_label(btn, p.desc, 38.0, 56.0, 13, main.OFFWHITE)
+		desc_l.position.x = 10
+		desc_l.size.x = 190
+		var price_l := _face_label(btn, "%d chips" % cost, 96.0, 24.0, 16, main.GOLD)
+		price_l.position.x = 10
+		price_l.size.x = 190
+		if slot.bought:
+			btn.disabled = true
+			price_l.text = "SOLD"
+		elif provisions.size() >= MAX_PROVISIONS:
+			btn.disabled = true
+			price_l.text = "%d chips — KIT FULL" % cost
+		var pressed_slot := slot
+		btn.pressed.connect(func() -> void:
+			if pressed_slot.bought:
+				return
+			if provisions.size() >= MAX_PROVISIONS:
+				_shop_refuse("YOUR KIT IS FULL — %d provisions is the limit" % MAX_PROVISIONS)
+				return
+			var c := _price(int(PROVISIONS[pressed_slot.id].price))
+			if chips < c:
+				_shop_refuse("NOT ENOUGH CHIPS — that costs %d" % c)
+				return
+			if _would_bust(c):
+				return
+			chips -= c
+			pressed_slot.bought = true
+			gain_provision(pressed_slot.id)
+			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+			_save_run()
 			_show_shop())
 
 
@@ -2460,6 +2718,9 @@ func build_ui() -> void:
 	_shop_relic_box = Control.new()
 	_shop_relic_box.position = Vector2(1480, 250)
 	shop_layer.add_child(_shop_relic_box)
+	_shop_prov_box = Control.new()
+	_shop_prov_box.position = Vector2(30, 250)
+	shop_layer.add_child(_shop_prov_box)
 	# Hover tooltip for the shelves, floated beside the hovered card.
 	_shop_tip = _make_stat_tip(shop_layer)
 	_shop_tip_label = _shop_tip.get_child(0) as Label

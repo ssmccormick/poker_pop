@@ -17,6 +17,7 @@ signal settle_landed                  # fires once when Phase A lands
 signal refill_done                    # internal: refill finished or skipped
 signal safe_cracked                   # the combo chain opened the safe
 signal boss_defeated                  # the room's boss is down
+signal provision_targeted(card)       # aimed provision picked a card (null = holstered)
 
 const GAP := 8
 const CELL_W := PlayingCard.W + GAP
@@ -119,6 +120,10 @@ var blackjack_presenting := false       # he's playing his hand out — table lo
 var blackjack_facedown := false         # this table deals its refills face-down
 # CRAZY 8s: every 8 on the board counts as wild.
 var eights_wild := false
+# Provisions: a targeted one waiting for its card, and the Rattlesnake
+# Tonic's promise (applied by _apply_card_mods, consumed by play_hand).
+var pending_provision := ""
+var next_hand_mult := 1.0
 
 
 func _select_cap() -> int:
@@ -328,6 +333,8 @@ func reset(deal_facedown := false) -> void:
 	blackjack_facedown = deal_facedown
 	eights_wild = false
 	PlayingCard.eights_wild = false
+	pending_provision = ""
+	next_hand_mult = 1.0
 	for card in grid.values():
 		card.queue_free()
 	grid.clear()
@@ -379,6 +386,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _refill_active and event is InputEventMouseButton and event.pressed:
 		_skip_refill()
 	if busy or locked:
+		return
+	if pending_provision != "" and event is InputEventMouseButton and event.pressed:
+		# An aimed provision eats the click: left picks the card, any
+		# other button holsters it.
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			var pick := _card_under_mouse(true)
+			if pick != null:
+				provision_targeted.emit(pick)
+		else:
+			pending_provision = ""
+			provision_targeted.emit(null)
 		return
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -662,6 +680,7 @@ func play_hand() -> void:
 			_reject_hand()
 			return
 	_apply_card_mods(result)
+	next_hand_mult = 1.0  # the tonic's promise is spent on this hand
 	result["count"] = selected.size()
 	# Objectives riding in the hand: key+chest pairs, duel bullets, and
 	# the hold'em re-deal card.
@@ -1715,6 +1734,95 @@ func _apply_card_mods(result: Dictionary) -> void:
 	if gold_cards > 0:
 		# Real money, straight to the pocket: $1 per gold card.
 		result["cash_earned"] = gold_cards
+	if next_hand_mult != 1.0:
+		# Rattlesnake Tonic: the promised double, shown in the preview
+		# too. play_hand consumes the flag when the hand actually scores.
+		result.score = int(result.score * next_hand_mult)
+		result["tonic"] = true
+
+
+# --- Provisions: board primitives (validity rules live in trail) ----------
+
+## Canteen: strips hazard state and soak off one card.
+func provision_clean(card: PlayingCard) -> void:
+	card.hazard = ""
+	card.washed = false
+	card.incoming = ""
+	card.fuse = 0
+	card.queue_redraw()
+	_play_sound(SFX_FLIP, 0.6, -8.0)
+	_fx(card.position, "splash")
+
+
+## Dynamite: one card leaves the table outright, then gravity settles.
+func provision_destroy(card: PlayingCard) -> void:
+	if busy or locked or not grid.has(card.grid_pos):
+		return
+	busy = true
+	clear_selection()
+	grid.erase(card.grid_pos)
+	shake_requested.emit(7.0)
+	_play_sound(SFX_POPS.pick_random(), 0.6, -4.0)
+	_fx(card.position, "sparks")
+	_fx(card.position, "smoke")
+	var tw := create_tween()
+	tw.tween_property(card, "scale", Vector2.ZERO, 0.22) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	await tw.finished
+	card.queue_free()
+	await _fall_and_fill(false)
+	busy = false
+
+
+## Branding Iron / Gold Pan: burns an enhancement onto a plain card.
+func provision_enhance(card: PlayingCard, mod: String) -> void:
+	card.mod = mod
+	if mod in ["plus", "minus", "bumper"]:
+		card.boost_dir = HAZARD_DIRS.pick_random()
+	card.queue_redraw()
+	_play_sound(SFX_MATCHES.pick_random(), 1.2, -8.0)
+	_fx(card.position, "sparks", Color("e8c547") if mod == "gold" else Color.WHITE)
+
+
+## Barber's Razor: a fresh face on the same card (mods survive the cut).
+func provision_reroll(card: PlayingCard) -> void:
+	card.rank = randi_range(2, 14)
+	card.suit = randi_range(0, 3)
+	card.queue_redraw()
+	_play_sound(SFX_FLIP, 1.3, -8.0)
+	_fx(card.position, "pop", card.suit_color())
+
+
+## Fresh Deck: every plain and enhanced card is swept and re-dealt.
+## Anchored things — hazards, bosses, safes, tails, treasure, bullets,
+## curses, blackjack backs — hold their ground.
+func provision_redeal() -> void:
+	if busy or locked:
+		return
+	var going: Array = []
+	for p in grid.keys():
+		var c: PlayingCard = grid[p]
+		if c.hazard == "" and c.boss == "" and not c.is_safe \
+				and not c.snake_tail and c.objective == "" \
+				and not c.cursed and not c.face_down and not c.honey:
+			going.append(c)
+	if going.is_empty():
+		return
+	busy = true
+	clear_selection()
+	_play_sound(SFX_SHUFFLES.pick_random(), 1.0, -5.0)
+	var tw := create_tween().set_parallel(true)
+	for i in going.size():
+		var c: PlayingCard = going[i]
+		grid.erase(c.grid_pos)
+		tw.tween_property(c, "scale", Vector2.ZERO, 0.2) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN) \
+				.set_delay(0.02 * i)
+	await tw.finished
+	for c in going:
+		c.queue_free()
+	await _fall_and_fill(false)
+	busy = false
 
 
 ## Old save/deck mod ids map onto the current family.
