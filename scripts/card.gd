@@ -526,11 +526,33 @@ func _draw() -> void:
 		if selected:
 			pass  # border/badge drawn below as usual
 	elif washed:
-		# The splash hides everything — you'd better remember this card.
-		draw_rect(rect.grow(-3), Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.16))
-		_draw_pixel_map(DROP_PX, Vector2(0, 2), 5.0, WATER_BLUE)
-		_draw_pixel_map(DROP_PX, Vector2(-W / 2.0 + 14, -H / 2.0 + 22), 2.0, WATER_BLUE)
-		_draw_pixel_map(DROP_PX, Vector2(W / 2.0 - 16, H / 2.0 - 24), 2.0, WATER_BLUE)
+		# Fully swamped: solid water to the brim — whatever this card
+		# was is down there somewhere, and the face is unreadable.
+		var body := rect.grow(-3)
+		draw_rect(body, Color(0.22, 0.38, 0.52))
+		# The waterline rolls just under the top edge, with a paler
+		# sliver of air above it so it reads as filled, not painted.
+		var level := body.position.y + 8.0
+		var surface := PackedVector2Array()
+		for i in 11:
+			var x := body.position.x + body.size.x * i / 10.0
+			surface.append(Vector2(x, level + 2.5 * sin(x * 0.18 + _t * 2.4 + _phase)))
+		var crest := surface.duplicate()
+		crest.append(Vector2(body.end.x, body.position.y))
+		crest.append(Vector2(body.position.x, body.position.y))
+		draw_colored_polygon(crest, Color(0.62, 0.78, 0.88))
+		draw_polyline(surface, Color(0.82, 0.93, 1.0, 0.95), 2.0)
+		# Faint drowned shapes and bubbles working their way up.
+		draw_circle(Vector2(-8, 6), 9.0, Color(0.19, 0.33, 0.46))
+		draw_circle(Vector2(10, -14), 6.0, Color(0.19, 0.33, 0.46))
+		draw_circle(Vector2(6, 26), 7.0, Color(0.19, 0.33, 0.46))
+		for k in 4:
+			var cycle := fposmod(_t * (0.35 + k * 0.14) + k * 0.41 + _phase, 1.0)
+			var bx := body.position.x + body.size.x * (0.18 + 0.21 * k) \
+					+ 5.0 * sin(cycle * 8.0 + k)
+			var by := lerpf(body.end.y - 8.0, level + 8.0, cycle)
+			draw_circle(Vector2(bx, by), 1.6 + 0.8 * (k % 2),
+					Color(0.85, 0.95, 1.0, 0.75 * (1.0 - cycle * 0.4)))
 		if washed_show_suit:  # Magnifying Glass
 			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	else:
