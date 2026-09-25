@@ -58,16 +58,25 @@ func _init() -> void:
 	failures += _check(b.grid[Vector2i(4, 4)].hazard == "", "distant card untouched")
 	_free_board(b)
 
-	# --- water drips on the tick -------------------------------------------
+	# --- the flood: water rises four ticks, then pours ----------------------
 	b = _board([[5, 0, 0, 0], [7, 1, 1, 0]])
 	b.grid[Vector2i(0, 0)].hazard = "water"
-	var wres: Dictionary = b._tick_fire_and_bombs()
-	failures += _check(wres.soaked == [Vector2i(1, 0)],
-			"water soaks its orthogonal neighbor on the tick")
-	failures += _check(b.grid[Vector2i(1, 0)].washed, "neighbor is washed")
-	wres = b._tick_fire_and_bombs()
-	failures += _check(wres.soaked.is_empty(),
-			"nothing left to soak once neighbors are washed")
+	for i in 4:
+		b._tick_fire_and_bombs()
+	failures += _check(b.grid[Vector2i(0, 0)].water_level == 4,
+			"the leak fills its own card in four ticks")
+	failures += _check(not b.grid[Vector2i(0, 0)].washed,
+			"the full SOURCE stays readable — stop the leak by playing it")
+	failures += _check(b.grid[Vector2i(1, 0)].water_level == 0,
+			"nothing pours before the source is full")
+	b._tick_fire_and_bombs()
+	failures += _check(b.grid[Vector2i(1, 0)].water_level == 1,
+			"a full card pours into its dry orthogonal neighbor")
+	for i in 3:
+		b._tick_fire_and_bombs()
+	failures += _check(b.grid[Vector2i(1, 0)].water_level == 4
+			and b.grid[Vector2i(1, 0)].washed,
+			"a victim at the brim drowns — face hidden, and it pours on")
 	_free_board(b)
 
 	# --- a fully burning board loses the table ------------------------------

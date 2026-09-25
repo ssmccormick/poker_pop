@@ -537,14 +537,16 @@ func _style_boss_bar(hp: int, max_hp: int) -> void:
 	target_bar_fill.color = RED
 	target_bar_fill.size.x = BAR_W * clampf(float(hp) / float(max_hp), 0.0, 1.0)
 	_boss_ticks.visible = true
-	# One notch per life; rebuild only when the segment count changes.
-	if _boss_ticks.get_child_count() != max_hp - 1:
+	# One notch per life — or ten even notches for a score-pool boss
+	# like the Jack, whose max runs to the thousands.
+	var seg := max_hp if max_hp <= 12 else 10
+	if _boss_ticks.get_child_count() != seg - 1:
 		for c in _boss_ticks.get_children():
 			c.queue_free()
-		for i in range(1, max_hp):
+		for i in range(1, seg):
 			var t := ColorRect.new()
 			t.color = Color(0, 0, 0, 0.55)
-			t.position = Vector2(BAR_W * i / max_hp, 0.0)
+			t.position = Vector2(BAR_W * i / seg, 0.0)
 			t.size = Vector2(3, 10)
 			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			_boss_ticks.add_child(t)
@@ -1100,13 +1102,13 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.face_down:
 		return "FACE DOWN\nSelect it to HIT: it flips on the spot and its pips join your sum. No take-backs — flip past 21 and you bust the round."
 	if card.washed:
-		lines.append("SOAKED — face hidden. It still is what it was… if you remember.")
+		lines.append("DROWNED — full to the brim: face hidden, and it POURS into its neighbors every hand. It still is what it was — play it blind if you remember, or bail it out with a canteen.")
 	else:
 		lines.append("%s of %s  ·  pips %d" % [rank_names.get(card.rank, str(card.rank)),
 				PlayingCard.SUIT_NAMES[card.suit], card.rank])
 	match card.boss:
 		"jack":
-			lines.append("JACK OF ALL TRADES — HP %d. Only hands scoring %d+ wound him, and the bar rises per hit." % [card.boss_hp, board.jack_bar])
+			lines.append("JACK OF ALL TRADES — %d score left to deal him. A hand beating %d with him in it bleeds its WHOLE SCORE off him; the bar rises per hit." % [card.boss_hp, board.jack_bar])
 		"queen":
 			lines.append("QUEEN BEE — %d stripes. Only 2-3 card hands can hold her." % card.boss_hp)
 		"cobra":
@@ -1126,7 +1128,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
 					"" if card.stone_hits == 1 else "s"])
 		"water":
-			lines.append("WATER — soaks a neighbor every hand. Play it to stop the leak.")
+			lines.append("WATER — the leak: fills 1/4 per hand (%d/4 now). A card full to the brim POURS into all four neighbors. Play it to stop the leak." % card.water_level)
 	match card.mod:
 		"chip":
 			lines.append("CHIP — pays +%d chips when played." % board.chip_bonus)
@@ -1146,6 +1148,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		lines.append("CRAZY 8s — this 8 counts as WILD: any rank, any suit.")
 	if card.two_plus:
 		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
+	if card.water_level > 0 and not card.washed and card.hazard != "water":
+		lines.append("FLOODING — %d/4 full and rising. At the brim the face drowns and it starts pouring. Still playable: clear it before it goes under." % card.water_level)
 	if card.incoming != "":
 		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
 	if card.boom:
@@ -1180,7 +1184,7 @@ const TUTOR := {
 	"goal_mine": ["GOLD MINE", "The board is choked with stone, and the seam runs 20 stones deep. Chip the rocks by clearing cards BESIDE them (three chips each) — broken rock has a chance of leaving GOLD cards in the rubble, and fresh rock rides in on the deal until the whole seam is on the table. Mine it DRY: the table clears only when every last stone is rubble."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
-	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand to wound him, but only hands that BEAT HIS BAR count — and the bar rises with every hit. Ten wounds puts him away."],
+	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE bleeds off him — the bar rises with every hit. Deal 10,000 total to put him away."],
 	"boss_queen": ["QUEEN BEE", "The Queen only fits in SMALL hands — 2 or 3 cards. She alternates: one hand she moves, the next she honeys a neighbor (honeyed cards also only play in small hands). Sting her three times."],
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
@@ -1190,7 +1194,7 @@ const TUTOR := {
 	"goal_collect": ["THE ROUNDUP", "The table calls for particular cardboard: a count of one SUIT, a stack of one RANK, or cards of many DIFFERENT ranks. Only cards actually cleared in scoring hands count — the banner tracks the tally."],
 	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot: clear a card from each of the 25 cells. A claimed plot wears a gold ring — fill the whole homestead to take the table."],
 	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand and the strongbox pays bonus chips. Purely optional — the room's real goal still rules."],
-	"relics": ["RELICS", "Run-wide charms (up to five). Each one quietly bends the rules in your favor for the rest of the ride."],
+	"relics": ["RELICS", "Run-wide charms — carry as many as you can afford. Each one quietly bends the rules in your favor for the rest of the ride."],
 	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots (good SADDLEBAGS add a fourth). Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
 }
 # (Modifier cards get no popup — hovering any board card shows a

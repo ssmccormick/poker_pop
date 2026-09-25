@@ -711,10 +711,11 @@ func play_hand() -> void:
 	for card in selected:
 		match card.boss:
 			"jack":
-				# The Jack shrugs off hands under his rising bar.
+				# The Jack shrugs off hands under his rising bar; a hand
+				# that beats it deals its whole SCORE as damage.
 				if jack_bar > 0 and result.score < jack_bar:
 					result["jack_shrugged"] = true
-				elif card.boss_hp <= 1:
+				elif card.boss_hp <= result.score:
 					result["boss_defeated"] = true
 			"queen":
 				if card.boss_hp <= 1:
@@ -757,7 +758,8 @@ func play_hand() -> void:
 			# reroll and teleport as usual.
 			continue
 		if card.boss == "jack" or card.boss == "queen":
-			card.boss_hp -= 1
+			# The Jack bleeds score; the Queen loses a stripe.
+			card.boss_hp -= result.score if card.boss == "jack" else 1
 			if card.boss == "jack":
 				jack_bar += JACK_BAR_STEP
 			boss_hits.append(card)  # the shot lands after the shoves
@@ -860,8 +862,9 @@ func play_hand() -> void:
 		for c in shoved_off:
 			c.queue_free()
 		if bounced_boss != null:
-			# Off the table costs him a life — then he storms right back.
-			bounced_boss.boss_hp -= 1
+			# Off the table costs him a life — a thousand points of the
+			# Jack's score pool, or one of the Queen's stripes.
+			bounced_boss.boss_hp -= 1000 if bounced_boss.boss == "jack" else 1
 			if bounced_boss.boss == "jack":
 				jack_bar += JACK_BAR_STEP
 			_play_sound(SFX_REVOLVERS.pick_random(), 1.0, -7.0)
@@ -1743,12 +1746,13 @@ func _apply_card_mods(result: Dictionary) -> void:
 
 # --- Provisions: board primitives (validity rules live in trail) ----------
 
-## Canteen: strips hazard state and soak off one card.
+## Canteen: strips hazard state, flood water and soak off one card.
 func provision_clean(card: PlayingCard) -> void:
 	card.hazard = ""
 	card.washed = false
 	card.incoming = ""
 	card.fuse = 0
+	card.water_level = 0
 	card.queue_redraw()
 	_play_sound(SFX_FLIP, 0.6, -8.0)
 	_fx(card.position, "splash")
@@ -1839,12 +1843,14 @@ static func migrate_mod(mod: String) -> String:
 
 # --- Trail boss engine ----------------------------------------------------
 
-const JACK_HP := 10
+# The Jack's life is a SCORE pool: qualifying hands deal their score
+# as damage, and 10,000 total puts him down.
+const JACK_HP := 10000
 const QUEEN_STRIPES := 3
 const COBRA_START_TAIL := 2
 # The Jack only respects strong hands: the hand that clears him must
 # beat this bar to wound him, and every wound raises it.
-const JACK_BAR_BASE := 50
+const JACK_BAR_BASE := 30
 const JACK_BAR_STEP := 25
 var jack_bar := 0
 
@@ -2303,22 +2309,39 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		if grid[p].hazard == "wind":
 			var wd: Vector2i = grid[p].wind_dir
 			grid[p].wind_dir = Vector2i(-wd.y, wd.x)
-	# Water drips: every uncleared water card soaks one random orthogonal
-	# plain neighbor per tick — clear it fast to stop the leak.
-	var soaked: Array = []
-	var waters: Array = []
+	# The FLOOD: every watered card rises one step per tick, filling in
+	# four. A card already at the brim at the start of the tick POURS —
+	# each orthogonal plain, dry neighbor starts filling. A victim that
+	# reaches the brim drowns (washed) and becomes a pourer itself.
+	var soaked: Array = []   # cells where water just started or rose
+	var flooded: Array = []  # cells that just reached the brim
+	var pourers: Array = []
+	var risers: Array = []
 	for p in grid:
-		if grid[p].hazard == "water":
-			waters.append(p)
-	for p in waters:
-		if grid[p].hazard_fresh:
-			continue  # landed this round — it starts dripping next one
-		for d in _intent_dirs(grid[p]):
+		var c: PlayingCard = grid[p]
+		if c.hazard == "water" and c.hazard_fresh:
+			continue  # landed this round — the leak starts next one
+		if c.water_level >= PlayingCard.WATER_FULL_LEVEL:
+			pourers.append(p)
+		elif c.hazard == "water" or c.water_level > 0:
+			risers.append(p)
+	for p in pourers:
+		for d in HAZARD_DIRS:
 			var q: Vector2i = p + d
-			if _victim_ok(q):
-				grid[q].washed = true
+			if _victim_ok(q) and grid[q].water_level == 0:
+				grid[q].water_level = 1
 				soaked.append(q)
-				break
+	for p in risers:
+		var c: PlayingCard = grid[p]
+		c.water_level += 1
+		soaked.append(p)
+		if c.water_level >= PlayingCard.WATER_FULL_LEVEL:
+			flooded.append(p)
+			if c.hazard != "water":
+				# Drowned: the face sinks out of sight. The leaky source
+				# itself stays readable (and playable) — stop THAT to
+				# stop the flood.
+				c.washed = true
 	var fires: Array = []
 	if tick_fire:
 		for p in grid:
@@ -2354,7 +2377,7 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		grid[p].hazard_fresh = false
 	_aim_spreaders()
 	return {"burned": burned, "ignited": ignited, "exploded": exploded,
-			"soaked": soaked}
+			"soaked": soaked, "flooded": flooded}
 
 
 ## Hazards on the table from the deal fight from hand one — only
@@ -2371,9 +2394,10 @@ func _victim_ok(q: Vector2i) -> bool:
 	if not grid.has(q):
 		return false
 	var c: PlayingCard = grid[q]
+	# A damp card won't catch fire, and pours don't restart it either.
 	return c.hazard == "" and not c.cursed and not c.washed \
 			and c.boss == "" and not c.is_safe and not c.snake_tail \
-			and c.objective == ""
+			and c.objective == "" and c.water_level == 0
 
 
 ## Points every fire/water card's next strike at a neighbor it can
@@ -2386,17 +2410,21 @@ func _aim_spreaders() -> void:
 		grid[p].incoming = ""
 	for p in grid:
 		var card: PlayingCard = grid[p]
-		if card.hazard != "fire" and card.hazard != "water":
-			continue
-		if not _victim_ok(p + card.next_dir):
-			var dirs := HAZARD_DIRS.duplicate()
-			dirs.shuffle()
-			for d in dirs:
+		if card.hazard == "fire":
+			if not _victim_ok(p + card.next_dir):
+				var dirs := HAZARD_DIRS.duplicate()
+				dirs.shuffle()
+				for d in dirs:
+					if _victim_ok(p + d):
+						card.next_dir = d
+						break
+			if _victim_ok(p + card.next_dir):
+				grid[p + card.next_dir].incoming = "fire"
+		elif card.water_level >= PlayingCard.WATER_FULL_LEVEL:
+			# A full card pours EVERY way at once — warn all of them.
+			for d in HAZARD_DIRS:
 				if _victim_ok(p + d):
-					card.next_dir = d
-					break
-		if _victim_ok(p + card.next_dir):
-			grid[p + card.next_dir].incoming = card.hazard
+					grid[p + d].incoming = "water"
 
 
 ## Runs the per-hand hazard tick with animations: called by trail after
@@ -2413,9 +2441,16 @@ func tick_hazards(tick_fire := true) -> bool:
 		return false
 	busy = true
 	var res := _tick_fire_and_bombs(tick_fire)
-	if not res.soaked.is_empty():
+	# Splash only where the water NEWLY arrived or just hit the brim —
+	# a quiet rise every hand would drown the table in noise.
+	var splashes: Array = []
+	for cell in res.soaked:
+		if grid.has(cell) and (grid[cell].water_level == 1
+				or grid[cell].water_level >= PlayingCard.WATER_FULL_LEVEL):
+			splashes.append(cell)
+	if not splashes.is_empty():
 		_play_sound(SFX_FLIP, 0.6, -8.0)
-		for cell in res.soaked:
+		for cell in splashes:
 			_fx(cell_center(cell), "splash")
 	if not res.ignited.is_empty():
 		_play_sound(SFX_MATCHES.pick_random(), randf_range(0.95, 1.1), -8.0)

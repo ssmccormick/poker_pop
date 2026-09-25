@@ -218,9 +218,18 @@ var incoming := "":
 		incoming = value
 		_update_processing()
 		queue_redraw()
-var washed := false:  # splashed: rank/suit hidden from the player
+var washed := false:  # drowned: rank/suit hidden under the waterline
 	set(value):
 		washed = value
+		_update_processing()
+		queue_redraw()
+# The flood: 0 = dry, rises one step per hand, WATER_FULL_LEVEL = at
+# the brim (the face drowns and the card pours into its neighbors).
+const WATER_FULL_LEVEL := 4
+var water_level := 0:
+	set(value):
+		water_level = value
+		_update_processing()
 		queue_redraw()
 # Deck enhancement (trail): "", "chip" (bonus chips when played),
 # "mult" (multiplies the hand it's in), "gold" ($1 real cash when
@@ -307,7 +316,8 @@ func _process(delta: float) -> void:
 ## Animate only while something on this card moves: a live hazard
 ## (stone sits still) or an incoming-strike preview.
 func _update_processing() -> void:
-	set_process((hazard != "" and hazard != "stone") or incoming != "")
+	set_process((hazard != "" and hazard != "stone") or incoming != ""
+			or water_level > 0 or washed)
 
 
 ## Fire, bombs, water and wind smoulder, spark, drip, or swirl
@@ -526,33 +536,12 @@ func _draw() -> void:
 		if selected:
 			pass  # border/badge drawn below as usual
 	elif washed:
-		# Fully swamped: solid water to the brim — whatever this card
-		# was is down there somewhere, and the face is unreadable.
-		var body := rect.grow(-3)
-		draw_rect(body, Color(0.22, 0.38, 0.52))
-		# The waterline rolls just under the top edge, with a paler
-		# sliver of air above it so it reads as filled, not painted.
-		var level := body.position.y + 8.0
-		var surface := PackedVector2Array()
-		for i in 11:
-			var x := body.position.x + body.size.x * i / 10.0
-			surface.append(Vector2(x, level + 2.5 * sin(x * 0.18 + _t * 2.4 + _phase)))
-		var crest := surface.duplicate()
-		crest.append(Vector2(body.end.x, body.position.y))
-		crest.append(Vector2(body.position.x, body.position.y))
-		draw_colored_polygon(crest, Color(0.62, 0.78, 0.88))
-		draw_polyline(surface, Color(0.82, 0.93, 1.0, 0.95), 2.0)
-		# Faint drowned shapes and bubbles working their way up.
+		# Drowned: water to the brim — whatever this card was is down
+		# there somewhere, and the face is unreadable.
+		_draw_flood(rect, 1.0, true)
 		draw_circle(Vector2(-8, 6), 9.0, Color(0.19, 0.33, 0.46))
 		draw_circle(Vector2(10, -14), 6.0, Color(0.19, 0.33, 0.46))
 		draw_circle(Vector2(6, 26), 7.0, Color(0.19, 0.33, 0.46))
-		for k in 4:
-			var cycle := fposmod(_t * (0.35 + k * 0.14) + k * 0.41 + _phase, 1.0)
-			var bx := body.position.x + body.size.x * (0.18 + 0.21 * k) \
-					+ 5.0 * sin(cycle * 8.0 + k)
-			var by := lerpf(body.end.y - 8.0, level + 8.0, cycle)
-			draw_circle(Vector2(bx, by), 1.6 + 0.8 * (k % 2),
-					Color(0.85, 0.95, 1.0, 0.75 * (1.0 - cycle * 0.4)))
 		if washed_show_suit:  # Magnifying Glass
 			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	else:
@@ -585,6 +574,11 @@ func _draw() -> void:
 					HORIZONTAL_ALIGNMENT_CENTER, 48, 46, WILD_PURPLE)
 		else:
 			_draw_suit(Vector2(0, 6), 5.0)
+
+	if water_level > 0 and not washed and hazard != "water":
+		# The flood spreading card by card: opaque water climbing the
+		# face — at the brim it drowns (washed) and starts pouring.
+		_draw_flood(rect, water_level / float(WATER_FULL_LEVEL), true)
 
 	match hazard:
 		"bomb":
@@ -653,10 +647,13 @@ func _draw() -> void:
 	match boss:
 		"jack":
 			_draw_pixel_map(CROWN_PX, Vector2(0, -H / 2.0 + 8), 3.0, GOLD)
+			# Score left to deal him, in thousands — the badge can't fit
+			# five digits, and the banner bar carries the exact count.
 			var bc := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
 			draw_circle(bc, 12, ERROR_RED)
-			draw_string(font, bc + Vector2(-10, 5), str(boss_hp),
-					HORIZONTAL_ALIGNMENT_CENTER, 20, 14, Color.WHITE)
+			draw_string(font, bc + Vector2(-11, 5),
+					"%dK" % ceili(boss_hp / 1000.0),
+					HORIZONTAL_ALIGNMENT_CENTER, 22, 12, Color.WHITE)
 		"queen":
 			_draw_pixel_map(CROWN_PX, Vector2(0, -H / 2.0 + 8), 3.0, GOLD)
 			for i in boss_hp:
@@ -890,27 +887,41 @@ func _draw_flame_layer(rect: Rect2, max_h: float, tongues: int, speed: float,
 	draw_colored_polygon(pts, col)
 
 
-## Half-swamped: water fills the lower half behind a rolling waveline,
-## with the odd bubble working its way up to the surface.
+## The leaky SOURCE card: translucent water at its current level, so
+## the face stays readable and the card stays playable.
 func _draw_water(rect: Rect2) -> void:
-	var level := rect.position.y + rect.size.y * 0.52
+	_draw_flood(rect, lerpf(0.16, 0.94,
+			water_level / float(WATER_FULL_LEVEL)), false)
+
+
+## The flood at height `frac` (0..1): a water body rising from the
+## bottom behind a rolling, animated surface line, with bubbles
+## working their way up. Opaque for drowning victims, translucent on
+## the leaky source so its face survives.
+func _draw_flood(rect: Rect2, frac: float, opaque: bool) -> void:
+	var body := rect.grow(-3)
+	var level := body.end.y - body.size.y * clampf(frac, 0.08, 1.0)
 	var surface := PackedVector2Array()
-	var n := 10
-	for i in n + 1:
-		var x := rect.position.x + 2.0 + (rect.size.x - 4.0) * i / n
-		surface.append(Vector2(x, level + 3.0 * sin(x * 0.16 + _t * 2.6 + _phase)))
+	for i in 11:
+		var x := body.position.x + body.size.x * i / 10.0
+		surface.append(Vector2(x, level + 2.6 * sin(x * 0.18 + _t * 2.5 + _phase)))
 	var fill := surface.duplicate()
-	fill.append(Vector2(rect.end.x - 2.0, rect.end.y - 2.0))
-	fill.append(Vector2(rect.position.x + 2.0, rect.end.y - 2.0))
-	draw_colored_polygon(fill, Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.42))
-	draw_polyline(surface, Color(0.82, 0.93, 1.0, 0.8), 2.0)
-	for b in 3:
-		var cycle := fposmod(_t * (0.45 + b * 0.17) + b * 0.37 + _phase, 1.0)
-		var bx := rect.position.x + rect.size.x * (0.25 + 0.25 * b) \
-				+ 4.0 * sin(cycle * 9.0 + b)
-		var by := lerpf(rect.end.y - 8.0, level + 6.0, cycle)
-		draw_circle(Vector2(bx, by), 2.2,
-				Color(0.85, 0.95, 1.0, 0.55 * (1.0 - cycle * 0.5)))
+	fill.append(Vector2(body.end.x, body.end.y))
+	fill.append(Vector2(body.position.x, body.end.y))
+	if opaque:
+		draw_colored_polygon(fill, Color(0.22, 0.38, 0.52))
+	else:
+		draw_colored_polygon(fill, Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.42))
+	draw_polyline(surface, Color(0.82, 0.93, 1.0, 0.9 if opaque else 0.75), 2.0)
+	# Bubbles need a little depth to rise through.
+	if body.end.y - level > 16.0:
+		for k in 3:
+			var cycle := fposmod(_t * (0.4 + k * 0.15) + k * 0.41 + _phase, 1.0)
+			var bx := body.position.x + body.size.x * (0.25 + 0.25 * k) \
+					+ 4.0 * sin(cycle * 8.0 + k)
+			var by := lerpf(body.end.y - 6.0, level + 6.0, cycle)
+			draw_circle(Vector2(bx, by), 2.0, Color(0.85, 0.95, 1.0,
+					(0.7 if opaque else 0.5) * (1.0 - cycle * 0.4)))
 
 
 ## Caught in a twister: translucent streaks orbiting the whole card,
