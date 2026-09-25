@@ -20,7 +20,7 @@ const QUEEN_ROOM := 13
 # carry stacks that keep pace.
 const POST_BOSS_COST_MULT := 10
 const BOSSES := {
-	"jack": {"tarot": "THE JACK", "name": "Jack of All Trades", "hands": 18},
+	"jack": {"tarot": "THE JACK", "name": "Jack of All Trades", "hands": 30},
 	"queen": {"tarot": "THE QUEEN", "name": "Queen Bee", "hands": 14},
 	"cobra": {"tarot": "THE KING", "name": "King Cobra", "hands": 14},
 }
@@ -125,8 +125,8 @@ const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
 # Meta and run saves live under the active profile (main.profile_path).
 
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
-const MAX_RELICS := 5
-const RELIC_PRICES := [90, 180, 375]  # by rarity C/R/L
+const MAX_RELICS := 999  # no satchel limit — the price is the gate
+const RELIC_PRICES := [150, 300, 600]  # by rarity C/R/L — carry is unlimited, so they cost dear
 
 # Traveling merchants: each shop stop is a different trader, rolled
 # per room, with their own stock — some deal only in relics.
@@ -538,7 +538,7 @@ func _provision_refusal(id: String, card: PlayingCard) -> String:
 		return "IT'S FACE DOWN — no telling what you'd hit"
 	match id:
 		"canteen":
-			if card.hazard == "" and not card.washed:
+			if card.hazard == "" and not card.washed and card.water_level == 0:
 				return "NOTHING TO DOUSE THERE"
 			if card.hazard == "stone":
 				return "WATER WON'T MOVE STONE — try dynamite"
@@ -548,7 +548,7 @@ func _provision_refusal(id: String, card: PlayingCard) -> String:
 		"branding_iron", "gold_pan":
 			if card.boss != "" or card.is_safe or card.snake_tail \
 					or card.cursed or card.hazard != "" or card.washed \
-					or card.mod != "":
+					or card.mod != "" or card.water_level > 0:
 				return "THE BRAND NEEDS A PLAIN, DRY CARD"
 		"razor":
 			if card.boss != "" or card.is_safe or card.snake_tail \
@@ -955,24 +955,26 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer["goal"] = "collect"
 			offer.odds = 1.5
 			offer.target = 0
-			offer.hands = mini(MAX_HANDS_BUY, 9 + region)
+			offer.hands = mini(MAX_HANDS_BUY, 10 + region)
 			match randi() % 3:
 				0:
+					# A real drive: most hands must be built around the
+					# called suit to land the count in time.
 					offer.tarot = "THE ROUNDUP"
 					offer.label = "Roundup"
 					offer["collect_suit"] = randi_range(0, 3)
-					offer["collect_need"] = 8 + 2 * region
+					offer["collect_need"] = 12 + 3 * region
 				1:
 					offer.tarot = "WANTED"
 					offer.label = "Wanted"
 					offer.odds = 2.0
 					offer["collect_rank"] = randi_range(2, 14)
-					offer["collect_need"] = 3 + region
+					offer["collect_need"] = 5 + region
 				_:
 					offer.tarot = "THE CENSUS"
 					offer.label = "Census"
 					offer["collect_kinds"] = true
-					offer["collect_need"] = 9 + region
+					offer["collect_need"] = mini(13, 11 + region)
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
 				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
 				+ OUTLAW_CHANCE + COLLECT_CHANCE + LANDRUSH_CHANCE:
@@ -2398,15 +2400,9 @@ func _render_shop_relics() -> void:
 		elif relics.has(slot.id):
 			btn.disabled = true
 			price_l.text = "ALREADY CARRIED"
-		elif relics.size() >= MAX_RELICS:
-			btn.disabled = true
-			price_l.text = "%d chips — SATCHEL FULL" % cost
 		var pressed_slot := slot
 		btn.pressed.connect(func() -> void:
 			if pressed_slot.bought:
-				return
-			if relics.size() >= MAX_RELICS:
-				_shop_refuse("YOUR SATCHEL IS FULL — %d relics is the limit" % MAX_RELICS)
 				return
 			var c := _price(RELIC_PRICES[RELICS[pressed_slot.id].rarity])
 			if chips < c:
@@ -2662,7 +2658,11 @@ func build_ui() -> void:
 	_tarot_cards_box = Control.new()
 	_tarot_cards_box.position = Vector2(0, 330)
 	tarot_layer.add_child(_tarot_cards_box)
-	_tarot_relics = _center(tarot_layer, "", 272, 18, main.GOLD)
+	_tarot_relics = _center(tarot_layer, "", 268, 16, main.GOLD)
+	# Unlimited carry: the trophy line can get long, so let it wrap.
+	_tarot_relics.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tarot_relics.size = Vector2(1500, 76)
+	_tarot_relics.position.x = 210
 	_center(tarot_layer, "No cashing out mid-ride: reach the end of the trail, or play GOLD cards for $cash along the way.", 850, 18, main.DIM)
 	_back_button(tarot_layer, back_to_menu, "MENU")
 	var deck_btn: Button = main._button(tarot_layer, "VIEW DECK", Vector2(1660, 970), Vector2(200, 54))

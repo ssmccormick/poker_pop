@@ -129,7 +129,7 @@ quarter clockwise every hand.
 | Normal | Score target within the hands you bought | The baseline |
 | Purge | A QUOTA hunt: 4 of ONE hazard kind (bomb/fire/wind/water) seeded at the deal, clear 10 (+3 per region) total AND leave the table clean; up to 2 more trickle in per hand keeping ≥4 on the table until the quota is spawned (no score target) | Shipped. Cleared = spawned − standing, so ANY exit counts: played, gusted off, shoved off, burned out, blown up. Fire spread adds to the spawned ledger, so WILDFIRE can overshoot its quota while flames still stand — the room isn't won until every last fire is out (and all-ablaze still loses the table). No ambient extras — the hazards ARE the room |
 | Gold Mine | Mine the seam DRY: 20 stones total — 12 seeded, the rest riding in on the deal (≤2/hand, keeping ≥6 standing until all 20 have spawned); the table clears only when every stone is broken (chip by clearing cards beside them, 3 chips each); 12 hands | Shipped. NOT a solid board — the plain cards between stones pop and refill so the mine shifts every hand. Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash) |
-| THE ROUNDUP / WANTED / THE CENSUS | Roundup family (goal "collect"): clear 8+2·region cards of one SUIT, or 3+region of one RANK (WANTED, 2:1), or cards of 9+region DIFFERENT ranks (CENSUS) — only cards actually cleared in scoring hands count (shipped) |
+| THE ROUNDUP / WANTED / THE CENSUS | Roundup family (goal "collect"): clear 12+3·region cards of one SUIT, or 5+region of one RANK (WANTED, 2:1), or cards of 11+region DIFFERENT ranks, capped at 13 (CENSUS) — only cards actually cleared in scoring hands count; 10+region hands to do it (shipped) |
 | LAND RUSH | Claim every plot: clear a card from each of the 25 cells; claimed plots wear a gold ring under the card; 12 hands, 2:1 (shipped) |
 | Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
 | Royal Hunt | Make one Royal Flush | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
@@ -251,15 +251,16 @@ spread, soak, burn down, and count down from hand one.
 | Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored). The FLAMES GROW as the rank falls — barely above the bottom edge on an Ace, all but consuming the card at rank 2. If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card. The next card to catch wears small flames licking its bottom edge |
 | Wind | THE CHARIOT | When played, every card from its cell to the edge in the wind's direction is blown off (unscored); the direction turns each hand and is HIDDEN by default — only the Weathervane relic shows the arrow. Safes are too heavy to move | Still a tool for the bold — a blind gust can kill a BOSS (blowing one off the table counts; a gusted tail segment wounds the cobra), and the Weathervane turns it back into a precision weapon |
 | Stone | STRENGTH | A BLOCKER: no rank, no suit, unplayable, and chains can't pass through it. Every card cleared orthogonally beside it chips it (3 chips = crumble); broken rock has a 35% chance of baring a GOLD card in the refill — everywhere, not just mines | Mine around it: build hands that clear its neighbors, and cash the gold it leaves behind |
-| Water | — | It DRIPS: every scoring hand, an uncleared water card soaks one random orthogonal neighbor — that card's rank and suit are WASHED AWAY, hidden until played. It still is what it was; you just have to remember | Play the water card to stop the leak (clearing it is a clean disposal, like every other hazard) |
+| Water | — | The FLOOD: a water card FILLS 1/4 per hand (translucent, its face stays readable). At the brim it POURS — all four orthogonal neighbors start filling, 4 hands each, opaque water climbing their faces. A victim at the brim DROWNS (face hidden) and pours onward itself | Play the source at any level to stop the leak; clear filling victims before they go under; a canteen bails out any one card. Drowned cards still play blind — if you remember what they were |
 
 Design calls: fire spreads 4-way (8-way wipes 5×5 boards); spread skips
 hazarded/cursed cards; hazards don't persist in the run save.
-Water calls: washed cards play normally (the evaluator knows the truth —
-the player doesn't); while a washed card is selected the preview shows
-"???" and the valid-hand green border is suppressed so you can't probe
-for free; the splash only lands on plain cards (never hazarded, cursed,
-objective, or already-washed ones); washing is room-local.
+Water calls: drowned (washed) cards play normally (the evaluator knows
+the truth — the player doesn't); while one is selected the preview
+shows "???" and the valid-hand green border is suppressed so you can't
+probe for free; water only pours into plain cards (never hazarded,
+cursed, objective, or already-damp ones); damp cards can't catch fire;
+flooding is room-local.
 
 ## Objective cards (SHIPPED)
 
@@ -310,7 +311,7 @@ overlay and a hover panel explaining the hovered card.
 | Gold card | Pays $1 of real, bankable cash every time it's played. Drawn SOLID GOLD, face and all |
 | Plus card | When cleared, the card its arrow points at gains +1 rank. Boosting an ACE wraps it into a LUCKY 2+ (green-framed deuce) that DOUBLES any hand it scores in (stacking). The arrow turns a quarter clockwise every hand — time the clear to aim it |
 | Minus card | Mirror of Plus: the aimed card drops −1 rank — and a 2 ground lower is DESTROYED, removed from the table unscored. Sculpt a King down to match your Queens, or grind junk to nothing |
-| Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand) — the push lands FIRST, while the bumper still sits on the felt, then the scored cards pop and the board settles. A gap absorbs the push; safes and cobra coils block it; a card pushed past the edge is removed unscored. The Jack and Queen ride the shove like anyone else: off the edge costs the boss ONE LIFE, and he storms back onto the vacated cell |
+| Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand) — the push lands FIRST, while the bumper still sits on the felt, then the scored cards pop and the board settles. A gap absorbs the push; safes and cobra coils block it; a card pushed past the edge is removed unscored. The Jack and Queen ride the shove like anyone else: off the edge costs the boss one life (a Queen stripe, or 1,000 of the Jack's score pool), and he storms back onto the vacated cell |
 | Wild card | Counts as ANY rank and suit; the evaluator takes the best assignment. The rarest roll (~3%) |
 | EXPLOSIVE (rider) | Not a mod — a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
 
@@ -325,10 +326,11 @@ Roll weights: Mult 26% · Chip 26% · Plus 14% · Minus 10% · Bumper 11%
 ## Relic system (SHIPPED — all 17 below are in)
 
 Run-wide passive items, Balatro-joker/StS-relic style. Held for the
-run (max 5 — visible as a row on the tarot screen and a line in-room),
-saved with the run, gone when it ends. Acquired from the shop's relic
-slot, chest rewards, and eventually bosses. Rarity sets price:
-Common ~60 chips · Rare ~120 · Legendary ~250.
+run — NO carry limit; the price is the gate — shown as a (wrapping)
+line on the tarot screen, saved with the run, gone when it ends.
+Acquired from the shop's relic slot and chest rewards. Rarity sets
+price: Common 150 chips · Rare 300 · Legendary 600 (×league
+multiplier, Snake Oil −25%).
 
 Starter catalog (names/numbers draft):
 | Relic | Rarity | Effect |
@@ -390,7 +392,7 @@ by leaving):
 | THE CARD SHARP | 10 | 0 | yes |
 
 Card prices: plain 40 chips, duplicates-of-owned 50, modified 80.
-Relic prices by rarity: C 90 / R 180 / L 375 (Snake Oil still −25%).
+Relic prices by rarity: C 150 / R 300 / L 600 (Snake Oil still −25%).
 Prices are computed at display time, so buying Snake Oil re-prices
 the rest of that same shop on the spot. Every purchase re-renders
 the shelves, and a refused purchase says WHY, loud and in red: not
@@ -451,14 +453,16 @@ within the hand budget to clear, at 3:1 odds. Bosses are LIVING CARDS
 on the board, participating in hands with their current identity —
 which makes deck sculpting the boss prep (stock queens before room 14).
 
-- **JACK OF ALL TRADES** (room 7) — a boss card with **10 HP**
-  (blackjack Jack). Every submitted hand — including ones that clear
-  him — makes him teleport and re-roll his rank AND suit. Pin him into
-  a scoring hand to deal 1 damage — but only hands **beating his bar**
-  count (starts 50, **+25 per wound**, shown in the banner); weaker
-  hands make him scoff and stay. Do it ten times. HP badge on the
-  card. A gust that blows him off the table still counts regardless.
-  A bumper shove off the edge costs him a life too — he storms back on.
+- **JACK OF ALL TRADES** (room 7) — his life is a **10,000-point
+  SCORE POOL**, fought over **30 hands**. Every submitted hand —
+  including ones that hit him — makes him teleport and re-roll his
+  rank AND suit. Pin him into a scoring hand that **beats his bar**
+  (starts 30, **+25 per hit**, shown in the banner) and the hand's
+  WHOLE SCORE bleeds off him; weaker hands make him scoff and stay.
+  The card badge shows thousands left ("7K"); the banner bar carries
+  the exact count in ten notches. A gust off the table is still an
+  instant kill; a bumper shove off the edge drains 1,000 — and he
+  storms back on.
 - **Boss feedback** — every wound lands as a visible SLUG: the scored
   hand's pieces gather into a gold bullet that zooms from the hand's
   center into the boss card (flinch + sparks + table shake). Boss
