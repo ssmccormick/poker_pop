@@ -174,7 +174,7 @@ const RELICS := {
 	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
 	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
 	"weathervane": {"name": "Weathervane", "rarity": 1, "desc": "Wind cards show which way they blow"},
-	"magnifying_glass": {"name": "Magnifying Glass", "rarity": 1, "desc": "Soaked cards still show their suit"},
+	"magnifying_glass": {"name": "Magnifying Glass", "rarity": 1, "desc": "Filled cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
 	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "First failed room adds no cursed card"},

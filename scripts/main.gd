@@ -662,7 +662,7 @@ func _update_preview() -> void:
 				return
 		for card in board.selected:
 			if card.washed:
-				preview_label.text = "???  —  a soaked card hides this hand's value."
+				preview_label.text = "???  —  a filled card hides this hand's value."
 				preview_label.add_theme_color_override("font_color", GOLD)
 				return
 		var result := Poker.evaluate(data)
@@ -1102,7 +1102,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.face_down:
 		return "FACE DOWN\nSelect it to HIT: it flips on the spot and its pips join your sum. No take-backs — flip past 21 and you bust the round."
 	if card.washed:
-		lines.append("DROWNED — full to the brim: face hidden, and it POURS into its neighbors every hand. It still is what it was — play it blind if you remember, or bail it out with a canteen.")
+		lines.append("FILLED — water to the brim: the card is under there somewhere, and it POURS into its neighbors every hand. It still is what it was — play it blind if you remember, or bail it out with a canteen.")
 	else:
 		lines.append("%s of %s  ·  pips %d" % [rank_names.get(card.rank, str(card.rank)),
 				PlayingCard.SUIT_NAMES[card.suit], card.rank])
@@ -1149,7 +1149,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.two_plus:
 		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
 	if card.water_level > 0 and not card.washed and card.hazard != "water":
-		lines.append("FLOODING — %d/4 full and rising. At the brim the face drowns and it starts pouring. Still playable: clear it before it goes under." % card.water_level)
+		lines.append("FLOODING — %d/4 full and rising. At the brim it's FILLED — face gone under, and it starts pouring. Still playable: clear it before it goes under." % card.water_level)
 	if card.incoming != "":
 		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
 	if card.boom:
@@ -1177,7 +1177,7 @@ const TUTOR := {
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. The card it will strike next shows SPARKS catching at its bottom edge, like flint on tinder — get it out of the path or douse the fire. If EVERY card on the table catches fire, the table is LOST."],
 	"hazard_wind": ["WIND CARD", "Play it and every card in the wind's direction is blown clean off the board — unscored. The direction turns a quarter every hand, and the wind keeps its secret: without a WEATHERVANE relic you won't know which way it blows until it does."],
 	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
-	"hazard_water": ["WATER CARD", "Every hand it drips, soaking an adjacent card — washing away its face. The card it will soak next shows water seeping in at its bottom edge. The soaked card still IS what it was... if you remember. Play the water card to stop the leak."],
+	"hazard_water": ["WATER CARD", "The leak FILLS its card 1/4 per hand. Full to the brim, it POURS into all four neighbors — and any card that fills goes under, face hidden, pouring onward. A FILLED card still IS what it was... if you remember. Play the water card, at any level, to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
 	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Clear a piece WITHOUT its partner and it DROPS to the card below it — and off the bottom edge it falls back in from the top of that column. The hardest job on the trail — the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],
