@@ -286,13 +286,10 @@ modified card.
   hands, reference ~1 minute per pair + 1, with minutes as the odds
   promise like HIGH NOON. Each opened chest pays its reward roll AND
   respawns a fresh key + chest until the count is met; clearing the
-  room awards a RELIC. A piece cleared WITHOUT its partner DROPS off
-  its carrier to the card below in the same column — and past the
-  bottom edge it wraps, falling in from the top onto that column's
-  first card (skipping stones/safes/bosses/other pieces; if nothing
-  in the column can catch it, it respawns on a fresh card). Pieces
-  lost off the board entirely (burned, gusted, bumped) respawn on a
-  fresh card — it just cost you seconds.
+  room awards a RELIC. A piece cleared WITHOUT its partner — or lost
+  off the board entirely (burned, gusted, bumped) — simply respawns
+  on a fresh random card; the seconds spent finding it are the price.
+  (The column-drop mechanic was tried and reverted.)
 - **Ambient chests**: random chance in normal rooms as optional loot.
 - v1: objective spawns don't mix with hazard rooms.
 

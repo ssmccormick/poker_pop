@@ -796,15 +796,6 @@ func play_hand() -> void:
 	result["cleared_cards"] = cleared_cards
 	result["cleared_cells"] = cleared_cells
 
-	# Stagecoach pieces cleared without their partner drop off the
-	# carrier and fall down the column (wrapping past the bottom).
-	if not result.get("chest_opened", false):
-		for card in poppers:
-			if card.objective in ["key", "chest"]:
-				var piece: String = card.objective
-				card.objective = ""
-				_drop_objective(piece, card.grid_pos, poppers)
-
 	# Stones are blockers now: every cleared card chips each stone
 	# beside it, and a stone out of chips crumbles with the pops.
 	var breaking := 0
@@ -1111,68 +1102,6 @@ func spawn_safe(combo: Array) -> void:
 	old.queue_free()
 
 
-## Marks two random plain cards as the key and the chest.
-## A falling key or chest, drawn from the card glyph pixel maps.
-class DropGlyph extends Node2D:
-	var kind := "key"
-
-	func _draw() -> void:
-		var map: Array = PlayingCard.KEY_PX if kind == "key" else PlayingCard.CHEST_PX
-		var col := Color("e8c547") if kind == "key" else Color("b07f3e")
-		var px := 3.0
-		var origin := Vector2(-map[0].length() * px / 2.0, -map.size() * px / 2.0)
-		for y in map.size():
-			var row: String = map[y]
-			for x in row.length():
-				if row[x] == "1":
-					draw_rect(Rect2(origin + Vector2(x * px, y * px),
-							Vector2(px, px)), col)
-
-
-## Stagecoach pieces don't vanish with their carrier: a key or chest
-## cleared without its partner DROPS to the card below in its column
-## — and off the bottom edge it wraps, falling in from the top onto
-## that column's first card. Returns false when no card can catch it.
-func _drop_objective(kind: String, from_cell: Vector2i, skip: Array) -> bool:
-	var target: PlayingCard = null
-	var cell := from_cell
-	for step in rows - 1:
-		cell = Vector2i(cell.x, (cell.y + 1) % rows)
-		if not grid.has(cell):
-			continue
-		var c: PlayingCard = grid[cell]
-		if skip.has(c) or c.cursed or c.is_safe or c.boss != "" \
-				or c.snake_tail or c.hazard == "stone" or c.objective != "":
-			continue
-		target = c
-		break
-	if target == null:
-		return false
-	target.objective = kind
-	if not is_inside_tree():
-		return true
-	# The piece visibly falls from the cleared card to its new home.
-	var g := DropGlyph.new()
-	g.kind = kind
-	g.z_index = 25
-	add_child(g)
-	g.position = cell_center(from_cell)
-	var wrapped: bool = target.grid_pos.y < from_cell.y
-	var tw := create_tween()
-	if wrapped:
-		tw.tween_property(g, "position:y", board_px_size().y + 70.0, 0.22) \
-				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.tween_callback(func() -> void:
-			g.position.y = -70.0)
-	tw.tween_property(g, "position", cell_center(target.grid_pos), 0.28) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_callback(func() -> void:
-		_play_sound(SFX_FLIP, 1.1, -9.0)
-		_fx(g.position, "dust")
-		g.queue_free())
-	return true
-
-
 class Slug extends Node2D:
 	func _draw() -> void:
 		# A gold slug drawn nose-right; rotation aims it.
@@ -1213,6 +1142,7 @@ func _fire_boss_slug(from: Vector2, target: PlayingCard) -> void:
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
+## Marks two random plain cards as the key and the chest.
 func spawn_key_and_chest() -> void:
 	var candidates: Array = []
 	for p in grid:

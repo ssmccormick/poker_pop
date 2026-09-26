@@ -265,6 +265,8 @@ var _buyin_tier_btns: Array = []
 var _sleeve_pc: PlayingCard      # buy-in screen: the sleeve on show
 var _sleeve_rank_label: Label
 var _sleeve_up_btn: Button
+var _win_rows: Array = []        # last table's winnings, itemized for the pick screen
+var _win_box: Control
 var _tarot_info: Label
 var _tarot_cards_box: Control
 var _bet_info: Label
@@ -2150,24 +2152,29 @@ func _room_cleared() -> void:
 	main.board.suppress_refill = true
 	if main.board._refill_active:
 		main.board._skip_refill()
-	var winnings := stake + int(stake * stake_odds)
+	# Itemized winnings: the flash is just "TABLE CLEARED" — the full
+	# breakdown waits on the pick screen, where the eye has time.
+	var pot := stake + int(stake * stake_odds)
+	var winnings := pot
+	_win_rows = [["THE POT — %d staked at %s : 1" % [stake,
+			String.num(stake_odds, 1)], pot]]
 	if has_relic("tin_star"):
 		winnings += 10
+		_win_rows.append(["TIN STAR", 10])
 	# Swift work pays: every spare hand (or every spare 10 seconds on
 	# a clock table) converts to chips, scaled to the table's blind.
 	var spare := int(room_time_left / 10.0) if room_on_clock() \
 			else maxi(room_hands_left, 0)
 	var bonus := spare * maxi(_blind_for(room_index) / 5, 1)
+	if bonus > 0:
+		_win_rows.append([("%d SECONDS TO SPARE" % int(room_time_left))
+				if room_on_clock() else ("%d HANDS TO SPARE" % spare), bonus])
 	winnings += bonus
 	chips += winnings
 	main.board._play_sound(Board.SFX_STING_BOSS if current_offer.has("boss")
 			else Board.SFX_STING_WIN, 1.0, -6.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
-	main._announce("TABLE CLEARED  +%d CHIPS" % winnings)
-	if bonus > 0:
-		_announce_after_settle(("%d SECONDS TO SPARE  +%d CHIPS"
-				% [int(room_time_left), bonus]) if room_on_clock()
-				else ("%d HANDS TO SPARE  +%d CHIPS" % [spare, bonus]))
+	main._announce("TABLE CLEARED")
 	main.board.confetti()
 	if current_offer.has("boss") and room_index == JACK_ROOM:
 		_announce_after_settle("BIG LEAGUE NOW — EVERYTHING COSTS 10× FROM HERE")
@@ -2182,7 +2189,7 @@ func _room_cleared() -> void:
 			_pending_relic_reward = relic_id
 		else:
 			chips += 60
-			_announce_after_settle("STRONGBOX  +60 CHIPS (no relic room)")
+			_win_rows.append(["STRONGBOX (no relic room)", 60])
 	_after_board_settles(func() -> void:
 		room_index += 1
 		if room_index >= ROOMS_TOTAL:
@@ -2303,6 +2310,7 @@ func _show_pick_now() -> void:
 	_hide_all()
 	main.game_started = false
 	main.play_music("tarot")
+	_render_win_ledger()
 	for child in _pick_box.get_children():
 		child.queue_free()
 	var pick_count := 4 if has_relic("card_sleeve") else 3
@@ -2336,6 +2344,60 @@ func _show_pick_now() -> void:
 			_pick_tip.visible = false)
 	_pick_tip.visible = false
 	pick_layer.visible = true
+
+
+## The winnings ledger on the pick screen: every chip the cleared
+## table paid, itemized, with the new stack underneath.
+func _render_win_ledger() -> void:
+	for child in _win_box.get_children():
+		child.queue_free()
+	if _win_rows.is_empty():
+		return
+	var rows := _win_rows.size()
+	var plate_h := 96 + rows * 34 + 58
+	UiKit.plate(_win_box, Rect2(0, 0, 420, plate_h))
+	var title := Label.new()
+	title.text = "THE TAKE"
+	title.position = Vector2(20, 14)
+	title.size = Vector2(380, 30)
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", main.GOLD)
+	_win_box.add_child(title)
+	UiKit.hrule(_win_box, Vector2(20, 52), 380)
+	var total := 0
+	for i in rows:
+		var row: Array = _win_rows[i]
+		total += int(row[1])
+		var name_l := Label.new()
+		name_l.text = String(row[0])
+		name_l.position = Vector2(20, 66 + i * 34)
+		name_l.size = Vector2(290, 30)
+		name_l.add_theme_font_size_override("font_size", 17)
+		name_l.add_theme_color_override("font_color", main.OFFWHITE)
+		_win_box.add_child(name_l)
+		var val_l := Label.new()
+		val_l.text = "+%d" % int(row[1])
+		val_l.position = Vector2(310, 66 + i * 34)
+		val_l.size = Vector2(90, 30)
+		val_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		val_l.add_theme_font_size_override("font_size", 17)
+		val_l.add_theme_color_override("font_color", main.GOLD)
+		_win_box.add_child(val_l)
+	UiKit.hrule(_win_box, Vector2(20, 74 + rows * 34), 380)
+	var total_l := Label.new()
+	total_l.text = "WON  +%d" % total
+	total_l.position = Vector2(20, 86 + rows * 34)
+	total_l.size = Vector2(280, 34)
+	total_l.add_theme_font_size_override("font_size", 24)
+	total_l.add_theme_color_override("font_color", main.GOLD)
+	_win_box.add_child(total_l)
+	var stack_l := Label.new()
+	stack_l.text = "CHIPS NOW  %d" % chips
+	stack_l.position = Vector2(20, 120 + rows * 34)
+	stack_l.size = Vector2(380, 28)
+	stack_l.add_theme_font_size_override("font_size", 17)
+	stack_l.add_theme_color_override("font_color", main.DIM)
+	_win_box.add_child(stack_l)
 
 
 # --- Flow: shop -----------------------------------------------------------
@@ -2871,8 +2933,12 @@ func build_ui() -> void:
 	_bet_back_btn = _back_button(bet_layer, bet_back, "BACK")
 
 	pick_layer = _layer()
-	_screen_title(pick_layer, "TAKE A CARD")
-	_center(pick_layer, "One joins your deck — or take none.", 240, 22, main.DIM)
+	_screen_title(pick_layer, "TABLE CLEARED")
+	_center(pick_layer, "Take a card — one joins your deck, or take none.", 240, 22, main.DIM)
+	# The winnings ledger sits at the left; the card offers keep the floor.
+	_win_box = Control.new()
+	_win_box.position = Vector2(120, 330)
+	pick_layer.add_child(_win_box)
 	_pick_box = Control.new()
 	_pick_box.position = Vector2(0, 360)
 	pick_layer.add_child(_pick_box)

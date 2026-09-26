@@ -237,6 +237,13 @@ func _ready() -> void:
 						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
 						"min_bet": 10, "goal": "safe"}, false)
 				trail._confirm_bet()
+			"trailpick":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail.chips = 372
+				trail._win_rows = [["THE POT — 50 staked at 1.5 : 1", 125],
+						["TIN STAR", 10], ["3 HANDS TO SPARE", 36]]
+				trail._show_pick()
 			"trailrelic":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -1206,7 +1213,7 @@ const TUTOR := {
 	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
 	"hazard_water": ["WATER CARD", "The leak FILLS its card 1/4 per hand. Full to the brim, it POURS into all four neighbors — and any card that fills goes under, face hidden, pouring onward. A FILLED card still IS what it was... if you remember. Play the water card, at any level, to stop the leak."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
-	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Clear a piece WITHOUT its partner and it DROPS to the card below it — and off the bottom edge it falls back in from the top of that column. The hardest job on the trail — the strongbox holds a RELIC."],
+	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Clear a piece WITHOUT its partner and it turns up again on a new card — the hand spent finding it is the price. The hardest job on the trail — the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],
 	"goal_mine": ["GOLD MINE", "The board is choked with stone, and the seam runs 20 stones deep. Chip the rocks by clearing cards BESIDE them (three chips each) — broken rock has a chance of leaving GOLD cards in the rubble, and fresh rock rides in on the deal until the whole seam is on the table. Mine it DRY: the table clears only when every last stone is rubble."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
@@ -2419,7 +2426,7 @@ func _debug_seed_hazards() -> void:
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss", "trailbj":
+		"trailhazard", "trailheist", "trailboss", "trailbj", "trailpick":
 			await get_tree().create_timer(4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
