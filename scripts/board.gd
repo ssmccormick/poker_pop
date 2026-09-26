@@ -2239,27 +2239,29 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		if grid[p].hazard == "wind":
 			var wd: Vector2i = grid[p].wind_dir
 			grid[p].wind_dir = Vector2i(-wd.y, wd.x)
-	# The FLOOD: every watered card rises one step per tick, filling in
+	# The FLOOD: every water card rises one step per tick, filling in
 	# four. A card already at the brim at the start of the tick POURS —
-	# each orthogonal plain, dry neighbor starts filling. A victim that
-	# reaches the brim drowns (washed) and becomes a pourer itself.
+	# and what it pours into BECOMES A WATER CARD itself, one step
+	# filled. One card type, making more of itself.
 	var soaked: Array = []   # cells where water just started or rose
 	var flooded: Array = []  # cells that just reached the brim
 	var pourers: Array = []
 	var risers: Array = []
 	for p in grid:
 		var c: PlayingCard = grid[p]
-		if c.hazard == "water" and c.hazard_fresh:
-			continue  # landed this round — the leak starts next one
+		if c.hazard != "water" or c.hazard_fresh:
+			continue  # fresh arrivals start rising next round
 		if c.water_level >= PlayingCard.WATER_FULL_LEVEL:
 			pourers.append(p)
-		elif c.hazard == "water" or c.water_level > 0:
+		else:
 			risers.append(p)
 	for p in pourers:
 		for d in HAZARD_DIRS:
 			var q: Vector2i = p + d
-			if _victim_ok(q) and grid[q].water_level == 0:
+			if _victim_ok(q):
+				grid[q].hazard = "water"
 				grid[q].water_level = 1
+				hazards_spawned["water"] = spawned_count("water") + 1
 				soaked.append(q)
 	for p in risers:
 		var c: PlayingCard = grid[p]
@@ -2267,11 +2269,9 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		soaked.append(p)
 		if c.water_level >= PlayingCard.WATER_FULL_LEVEL:
 			flooded.append(p)
-			if c.hazard != "water":
-				# Drowned: the face sinks out of sight. The leaky source
-				# itself stays readable (and playable) — stop THAT to
-				# stop the flood.
-				c.washed = true
+			# At the brim the face is gone — tooltip, preview, and green
+			# tell all go quiet. It still plays blind, if you remember.
+			c.washed = true
 	var fires: Array = []
 	if tick_fire:
 		for p in grid:

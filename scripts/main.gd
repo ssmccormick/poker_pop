@@ -1162,7 +1162,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
 					"" if card.stone_hits == 1 else "s"])
 		"water":
-			lines.append("WATER — the leak: fills 1/4 per hand (%d/4 now). A card full to the brim POURS into all four neighbors. Play it to stop the leak." % card.water_level)
+			lines.append("WATER — fills 1/4 per hand (%d/4 now). Full to the brim it POURS, turning all four neighbors into water cards. Play it at any level to clear it." % card.water_level)
 	match card.mod:
 		"chip":
 			lines.append("CHIP — pays +%d chips when played." % board.chip_bonus)
@@ -1182,8 +1182,6 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		lines.append("CRAZY 8s — this 8 counts as WILD: any rank, any suit.")
 	if card.two_plus:
 		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
-	if card.water_level > 0 and not card.washed and card.hazard != "water":
-		lines.append("FLOODING — %d/4 full and rising. At the brim it's FILLED — face gone under, and it starts pouring. Still playable: clear it before it goes under." % card.water_level)
 	if card.incoming != "":
 		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
 	if card.boom:
@@ -1211,7 +1209,7 @@ const TUTOR := {
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. The card it will strike next shows SPARKS catching at its bottom edge, like flint on tinder — get it out of the path or douse the fire. If EVERY card on the table catches fire, the table is LOST."],
 	"hazard_wind": ["WIND CARD", "Play it and every card in the wind's direction is blown clean off the board — unscored. The direction turns a quarter every hand, and the wind keeps its secret: without a WEATHERVANE relic you won't know which way it blows until it does."],
 	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
-	"hazard_water": ["WATER CARD", "The leak FILLS its card 1/4 per hand. Full to the brim, it POURS into all four neighbors — and any card that fills goes under, face hidden, pouring onward. A FILLED card still IS what it was... if you remember. Play the water card, at any level, to stop the leak."],
+	"hazard_water": ["WATER CARD", "The leak FILLS its card 1/4 per hand. Full to the brim, it POURS — turning all four neighbors into WATER CARDS that fill and pour in turn. A card at the brim hides its face completely; it still IS what it was... if you remember. Play any water card, at any level, to clear it."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
 	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Clear a piece WITHOUT its partner and it turns up again on a new card — the hand spent finding it is the price. The hardest job on the trail — the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],

@@ -58,25 +58,27 @@ func _init() -> void:
 	failures += _check(b.grid[Vector2i(4, 4)].hazard == "", "distant card untouched")
 	_free_board(b)
 
-	# --- the flood: water rises four ticks, then pours ----------------------
+	# --- the flood: water rises four ticks, then makes more water cards -----
 	b = _board([[5, 0, 0, 0], [7, 1, 1, 0]])
 	b.grid[Vector2i(0, 0)].hazard = "water"
 	for i in 4:
 		b._tick_fire_and_bombs()
-	failures += _check(b.grid[Vector2i(0, 0)].water_level == 4,
-			"the leak fills its own card in four ticks")
-	failures += _check(not b.grid[Vector2i(0, 0)].washed,
-			"the full SOURCE stays readable — stop the leak by playing it")
+	failures += _check(b.grid[Vector2i(0, 0)].water_level == 4
+			and b.grid[Vector2i(0, 0)].washed,
+			"the leak fills its own card in four ticks — brim hides the face")
 	failures += _check(b.grid[Vector2i(1, 0)].water_level == 0,
-			"nothing pours before the source is full")
+			"nothing pours before the card is full")
 	b._tick_fire_and_bombs()
-	failures += _check(b.grid[Vector2i(1, 0)].water_level == 1,
-			"a full card pours into its dry orthogonal neighbor")
+	failures += _check(b.grid[Vector2i(1, 0)].hazard == "water"
+			and b.grid[Vector2i(1, 0)].water_level == 1,
+			"pouring turns the dry neighbor into a WATER CARD of its own")
+	failures += _check(b.spawned_count("water") == 1,
+			"the new water card joins the spawn ledger (the test seed bypassed it)")
 	for i in 3:
 		b._tick_fire_and_bombs()
 	failures += _check(b.grid[Vector2i(1, 0)].water_level == 4
 			and b.grid[Vector2i(1, 0)].washed,
-			"a victim at the brim drowns — face hidden, and it pours on")
+			"the second water card fills like the first — one type, all alike")
 	_free_board(b)
 
 	# --- a fully burning board loses the table ------------------------------

@@ -575,11 +575,6 @@ func _draw() -> void:
 		else:
 			_draw_suit(Vector2(0, 6), 5.0)
 
-	if water_level > 0 and not washed and hazard != "water":
-		# The flood spreading card by card: opaque water climbing the
-		# face — at the brim it drowns (washed) and starts pouring.
-		_draw_flood(rect, water_level / float(WATER_FULL_LEVEL))
-
 	match hazard:
 		"bomb":
 			var c := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
@@ -611,7 +606,9 @@ func _draw() -> void:
 			if show_hazard_intent:
 				_draw_intent_arrow(wind_dir, WIND_BLUE)
 		"water":
-			_draw_water(rect)
+			if not washed:
+				# The washed branch already drew the full tank.
+				_draw_water(rect)
 
 	if incoming != "" and hazard == "":
 		# Always on show: where the fire or water strikes next.
