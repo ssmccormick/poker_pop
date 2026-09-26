@@ -188,6 +188,7 @@ var main: Node2D  # set by main.gd before build()
 
 # Meta (persists forever)
 var cash := 0
+var sleeve_rank := 2   # ACE UP THE SLEEVE: the starting rank, meta-upgraded with $cash up to an Ace
 
 # Run state
 var run_active := false
@@ -223,6 +224,11 @@ const OUTLAW_BAR_BASE := 75      # score under this and he fires (+ per region)
 var relics: Array = []   # relic ids held this run
 var provisions: Array = []       # provision ids in the kit (max 3, dupes fine)
 var _aiming_slot := -1           # kit slot waiting on a target, -1 = none
+# ACE UP THE SLEEVE: the hidden card you can trade onto the table once
+# per room — the card you take waits up the sleeve for another table.
+var sleeve_card := {}            # {rank, suit, mod, boom, two_plus}
+var sleeve_used := false         # one swap per table
+var _aiming_sleeve := false
 var _shop_stock_provisions: Array = []   # [{id, bought}] on the shelf
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
@@ -256,6 +262,9 @@ var _pending_relic_reward := ""
 var _buyin_cash_label: Label
 var _buyin_resume_btn: Button
 var _buyin_tier_btns: Array = []
+var _sleeve_pc: PlayingCard      # buy-in screen: the sleeve on show
+var _sleeve_rank_label: Label
+var _sleeve_up_btn: Button
 var _tarot_info: Label
 var _tarot_cards_box: Control
 var _bet_info: Label
@@ -305,6 +314,7 @@ func _load_meta() -> void:
 	var cf := ConfigFile.new()
 	cf.load(main.profile_path("trail_meta.cfg"))
 	cash = int(cf.get_value("meta", "cash", 0))
+	sleeve_rank = clampi(int(cf.get_value("meta", "sleeve_rank", 2)), 2, 14)
 
 
 func _save_meta() -> void:
@@ -312,6 +322,7 @@ func _save_meta() -> void:
 		return  # screenshot runs must not touch real saves
 	var cf := ConfigFile.new()
 	cf.set_value("meta", "cash", cash)
+	cf.set_value("meta", "sleeve_rank", sleeve_rank)
 	cf.save(main.profile_path("trail_meta.cfg"))
 
 
@@ -347,6 +358,7 @@ func _save_run() -> void:
 	for id in provisions:
 		prov_arr.append(id)
 	cf.set_value("run", "provisions", prov_arr)
+	cf.set_value("run", "sleeve", sleeve_card)
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
@@ -388,6 +400,9 @@ func _load_run() -> bool:
 	for id in cf.get_value("run", "provisions", PackedStringArray()):
 		if PROVISIONS.has(String(id)):
 			provisions.append(String(id))
+	sleeve_card = cf.get_value("run", "sleeve", {})
+	if sleeve_card.is_empty():
+		sleeve_card = _fresh_sleeve()  # runs saved before the sleeve existed
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
@@ -440,6 +455,94 @@ func _gain_relic(id: String) -> void:
 	_save_run()
 
 
+# --- Ace up the Sleeve ------------------------------------------------------
+
+const RANK_CHARS := {11: "J", 12: "Q", 13: "K", 14: "A"}
+const SUIT_CHARS := ["♠", "♥", "♦", "♣"]
+
+
+## A new run's sleeve: the meta-upgraded rank, in a random suit.
+func _fresh_sleeve() -> Dictionary:
+	return {"rank": sleeve_rank, "suit": randi_range(0, 3),
+			"mod": "", "boom": false, "two_plus": false}
+
+
+## "A♥"-style label for whatever is up the sleeve right now.
+func sleeve_label() -> String:
+	if sleeve_card.is_empty():
+		return "—"
+	var r := int(sleeve_card.rank)
+	var txt: String = RANK_CHARS.get(r, str(r))
+	if bool(sleeve_card.get("two_plus", false)):
+		txt = "2+"
+	if String(sleeve_card.get("mod", "")) != "":
+		txt += " · %s" % String(sleeve_card.mod).to_upper()
+	return "%s%s" % [txt, SUIT_CHARS[int(sleeve_card.suit)]]
+
+
+## The next sleeve upgrade's $cash price (rank 2 → ... → Ace).
+func sleeve_upgrade_cost() -> int:
+	return 10 * (sleeve_rank - 1)
+
+
+## The SLEEVE button: arms the swap (or holsters it again).
+func use_sleeve() -> void:
+	if _aiming_sleeve:
+		main.board.pending_provision = ""
+		_aiming_sleeve = false
+		main._announce("HOLSTERED", main.DIM)
+		return
+	if not in_room or not main.game_started or main.board.busy \
+			or main.board.locked or main.board.blackjack_presenting:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	if sleeve_used:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce("THE SLEEVE IS SPENT — one swap per table", main.RED)
+		return
+	_aiming_slot = -1  # only one thing aims at a time
+	_aiming_sleeve = true
+	main.board.pending_provision = "sleeve"
+	main._announce("PICK A CARD TO SWAP FOR THE %s — right-click to holster"
+			% sleeve_label(), main.GOLD)
+
+
+## Why this card can't be traded up the sleeve — "" when it can.
+func _sleeve_refusal(card: PlayingCard) -> String:
+	if card.face_down:
+		return "IT'S FACE DOWN — no blind trades"
+	if card.boss != "" or card.is_safe or card.snake_tail:
+		return "THAT WON'T FIT UP A SLEEVE"
+	if card.cursed or card.hazard != "" or card.washed or card.water_level > 0:
+		return "NOTHING CURSED, BURNING, TICKING, OR DRIPPING GOES UP THE SLEEVE"
+	if card.objective != "":
+		return "THE JOB PIECE STAYS ON THE TABLE"
+	return ""
+
+
+## The trade: the table card and the sleeve card swap identities in
+## place. What you took rides along to the next table.
+func _do_sleeve_swap(card: PlayingCard) -> void:
+	var taken := {"rank": card.rank, "suit": card.suit, "mod": card.mod,
+			"boom": card.boom, "two_plus": card.two_plus}
+	card.rank = int(sleeve_card.rank)
+	card.suit = int(sleeve_card.suit)
+	card.mod = String(sleeve_card.get("mod", ""))
+	card.boom = bool(sleeve_card.get("boom", false))
+	card.two_plus = bool(sleeve_card.get("two_plus", false))
+	if card.mod in ["plus", "minus", "bumper"]:
+		card.boost_dir = Board.HAZARD_DIRS.pick_random()
+	card.queue_redraw()
+	sleeve_card = taken
+	sleeve_used = true
+	main.stat_bump("sleeve_swaps")
+	main.board._play_sound(Board.SFX_FLIP, 1.2, -6.0)
+	main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.4, -10.0, 0.08)
+	main.board._fx(card.position, "pop", card.suit_color())
+	main._announce("UP THE SLEEVE IT GOES — NOW HOLDING %s" % sleeve_label())
+	_save_run()
+
+
 # --- Provisions -----------------------------------------------------------
 
 ## Kit capacity: three slots, four with the Saddlebags relic.
@@ -479,6 +582,7 @@ func use_provision(slot: int) -> void:
 		_spend_provision(slot)
 		_apply_instant_provision(id)
 		return
+	_aiming_sleeve = false  # only one thing aims at a time
 	_aiming_slot = slot
 	main.board.pending_provision = id
 	main._announce("PICK A CARD FOR THE %s — right-click to holster"
@@ -512,8 +616,22 @@ func _apply_instant_provision(id: String) -> void:
 			main._announce("RATTLESNAKE TONIC — NEXT HAND COUNTS DOUBLE")
 
 
-## The aimed provision picked a card (null = holstered by right-click).
+## The aimed provision or sleeve picked a card (null = holstered).
 func _on_provision_target(card) -> void:
+	if _aiming_sleeve:
+		if card == null:
+			_aiming_sleeve = false
+			main._announce("HOLSTERED", main.DIM)
+			return
+		var swap_why := _sleeve_refusal(card)
+		if swap_why != "":
+			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+			main._announce(swap_why, main.RED)
+			return  # still aiming — pick another card or holster
+		_aiming_sleeve = false
+		main.board.pending_provision = ""
+		_do_sleeve_swap(card)
+		return
 	if _aiming_slot < 0 or _aiming_slot >= provisions.size():
 		_aiming_slot = -1
 		return
@@ -703,7 +821,7 @@ func _open_buyin_now() -> void:
 	main.menu_layer.visible = false
 	main.menu_open = false
 	_hide_all()
-	_buyin_cash_label.text = "CASH  $%d" % cash
+	_refresh_sleeve_panel()
 	# A ride in progress takes top billing; fresh saddles move down.
 	var riding := _has_saved_run()
 	_buyin_resume_btn.visible = riding
@@ -715,6 +833,23 @@ func _open_buyin_now() -> void:
 		for i in _buyin_tier_btns.size():
 			(_buyin_tier_btns[i] as Button).position = Vector2(660, 330 + i * 130)
 	buyin_layer.visible = true
+
+
+## Buy-in screen: the sleeve card, its blurb, and the upgrade button.
+func _refresh_sleeve_panel() -> void:
+	_buyin_cash_label.text = "CASH  $%d" % cash
+	_sleeve_pc.rank = sleeve_rank
+	_sleeve_pc.suit = 0
+	_sleeve_pc.queue_redraw()
+	_sleeve_rank_label.text = "Starts every run as a %s of a random suit" \
+			% String(RANK_CHARS.get(sleeve_rank, str(sleeve_rank)))
+	if sleeve_rank >= 14:
+		_sleeve_up_btn.disabled = true
+		_sleeve_up_btn.text = "FULLY SHARPENED — AN ACE"
+	else:
+		_sleeve_up_btn.disabled = false
+		_sleeve_up_btn.text = "RAISE TO %s — $%d" % [String(RANK_CHARS.get(
+				sleeve_rank + 1, str(sleeve_rank + 1))), sleeve_upgrade_cost()]
 
 
 func _has_saved_run() -> bool:
@@ -737,6 +872,9 @@ func _start_run(tier: int) -> void:
 	relics.clear()
 	provisions.clear()
 	_aiming_slot = -1
+	sleeve_card = _fresh_sleeve()
+	sleeve_used = false
+	_aiming_sleeve = false
 	burns_used = 0
 	_second_wind_used = false
 	_fire_tick_flip = false
@@ -1279,6 +1417,9 @@ func _confirm_bet() -> void:
 func _start_room() -> void:
 	in_room = true
 	main.stat_max("deepest_table", room_index + 1)
+	sleeve_used = false  # one swap per table, fresh each sit-down
+	_aiming_sleeve = false
+	main.tutor_show("sleeve")
 	room_score = 0
 	room_target = current_offer.target
 	room_goal = current_offer.get("goal", "")
@@ -1997,6 +2138,7 @@ func _tick_room_hazards() -> void:
 func _room_cleared() -> void:
 	in_room = false
 	_aiming_slot = -1
+	_aiming_sleeve = false
 	main.board.pending_provision = ""
 	pending_retry = {}
 	main.stat_bump("tables_cleared")
@@ -2105,6 +2247,7 @@ func on_abandon_room() -> void:
 		return
 	in_room = false
 	_aiming_slot = -1
+	_aiming_sleeve = false
 	main.board.pending_provision = ""
 	# No penalty for stepping away: the whole outlay comes back and the
 	# table is saved — returning restarts it like a fresh sit-down.
@@ -2647,6 +2790,34 @@ func build_ui() -> void:
 		var tier := i
 		b.pressed.connect(func() -> void:
 			_start_run(tier))
+	# ACE UP THE SLEEVE — the one meta upgrade, bought with $cash.
+	UiKit.plate(buyin_layer, Rect2(1420, 330, 380, 470))
+	var sleeve_title := _center(buyin_layer, "ACE UP THE SLEEVE", 348, 26, main.GOLD)
+	sleeve_title.position.x = 1420 - main.VIEW.x / 2.0 + 190
+	_sleeve_pc = PlayingCard.new()
+	_sleeve_pc.material = Themes.current_material()
+	_sleeve_pc.position = Vector2(1610, 505)
+	_sleeve_pc.scale = Vector2(1.4, 1.4)
+	buyin_layer.add_child(_sleeve_pc)
+	_sleeve_rank_label = _center(buyin_layer, "", 610, 20, main.OFFWHITE)
+	_sleeve_rank_label.position.x = 1420 - main.VIEW.x / 2.0 + 190
+	var sleeve_note: Label = main._label(buyin_layer,
+			"Once per table: trade it for any plain card — what you take rides up the sleeve to the next table. Every run starts it fresh.",
+			Vector2(1450, 646), 15, main.DIM)
+	sleeve_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sleeve_note.size = Vector2(320, 84)
+	_sleeve_up_btn = main._button(buyin_layer, "", Vector2(1450, 730), Vector2(320, 52))
+	_sleeve_up_btn.add_theme_font_size_override("font_size", 18)
+	_sleeve_up_btn.pressed.connect(func() -> void:
+		if sleeve_rank >= 14 or cash < sleeve_upgrade_cost():
+			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+			return
+		cash -= sleeve_upgrade_cost()
+		sleeve_rank += 1
+		_save_meta()
+		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+		_refresh_sleeve_panel())
+
 	_buyin_resume_btn = main._button(buyin_layer, "RESUME YOUR RIDE", Vector2(660, 740), Vector2(600, 70))
 	_buyin_resume_btn.add_theme_font_size_override("font_size", 24)
 	_buyin_resume_btn.pressed.connect(_resume_run)

@@ -353,6 +353,20 @@ Starter catalog (names/numbers draft):
 | Saddlebags | R | A 4th slot in the provision kit |
 | Lucky Chip | L | 10% chance a played hand costs no hand |
 
+## Ace up the Sleeve (SHIPPED)
+
+Every trail run starts with a hidden card up the sleeve — the top row
+of the KIT panel. ONCE PER TABLE you may click it and pick any plain
+card on the table: the two trade places in a blink (a free action, no
+hand spent), and the card you took rides up the sleeve to be played
+onto another table. Nothing cursed, hazarded, flooded, face-down,
+objective-bearing, or boss-sized fits up a sleeve; enhanced cards do,
+mods and all — palming a MULT or GOLD card for the right table is the
+whole play. The sleeve starts each run as a **2 of a random suit**
+and is META-UPGRADED with $cash at the trail buy-in screen
+($10×(rank−1) per step) all the way to an **Ace**. Saved with the
+run; the swap resets at every sit-down.
+
 ## Provisions (SHIPPED)
 
 One-shot consumables in a 3-slot KIT (right HUD column, trail rooms

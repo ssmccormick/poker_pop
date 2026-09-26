@@ -62,7 +62,8 @@ var target_bar_back: ColorRect
 var _boss_ticks: Control  # HP segment marks over the banner bar
 var _kit_plate: Panel
 var _kit_title: Label
-var _kit_btns: Array = []  # three provision slot buttons
+var _kit_btns: Array = []  # provision slot buttons
+var _sleeve_btn: Button    # Ace up the Sleeve, top row of the kit
 var _kit_sig := ""         # last-rendered kit state, to skip rebuilds
 var target_bar_fill: ColorRect
 var hand_display: Node2D
@@ -125,6 +126,7 @@ var _tutor_queue: Array = []
 var tutor_layer: ColorRect
 var _tutor_title: Label
 var _tutor_body: Label
+var _tutor_scroll: ScrollContainer
 
 # Board hover tooltip: full stats for the card under the mouse.
 var _tooltip: PanelContainer
@@ -498,17 +500,42 @@ func _update_kit() -> void:
 		return
 	_kit_plate.visible = show
 	_kit_title.visible = show
+	_sleeve_btn.visible = show
 	for i in _kit_btns.size():
 		_kit_btns[i].visible = show and i < trail.kit_size()
 	if not show:
 		_kit_sig = ""
 		return
-	var sig := str(trail.provisions) + str(trail._aiming_slot) + str(trail.kit_size())
+	var sig := str(trail.provisions) + str(trail._aiming_slot) + str(trail.kit_size()) \
+			+ str(trail.sleeve_card) + str(trail.sleeve_used) + str(trail._aiming_sleeve)
 	if sig == _kit_sig:
 		return
 	_kit_sig = sig
+	# Layout: the sleeve row plus the kit slots — compressed a little
+	# when the Saddlebags add a fifth row.
+	var rows := 1 + trail.kit_size()
+	var spacing := 64.0 if rows <= 4 else 53.0
+	var bh := 56.0 if rows <= 4 else 48.0
+	_sleeve_btn.position = Vector2(PANEL_R, 574)
+	_sleeve_btn.size = Vector2(300, bh)
+	_sleeve_btn.pivot_offset = _sleeve_btn.size / 2.0
+	if trail._aiming_sleeve:
+		_sleeve_btn.disabled = false
+		_sleeve_btn.text = "AIMING…"
+		_sleeve_btn.tooltip_text = "Pick a card on the table to swap — right-click or press again to holster."
+	elif trail.sleeve_used:
+		_sleeve_btn.disabled = true
+		_sleeve_btn.text = "SLEEVE — SPENT"
+		_sleeve_btn.tooltip_text = "One swap per table. It comes back at the next sit-down."
+	else:
+		_sleeve_btn.disabled = false
+		_sleeve_btn.text = "SLEEVE  %s" % trail.sleeve_label()
+		_sleeve_btn.tooltip_text = "ACE UP THE SLEEVE — once per table, trade this card for any plain card on the table; what you take rides up the sleeve to another table. Upgrade its starting rank at the trail buy-in."
 	for i in _kit_btns.size():
 		var btn: Button = _kit_btns[i]
+		btn.position = Vector2(PANEL_R, 574 + (i + 1) * spacing)
+		btn.size = Vector2(300, bh)
+		btn.pivot_offset = btn.size / 2.0
 		if i < trail.provisions.size():
 			var p: Dictionary = TrailMode.PROVISIONS[trail.provisions[i]]
 			btn.disabled = false
@@ -1196,6 +1223,7 @@ const TUTOR := {
 	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand and the strongbox pays bonus chips. Purely optional — the room's real goal still rules."],
 	"relics": ["RELICS", "Run-wide charms — carry as many as you can afford. Each one quietly bends the rules in your favor for the rest of the ride."],
 	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots (good SADDLEBAGS add a fourth). Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
+	"sleeve": ["ACE UP THE SLEEVE", "You ride with a hidden card — the SLEEVE row atop your kit. Once per table, click it and pick a plain card on the table: they trade places, and the card you take waits up your sleeve for another table. Raise its starting rank with $cash at the trail buy-in."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
 # tooltip with its full story instead.)
@@ -1227,6 +1255,7 @@ func _tutor_next() -> void:
 	var key: String = _tutor_queue.pop_front()
 	_tutor_title.text = TUTOR[key][0]
 	_tutor_body.text = TUTOR[key][1]
+	_tutor_scroll.scroll_vertical = 0
 	tutor_layer.visible = true
 
 
@@ -1703,12 +1732,16 @@ func _build_ui() -> void:
 	_label(hud_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
 			Vector2(PANEL_R, 860), 16, DIM)
 
-	# The provision KIT: three one-shot slots, four with Saddlebags,
-	# trail rooms only.
+	# The KIT: the sleeve on top, then three provision slots (four with
+	# Saddlebags), trail rooms only. Rows are laid out in _update_kit.
 	_kit_plate = UiKit.plate(hud_root, Rect2(PANEL_R - 18, 524, 336, 312))
 	_kit_title = _label(hud_root, "KIT", Vector2(PANEL_R, 536), 22, DIM)
+	_sleeve_btn = _button(hud_root, "—", Vector2(PANEL_R, 574), Vector2(300, 56))
+	_sleeve_btn.add_theme_font_size_override("font_size", 19)
+	_sleeve_btn.pressed.connect(func() -> void:
+		trail.use_sleeve())
 	for i in 4:
-		var kb := _button(hud_root, "—", Vector2(PANEL_R, 574 + i * 64), Vector2(300, 56))
+		var kb := _button(hud_root, "—", Vector2(PANEL_R, 574 + (i + 1) * 64), Vector2(300, 56))
 		kb.add_theme_font_size_override("font_size", 19)
 		var slot := i
 		kb.pressed.connect(func() -> void:
@@ -1716,6 +1749,7 @@ func _build_ui() -> void:
 		_kit_btns.append(kb)
 	_kit_plate.visible = false
 	_kit_title.visible = false
+	_sleeve_btn.visible = false
 	for b in _kit_btns:
 		b.visible = false
 
@@ -2042,9 +2076,19 @@ func _build_profiles_and_tutor() -> void:
 		rule.size = Vector2(600, 2)
 		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tutor_layer.add_child(rule)
-	_tutor_body = _label(tutor_layer, "", Vector2(620, 415), 26, UiKit.POSTER_INK)
-	_tutor_body.size = Vector2(680, 220)
+	# The body lives in a scroll well: a long lesson scrolls instead of
+	# running under the GOT IT button.
+	_tutor_scroll = ScrollContainer.new()
+	_tutor_scroll.position = Vector2(620, 411)
+	_tutor_scroll.size = Vector2(680, 236)
+	_tutor_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tutor_layer.add_child(_tutor_scroll)
+	_tutor_body = Label.new()
 	_tutor_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tutor_body.custom_minimum_size = Vector2(655, 0)
+	_tutor_body.add_theme_font_size_override("font_size", 26)
+	_tutor_body.add_theme_color_override("font_color", UiKit.POSTER_INK)
+	_tutor_scroll.add_child(_tutor_body)
 	var ok := _button(tutor_layer, "GOT IT", Vector2(810, 660), Vector2(300, 60))
 	ok.add_theme_font_size_override("font_size", 24)
 	ok.pressed.connect(_tutor_next)
