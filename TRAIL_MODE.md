@@ -453,7 +453,7 @@ within the hand budget to clear, at 3:1 odds. Bosses are LIVING CARDS
 on the board, participating in hands with their current identity —
 which makes deck sculpting the boss prep (stock queens before room 14).
 
-- **JACK OF ALL TRADES** (room 7) — his life is a **10,000-point
+- **JACK OF ALL TRADES** (room 7) — his life is a **5,000-point
   SCORE POOL**, fought over **30 hands**. Every submitted hand —
   including ones that hit him — makes him teleport and re-roll his
   rank AND suit. Pin him into a scoring hand that **beats his bar**

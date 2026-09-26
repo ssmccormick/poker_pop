@@ -1844,8 +1844,8 @@ static func migrate_mod(mod: String) -> String:
 # --- Trail boss engine ----------------------------------------------------
 
 # The Jack's life is a SCORE pool: qualifying hands deal their score
-# as damage, and 10,000 total puts him down.
-const JACK_HP := 10000
+# as damage, and 5,000 total puts him down.
+const JACK_HP := 5000
 const QUEEN_STRIPES := 3
 const COBRA_START_TAIL := 2
 # The Jack only respects strong hands: the hand that clears him must
