@@ -1230,8 +1230,12 @@ class DeckStack extends Node2D:
 var _deck_stack: DeckStack
 
 
-## Shows the deck at the current throw point (created lazily).
+## Shows the deck at the current throw point (created lazily). When
+## main has anchored the throw to its own HUD stack, that stack IS the
+## deck — no transient pile on top of it.
 func _show_deck_stack() -> void:
+	if deal_anchor != Vector2.ZERO:
+		return
 	if _deck_stack == null:
 		_deck_stack = DeckStack.new()
 		_deck_stack.z_index = 19  # under the flying cards
