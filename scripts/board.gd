@@ -1199,9 +1199,16 @@ func _reject_hand() -> void:
 			card.error_flash = false
 
 
-## Where the dealer throws from: a visible deck sitting just past the
-## near edge of the table rim.
+# The HUD's deck pile (global coords); main points this at the plate
+# in the lower-left so every deal visibly comes from the player's deck.
+var deal_anchor := Vector2.ZERO
+
+
+## Where the dealer throws from: the HUD deck pile when main has
+## anchored one, else a spot just past the near edge of the table rim.
 func deck_origin() -> Vector2:
+	if deal_anchor != Vector2.ZERO and is_inside_tree():
+		return to_local(deal_anchor)
 	return Vector2(board_px_size().x * 0.5, board_px_size().y + PlayingCard.H * 0.9)
 
 

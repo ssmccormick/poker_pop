@@ -65,6 +65,11 @@ var _kit_title: Label
 var _kit_btns: Array = []  # provision slot buttons
 var _sleeve_btn: Button    # Ace up the Sleeve, top row of the kit
 var _kit_sig := ""         # last-rendered kit state, to skip rebuilds
+var _deck_plate: Panel     # lower left: the pile every card deals from
+var _deck_btn: Button
+var _deck_peek: ColorRect  # click the pile: what's left, out of order
+var _deck_peek_grid: Control
+var _deck_peek_count: Label
 var target_bar_fill: ColorRect
 var hand_display: Node2D
 var community_display: Node2D
@@ -496,7 +501,43 @@ func _update_labels() -> void:
 			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_kit()
+	if _deck_btn != null:
+		var show_deck := game_started and not menu_open and not game_over
+		_deck_plate.visible = show_deck
+		_deck_btn.visible = show_deck
+		if show_deck:
+			_deck_btn.text = "DECK  %d" % board.deck.size()
+		elif _deck_peek.visible:
+			_deck_peek.visible = false
 	_update_preview()
+
+
+## Riffle through the undealt pile — shuffled for display, so the
+## draw order stays the dealer's secret.
+func _open_deck_peek() -> void:
+	if not game_started or game_over:
+		return
+	for c in _deck_peek_grid.get_children():
+		c.queue_free()
+	var pool: Array = board.deck.duplicate()
+	pool.shuffle()
+	_deck_peek_count.text = "%d cards still to come — in no particular order" % pool.size()
+	for i in pool.size():
+		var d: Dictionary = pool[i]
+		var pc := PlayingCard.new()
+		pc.rank = int(d.rank)
+		pc.suit = int(d.suit)
+		pc.mod = Board.migrate_mod(String(d.get("mod", "")))
+		pc.boom = bool(d.get("boom", false))
+		pc.cursed = bool(d.get("cursed", false))
+		pc.material = Themes.current_material()
+		pc.scale = Vector2(0.9, 0.9)
+		pc.position = Vector2(64 + (i % 12) * 110, 70 + (i / 12) * 128)
+		_deck_peek_grid.add_child(pc)
+	_deck_peek_grid.custom_minimum_size = Vector2(1360,
+			70 + ceili(pool.size() / 12.0) * 128)
+	board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.1, -10.0)
+	_deck_peek.visible = true
 
 
 ## The provision kit: three slots in the right column, trail rooms only.
@@ -1757,6 +1798,41 @@ func _build_ui() -> void:
 	_sleeve_btn.visible = false
 	for b in _kit_btns:
 		b.visible = false
+
+	# The player's DECK, lower left: the pile every card is dealt from.
+	# Click it to riffle through what's left (in no particular order).
+	_deck_plate = UiKit.plate(hud_root, Rect2(PANEL_X - 18, 930, 336, 122))
+	_deck_btn = _button(hud_root, "DECK", Vector2(PANEL_X, 944), Vector2(300, 94))
+	_deck_btn.add_theme_font_size_override("font_size", 24)
+	_deck_btn.tooltip_text = "The cards still to be dealt. Click to riffle through them — no peeking at the order. When the pile runs dry, a fresh copy of your deck shuffles in."
+	_deck_btn.pressed.connect(_open_deck_peek)
+	_deck_plate.visible = false
+	_deck_btn.visible = false
+	board.deal_anchor = Vector2(PANEL_X + 132, 991)
+
+	_deck_peek = ColorRect.new()
+	_deck_peek.color = Color(0, 0, 0, 0.72)
+	_deck_peek.size = VIEW
+	_deck_peek.visible = false
+	_deck_peek.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui_root.add_child(_deck_peek)
+	var peek_title := _label(_deck_peek, "LEFT IN THE DECK", Vector2(0, 80), 48, GOLD)
+	peek_title.size = Vector2(VIEW.x, 70)
+	peek_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_deck_peek_count = _label(_deck_peek, "", Vector2(0, 156), 22, DIM)
+	_deck_peek_count.size = Vector2(VIEW.x, 34)
+	_deck_peek_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var peek_scroll := ScrollContainer.new()
+	peek_scroll.position = Vector2(280, 220)
+	peek_scroll.size = Vector2(1360, 690)
+	peek_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_deck_peek.add_child(peek_scroll)
+	_deck_peek_grid = Control.new()
+	peek_scroll.add_child(_deck_peek_grid)
+	var peek_close := _button(_deck_peek, "BACK TO THE TABLE", Vector2(785, 950), Vector2(350, 60))
+	peek_close.add_theme_font_size_override("font_size", 22)
+	peek_close.pressed.connect(func() -> void:
+		_deck_peek.visible = false)
 
 	preview_label = _label(hud_root, "", Vector2(380, 1026), 26, DIM)
 
