@@ -1630,6 +1630,9 @@ func _apply_board_layout() -> void:
 	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0 \
 			+ Vector2.ONE * margin * s
 	_board_home = board.position
+	# The HUD deck stack wears the same scale as the cards on the felt.
+	for c in _deck_stack_cards:
+		(c as PlayingCard).scale = board.scale
 
 
 ## Rattles the table (never the HUD): a decaying random jitter around
@@ -1811,21 +1814,22 @@ func _build_ui() -> void:
 	# The player's DECK, lower left: a real stack of card backs that
 	# every deal comes straight off of. Click the stack to riffle
 	# through what's left (in no particular order).
-	_deck_plate = UiKit.plate(hud_root, Rect2(PANEL_X - 18, 892, 336, 164))
+	_deck_plate = UiKit.plate(hud_root, Rect2(PANEL_X - 18, 852, 336, 204))
 	for i in range(3, -1, -1):
 		var back := PlayingCard.new()
 		back.face_down = true
-		back.scale = Vector2(0.82, 0.82)
-		back.position = Vector2(PANEL_X + 150 + i * 3.0, 956 - i * 3.0)
+		# Scaled to match the cards on the felt by _apply_board_layout.
+		back.position = Vector2(PANEL_X + 150 + i * 3.0, 946 - i * 3.0)
 		hud_root.add_child(back)
 		_deck_stack_cards.append(back)
-	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1014), 22, GOLD)
+	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1022), 22, GOLD)
 	_deck_count.size = Vector2(300, 32)
 	_deck_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_deck_btn = Button.new()
 	_deck_btn.flat = true
-	_deck_btn.position = Vector2(PANEL_X - 18, 892)
-	_deck_btn.size = Vector2(336, 164)
+	_deck_btn.focus_mode = Control.FOCUS_NONE  # Space stays PLAY HAND's
+	_deck_btn.position = Vector2(PANEL_X - 18, 852)
+	_deck_btn.size = Vector2(336, 204)
 	_deck_btn.tooltip_text = "The cards still to be dealt. Click to riffle through them — no peeking at the order. When the stack runs dry, a fresh copy of your deck shuffles in."
 	_deck_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_deck_btn.pressed.connect(_open_deck_peek)
@@ -1835,7 +1839,7 @@ func _build_ui() -> void:
 	_deck_count.visible = false
 	for c in _deck_stack_cards:
 		c.visible = false
-	board.deal_anchor = Vector2(PANEL_X + 150, 956)
+	board.deal_anchor = Vector2(PANEL_X + 150, 946)
 
 	_deck_peek = ColorRect.new()
 	_deck_peek.color = Color(0, 0, 0, 0.72)
