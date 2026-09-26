@@ -538,7 +538,7 @@ func _draw() -> void:
 	elif washed:
 		# Drowned: water to the brim — whatever this card was is down
 		# there somewhere, and the face is unreadable.
-		_draw_flood(rect, 1.0, true)
+		_draw_flood(rect, 1.0)
 		draw_circle(Vector2(-8, 6), 9.0, Color(0.19, 0.33, 0.46))
 		draw_circle(Vector2(10, -14), 6.0, Color(0.19, 0.33, 0.46))
 		draw_circle(Vector2(6, 26), 7.0, Color(0.19, 0.33, 0.46))
@@ -578,7 +578,7 @@ func _draw() -> void:
 	if water_level > 0 and not washed and hazard != "water":
 		# The flood spreading card by card: opaque water climbing the
 		# face — at the brim it drowns (washed) and starts pouring.
-		_draw_flood(rect, water_level / float(WATER_FULL_LEVEL), true)
+		_draw_flood(rect, water_level / float(WATER_FULL_LEVEL))
 
 	match hazard:
 		"bomb":
@@ -887,18 +887,17 @@ func _draw_flame_layer(rect: Rect2, max_h: float, tongues: int, speed: float,
 	draw_colored_polygon(pts, col)
 
 
-## The leaky SOURCE card: translucent water at its current level, so
-## the face stays readable and the card stays playable.
+## The leaky SOURCE card: solid water at its current level — as it
+## rises, the face slips out of sight rank-corner last.
 func _draw_water(rect: Rect2) -> void:
 	_draw_flood(rect, lerpf(0.16, 0.94,
-			water_level / float(WATER_FULL_LEVEL)), false)
+			water_level / float(WATER_FULL_LEVEL)))
 
 
-## The flood at height `frac` (0..1): a water body rising from the
-## bottom behind a rolling, animated surface line, with bubbles
-## working their way up. Opaque for drowning victims, translucent on
-## the leaky source so its face survives.
-func _draw_flood(rect: Rect2, frac: float, opaque: bool) -> void:
+## The flood at height `frac` (0..1): an OPAQUE water body rising from
+## the bottom behind a rolling, animated surface line, with bubbles
+## working their way up. Whatever it covers, you can't read.
+func _draw_flood(rect: Rect2, frac: float) -> void:
 	var body := rect.grow(-3)
 	var level := body.end.y - body.size.y * clampf(frac, 0.08, 1.0)
 	var surface := PackedVector2Array()
@@ -908,11 +907,8 @@ func _draw_flood(rect: Rect2, frac: float, opaque: bool) -> void:
 	var fill := surface.duplicate()
 	fill.append(Vector2(body.end.x, body.end.y))
 	fill.append(Vector2(body.position.x, body.end.y))
-	if opaque:
-		draw_colored_polygon(fill, Color(0.22, 0.38, 0.52))
-	else:
-		draw_colored_polygon(fill, Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.42))
-	draw_polyline(surface, Color(0.82, 0.93, 1.0, 0.9 if opaque else 0.75), 2.0)
+	draw_colored_polygon(fill, Color(0.22, 0.38, 0.52))
+	draw_polyline(surface, Color(0.82, 0.93, 1.0, 0.9), 2.0)
 	# Bubbles need a little depth to rise through.
 	if body.end.y - level > 16.0:
 		for k in 3:
@@ -921,7 +917,7 @@ func _draw_flood(rect: Rect2, frac: float, opaque: bool) -> void:
 					+ 4.0 * sin(cycle * 8.0 + k)
 			var by := lerpf(body.end.y - 6.0, level + 6.0, cycle)
 			draw_circle(Vector2(bx, by), 2.0, Color(0.85, 0.95, 1.0,
-					(0.7 if opaque else 0.5) * (1.0 - cycle * 0.4)))
+					0.7 * (1.0 - cycle * 0.4)))
 
 
 ## Caught in a twister: translucent streaks orbiting the whole card,
