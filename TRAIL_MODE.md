@@ -291,6 +291,12 @@ modified card.
   on a fresh random card; the seconds spent finding it are the price.
   (The column-drop mechanic was tried and reverted.)
 - **Ambient chests**: random chance in normal rooms as optional loot.
+  Opening one mid-room only CLAIMS it ("it cracks open after the
+  table") — the reward reveals with the winnings once the table is
+  cleared: coin joins THE TAKE ledger (30+15/region), a card owes an
+  EXTRA 3-card pick round after the normal one (25% mod chance), and
+  a relic — always a COMMON — takes the strongbox reveal screen. A
+  failed or abandoned table loses the unopened chest.
 - v1: objective spawns don't mix with hazard rooms.
 
 ## Deck modifiers (SHIPPED)

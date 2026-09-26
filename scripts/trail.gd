@@ -267,6 +267,13 @@ var _sleeve_rank_label: Label
 var _sleeve_up_btn: Button
 var _win_rows: Array = []        # last table's winnings, itemized for the pick screen
 var _win_box: Control
+var _pick_title: Label
+var _pick_sub: Label
+var _relic_sub: Label
+var _chest_rewards: Array = []   # ambient chests opened this room: "chips"/"card"/"relic"
+var _chest_card_rounds := 0      # extra 3-card pick rounds owed by chests
+var _in_chest_pick := false      # the pick screen is showing a chest round
+var _relic_ambient := false      # the strongbox screen shows chest loot, not the stagecoach job
 var _tarot_info: Label
 var _tarot_cards_box: Control
 var _bet_info: Label
@@ -1421,6 +1428,7 @@ func _start_room() -> void:
 	main.stat_max("deepest_table", room_index + 1)
 	sleeve_used = false  # one swap per table, fresh each sit-down
 	_aiming_sleeve = false
+	_chest_rewards.clear()  # unopened luck doesn't carry between tables
 	main.tutor_show("sleeve")
 	room_score = 0
 	room_target = current_offer.target
@@ -1648,8 +1656,8 @@ func on_hand_played(result: Dictionary) -> void:
 		_announce_after_settle("THE JACK SCOFFS — BEAT %d TO WOUND HIM"
 				% main.board.jack_bar)
 	if result.get("chest_opened", false):
-		_open_chest()
 		if room_goal == "chest":
+			_open_chest()
 			room_chests_opened += 1
 			if room_chests_opened >= room_chests_needed:
 				_room_cleared()
@@ -1658,6 +1666,9 @@ func on_hand_played(result: Dictionary) -> void:
 			_consume_hand()
 			_respawn_treasure()
 			return
+		# An AMBIENT chest keeps its secret: the reward is rolled now
+		# but only cracked open once the table is cleared.
+		_defer_chest_reward()
 	if room_goal in ["", "timed", "holdem", "crazy8"] and room_score >= room_target:
 		_room_cleared()
 		return
@@ -1858,7 +1869,32 @@ func on_safe_cracked() -> void:
 	_consume_hand()
 
 
-## Chest reward roll (treasure rooms and ambient chests).
+## An ambient chest opened mid-room: the reward KIND is rolled now,
+## the reveal waits for the winnings screen.
+func _defer_chest_reward() -> void:
+	var roll := randf()
+	if roll < 0.5:
+		_chest_rewards.append("chips")
+	elif roll < 0.85:
+		_chest_rewards.append("card")
+	elif _unowned_common_relic() != "":
+		_chest_rewards.append("relic")
+	else:
+		_chest_rewards.append("chips")
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 0.8, -8.0)
+	_announce_after_settle("CHEST CLAIMED — IT CRACKS OPEN AFTER THE TABLE")
+
+
+## A random COMMON relic the player doesn't own yet, or "".
+func _unowned_common_relic() -> String:
+	var pool: Array = []
+	for id in RELICS:
+		if int(RELICS[id].rarity) == 0 and not relics.has(id):
+			pool.append(id)
+	return pool.pick_random() if not pool.is_empty() else ""
+
+
+## Chest reward roll (treasure rooms — ambient chests defer instead).
 func _open_chest() -> void:
 	var region := room_index / REGION_SIZE + 1
 	var roll := randf()
@@ -2152,6 +2188,7 @@ func _room_cleared() -> void:
 	main.board.suppress_refill = true
 	if main.board._refill_active:
 		main.board._skip_refill()
+	_in_chest_pick = false
 	# Itemized winnings: the flash is just "TABLE CLEARED" — the full
 	# breakdown waits on the pick screen, where the eye has time.
 	var pot := stake + int(stake * stake_odds)
@@ -2187,9 +2224,33 @@ func _room_cleared() -> void:
 		if relic_id != "" and relics.size() < MAX_RELICS:
 			_gain_relic(relic_id)
 			_pending_relic_reward = relic_id
+			_relic_ambient = false
 		else:
 			chips += 60
 			_win_rows.append(["STRONGBOX (no relic room)", 60])
+	# Ambient chests crack open with the winnings: chips join the
+	# ledger, a card owes an extra pick round, a relic takes the
+	# strongbox screen.
+	_chest_card_rounds = 0
+	for kind in _chest_rewards:
+		match String(kind):
+			"chips":
+				var region := room_index / REGION_SIZE + 1
+				var loot := 30 + 15 * region
+				chips += loot
+				_win_rows.append(["THE CHEST — coin inside", loot])
+			"card":
+				_chest_card_rounds += 1
+			"relic":
+				var rid := _unowned_common_relic()
+				if rid != "" and _pending_relic_reward == "":
+					_gain_relic(rid)
+					_pending_relic_reward = rid
+					_relic_ambient = true
+				else:
+					chips += 60
+					_win_rows.append(["THE CHEST — nothing new inside", 60])
+	_chest_rewards.clear()
 	_after_board_settles(func() -> void:
 		room_index += 1
 		if room_index >= ROOMS_TOTAL:
@@ -2217,6 +2278,7 @@ func on_time_up() -> void:
 
 func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	in_room = false
+	_chest_rewards.clear()  # the chest went down with the table
 	main.board.locked = true
 	# The stake is gone and a curse joins the deck (unless Second Wind
 	# spares the first stumble) — and the room does NOT clear: the same
@@ -2292,6 +2354,8 @@ func _show_relic_reward_now() -> void:
 	_hide_all()
 	main.game_started = false
 	main.play_music("tarot")
+	_relic_sub.text = ("The chest you cracked along the way held a charm."
+			if _relic_ambient else "The stagecoach job pays in more than chips.")
 	var r: Dictionary = RELICS.get(_pending_relic_reward, {})
 	_relic_icon.relic_id = _pending_relic_reward
 	_relic_name.text = String(r.get("name", "")).to_upper()
@@ -2310,13 +2374,22 @@ func _show_pick_now() -> void:
 	_hide_all()
 	main.game_started = false
 	main.play_music("tarot")
-	_render_win_ledger()
+	if _in_chest_pick:
+		_pick_title.text = "FROM THE CHEST"
+		_pick_sub.text = "The chest held a card — take it, or leave it in the dust."
+		for child in _win_box.get_children():
+			child.queue_free()  # the ledger already had its moment
+	else:
+		_pick_title.text = "TABLE CLEARED"
+		_pick_sub.text = "Take a card — one joins your deck, or take none."
+		_render_win_ledger()
 	for child in _pick_box.get_children():
 		child.queue_free()
-	var pick_count := 4 if has_relic("card_sleeve") else 3
+	var pick_count := 3 if _in_chest_pick \
+			else (4 if has_relic("card_sleeve") else 3)
 	var start_x := 545.0 if pick_count == 4 else 660.0
 	for i in pick_count:
-		var card_data := _random_card_offer()
+		var card_data := _random_card_offer(0.25 if _in_chest_pick else PICK_MOD_CHANCE)
 		var holder: Button = main._button(_pick_box, "", Vector2(start_x + i * 220, 0), Vector2(170, 240))
 		var pc := PlayingCard.new()
 		pc.rank = card_data.rank
@@ -2332,7 +2405,7 @@ func _show_pick_now() -> void:
 			deck.append(data)
 			main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
 			_save_run()
-			_show_tarot())
+			_after_pick())
 		# Hover: the card's full story in a tooltip beneath it.
 		holder.mouse_entered.connect(func() -> void:
 			_pick_tip_label.text = _deck_stat_text(data)
@@ -2344,6 +2417,18 @@ func _show_pick_now() -> void:
 			_pick_tip.visible = false)
 	_pick_tip.visible = false
 	pick_layer.visible = true
+
+
+## After a pick (or a skip): any chest-owed card rounds run first,
+## then fate deals the next tables.
+func _after_pick() -> void:
+	if _chest_card_rounds > 0:
+		_chest_card_rounds -= 1
+		_in_chest_pick = true
+		main.transition(_show_pick_now)
+		return
+	_in_chest_pick = false
+	_show_tarot()
 
 
 ## The winnings ledger on the pick screen: every chip the cleared
@@ -2933,8 +3018,8 @@ func build_ui() -> void:
 	_bet_back_btn = _back_button(bet_layer, bet_back, "BACK")
 
 	pick_layer = _layer()
-	_screen_title(pick_layer, "TABLE CLEARED")
-	_center(pick_layer, "Take a card — one joins your deck, or take none.", 240, 22, main.DIM)
+	_pick_title = _center(pick_layer, "TABLE CLEARED", 100, 64, main.GOLD)
+	_pick_sub = _center(pick_layer, "Take a card — one joins your deck, or take none.", 240, 22, main.DIM)
 	# The winnings ledger sits at the left; the card offers keep the floor.
 	_win_box = Control.new()
 	_win_box.position = Vector2(120, 330)
@@ -2945,7 +3030,7 @@ func build_ui() -> void:
 	var skip: Button = main._button(pick_layer, "SKIP", Vector2(835, 740), Vector2(250, 60))
 	skip.add_theme_font_size_override("font_size", 24)
 	skip.pressed.connect(func() -> void:
-		_show_tarot())
+		_after_pick())
 	# Hover tooltip for the offered cards: stats, mods, and what they do.
 	_pick_tip = _make_stat_tip(pick_layer)
 	_pick_tip_label = _pick_tip.get_child(0) as Label
@@ -2976,7 +3061,7 @@ func build_ui() -> void:
 
 	relic_layer = _layer()
 	_screen_title(relic_layer, "THE STRONGBOX")
-	_center(relic_layer, "The stagecoach job pays in more than chips.", 210, 22, main.DIM)
+	_relic_sub = _center(relic_layer, "The stagecoach job pays in more than chips.", 210, 22, main.DIM)
 	UiKit.plate(relic_layer, Rect2(660, 300, 600, 480))
 	_relic_icon = RelicIcon.new()
 	_relic_icon.position = Vector2(960, 440)
