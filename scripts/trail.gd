@@ -1701,20 +1701,9 @@ func on_hand_played(result: Dictionary) -> void:
 		if room_outlaw_hp <= 0:
 			_outlaw_dead_pending = true
 			return
-		# HIS bullets burn down: every hand ticks their fuses, and one
-		# that reaches zero fires at you and is spent. Clearing one in
-		# a hand DEFUSES it — no penalty (the board already unmarked
-		# the played ones before this runs).
-		var fired := 0
-		for p in main.board.grid:
-			var c: PlayingCard = main.board.grid[p]
-			if c.objective == "hisbullet" and c.bullet_timer > 0:
-				c.bullet_timer -= 1
-				if c.bullet_timer <= 0:
-					fired += 1
-					c.objective = ""
-					main.board._fx(c.position, "sparks", Color("e05252"))
-		var caught := fired
+		# HIS bullets are mines now: no fuse, no countdown. Clear a card
+		# carrying one and he shoots you for it — step AROUND them.
+		var caught := int(result.get("bullets_his", 0))
 		# Weak hands still give him a free shot.
 		if result.score < _outlaw_bar():
 			caught += 1
@@ -1726,7 +1715,8 @@ func on_hand_played(result: Dictionary) -> void:
 			if room_grit <= 0:
 				_room_failed("GUNNED DOWN AT THE SHOWDOWN")
 				return
-			_announce_after_settle(("HIS BULLET FIRES — GRIT %d" if fired > 0
+			_announce_after_settle(("YOU CAUGHT HIS BULLET — GRIT %d"
+					if int(result.get("bullets_his", 0)) > 0
 					else "THE OUTLAW FIRES — GRIT %d") % room_grit)
 		_replenish_bullets()
 	if room_goal == "purge":

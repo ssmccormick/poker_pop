@@ -113,7 +113,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | TEXAS HOLD'EM | Variant: persistent 5-card community, pick 2 hole cards, best playable subset of the 7 scores; RE-DEAL card refreshes the community (shipped) |
 | CRAZY 8s | Variant: every 8 is WILD, but the board crawls with a mixed hazard storm (8 + region seeded, replenished each hand); score target (shipped) |
 | BLACKJACK | Variant: poker off — the table is dealt FACE-DOWN (corners up); chain blind hits, then the dealer flips his hole card and draws out his hand like a real dealer; 3+region wins to clear; hazard storm of 5 + region, replenished (shipped) |
-| SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (6+region HP). HIS red bullets are LIT with a 3-hand fuse — at zero one fires and costs GRIT; clearing one in a scoring hand defuses it penalty-free. Weak hands under the posted score give him free shots; 3 GRIT (shipped) |
+| SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (6+region HP). HIS red bullets are waiting slugs — no fuse, no countdown: clear a card carrying one and he SHOOTS you for it (−1 grit each), so build hands AROUND them (at most two ride the board). Weak hands under the posted score give him free shots; 3 GRIT (shipped; the fuse version was tried and reverted) |
 
 **Goal vs limit**: every non-boss room now rolls its challenge type
 independently — 50% a HAND BUDGET, 50% ON THE CLOCK (plain score
@@ -187,8 +187,9 @@ quarter clockwise every hand.
   burn through the card backs (a hazarded card is always face-up),
   and the storm rules still apply — 5 + region, replenished, no
   ambient roll.
-- **SHOWDOWN — the Outlaw**: an Outlaw portrait with HP beside the
-  board. YOUR bullet cards and HIS bullet cards spawn among the deals.
+- **SHOWDOWN — the Outlaw**: an Outlaw portrait in the RIGHT gutter
+  (the deck pile holds the left corner now). YOUR bullet cards and
+  HIS bullet cards spawn among the deals.
   Clear YOUR bullets in scoring hands → shots that damage him. Clear
   HIS bullets → he shoots YOU. He also shoots if your scored hand is
   below a posted threshold. Shots cost DUEL HP (separate, ~3 grit for
