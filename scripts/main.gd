@@ -1821,23 +1821,28 @@ func _build_ui() -> void:
 	# The player's DECK, floating loose in the lower left: one drawn
 	# card back PER CARD in the shoe, so a 32-card deck is a stack of
 	# 32 — and each deal visibly takes the top one. Click the stack to
-	# riffle through what's left (in no particular order).
+	# riffle through what's left (in no particular order). The pile
+	# lives in WORLD space (not the HUD layer) so dealt cards, at
+	# z 20 while flying, sail OVER it instead of under.
+	var pile_root := Node2D.new()
+	pile_root.z_index = 5
+	add_child(pile_root)
 	for i in DECK_STACK_MAX:
 		var back := PlayingCard.new()
 		back.face_down = true
 		back.visible = false
 		# Scale is synced (bigger than the felt) in _update_labels.
-		back.position = Vector2(178.0 + i * 0.7, 926.0 - i * 0.7)
-		hud_root.add_child(back)
+		back.position = Vector2(182.0 + i * 0.7, 880.0 - i * 0.7)
+		pile_root.add_child(back)
 		_deck_stack_cards.append(back)
-	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1036), 24, GOLD)
+	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 992), 24, GOLD)
 	_deck_count.size = Vector2(280, 32)
 	_deck_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_deck_btn = Button.new()
 	_deck_btn.flat = true
 	_deck_btn.focus_mode = Control.FOCUS_NONE  # Space stays PLAY HAND's
-	_deck_btn.position = Vector2(PANEL_X - 10, 796)
-	_deck_btn.size = Vector2(310, 278)
+	_deck_btn.position = Vector2(PANEL_X - 10, 752)
+	_deck_btn.size = Vector2(310, 276)
 	_deck_btn.tooltip_text = "The cards still to be dealt. Click to riffle through them — no peeking at the order. When the stack runs dry, a fresh copy of your deck shuffles in."
 	_deck_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_deck_btn.pressed.connect(_open_deck_peek)
