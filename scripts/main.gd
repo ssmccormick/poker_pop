@@ -511,9 +511,13 @@ func _update_labels() -> void:
 		for i in _deck_stack_cards.size():
 			# The stack thins as the shoe drains: 4 backs down to 1.
 			# Array order is bottom-of-stack first, so the top back
-			# (last) is the one that stays to the end.
-			(_deck_stack_cards[i] as PlayingCard).visible = show_deck \
-					and board.deck.size() > (3 - i) * 13
+			# (last) is the one that stays to the end. Every back wears
+			# the felt cards' exact scale — synced here because the
+			# board layout can change after the stack is built.
+			var back: PlayingCard = _deck_stack_cards[i]
+			if back.scale != board.scale:
+				back.scale = board.scale
+			back.visible = show_deck and board.deck.size() > (3 - i) * 13
 		if show_deck:
 			_deck_count.text = "DECK  %d" % board.deck.size()
 		elif _deck_peek.visible:
@@ -1630,9 +1634,6 @@ func _apply_board_layout() -> void:
 	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0 \
 			+ Vector2.ONE * margin * s
 	_board_home = board.position
-	# The HUD deck stack wears the same scale as the cards on the felt.
-	for c in _deck_stack_cards:
-		(c as PlayingCard).scale = board.scale
 
 
 ## Rattles the table (never the HUD): a decaying random jitter around
@@ -1818,8 +1819,8 @@ func _build_ui() -> void:
 	for i in range(3, -1, -1):
 		var back := PlayingCard.new()
 		back.face_down = true
-		# Scaled to match the cards on the felt by _apply_board_layout.
-		back.position = Vector2(PANEL_X + 150 + i * 3.0, 946 - i * 3.0)
+		# Scale is synced to the felt cards every frame in _update_labels.
+		back.position = Vector2(PANEL_X + 150 + i * 4.0, 938 - i * 4.0)
 		hud_root.add_child(back)
 		_deck_stack_cards.append(back)
 	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1022), 22, GOLD)
@@ -1839,7 +1840,7 @@ func _build_ui() -> void:
 	_deck_count.visible = false
 	for c in _deck_stack_cards:
 		c.visible = false
-	board.deal_anchor = Vector2(PANEL_X + 150, 946)
+	board.deal_anchor = Vector2(PANEL_X + 150, 938)
 
 	_deck_peek = ColorRect.new()
 	_deck_peek.color = Color(0, 0, 0, 0.72)
