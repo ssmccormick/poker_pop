@@ -217,6 +217,8 @@ func _ready() -> void:
 				_open_stats()
 			"trail":
 				trail.open_buyin()
+			"upgrades":
+				trail.open_upgrades()
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -2053,6 +2055,11 @@ func _build_menu() -> void:
 	trail_btn.add_theme_font_size_override("font_size", 26)
 	trail_btn.pressed.connect(func() -> void:
 		trail.open_buyin())
+	# The Outfitter: every $cash meta upgrade, right beside the ride.
+	var upgrades_btn := _button(menu_layer, "UPGRADES", Vector2(1250, 336), Vector2(210, 66))
+	upgrades_btn.add_theme_font_size_override("font_size", 20)
+	upgrades_btn.pressed.connect(func() -> void:
+		trail.open_upgrades())
 	_menu_center("Buy in · bet at every table · sculpt your deck · ride to the end or bust", 408, 20, DIM)
 
 	_menu_center("TIME TRIAL", 456, 24, GOLD)

@@ -186,9 +186,11 @@ const RELICS := {
 
 var main: Node2D  # set by main.gd before build()
 
-# Meta (persists forever)
+# Meta (persists forever) — everything the OUTFITTER sells for $cash.
 var cash := 0
-var sleeve_rank := 2   # ACE UP THE SLEEVE: the starting rank, meta-upgraded with $cash up to an Ace
+var sleeve_rank := 2     # ACE UP THE SLEEVE: the starting rank, up to an Ace
+var meta_bankroll := 0   # +20 starting chips per level on every buy-in (max 5)
+var meta_provisions := 0 # random provisions in the kit at run start (max 2)
 
 # Run state
 var run_active := false
@@ -262,9 +264,10 @@ var _pending_relic_reward := ""
 var _buyin_cash_label: Label
 var _buyin_resume_btn: Button
 var _buyin_tier_btns: Array = []
-var _sleeve_pc: PlayingCard      # buy-in screen: the sleeve on show
-var _sleeve_rank_label: Label
-var _sleeve_up_btn: Button
+var upgrades_layer: ColorRect    # the OUTFITTER: meta upgrades for $cash
+var _up_cash: Label
+var _up_rows: Array = []         # [{id, status: Label, btn: Button}]
+var _sleeve_pc: PlayingCard      # the sleeve on show beside its row
 var _win_rows: Array = []        # last table's winnings, itemized for the pick screen
 var _win_box: Control
 var _pick_title: Label
@@ -324,6 +327,8 @@ func _load_meta() -> void:
 	cf.load(main.profile_path("trail_meta.cfg"))
 	cash = int(cf.get_value("meta", "cash", 0))
 	sleeve_rank = clampi(int(cf.get_value("meta", "sleeve_rank", 2)), 2, 14)
+	meta_bankroll = clampi(int(cf.get_value("meta", "bankroll", 0)), 0, 5)
+	meta_provisions = clampi(int(cf.get_value("meta", "provisions", 0)), 0, 2)
 
 
 func _save_meta() -> void:
@@ -332,6 +337,8 @@ func _save_meta() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("meta", "cash", cash)
 	cf.set_value("meta", "sleeve_rank", sleeve_rank)
+	cf.set_value("meta", "bankroll", meta_bankroll)
+	cf.set_value("meta", "provisions", meta_provisions)
 	cf.save(main.profile_path("trail_meta.cfg"))
 
 
@@ -830,7 +837,7 @@ func _open_buyin_now() -> void:
 	main.menu_layer.visible = false
 	main.menu_open = false
 	_hide_all()
-	_refresh_sleeve_panel()
+	_buyin_cash_label.text = "CASH  $%d" % cash
 	# A ride in progress takes top billing; fresh saddles move down.
 	var riding := _has_saved_run()
 	_buyin_resume_btn.visible = riding
@@ -844,21 +851,79 @@ func _open_buyin_now() -> void:
 	buyin_layer.visible = true
 
 
-## Buy-in screen: the sleeve card, its blurb, and the upgrade button.
-func _refresh_sleeve_panel() -> void:
-	_buyin_cash_label.text = "CASH  $%d" % cash
+# --- The Outfitter: meta upgrades bought with $cash -----------------------
+
+func open_upgrades() -> void:
+	main.transition(_open_upgrades_now)
+
+
+func _open_upgrades_now() -> void:
+	main.menu_layer.visible = false
+	main.menu_open = false
+	_hide_all()
+	_refresh_upgrades()
+	upgrades_layer.visible = true
+
+
+## The next level's price for one upgrade — 0 when it's maxed out.
+func upgrade_cost(id: String) -> int:
+	match id:
+		"sleeve":
+			return 0 if sleeve_rank >= 14 else sleeve_upgrade_cost()
+		"bankroll":
+			return 0 if meta_bankroll >= 5 else 20 * (meta_bankroll + 1)
+		"provisions":
+			return 0 if meta_provisions >= 2 else 35 * (meta_provisions + 1)
+	return 0
+
+
+func _buy_upgrade(id: String) -> void:
+	var cost := upgrade_cost(id)
+	if cost <= 0 or cash < cost:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	cash -= cost
+	match id:
+		"sleeve":
+			sleeve_rank += 1
+		"bankroll":
+			meta_bankroll += 1
+		"provisions":
+			meta_provisions += 1
+	_save_meta()
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+	_refresh_upgrades()
+
+
+func _refresh_upgrades() -> void:
+	_up_cash.text = "CASH  $%d" % cash
 	_sleeve_pc.rank = sleeve_rank
 	_sleeve_pc.suit = 0
 	_sleeve_pc.queue_redraw()
-	_sleeve_rank_label.text = "Starts every run as a %s of a random suit" \
-			% String(RANK_CHARS.get(sleeve_rank, str(sleeve_rank)))
-	if sleeve_rank >= 14:
-		_sleeve_up_btn.disabled = true
-		_sleeve_up_btn.text = "FULLY SHARPENED — AN ACE"
-	else:
-		_sleeve_up_btn.disabled = false
-		_sleeve_up_btn.text = "RAISE TO %s — $%d" % [String(RANK_CHARS.get(
-				sleeve_rank + 1, str(sleeve_rank + 1))), sleeve_upgrade_cost()]
+	for row in _up_rows:
+		var id: String = row.id
+		var status: Label = row.status
+		var btn: Button = row.btn
+		var cost := upgrade_cost(id)
+		match id:
+			"sleeve":
+				status.text = "Starts every run as a %s of a random suit" \
+						% String(RANK_CHARS.get(sleeve_rank, str(sleeve_rank)))
+				btn.text = "FULLY SHARPENED — AN ACE" if cost <= 0 \
+						else "RAISE TO %s — $%d" % [String(RANK_CHARS.get(
+								sleeve_rank + 1, str(sleeve_rank + 1))), cost]
+			"bankroll":
+				status.text = "Level %d / 5  ·  +%d chips at every buy-in" \
+						% [meta_bankroll, 20 * meta_bankroll]
+				btn.text = "SADDLE HEAVIER — $%d" % cost if cost > 0 \
+						else "AS HEAVY AS IT GETS"
+			"provisions":
+				status.text = "Level %d / 2  ·  %d provision%s at the start" \
+						% [meta_provisions, meta_provisions,
+						"" if meta_provisions == 1 else "s"]
+				btn.text = "PACK ANOTHER — $%d" % cost if cost > 0 \
+						else "THE KIT RIDES FULL"
+		btn.disabled = cost <= 0 or cash < cost
 
 
 func _has_saved_run() -> bool:
@@ -878,8 +943,13 @@ func _start_run(tier: int) -> void:
 	chips = TABLES[tier].chips
 	deck = _fresh_deck()
 	room_index = 0
+	# The Outfitter's gear rides along: extra chips on the stack, and
+	# provisions already in the kit.
+	chips += 20 * meta_bankroll
 	relics.clear()
 	provisions.clear()
+	for i in meta_provisions:
+		provisions.append(_random_provision())
 	_aiming_slot = -1
 	sleeve_card = _fresh_sleeve()
 	sleeve_used = false
@@ -2762,6 +2832,22 @@ func _render_shop_provisions() -> void:
 			_show_shop())
 
 
+## A wrapping label built the safe way: autowrap on BEFORE the size is
+## set and before it enters the tree, so the rect actually holds.
+func _wrap_label(parent: Control, text: String, rect: Rect2, font_size: int,
+		col: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.position = rect.position
+	l.size = rect.size
+	l.add_theme_font_size_override("font_size", font_size)
+	l.add_theme_color_override("font_color", col)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(l)
+	return l
+
+
 ## One gold-bordered card-stat tooltip, parented to a screen layer.
 ## The label is its first (only) child.
 func _make_stat_tip(layer: Control) -> PanelContainer:
@@ -2934,38 +3020,48 @@ func build_ui() -> void:
 		var tier := i
 		b.pressed.connect(func() -> void:
 			_start_run(tier))
-	# ACE UP THE SLEEVE — the one meta upgrade, bought with $cash.
-	UiKit.plate(buyin_layer, Rect2(1420, 330, 380, 470))
-	var sleeve_title := _center(buyin_layer, "ACE UP THE SLEEVE", 348, 26, main.GOLD)
-	sleeve_title.position.x = 1420 - main.VIEW.x / 2.0 + 190
-	_sleeve_pc = PlayingCard.new()
-	_sleeve_pc.material = Themes.current_material()
-	_sleeve_pc.position = Vector2(1610, 505)
-	_sleeve_pc.scale = Vector2(1.4, 1.4)
-	buyin_layer.add_child(_sleeve_pc)
-	_sleeve_rank_label = _center(buyin_layer, "", 610, 20, main.OFFWHITE)
-	_sleeve_rank_label.position.x = 1420 - main.VIEW.x / 2.0 + 190
-	var sleeve_note: Label = main._label(buyin_layer,
-			"Once per table: trade it for any plain card — what you take rides up the sleeve to the next table. Every run starts it fresh.",
-			Vector2(1450, 646), 15, main.DIM)
-	sleeve_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	sleeve_note.size = Vector2(320, 84)
-	_sleeve_up_btn = main._button(buyin_layer, "", Vector2(1450, 730), Vector2(320, 52))
-	_sleeve_up_btn.add_theme_font_size_override("font_size", 18)
-	_sleeve_up_btn.pressed.connect(func() -> void:
-		if sleeve_rank >= 14 or cash < sleeve_upgrade_cost():
-			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-			return
-		cash -= sleeve_upgrade_cost()
-		sleeve_rank += 1
-		_save_meta()
-		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
-		_refresh_sleeve_panel())
-
 	_buyin_resume_btn = main._button(buyin_layer, "RESUME YOUR RIDE", Vector2(660, 740), Vector2(600, 70))
 	_buyin_resume_btn.add_theme_font_size_override("font_size", 24)
 	_buyin_resume_btn.pressed.connect(_resume_run)
 	_back_button(buyin_layer, back_to_menu)
+
+	# THE OUTFITTER — every meta upgrade $cash can buy, one shelf each.
+	upgrades_layer = _layer()
+	_screen_title(upgrades_layer, "THE OUTFITTER")
+	_center(upgrades_layer, "Permanent gear, paid in $cash banked from finished rides.", 200, 22, main.DIM)
+	_up_cash = _center(upgrades_layer, "", 246, 30, main.GOLD)
+	var updefs := [
+		["sleeve", "ACE UP THE SLEEVE",
+			"The hidden swap card every run starts with — once per table, trade it for any plain card on the felt. Raising it raises its starting rank, all the way to an Ace."],
+		["bankroll", "BANKROLL",
+			"Ride out heavier: +20 starting chips on every buy-in, per level, at every stake."],
+		["provisions", "PACKED KIT",
+			"Never leave town empty-handed: a random provision already in the kit at every run's start, per level."],
+	]
+	for i in updefs.size():
+		var def: Array = updefs[i]
+		var top := 320.0 + i * 190.0
+		UiKit.plate(upgrades_layer, Rect2(440, top, 1040, 170))
+		var name_l: Label = main._label(upgrades_layer, String(def[1]),
+				Vector2(560, top + 22), 28, main.GOLD)
+		name_l.size = Vector2(560, 36)
+		_wrap_label(upgrades_layer, String(def[2]),
+				Rect2(560, top + 64, 570, 92), 17, main.OFFWHITE)
+		var status := _wrap_label(upgrades_layer, "",
+				Rect2(1170, top + 24, 290, 64), 19, main.DIM)
+		var buy: Button = main._button(upgrades_layer, "",
+				Vector2(1170, top + 96), Vector2(290, 52))
+		buy.add_theme_font_size_override("font_size", 17)
+		var uid := String(def[0])
+		buy.pressed.connect(func() -> void:
+			_buy_upgrade(uid))
+		_up_rows.append({"id": uid, "status": status, "btn": buy})
+	_sleeve_pc = PlayingCard.new()
+	_sleeve_pc.material = Themes.current_material()
+	_sleeve_pc.position = Vector2(505, 405)
+	_sleeve_pc.scale = Vector2(1.1, 1.1)
+	upgrades_layer.add_child(_sleeve_pc)
+	_back_button(upgrades_layer, back_to_menu, "MENU")
 
 	tarot_layer = _layer()
 	_screen_title(tarot_layer, "FATE DEALS")
@@ -3115,8 +3211,8 @@ func _layer() -> ColorRect:
 
 
 func _hide_all() -> void:
-	for l in [buyin_layer, tarot_layer, bet_layer, pick_layer, shop_layer,
-			remove_layer, relic_layer, end_layer]:
+	for l in [buyin_layer, upgrades_layer, tarot_layer, bet_layer, pick_layer,
+			shop_layer, remove_layer, relic_layer, end_layer]:
 		if l:
 			l.visible = false
 

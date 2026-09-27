@@ -368,9 +368,20 @@ onto another table. Nothing cursed, hazarded, flooded, face-down,
 objective-bearing, or boss-sized fits up a sleeve; enhanced cards do,
 mods and all — palming a MULT or GOLD card for the right table is the
 whole play. The sleeve starts each run as a **2 of a random suit**
-and is META-UPGRADED with $cash at the trail buy-in screen
-($10×(rank−1) per step) all the way to an **Ace**. Saved with the
-run; the swap resets at every sit-down.
+and is META-UPGRADED with $cash at THE OUTFITTER ($10×(rank−1) per
+step) all the way to an **Ace**. Saved with the run; the swap resets
+at every sit-down.
+
+## The Outfitter (SHIPPED)
+
+The meta-progression shop, reached from the MAIN MENU (UPGRADES,
+beside THE TRAIL): every permanent upgrade $cash can buy, one shelf
+per upgrade, each showing its current level and next price. Current
+stock: **Ace up the Sleeve** (starting rank 2→A, $10×(rank−1));
+**Bankroll** (+20 starting chips per level on every buy-in, 5 levels,
+$20×(level+1)); **Packed Kit** (a random provision already in the kit
+at run start, 2 levels, $35×(level+1)). All saved in trail_meta.cfg;
+new upgrades belong on this screen.
 
 ## Provisions (SHIPPED)
 
