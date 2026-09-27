@@ -1210,9 +1210,12 @@ func _reject_hand() -> void:
 			card.error_flash = false
 
 
-# The HUD's deck pile (global coords); main points this at the plate
+# The HUD's deck pile (global coords); main points this at the stack
 # in the lower-left so every deal visibly comes from the player's deck.
+# deal_anchor tracks the pile's current top card; deal_scale is that
+# card's on-screen scale relative to the felt (0 = use the default).
 var deal_anchor := Vector2.ZERO
+var deal_scale := 0.0
 
 
 ## Where the dealer throws from: the HUD deck pile when main has
@@ -1360,7 +1363,10 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			# Each waits INVISIBLE in the stack until its own throw, and
 			# leaves back-up, flipping face-up mid-flight.
 			card.rotation = -TAU * randf_range(DEAL_SPIN_MIN, DEAL_SPIN_MAX)
-			card.scale = Vector2(DEAL_START_SCALE, DEAL_START_SCALE)
+			# Launch at the HUD stack's exact card size, so the throw IS
+			# the top card of the pile leaving it.
+			var s0 := deal_scale if deal_scale > 0.0 else DEAL_START_SCALE
+			card.scale = Vector2(s0, s0)
 			card.z_index = 20
 			card.visible = false
 			if not card.face_down:
@@ -1401,21 +1407,28 @@ func _fall_and_fill(initial_deal: bool) -> void:
 	for i in deals.size():
 		var d: Dictionary = deals[i]
 		var card: PlayingCard = d.card
-		var from: Vector2 = card.position
 		var to: Vector2 = d.pos
-		var ctrl := (from + to) * 0.5 + Vector2(0.0, -DEAL_ARC_HEIGHT)
 		var delay := deal_base + i * t_stagger
 		var sh := _make_deal_shadow(to)
 		_refill_shadows.append(sh)
+		# The arc is measured at LAUNCH, from wherever the pile's top
+		# card sits right then — the stack shrinks as it deals.
+		var fl := {"from": card.position,
+				"ctrl": (card.position + to) * 0.5 + Vector2(0.0, -DEAL_ARC_HEIGHT)}
 		var flight := func(t: float) -> void:
 			if is_instance_valid(card):
+				var from: Vector2 = fl.from
+				var ctrl: Vector2 = fl.ctrl
 				card.position = from.lerp(ctrl, t).lerp(ctrl.lerp(to, t), t)
-		tw.tween_method(flight, 0.0, 1.0, t_deal) \
-				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
 		# The card appears the moment IT leaves the stack...
 		tw.tween_callback(func() -> void:
 			if is_instance_valid(card):
+				card.position = deck_origin()
+				fl.from = card.position
+				fl.ctrl = (fl.from + to) * 0.5 + Vector2(0.0, -DEAL_ARC_HEIGHT)
 				card.visible = true).set_delay(delay)
+		tw.tween_method(flight, 0.0, 1.0, t_deal) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT).set_delay(delay)
 		# ...and flips from back to face through the first arc.
 		if card.deal_flip < 1.0:
 			tw.tween_property(card, "deal_flip", 1.0, t_deal * 0.55) \

@@ -66,6 +66,7 @@ var _kit_btns: Array = []  # provision slot buttons
 var _sleeve_btn: Button    # Ace up the Sleeve, top row of the kit
 var _kit_sig := ""         # last-rendered kit state, to skip rebuilds
 const DECK_STACK_MAX := 60  # backs to pool for the literal stack
+const DECK_PILE_FACTOR := 1.35  # the pile's size relative to felt cards
 var _deck_btn: Button      # invisible click area over the stack
 var _deck_count: Label
 var _deck_stack_cards: Array = []  # one drawn back per card in the shoe
@@ -512,10 +513,14 @@ func _update_labels() -> void:
 		# top card off the stack.
 		var shoe: int = board.deck.size() + board.undealt_in_flight()
 		var shown := mini(shoe, _deck_stack_cards.size())
+		# The pile stands a good third bigger than the felt cards — it
+		# should look like the deck in your hand, not another slot.
+		var pile_scale: Vector2 = board.scale * DECK_PILE_FACTOR
+		board.deal_scale = DECK_PILE_FACTOR
 		for i in _deck_stack_cards.size():
 			var back: PlayingCard = _deck_stack_cards[i]
-			if back.scale != board.scale:
-				back.scale = board.scale  # always the felt cards' size
+			if back.scale != pile_scale:
+				back.scale = pile_scale
 			back.visible = show_deck and i < shown
 		if shown > 0:
 			board.deal_anchor = (_deck_stack_cards[shown - 1] as PlayingCard).position
@@ -1821,18 +1826,18 @@ func _build_ui() -> void:
 		var back := PlayingCard.new()
 		back.face_down = true
 		back.visible = false
-		# Scale is synced to the felt cards every frame in _update_labels.
-		back.position = Vector2(164.0 + i * 0.7, 958.0 - i * 0.7)
+		# Scale is synced (bigger than the felt) in _update_labels.
+		back.position = Vector2(178.0 + i * 0.7, 926.0 - i * 0.7)
 		hud_root.add_child(back)
 		_deck_stack_cards.append(back)
-	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1044), 22, GOLD)
-	_deck_count.size = Vector2(260, 30)
+	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1036), 24, GOLD)
+	_deck_count.size = Vector2(280, 32)
 	_deck_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_deck_btn = Button.new()
 	_deck_btn.flat = true
 	_deck_btn.focus_mode = Control.FOCUS_NONE  # Space stays PLAY HAND's
-	_deck_btn.position = Vector2(PANEL_X - 10, 848)
-	_deck_btn.size = Vector2(300, 226)
+	_deck_btn.position = Vector2(PANEL_X - 10, 796)
+	_deck_btn.size = Vector2(310, 278)
 	_deck_btn.tooltip_text = "The cards still to be dealt. Click to riffle through them — no peeking at the order. When the stack runs dry, a fresh copy of your deck shuffles in."
 	_deck_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_deck_btn.pressed.connect(_open_deck_peek)
