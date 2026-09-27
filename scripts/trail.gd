@@ -2091,7 +2091,14 @@ func collect_status() -> String:
 	if o.has("collect_rank"):
 		return "WANTED: %s  %d / %d" % [_rank_plural(int(o.collect_rank)),
 				room_collect_done, room_collect_need]
-	return "DIFFERENT RANKS  %d / %d" % [room_collect_done, room_collect_need]
+	# The census names its remaining heads: every rank not yet cleared
+	# stays on the list, and each catch strikes one off the banner.
+	var left := PackedStringArray()
+	for r in range(2, 15):
+		if not room_collect_kinds.has(r):
+			left.append(String(RANK_CHARS.get(r, str(r))))
+	return "RANKS %d/%d · LEFT %s" % [room_collect_done, room_collect_need,
+			" ".join(left)]
 
 
 ## The room's total clearing quota.
