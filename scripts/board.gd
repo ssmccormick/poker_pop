@@ -358,6 +358,17 @@ func _refill_deck() -> void:
 	deck.shuffle()
 
 
+## Cards drawn from the shoe but not yet thrown (invisible, awaiting
+## their turn in the deal) — the HUD stack still shows them on top,
+## so each one visibly leaves as its throw begins.
+func undealt_in_flight() -> int:
+	var n := 0
+	for p in grid:
+		if not grid[p].visible:
+			n += 1
+	return n
+
+
 ## Returns {} when a single deck runs out.
 func draw_card() -> Dictionary:
 	if deck.is_empty():

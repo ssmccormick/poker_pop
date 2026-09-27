@@ -65,10 +65,10 @@ var _kit_title: Label
 var _kit_btns: Array = []  # provision slot buttons
 var _sleeve_btn: Button    # Ace up the Sleeve, top row of the kit
 var _kit_sig := ""         # last-rendered kit state, to skip rebuilds
-var _deck_plate: Panel     # lower left: the stack every card deals off
+const DECK_STACK_MAX := 60  # backs to pool for the literal stack
 var _deck_btn: Button      # invisible click area over the stack
 var _deck_count: Label
-var _deck_stack_cards: Array = []  # the drawn card backs
+var _deck_stack_cards: Array = []  # one drawn back per card in the shoe
 var _deck_peek: ColorRect  # click the stack: what's left, out of order
 var _deck_peek_grid: Control
 var _deck_peek_count: Label
@@ -505,21 +505,22 @@ func _update_labels() -> void:
 	_update_kit()
 	if _deck_btn != null:
 		var show_deck := game_started and not menu_open and not game_over
-		_deck_plate.visible = show_deck
 		_deck_btn.visible = show_deck
 		_deck_count.visible = show_deck
+		# One back per card still to be dealt: cards drawn but not yet
+		# thrown stay counted on top, so each throw visibly takes the
+		# top card off the stack.
+		var shoe: int = board.deck.size() + board.undealt_in_flight()
+		var shown := mini(shoe, _deck_stack_cards.size())
 		for i in _deck_stack_cards.size():
-			# The stack thins as the shoe drains: 4 backs down to 1.
-			# Array order is bottom-of-stack first, so the top back
-			# (last) is the one that stays to the end. Every back wears
-			# the felt cards' exact scale — synced here because the
-			# board layout can change after the stack is built.
 			var back: PlayingCard = _deck_stack_cards[i]
 			if back.scale != board.scale:
-				back.scale = board.scale
-			back.visible = show_deck and board.deck.size() > (3 - i) * 13
+				back.scale = board.scale  # always the felt cards' size
+			back.visible = show_deck and i < shown
+		if shown > 0:
+			board.deal_anchor = (_deck_stack_cards[shown - 1] as PlayingCard).position
 		if show_deck:
-			_deck_count.text = "DECK  %d" % board.deck.size()
+			_deck_count.text = "DECK  %d" % shoe
 		elif _deck_peek.visible:
 			_deck_peek.visible = false
 	_update_preview()
@@ -1812,35 +1813,33 @@ func _build_ui() -> void:
 	for b in _kit_btns:
 		b.visible = false
 
-	# The player's DECK, lower left: a real stack of card backs that
-	# every deal comes straight off of. Click the stack to riffle
-	# through what's left (in no particular order).
-	_deck_plate = UiKit.plate(hud_root, Rect2(PANEL_X - 18, 852, 336, 204))
-	for i in range(3, -1, -1):
+	# The player's DECK, floating loose in the lower left: one drawn
+	# card back PER CARD in the shoe, so a 32-card deck is a stack of
+	# 32 — and each deal visibly takes the top one. Click the stack to
+	# riffle through what's left (in no particular order).
+	for i in DECK_STACK_MAX:
 		var back := PlayingCard.new()
 		back.face_down = true
+		back.visible = false
 		# Scale is synced to the felt cards every frame in _update_labels.
-		back.position = Vector2(PANEL_X + 150 + i * 4.0, 938 - i * 4.0)
+		back.position = Vector2(164.0 + i * 0.7, 958.0 - i * 0.7)
 		hud_root.add_child(back)
 		_deck_stack_cards.append(back)
-	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1022), 22, GOLD)
-	_deck_count.size = Vector2(300, 32)
+	_deck_count = _label(hud_root, "DECK", Vector2(PANEL_X, 1044), 22, GOLD)
+	_deck_count.size = Vector2(260, 30)
 	_deck_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_deck_btn = Button.new()
 	_deck_btn.flat = true
 	_deck_btn.focus_mode = Control.FOCUS_NONE  # Space stays PLAY HAND's
-	_deck_btn.position = Vector2(PANEL_X - 18, 852)
-	_deck_btn.size = Vector2(336, 204)
+	_deck_btn.position = Vector2(PANEL_X - 10, 848)
+	_deck_btn.size = Vector2(300, 226)
 	_deck_btn.tooltip_text = "The cards still to be dealt. Click to riffle through them — no peeking at the order. When the stack runs dry, a fresh copy of your deck shuffles in."
 	_deck_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_deck_btn.pressed.connect(_open_deck_peek)
 	hud_root.add_child(_deck_btn)
-	_deck_plate.visible = false
 	_deck_btn.visible = false
 	_deck_count.visible = false
-	for c in _deck_stack_cards:
-		c.visible = false
-	board.deal_anchor = Vector2(PANEL_X + 150, 938)
+	board.deal_anchor = Vector2(164, 958)
 
 	_deck_peek = ColorRect.new()
 	_deck_peek.color = Color(0, 0, 0, 0.72)
