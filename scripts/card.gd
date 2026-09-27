@@ -462,6 +462,9 @@ func _draw() -> void:
 		var sx := maxf(absf(cos(deal_flip * PI)), 0.04)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2(sx, 1.0))
 		if deal_flip < 0.5:
+			# The cream card base under the back, so the flying card
+			# wears the same white border as the ones in the stack.
+			_face_box.draw(get_canvas_item(), rect)
 			_draw_card_back(rect)
 			return
 	# Shadows stay on the felt while the face lifts — wider when the
