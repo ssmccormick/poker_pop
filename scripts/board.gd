@@ -302,6 +302,12 @@ const SFX_LOSS_HOWLS := [
 ]
 const SFX_BELL := preload("res://assets/sfx/west/bell.mp3")
 const SFX_FUSE_START := preload("res://assets/sfx/west/fuse_start.mp3")
+const SFX_FUSE_LOOP := preload("res://assets/sfx/west/fuse_loop.mp3")
+const SFX_LAUGHS := [
+	preload("res://assets/sfx/west/laugh_1.mp3"),
+	preload("res://assets/sfx/west/laugh_2.mp3"),
+	preload("res://assets/sfx/west/laugh_3.mp3"),
+]
 const SFX_REVOLVER_CHARGE := preload("res://assets/sfx/west/revolver_charge.mp3")
 const SFX_STING_WIN := preload("res://assets/sfx/west/sting_win.mp3")
 const SFX_STING_BOSS := preload("res://assets/sfx/west/sting_boss.mp3")
@@ -355,6 +361,35 @@ func _refill_deck() -> void:
 	else:
 		deck = custom_deck.duplicate(true)
 	deck.shuffle()
+
+
+var _fuse_player: AudioStreamPlayer
+
+
+## The dynamite is IMPOSSIBLE to ignore: while any bomb sits on the
+## board, a burning-fuse sizzle plays loud on loop. Main calls this
+## every frame with whether the table is actually live.
+func update_fuse_loop(active: bool) -> void:
+	var want := false
+	if active and is_inside_tree():
+		for p in grid:
+			if grid[p].hazard == "bomb":
+				want = true
+				break
+	if want:
+		if _fuse_player == null:
+			_fuse_player = AudioStreamPlayer.new()
+			var s := SFX_FUSE_LOOP
+			s.loop = true
+			_fuse_player.stream = s
+			_fuse_player.volume_db = -6.0
+			_fuse_player.pitch_scale = 1.45
+			_fuse_player.bus = "SFX"
+			add_child(_fuse_player)
+		if not _fuse_player.playing:
+			_fuse_player.play()
+	elif _fuse_player != null and _fuse_player.playing:
+		_fuse_player.stop()
 
 
 ## Cards drawn from the shoe but not yet thrown (invisible, awaiting

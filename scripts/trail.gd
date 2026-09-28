@@ -1203,9 +1203,11 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer["goal"] = "landrush"
 			offer.hands = MAX_HANDS_BUY
 			offer.target = 0
-	# Every job deals as either a HAND BUDGET or a COUNTDOWN (50/50).
-	# Plain score tables that draw the clock take the HIGH NOON name.
-	if randf() < 0.5:
+	# Every job deals as either a HAND BUDGET or a COUNTDOWN (50/50) —
+	# except the BANK JOB and the STAGECOACH, which always run on the
+	# clock: vaults and schedules wait for no hand count. Plain score
+	# tables that draw the clock take the HIGH NOON name.
+	if String(offer.get("goal", "")) in ["safe", "chest"] or randf() < 0.5:
 		offer["limit"] = "time"
 		if not offer.has("minutes"):
 			offer["minutes"] = clampi(roundi(int(offer.hands) * 0.35), 2,

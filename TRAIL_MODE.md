@@ -248,7 +248,7 @@ spread, soak, burn down, and count down from hand one.
 
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |
-| Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward) | Include it in any scoring hand to defuse |
+| Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward). Drawn as a BUNDLE OF DYNAMITE with a pulsing red alert ring around the whole card, and while any bomb sits on the board a loud fuse-sizzle loops constantly — you cannot not notice it | Include it in any scoring hand to defuse |
 | Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored). The FLAMES GROW as the rank falls — barely above the bottom edge on an Ace, all but consuming the card at rank 2. If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card. The next card to catch wears small flames licking its bottom edge |
 | Wind | THE CHARIOT | When played, every card from its cell to the edge in the wind's direction is blown off (unscored); the direction turns each hand and is HIDDEN by default — only the Weathervane relic shows the arrow. Safes are too heavy to move | Still a tool for the bold — a blind gust can kill a BOSS (blowing one off the table counts; a gusted tail segment wounds the cobra), and the Weathervane turns it back into a precision weapon |
 | Stone | STRENGTH | A BLOCKER: no rank, no suit, unplayable, and chains can't pass through it. Every card cleared orthogonally beside it chips it (3 chips = crumble); broken rock has a 35% chance of baring a GOLD card in the refill — everywhere, not just mines | Mine around it: build hands that clear its neighbors, and cash the gold it leaves behind |
@@ -283,6 +283,8 @@ rank/suit cards with overlays) are on the board. Make a VALID poker
 hand containing BOTH — the hand scores normally and the chest opens.
 Rewards: a new card for the deck, bonus chips, cash, or (later) a
 modified card.
+- Both objective jobs — the BANK JOB and the STAGECOACH — **always
+  run on the clock**: they never deal as hand-budget tables.
 - **Treasure room (STAGECOACH HAUL, odds 2.0)**: the room demands
   **3–5 pairs by depth**, and it runs **on the clock** — unlimited
   hands, reference ~1 minute per pair + 1, with minutes as the odds

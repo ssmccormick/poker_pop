@@ -580,7 +580,22 @@ func _draw() -> void:
 
 	match hazard:
 		"bomb":
-			var c := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
+			# DYNAMITE, impossible to miss: a red alert ring pulsing
+			# around the whole card, a bound bundle of three sticks,
+			# and the fuse hissing shorter above it.
+			var alert := 0.5 + 0.5 * sin(_t * 6.0 + _phase)
+			draw_rect(rect.grow(-2), Color(0.88, 0.2, 0.12, 0.3 + 0.4 * alert),
+					false, 4.0)
+			var bb := Vector2(-W / 2.0 + 21, H / 2.0 - 20)
+			for k in 3:
+				var sx := bb.x - 9.0 + k * 9.0
+				var sy := bb.y + (0.0 if k == 1 else 2.0)
+				var stick := Rect2(Vector2(sx - 3.5, sy - 15.0), Vector2(7, 26))
+				draw_rect(stick, Color("b8382a"))
+				draw_rect(Rect2(stick.position, Vector2(7, 4)), Color("d9d0b8"))
+				draw_rect(stick, Color("7e2018"), false, 1.5)
+			# The binding strap.
+			draw_rect(Rect2(bb + Vector2(-14, -3), Vector2(28, 5)), Color("6a4a28"))
 			# The fuse rope, one notch shorter every hand.
 			var burn := float(fuse) / maxi(_fuse_max, 1)
 			var rope := PackedVector2Array()
@@ -589,15 +604,17 @@ func _draw() -> void:
 				rope.append(_fuse_point(burn * i / steps))
 			if rope.size() >= 2:
 				draw_polyline(rope, Color("8a6a42"), 3.0)
-			# The burning end: a flickering spark.
+			# The burning end: a big, flickering spark.
 			var tip := _fuse_point(burn)
 			var pulse := 0.5 + 0.5 * sin(_t * 16.0 + _phase)
 			for k in 4:
 				var ray := Vector2.RIGHT.rotated(_t * 7.0 + k * TAU / 4.0)
-				draw_line(tip + ray * 2.0, tip + ray * (5.0 + 3.0 * pulse),
-						Color("ffdf8a"), 2.0)
-			draw_circle(tip, 2.6 + 1.2 * pulse, Color(1.0, 0.95, 0.8))
-			draw_circle(c, 12, BOMB_BLACK)
+				draw_line(tip + ray * 2.0, tip + ray * (7.0 + 4.0 * pulse),
+						Color("ffdf8a"), 2.4)
+			draw_circle(tip, 3.2 + 1.6 * pulse, Color(1.0, 0.95, 0.8))
+			# Hands left, stamped beside the bundle.
+			var c := bb + Vector2(26, -8)
+			draw_circle(c, 11, BOMB_BLACK)
 			draw_string(font, c + Vector2(-10, 5), str(fuse),
 					HORIZONTAL_ALIGNMENT_CENTER, 20, 14, Color.WHITE)
 		"fire":
@@ -1020,7 +1037,8 @@ func _fuse_tip() -> Vector2:
 ## A point along the fuse rope: s = 0 at the bomb, 1 = the full,
 ## freshly-lit length. Curls up and to the right with a wiggle.
 func _fuse_point(s: float) -> Vector2:
-	var base := Vector2(-W / 2.0 + 16, H / 2.0 - 17) + Vector2(3, -11)
+	# Rises from the middle stick of the dynamite bundle.
+	var base := Vector2(-W / 2.0 + 21, H / 2.0 - 35)
 	return base + Vector2(9.0 * s + 4.0 * sin(s * 6.5), -27.0 * s)
 
 

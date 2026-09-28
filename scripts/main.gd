@@ -327,6 +327,8 @@ func _process(delta: float) -> void:
 			if trail.room_time_left <= 0.0:
 				trail.room_time_left = 0.0
 				trail.on_time_up()
+	board.update_fuse_loop(game_started and not menu_open and not game_over
+			and not get_tree().paused)
 	_update_labels()
 	_update_tooltip(delta)
 
@@ -805,6 +807,9 @@ func _on_hand_played(result: Dictionary) -> void:
 	if result.get("base", 0) >= 1200:
 		board.confetti()  # straight flush or better earns the parade
 		board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -7.0, 0.25)
+		# The saloon erupts — the closest thing the trail has to a
+		# Candy Crush announcer.
+		board._play_sound(Board.SFX_LAUGHS.pick_random(), 1.0, -8.0, 0.35)
 	if mode_kind == "tutorial":
 		_tut_on_hand(String(result.name))
 		return
@@ -1620,16 +1625,17 @@ func _announce(text: String, color: Color = GOLD) -> void:
 	announcer.add_theme_color_override("font_color", color)
 	if _announce_tween and _announce_tween.is_valid():
 		_announce_tween.kill()
-	# Punch in from oversized, hold, fade.
+	# Ease in gently from slightly oversized, hold long enough to
+	# actually read, then melt away slowly.
 	announcer.pivot_offset = announcer.size / 2.0
-	announcer.scale = Vector2(1.35, 1.35)
+	announcer.scale = Vector2(1.18, 1.18)
 	announcer.modulate = Color(1, 1, 1, 0)
 	_announce_tween = create_tween()
-	_announce_tween.tween_property(announcer, "scale", Vector2.ONE, 0.13) \
-			.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
-	_announce_tween.parallel().tween_property(announcer, "modulate:a", 1.0, 0.09)
-	_announce_tween.tween_interval(0.85)
-	_announce_tween.tween_property(announcer, "modulate:a", 0.0, 0.5)
+	_announce_tween.tween_property(announcer, "scale", Vector2.ONE, 0.45) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_announce_tween.parallel().tween_property(announcer, "modulate:a", 1.0, 0.35)
+	_announce_tween.tween_interval(2.2)
+	_announce_tween.tween_property(announcer, "modulate:a", 0.0, 1.4)
 
 
 ## Centers the board inside the play area, scaling up or down to fit.
@@ -1895,7 +1901,7 @@ func _build_ui() -> void:
 	announcer = Label.new()
 	announcer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	announcer.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	announcer.add_theme_font_size_override("font_size", 92)
+	announcer.add_theme_font_size_override("font_size", 58)
 	announcer.add_theme_color_override("font_color", GOLD)
 	announcer.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	announcer.add_theme_constant_override("shadow_offset_x", 5)
