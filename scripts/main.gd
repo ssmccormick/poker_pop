@@ -253,6 +253,9 @@ func _ready() -> void:
 				trail.chips = 372
 				trail._win_rows = [["THE POT — 50 staked at 1.5 : 1", 125],
 						["TIN STAR", 10], ["3 HANDS TO SPARE", 36]]
+				trail._chest_won_cards = [
+					{"rank": 13, "suit": 1, "cursed": false, "mod": "gold", "boom": false},
+					{"rank": 7, "suit": 0, "cursed": false, "mod": "", "boom": false}]
 				trail._show_pick()
 			"trailrelic":
 				menu_layer.visible = false

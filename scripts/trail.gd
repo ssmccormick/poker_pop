@@ -274,6 +274,7 @@ var _pick_title: Label
 var _pick_sub: Label
 var _relic_sub: Label
 var _chest_rewards: Array = []   # ambient chests opened this room: "chips"/"card"/"relic"
+var _chest_won_cards: Array = [] # deck cards won from chests, shown on the victory screen
 var _chest_card_rounds := 0      # extra 3-card pick rounds owed by chests
 var _in_chest_pick := false      # the pick screen is showing a chest round
 var _relic_ambient := false      # the strongbox screen shows chest loot, not the stagecoach job
@@ -1501,6 +1502,7 @@ func _start_room() -> void:
 	sleeve_used = false  # one swap per table, fresh each sit-down
 	_aiming_sleeve = false
 	_chest_rewards.clear()  # unopened luck doesn't carry between tables
+	_chest_won_cards.clear()
 	main.tutor_show("sleeve")
 	room_score = 0
 	room_target = current_offer.target
@@ -1966,14 +1968,19 @@ func _open_chest() -> void:
 		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0)
 		_announce_after_settle("CHEST  +%d CHIPS" % loot)
 	elif roll < 0.65:
+		# A card for the deck — held back and SHOWN on the victory
+		# screen, not narrated mid-heist.
 		var card := _random_card_offer(0.25)
 		deck.append(card)
-		_announce_after_settle("CHEST  NEW CARD FOR YOUR DECK")
+		_chest_won_cards.append(card)
+		main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
 	elif roll < 0.80:
 		# No loose cash on the trail — the chest holds a GOLD card.
-		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-				"cursed": false, "mod": "gold", "boom": false})
-		_announce_after_settle("CHEST  A GOLD CARD!")
+		var gold := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+				"cursed": false, "mod": "gold", "boom": false}
+		deck.append(gold)
+		_chest_won_cards.append(gold)
+		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.2, -8.0)
 	elif roll < 0.88 and provisions.size() < kit_size():
 		var pid := _random_provision()
 		gain_provision(pid)
@@ -1987,7 +1994,8 @@ func _open_chest() -> void:
 				"cursed": false, "mod": _random_mod(),
 				"boom": randf() < BOOM_CHANCE}
 		deck.append(enhanced)
-		_announce_after_settle("CHEST  AN ENHANCED CARD!")
+		_chest_won_cards.append(enhanced)
+		main.board._play_sound(Board.SFX_FLIP, 1.3, -8.0)
 	_save_run()
 
 
@@ -2348,6 +2356,7 @@ func on_time_up() -> void:
 func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	in_room = false
 	_chest_rewards.clear()  # the chest went down with the table
+	_chest_won_cards.clear()
 	main.board.locked = true
 	# The stake is gone and a curse joins the deck (unless Second Wind
 	# spares the first stumble) — and the room does NOT clear: the same
@@ -2552,6 +2561,26 @@ func _render_win_ledger() -> void:
 	stack_l.add_theme_font_size_override("font_size", 17)
 	stack_l.add_theme_color_override("font_color", main.DIM)
 	_win_box.add_child(stack_l)
+	# Cards the chests coughed up mid-room, shown instead of narrated.
+	if not _chest_won_cards.is_empty():
+		var head := Label.new()
+		head.text = "THE CHESTS HELD"
+		head.position = Vector2(20, plate_h + 16)
+		head.size = Vector2(380, 28)
+		head.add_theme_font_size_override("font_size", 20)
+		head.add_theme_color_override("font_color", main.GOLD)
+		_win_box.add_child(head)
+		for i in mini(_chest_won_cards.size(), 4):
+			var d: Dictionary = _chest_won_cards[i]
+			var pc := PlayingCard.new()
+			pc.rank = int(d.rank)
+			pc.suit = int(d.suit)
+			pc.mod = Board.migrate_mod(String(d.get("mod", "")))
+			pc.boom = bool(d.get("boom", false))
+			pc.material = Themes.current_material()
+			pc.scale = Vector2(0.95, 0.95)
+			pc.position = Vector2(62 + i * 100, plate_h + 116)
+			_win_box.add_child(pc)
 
 
 # --- Flow: shop -----------------------------------------------------------
