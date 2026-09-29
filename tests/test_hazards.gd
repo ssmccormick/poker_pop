@@ -100,9 +100,27 @@ func _init() -> void:
 	failures += _check(b.predicted_hazards_left() == 2,
 			"popped bomb goes; standing stone and unplayed wind remain")
 	b.selected.assign([b.grid[Vector2i(0, 1)], b.grid[Vector2i(1, 0)]])
-	failures += _check(b.predicted_hazards_left() == 1,
-			"played wind gusts the bomb away — only the stone remains")
+	failures += _check(b.predicted_hazards_left() == 2,
+			"playing the wind removes only itself — bomb and stone remain")
 	b.selected.clear()
+	_free_board(b)
+
+	# --- wind blows the first card downwind every round ---------------------
+	b = _board([[5, 0, 0, 0], [7, 1, 2, 0], [9, 2, 4, 0]])
+	b.grid[Vector2i(0, 0)].hazard = "wind"
+	b.grid[Vector2i(0, 0)].wind_dir = Vector2i.UP  # the tick turns it to RIGHT
+	var bres: Dictionary = b._tick_fire_and_bombs()
+	failures += _check((bres.blown as Array).size() == 1
+			and bres.blown[0].cell == Vector2i(2, 0),
+			"the wind takes the first card downwind, blowing across the gap")
+	_free_board(b)
+	b = _board([[5, 0, 0, 0], [7, 1, 1, 0]])
+	b.grid[Vector2i(0, 0)].hazard = "wind"
+	b.grid[Vector2i(0, 0)].wind_dir = Vector2i.UP
+	b.grid[Vector2i(0, 0)].hazard_fresh = true
+	bres = b._tick_fire_and_bombs()
+	failures += _check((bres.blown as Array).is_empty(),
+			"a wind that just landed holds its breath for a round")
 	_free_board(b)
 
 	# --- bomb fuse ---------------------------------------------------------

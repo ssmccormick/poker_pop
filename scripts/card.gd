@@ -1017,6 +1017,14 @@ func _draw_incoming(rect: Rect2) -> void:
 			draw_colored_polygon(fill,
 					Color(WATER_BLUE.r, WATER_BLUE.g, WATER_BLUE.b, 0.3))
 			draw_polyline(pts, Color(0.82, 0.93, 1.0, 0.5), 1.5)
+		"wind":
+			# The Weathervane's warning: the gust takes THIS card next.
+			for k in 3:
+				var wy := rect.end.y - 14.0 + k * 4.0
+				var sweep := 8.0 * sin(_t * 3.2 + _phase + k * 1.4)
+				draw_line(Vector2(rect.position.x + 10.0 + sweep, wy),
+						Vector2(rect.position.x + 34.0 + sweep, wy),
+						Color(WIND_BLUE.r, WIND_BLUE.g, WIND_BLUE.b, 0.7), 2.0)
 
 
 ## The Weathervane tell on the wind card itself: its blow direction.

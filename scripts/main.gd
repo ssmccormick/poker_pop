@@ -1227,7 +1227,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"fire":
 			lines.append("FIRE — spreads every hand and burns its rank down. Play it to douse it.")
 		"wind":
-			lines.append("WIND — play it and everything in the wind's direction blows off the board. The direction turns each hand — and stays hidden unless you carry the Weathervane.")
+			lines.append("WIND — every hand it BLOWS the first card in its facing direction clean off the board, unscored. The direction turns each hand — hidden without the Weathervane, which also marks the next victim. Play it to still the air.")
 		"stone":
 			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
 					"" if card.stone_hits == 1 else "s"])
@@ -1277,7 +1277,7 @@ const TUTOR := {
 	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
 	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero, the table is lost."],
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. The card it will strike next shows SPARKS catching at its bottom edge, like flint on tinder — get it out of the path or douse the fire. If EVERY card on the table catches fire, the table is LOST."],
-	"hazard_wind": ["WIND CARD", "Play it and every card in the wind's direction is blown clean off the board — unscored. The direction turns a quarter every hand, and the wind keeps its secret: without a WEATHERVANE relic you won't know which way it blows until it does."],
+	"hazard_wind": ["WIND CARD", "Every hand, the wind BLOWS the first card in its facing direction clean off the board — unscored, gone. The direction turns a quarter every hand, and the wind keeps its secret: without a WEATHERVANE you won't know which way it blows until the card is gone. Play the wind card to still the air."],
 	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
 	"hazard_water": ["WATER CARD", "The leak FILLS its card 1/4 per hand. Full to the brim, it POURS — turning all four neighbors into WATER CARDS that fill and pour in turn. A card at the brim hides its face completely; it still IS what it was... if you remember. Play any water card, at any level, to clear it."],
 	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],

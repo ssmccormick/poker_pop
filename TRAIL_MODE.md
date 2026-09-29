@@ -250,7 +250,7 @@ spread, soak, burn down, and count down from hand one.
 | --- | --- | --- | --- |
 | Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward). Drawn as a BUNDLE OF DYNAMITE with a pulsing red alert ring around the whole card, and while any bomb sits on the board a loud fuse-sizzle loops constantly — you cannot not notice it | Include it in any scoring hand to defuse |
 | Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored). The FLAMES GROW as the rank falls — barely above the bottom edge on an Ace, all but consuming the card at rank 2. If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card. The next card to catch wears small flames licking its bottom edge |
-| Wind | THE CHARIOT | When played, every card from its cell to the edge in the wind's direction is blown off (unscored); the direction turns each hand and is HIDDEN by default — only the Weathervane relic shows the arrow. Safes are too heavy to move | Still a tool for the bold — a blind gust can kill a BOSS (blowing one off the table counts; a gusted tail segment wounds the cobra), and the Weathervane turns it back into a precision weapon |
+| Wind | THE CHARIOT | Every scoring hand it BLOWS the first card in its facing direction clean off the board, unscored — the direction turns a quarter each hand and is HIDDEN by default (the Weathervane shows the arrow AND marks the next victim). Safes, bosses, and cobra coils are too heavy and block the gust; hazards, treasure, and bullets all fly (their respawn nets catch the objectives) | Play the wind card, at any time, to still the air — every hand you wait costs you a card |
 | Stone | STRENGTH | A BLOCKER: no rank, no suit, unplayable, and chains can't pass through it. Every card cleared orthogonally beside it chips it (3 chips = crumble); broken rock has a 35% chance of baring a GOLD card in the refill — everywhere, not just mines | Mine around it: build hands that clear its neighbors, and cash the gold it leaves behind |
 | Water | — | The FLOOD: a water card FILLS 1/4 per hand with SOLID water — the face sinks from view as it rises, rank corner last. At the brim it POURS — every plain orthogonal neighbor BECOMES A WATER CARD of its own (one step filled) that fills and pours in turn. ONE card type, making more of itself. At the brim the face is hidden EVERYWHERE — board, hover tooltip, and hand preview all go quiet | Play any water card, at any level, to clear it; a canteen bails one out. A card at the brim still plays blind — if you remember what it was |
 
@@ -492,9 +492,9 @@ which makes deck sculpting the boss prep (stock queens before room 14).
   (starts 30, **+25 per hit**, shown in the banner) and the hand's
   WHOLE SCORE bleeds off him; weaker hands make him scoff and stay.
   The card badge shows thousands left ("7K"); the banner bar carries
-  the exact count in ten notches. A gust off the table is still an
-  instant kill; a bumper shove off the edge drains 1,000 — and he
-  storms back on.
+  the exact count in ten notches. The per-round wind can't touch him
+  (bosses are too heavy for it); a bumper shove off the edge drains
+  1,000 — and he storms back on.
 - **Boss feedback** — every wound lands as a visible SLUG: the scored
   hand's pieces gather into a gold bullet that zooms from the hand's
   center into the boss card (flinch + sparks + table shake). Boss

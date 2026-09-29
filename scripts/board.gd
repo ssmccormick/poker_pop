@@ -768,11 +768,7 @@ func play_hand() -> void:
 			"cobra":
 				if card.cobra_body.is_empty():
 					result["boss_defeated"] = true
-	# A gust kill counts too: a played wind card whose line reaches a
-	# boss still standing after the pops blows him off the table.
-	if _gust_will_hit_boss():
-		result["boss_defeated"] = true
-	# Purge rooms watch this: hazards surviving the pops and gusts.
+	# Purge rooms watch this: hazards surviving the pops.
 	result["hazards_left"] = predicted_hazards_left()
 	busy = true
 
@@ -785,10 +781,8 @@ func play_hand() -> void:
 		center += card.position
 	center /= played.size()
 
-	# Partition: wind and water effects are snapshotted before their
-	# cells change.
+	# Partition: payload effects are snapshotted before cells change.
 	var poppers: Array = []
-	var gusts: Array = []     # {"cell", "dir"}
 	var boomers: Array = []   # {"cell", "mod"} — exploding mods spread
 	var arrows: Array = []    # {"cell", "dir", "mod"} — plus/minus aims
 	var bumps: Array = []     # {"cell", "dir"} — bumper shoves
@@ -820,8 +814,6 @@ func play_hand() -> void:
 			else:
 				_cobra_revert(card)
 			continue
-		if card.hazard == "wind":
-			gusts.append({"cell": card.grid_pos, "dir": card.wind_dir})
 		if card.boom and card.mod != "":
 			boomers.append({"cell": card.grid_pos, "mod": card.mod})
 		if card.mod in ["plus", "minus"]:
@@ -1008,59 +1000,9 @@ func play_hand() -> void:
 					c.rank -= 1
 				_play_sound(SFX_FLIP, 1.4 if adata.mod == "plus" else 0.7, -8.0)
 				_fx(cell_center(q), "sparks")
-	# A transition (room clear / level clear) suppresses the refill, but
-	# a pending gust still blows — it may be the very thing that won the
-	# table, and the boss should visibly leave with it.
+	# A transition (room clear / level clear) suppresses the refill.
 	var ending := suppress_refill
 	suppress_refill = false
-
-	# Wind: gusts blow every card from the wind cell to the edge off the
-	# board, unscored.
-	var blown := {}  # cell -> dir
-	for g in gusts:
-		for cell in wind_line_cells(g.cell, g.dir):
-			blown[cell] = g.dir
-	if not blown.is_empty():
-		# Clipped short with a fast fade — a gust, not a storm front.
-		_play_sound(SFX_WINDS.pick_random(), randf_range(1.0, 1.2), -5.0, 0.0, 0.9)
-		for g in gusts:
-			_fx(cell_center(g.cell), "dust", Color.WHITE, Vector2(g.dir))
-		var gtw := create_tween().set_parallel(true)
-		var flying: Array = []
-		var gusted_boss := false
-		for cell: Vector2i in blown:
-			if not grid.has(cell):
-				continue  # already swept away with a blown cobra head
-			var card: PlayingCard = grid[cell]
-			if card.boss != "":
-				gusted_boss = true
-				# The whole snake leaves with its head.
-				for seg: PlayingCard in card.cobra_body:
-					if grid.get(seg.grid_pos) == seg:
-						grid.erase(seg.grid_pos)
-					seg.z_index = 15
-					flying.append(seg)
-					gtw.tween_property(seg, "position",
-							seg.position + Vector2(blown[cell]) * 1700.0, 0.45) \
-							.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-					gtw.tween_property(seg, "rotation", seg.rotation + 2.2, 0.45)
-				card.cobra_body.clear()
-				card.cobra_stack.clear()
-			elif card.snake_tail:
-				# Unhook the segment so the head never holds a freed card.
-				_cobra_detach_segment(card)
-			grid.erase(cell)
-			flying.append(card)
-			card.z_index = 15
-			gtw.tween_property(card, "position",
-					card.position + Vector2(blown[cell]) * 1700.0, 0.45) \
-					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			gtw.tween_property(card, "rotation", card.rotation + 2.2, 0.45)
-		await gtw.finished
-		for card in flying:
-			card.queue_free()
-		if gusted_boss and not defeated_boss:
-			boss_defeated.emit()
 
 	if ending:
 		busy = false
@@ -2021,8 +1963,8 @@ func _cobra_revert(head: PlayingCard) -> void:
 		head.suit = identity.suit
 
 
-## A tail segment leaves the board outside the normal revert path (blown
-## off by a gust): unhook it from its head so the body never holds a
+## A tail segment leaves the board outside the normal revert path:
+## unhook it from its head so the body never holds a
 ## freed card. The identity it carried is lost with it.
 func _cobra_detach_segment(seg: PlayingCard) -> void:
 	for p in grid:
@@ -2034,37 +1976,14 @@ func _cobra_detach_segment(seg: PlayingCard) -> void:
 			return
 
 
-## True when a wind card in the current selection will blow a boss off
-## the board: his cell sits in a gust line and he survives the pops
-## (bosses and multi-hit stones keep their cells; everything else played
-## this hand vacates before the gust resolves).
-func _gust_will_hit_boss() -> bool:
-	var vacating := {}
-	for card in selected:
-		if card.boss != "" or (card.hazard == "stone" and card.stone_hits > 1):
-			continue
-		vacating[card.grid_pos] = true
-	for card in selected:
-		if card.hazard != "wind":
-			continue
-		for cell in wind_line_cells(card.grid_pos, card.wind_dir):
-			if not vacating.has(cell) and grid[cell].boss != "":
-				return true
-	return false
-
-
 ## Hazard cards that will survive this hand: not popped with the
-## selection (kept stones stay put) and not sitting in a gust line.
+## selection (kept stones stay put).
 func predicted_hazards_left() -> int:
 	var gone := {}
 	for card in selected:
 		if card.boss != "":
 			continue
 		gone[card.grid_pos] = true
-	for card in selected:
-		if card.hazard == "wind":
-			for cell in wind_line_cells(card.grid_pos, card.wind_dir):
-				gone[cell] = true
 	var left := 0
 	for p in grid:
 		if grid[p].hazard != "" and not gone.has(p):
@@ -2369,12 +2288,32 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 			grid[p].fuse -= 1
 			if grid[p].fuse <= 0:
 				exploded = true
+	# WIND strips the table every round: each standing wind card blows
+	# the first card in its facing direction clean off the board,
+	# unscored — its direction just turned a quarter above. Safes,
+	# bosses, and cobra coils are too heavy; they block the gust.
+	var wind_blown: Array = []  # {"cell", "dir"} — caller animates & removes
+	var blown_marks := {}
+	for p in grid:
+		var w: PlayingCard = grid[p]
+		if w.hazard != "wind" or w.hazard_fresh:
+			continue
+		var q: Vector2i = p + w.wind_dir
+		while q.x >= 0 and q.x < cols and q.y >= 0 and q.y < rows:
+			if grid.has(q):
+				var v: PlayingCard = grid[q]
+				if not v.is_safe and v.boss == "" and not v.snake_tail \
+						and not blown_marks.has(q):
+					blown_marks[q] = true
+					wind_blown.append({"cell": q, "dir": w.wind_dir})
+				break  # whatever stands there stops the gust either way
+			q += w.wind_dir
 	# Every hazard that sat this round out is seasoned for the next.
 	for p in grid:
 		grid[p].hazard_fresh = false
 	_aim_spreaders()
 	return {"burned": burned, "ignited": ignited, "exploded": exploded,
-			"soaked": soaked, "flooded": flooded}
+			"soaked": soaked, "flooded": flooded, "blown": wind_blown}
 
 
 ## Hazards on the table from the deal fight from hand one — only
@@ -2422,6 +2361,18 @@ func _aim_spreaders() -> void:
 			for d in HAZARD_DIRS:
 				if _victim_ok(p + d):
 					grid[p + d].incoming = "water"
+		elif card.hazard == "wind" and PlayingCard.show_hazard_intent:
+			# The Weathervane also marks who the wind takes next hand —
+			# without it, the direction (and the victim) stays a secret.
+			var q: Vector2i = p + card.wind_dir
+			while q.x >= 0 and q.x < cols and q.y >= 0 and q.y < rows:
+				if grid.has(q):
+					var v: PlayingCard = grid[q]
+					if not v.is_safe and v.boss == "" and not v.snake_tail \
+							and v.hazard == "" and v.incoming == "":
+						v.incoming = "wind"
+					break
+				q += card.wind_dir
 
 
 ## Runs the per-hand hazard tick with animations: called by trail after
@@ -2462,17 +2413,37 @@ func tick_hazards(tick_fire := true) -> bool:
 			if grid[p].hazard == "bomb" and grid[p].fuse <= 0:
 				_fx(cell_center(p), "smoke")
 	var burned: Array = res.burned
-	if not burned.is_empty():
-		_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)
+	var blown: Array = res.get("blown", [])
+	if not burned.is_empty() or not blown.is_empty():
 		var btw := create_tween().set_parallel(true)
 		var goners: Array = []
-		for cell: Vector2i in burned:
-			var card: PlayingCard = grid[cell]
-			grid.erase(cell)
-			goners.append(card)
-			btw.tween_property(card, "scale", Vector2.ZERO, 0.25) \
-					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-			btw.tween_property(card, "modulate", Color(1.6, 0.7, 0.4), 0.25)
+		if not burned.is_empty():
+			_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)
+			for cell: Vector2i in burned:
+				var card: PlayingCard = grid[cell]
+				grid.erase(cell)
+				goners.append(card)
+				btw.tween_property(card, "scale", Vector2.ZERO, 0.25) \
+						.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+				btw.tween_property(card, "modulate", Color(1.6, 0.7, 0.4), 0.25)
+		if not blown.is_empty():
+			# Clipped short with a fast fade — a gust, not a storm front.
+			_play_sound(SFX_WINDS.pick_random(), randf_range(1.0, 1.2), -6.0, 0.0, 0.9)
+			for b in blown:
+				var cell: Vector2i = b.cell
+				if not grid.has(cell):
+					continue
+				var card: PlayingCard = grid[cell]
+				if card.snake_tail:
+					_cobra_detach_segment(card)
+				grid.erase(cell)
+				goners.append(card)
+				card.z_index = 15
+				_fx(card.position, "dust", Color.WHITE, Vector2(b.dir))
+				btw.tween_property(card, "position",
+						card.position + Vector2(b.dir) * 1700.0, 0.45) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				btw.tween_property(card, "rotation", card.rotation + 2.2, 0.45)
 		await btw.finished
 		for card in goners:
 			card.queue_free()

@@ -52,22 +52,17 @@ func _init() -> void:
 			"starting identities stored")
 	_free_board(b)
 
-	# --- a gust that reaches a standing boss counts as the kill -------------
-	b = _board([[5, 0, 0, 0], [7, 1, 1, 0], [11, 2, 2, 0], [9, 3, 0, 1]])
+	# --- the per-round wind never takes a boss ------------------------------
+	b = _board([[5, 0, 0, 0], [11, 1, 1, 0]])
 	var wind: PlayingCard = b.grid[Vector2i(0, 0)]
 	wind.hazard = "wind"
-	wind.wind_dir = Vector2i.RIGHT
-	var jack: PlayingCard = b.grid[Vector2i(2, 0)]
+	wind.wind_dir = Vector2i.UP  # the tick turns it a quarter to RIGHT
+	var jack: PlayingCard = b.grid[Vector2i(1, 0)]
 	jack.boss = "jack"
 	jack.boss_hp = 5
-	b.selected.assign([wind, b.grid[Vector2i(1, 0)]])
-	failures += _check(b._gust_will_hit_boss(),
-			"gust line reaching the boss predicts the kill")
-	wind.wind_dir = Vector2i.DOWN
-	b.selected.assign([wind, b.grid[Vector2i(0, 1)]])
-	failures += _check(not b._gust_will_hit_boss(),
-			"gust blowing past nothing bossy predicts no kill")
-	b.selected.clear()
+	var wres: Dictionary = b._tick_fire_and_bombs()
+	failures += _check((wres.blown as Array).is_empty(),
+			"a boss is too heavy for the round-by-round gust")
 	_free_board(b)
 
 	# --- a blown tail segment unhooks from its head -------------------------
