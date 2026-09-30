@@ -38,6 +38,17 @@ func _init() -> void:
 	failures += _check(bombs == 2, "exactly two bombs seeded")
 	_free_board(b)
 
+	# --- bosses (and their kin) never seed as hazards -----------------------
+	b = _board([[5, 0, 0, 0], [6, 1, 1, 0], [9, 2, 2, 0]])
+	b.grid[Vector2i(0, 0)].boss = "jack"
+	b.grid[Vector2i(1, 0)].is_safe = true
+	b.apply_room_hazards("bomb", 3)
+	failures += _check(b.grid[Vector2i(0, 0)].hazard == ""
+			and b.grid[Vector2i(1, 0)].hazard == ""
+			and b.grid[Vector2i(2, 0)].hazard == "bomb",
+			"a seeded bomb never lands on a boss or a safe")
+	_free_board(b)
+
 	# --- fire spreads each tick, then burns down ---------------------------
 	b = _board([[3, 0, 0, 0], [7, 1, 1, 0], [9, 2, 0, 1], [4, 3, 4, 4]])
 	b.grid[Vector2i(0, 0)].hazard = "fire"

@@ -2135,7 +2135,11 @@ func apply_room_hazards(kind: String, count: int) -> void:
 	var candidates: Array = []
 	for p in grid:
 		var card: PlayingCard = grid[p]
-		if card.hazard == "" and not card.cursed and not card.washed:
+		# Never on a boss, safe, tail, or job piece: those cards can't
+		# be cleared the normal way, so a bomb there is a rigged loss.
+		if card.hazard == "" and not card.cursed and not card.washed \
+				and card.boss == "" and not card.is_safe \
+				and not card.snake_tail and card.objective == "":
 			candidates.append(card)
 	candidates.shuffle()
 	for i in mini(count, candidates.size()):
