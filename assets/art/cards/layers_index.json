@@ -54,18 +54,22 @@
    "face_J_spades": "cards/center/face_J_spades.png",
    "face_Q_spades": "cards/center/face_Q_spades.png",
    "face_K_spades": "cards/center/face_K_spades.png",
+   "face_A_spades": "cards/center/face_A_spades.png",
    "pip_hearts": "cards/center/pip_hearts.png",
    "face_J_hearts": "cards/center/face_J_hearts.png",
    "face_Q_hearts": "cards/center/face_Q_hearts.png",
    "face_K_hearts": "cards/center/face_K_hearts.png",
+   "face_A_hearts": "cards/center/face_A_hearts.png",
    "pip_diamonds": "cards/center/pip_diamonds.png",
    "face_J_diamonds": "cards/center/face_J_diamonds.png",
    "face_Q_diamonds": "cards/center/face_Q_diamonds.png",
    "face_K_diamonds": "cards/center/face_K_diamonds.png",
+   "face_A_diamonds": "cards/center/face_A_diamonds.png",
    "pip_clubs": "cards/center/pip_clubs.png",
    "face_J_clubs": "cards/center/face_J_clubs.png",
    "face_Q_clubs": "cards/center/face_Q_clubs.png",
-   "face_K_clubs": "cards/center/face_K_clubs.png"
+   "face_K_clubs": "cards/center/face_K_clubs.png",
+   "face_A_clubs": "cards/center/face_A_clubs.png"
   },
   "mod_wash": {
    "mult": "cards/mod_wash/mult.png",
@@ -136,9 +140,13 @@
   },
   "boss": {
    "jack_card": "cards/boss/jack_card.png",
+   "jack_card_titled": "cards/boss/jack_card_titled.png",
    "queen_card": "cards/boss/queen_card.png",
+   "queen_card_titled": "cards/boss/queen_card_titled.png",
    "cobra_card": "cards/boss/cobra_card.png",
+   "cobra_card_titled": "cards/boss/cobra_card_titled.png",
    "outlaw_card": "cards/boss/outlaw_card.png",
+   "outlaw_card_titled": "cards/boss/outlaw_card_titled.png",
    "boss_frame": "cards/boss/boss_frame.png"
   },
   "boss_portrait": {
@@ -229,21 +237,18 @@
   "note": "Every file in cards/ is a 500x700 transparent PNG on the same canvas. Draw them at (0,0) in this order; skip any layer the card doesn't have.",
   "order": [
    "base (card_blank | stone | safe | cobra_tail | card_back)",
-   "center (pip_<suit> or face_<J|Q|K>_<suit>) - omit when the card has a mod",
-   "mod_wash/<mod> (full-bleed, corners included)",
+   "center (pip_<suit>, face_<J|Q|K>_<suit>, or face_A_<suit> for Aces) - omit when the card has a mod",
+   "mod_wash/<mod> (full-bleed)",
    "mod_frame/<mod>",
-   "mod_emblem/<mod> (plus/minus/bumper: *_arrow_up, rotate 90 deg per facing around the card center)",
-   "rank/<rank>_<black|red> (bone halo + drop shadow baked in, reads on any wash)",
-   "suit_corner/<suit> (same halo + shadow)",
+   "mod_emblem/<mod> (directional: *_arrow_up, rotate per facing)",
+   "rank/<rank>_<black|red>",
+   "suit_corner/<suit>",
    "hazard/*",
    "special/*",
    "rider/*",
-   "boss/boss_frame on top of boss/<name>_card"
+   "bosses: boss/<name>_card (no title, corners clear) -> rank -> suit_corner -> boss/boss_frame. boss/<name>_card_titled bakes the name in for menus/reveals and should NOT get rank/suit layers"
   ],
-  "fire_levels": "fire_1 at Ace..fire_4 at rank 2: suggested A-J:1, 10-7:2, 6-4:3, 3-2:4",
-  "wind": "hazard/wind emblem + hazard/wind_arrow_up rotated to the blow direction (hide it without Weathervane)",
-  "bomb": "hazard/bomb + hazard/bomb_alert_ring + hazard/bomb_fuse_badge_<n>",
-  "safe": "base/safe has 4 empty digit windows; draw combo digits in-engine (Oswald 600, #e6d5b0)",
+  "fire_levels": "suggested A-J:1, 10-7:2, 6-4:3, 3-2:4",
   "icons": "relics/ and provisions/: glyph/, frame/, framed/. 256x256 transparent.",
   "mod_colors": {
    "mult": "#8f4a34",
@@ -254,6 +259,12 @@
    "gold": "#b38c3e",
    "wild": "#644a70",
    "lucky": "#56703f"
-  }
+  },
+  "changelog": [
+   "r2: clubs seam closed (pip_clubs, suit_corner/clubs, face_*_clubs, ui/suit_clubs regenerated)",
+   "r2: added center/face_A_<suit> x4",
+   "r2: corner suits drawn as halo pass + ink pass (no internal halo lines)",
+   "r2: boss/<name>_card no longer bakes the title (it collided with the corner index); titled copies are boss/<name>_card_titled"
+  ]
  }
 }
