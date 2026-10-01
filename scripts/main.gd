@@ -2,11 +2,15 @@ extends Node2D
 
 ## Game flow, main menu, modes, and UI for Poker Pop.
 
-const BG := Color("1a1a1a")
+const LOGO_STACKED := preload("res://assets/art/brand/logo_stacked.png")
+const LOGO_HORIZONTAL := preload("res://assets/art/brand/logo_horizontal.png")
+
+# Brand palette: Coal ground, Bone text, gold kept as the hot accent.
+const BG := Color("15100c")
 const GOLD := Color("e8c547")
-const OFFWHITE := Color("e8e0c8")
+const OFFWHITE := Color("e6d5b0")
 const RED := Color("c23b3b")
-const DIM := Color("8a836e")
+const DIM := Color("9a8a68")
 
 # Arcade mode difficulty curve. No hand limit — the draining meter is
 # the challenge; keep scoring or the bar runs out.
@@ -1698,8 +1702,7 @@ func _build_ui() -> void:
 	UiKit.plate(hud_root, Rect2(PANEL_R - 18, 126, 336, 384))
 	UiKit.plate(hud_root, Rect2(PANEL_R - 18, 840, 336, 236))
 
-	_label(hud_root, "POKER", Vector2(PANEL_X, 28), 42, RED)
-	_label(hud_root, "POP", Vector2(PANEL_X + 168, 28), 42, OFFWHITE)
+	_logo(hud_root, LOGO_HORIZONTAL, Rect2(PANEL_X, 26, 300, 64))
 	UiKit.hrule(hud_root, Vector2(PANEL_X, 96), 300)
 
 	score_label = _label(hud_root, "", Vector2(PANEL_X, 140), 40, GOLD)
@@ -2037,14 +2040,13 @@ func _build_menu() -> void:
 			ghost.suit = randi_range(0, 3)
 			ghost.position.x = randf_range(180.0, 1740.0))
 
-	var title_poker := _label(menu_layer, "POKER", Vector2(600, 110), 110, RED)
-	var title_pop := _label(menu_layer, "POP", Vector2(1042, 110), 110, OFFWHITE)
-	for t: Label in [title_poker, title_pop]:
-		var ttw := create_tween().set_loops()
-		ttw.tween_property(t, "position:y", 102.0, 2.2) \
-				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		ttw.tween_property(t, "position:y", 118.0, 2.2) \
-				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# The brand logo rides the old wordmark's gentle bob.
+	var title_logo := _logo(menu_layer, LOGO_STACKED, Rect2(735, 44, 450, 252))
+	var ttw := create_tween().set_loops()
+	ttw.tween_property(title_logo, "position:y", 38.0, 2.2) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	ttw.tween_property(title_logo, "position:y", 50.0, 2.2) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_menu_center("Chain adjacent cards into poker hands", 280, 26, DIM)
 
 	_profile_menu_btn = _button(menu_layer, "PROFILE %d" % profile, Vector2(60, 60), Vector2(240, 54))
@@ -2444,8 +2446,7 @@ func _build_splash() -> void:
 	splash_layer.color = BG
 	splash_layer.size = VIEW
 	ui_root.add_child(splash_layer)
-	_label(splash_layer, "POKER", Vector2(600, 380), 110, RED)
-	_label(splash_layer, "POP", Vector2(1042, 380), 110, OFFWHITE)
+	_logo(splash_layer, LOGO_STACKED, Rect2(610, 180, 700, 392))
 	var prompt := _label(splash_layer, "CLICK TO START", Vector2(0, 640), 36, GOLD)
 	prompt.size = Vector2(VIEW.x, 72)
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2472,6 +2473,23 @@ func _menu_center(text: String, y: float, font_size: int, color: Color) -> Label
 	l.size = Vector2(VIEW.x, font_size * 2.0)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
+
+
+## A brand image fitted into a rect, keeping its aspect.
+func _logo(parent: Control, tex: Texture2D, rect: Rect2) -> TextureRect:
+	var tr := TextureRect.new()
+	tr.texture = tex
+	# expand_mode must be set BEFORE size: with the default KEEP_SIZE
+	# the texture's full resolution is the minimum, and the rect
+	# refuses to shrink below it (the Label autowrap pitfall again).
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.position = rect.position
+	tr.size = rect.size
+	tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(tr)
+	return tr
 
 
 func _label(parent: Control, text: String, pos: Vector2, size: int, color: Color) -> Label:

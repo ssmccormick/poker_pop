@@ -9,8 +9,8 @@ extends RefCounted
 const LIST := [
 	{
 		"name": "Classic",
-		"felt": "25201a", "rim": "3a2a1c",
-		"bg": Color("1a1a1a"),
+		"felt": "1c2e25", "rim": "3a2618",
+		"bg": Color("15100c"),
 		"face": Color("e8e0c8"),
 		"edge": Color("a89c7d"),
 		"red": Color("c23b3b"),

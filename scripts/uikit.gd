@@ -6,11 +6,13 @@ extends RefCounted
 ## shared stylebox factory, dividers, and slider styling. Static-only
 ## (no scene access), safe to load headless.
 
-const PANEL_BG := Color("262019")        # dark leather
-const PANEL_EDGE := Color("6e5f3a")      # dimmed brass (gold = hover/active)
-const PANEL_BG_HOVER := Color("3d3a2c")
-const PANEL_BG_PRESSED := Color("55503a")
-const PANEL_BG_DISABLED := Color("1f1c17")
+# Brand palette (PokerPop kit): Coal 15100C · Saloon Oak 3A2618 ·
+# Worn Felt 1C2E25 · Bone E6D5B0 · Tarnished Brass B08A4A · Oxblood 7C1F16.
+const PANEL_BG := Color("241910")        # dark saloon oak
+const PANEL_EDGE := Color("b08a4a")      # tarnished brass (gold = hover/active)
+const PANEL_BG_HOVER := Color("38281a")
+const PANEL_BG_PRESSED := Color("4a3524")
+const PANEL_BG_DISABLED := Color("1b130c")
 const POSTER_PAPER := Color("d8cba8")    # wanted-poster stock
 const POSTER_INK := Color("3a3126")
 const POSTER_EDGE := Color("5a4a2e")
