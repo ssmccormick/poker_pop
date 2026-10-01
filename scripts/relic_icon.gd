@@ -14,6 +14,9 @@ const WOOD := Color("8a6a42")
 const CANVAS := Color("cbb68f")
 const WIND := Color("9ec9d8")
 
+# Game ids whose art files spell the name differently.
+const ART_NAMES := {"bomb_badge": "bomb_squad_badge"}
+
 var relic_id := "":
 	set(value):
 		relic_id = value
@@ -21,6 +24,11 @@ var relic_id := "":
 
 
 func _draw() -> void:
+	# The kit's framed icon when it exists; the vector emblem otherwise.
+	var t := CardArt.tex("relic_framed", ART_NAMES.get(relic_id, relic_id))
+	if t != null:
+		draw_texture_rect(t, Rect2(-36, -36, 72, 72), false)
+		return
 	draw_circle(Vector2.ZERO, 34, DISC)
 	draw_arc(Vector2.ZERO, 32, 0, TAU, 40, RIM, 2.5)
 	match relic_id:

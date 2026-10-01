@@ -2827,6 +2827,14 @@ func _render_shop_provisions() -> void:
 		var cost := _price(int(p.price))
 		var btn: Button = main._button(_shop_prov_box, "",
 				Vector2(0, 40 + i * 140), Vector2(210, 126))
+		var picon := TextureRect.new()
+		picon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		picon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		picon.position = Vector2(158, 36)
+		picon.size = Vector2(44, 44)
+		picon.texture = CardArt.provision_icon(String(slot.id))
+		btn.add_child(picon)
 		var name_l := _face_label(btn, p.name, 10.0, 26.0, 18, main.GOLD)
 		name_l.position.x = 10
 		name_l.size.x = 190

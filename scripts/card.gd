@@ -462,6 +462,9 @@ func _draw() -> void:
 		var sx := maxf(absf(cos(deal_flip * PI)), 0.04)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2(sx, 1.0))
 		if deal_flip < 0.5:
+			if CardArt.available():
+				draw_texture_rect(CardArt.tex("base", "card_back"), rect, false)
+				return
 			# The cream card base under the back, so the flying card
 			# wears the same white border as the ones in the stack.
 			_face_box.draw(get_canvas_item(), rect)
@@ -478,6 +481,11 @@ func _draw() -> void:
 	if selected:
 		# Lift the whole face slightly while selected.
 		draw_set_transform(Vector2(0, -8))
+	if CardArt.available():
+		# The layered art kit draws the whole face; interaction rings
+		# and badges ride on top. Game logic untouched.
+		_draw_art(rect)
+		return
 	if selected:
 		var box := _selected_box
 		if error_flash:
@@ -701,6 +709,219 @@ func _draw() -> void:
 		draw_circle(badge_center, 10, badge_color)
 		draw_string(font, badge_center + Vector2(-10, 5.5), str(chain_index),
 				HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
+
+
+# --- Layered art-kit rendering (visual only; logic lives elsewhere) -------
+
+static var _art_ring_cache := {}
+
+
+## One layer from the kit, drawn over the full card rect. Rotation is
+## around the card center (for the *_arrow_up facings), re-applying
+## the selection lift so the arrow rides the raised card.
+func _art(rect: Rect2, group: String, name: String, tint := Color.WHITE,
+		rot := 0.0) -> void:
+	var t := CardArt.tex(group, name)
+	if t == null:
+		return
+	if rot != 0.0:
+		var lift := Vector2(0, -8) if selected else Vector2.ZERO
+		draw_set_transform(lift, rot, Vector2.ONE)
+		draw_texture_rect(t, rect, false, tint)
+		draw_set_transform(lift, 0.0, Vector2.ONE)
+	else:
+		draw_texture_rect(t, rect, false, tint)
+
+
+## Border-only selection ring for art cards (a filled stylebox would
+## paint over the artwork).
+func _art_ring(col: Color) -> StyleBoxFlat:
+	var key := col.to_html()
+	if not _art_ring_cache.has(key):
+		var sb := StyleBoxFlat.new()
+		sb.draw_center = false
+		sb.set_corner_radius_all(8)
+		sb.border_color = col
+		sb.set_border_width_all(3)
+		_art_ring_cache[key] = sb
+	return _art_ring_cache[key]
+
+
+func _draw_art_rings(rect: Rect2) -> void:
+	if selected:
+		var col := GOLD
+		if error_flash:
+			col = ERROR_RED
+		elif hand_valid:
+			col = GREEN
+		draw_style_box(_art_ring(col), rect.grow(-1))
+	elif hovered:
+		_hover_glow.draw(get_canvas_item(), rect.grow(3))
+		_hover_ring.draw(get_canvas_item(), rect)
+
+
+func _draw_art_chain_badge(font: Font) -> void:
+	if not (selected and chain_index > 0):
+		return
+	var badge_color := GOLD
+	if error_flash:
+		badge_color = ERROR_RED
+	elif hand_valid:
+		badge_color = GREEN
+	var c := Vector2(W / 2.0 - 13, -H / 2.0 + 13)
+	draw_circle(c, 10, badge_color)
+	draw_string(font, c + Vector2(-10, 5.5), str(chain_index),
+			HORIZONTAL_ALIGNMENT_CENTER, 20, 15, BLACK)
+
+
+func _draw_art_rank_suit(rect: Rect2) -> void:
+	var ink := "red" if suit == 1 or suit == 2 else "black"
+	_art(rect, "rank", "%s_%s" % [CardArt.rank_name(rank), ink])
+	_art(rect, "suit_corner", CardArt.suit_name(suit))
+
+
+## The full kit stack for this card's state, plus the interaction
+## overlays. Mirrors the vector path branch-for-branch.
+func _draw_art(rect: Rect2) -> void:
+	var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
+	if face_down:
+		_art(rect, "base", "card_back")
+		_draw_art_chain_badge(font)
+		_draw_art_rings(rect)
+		return
+	if snake_tail:
+		_art(rect, "base", "cobra_tail")
+		_draw_art_rings(rect)
+		return
+	if is_safe:
+		_art(rect, "base", "safe")
+		# Combo digits in the four windows (the kit leaves them empty).
+		var dfont: Font = FontLib.numbers if FontLib.numbers != null else font
+		for i in combo.size():
+			var digit_col := GREEN if i < combo_progress else Color("e6d5b0")
+			draw_string(dfont, Vector2(-28.0 + i * 14.6, H / 2.0 - 21.0),
+					str(combo[i]), HORIZONTAL_ALIGNMENT_CENTER, 15, 15, digit_col)
+		_draw_art_rings(rect)
+		return
+	if boss != "":
+		_art(rect, "boss", boss + "_card")
+		_draw_art_rank_suit(rect)
+		_art(rect, "boss", "boss_frame")
+		match boss:
+			"jack":
+				var bc := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
+				draw_circle(bc, 12, ERROR_RED)
+				draw_string(font, bc + Vector2(-11, 5),
+						"%dK" % ceili(boss_hp / 1000.0),
+						HORIZONTAL_ALIGNMENT_CENTER, 22, 12, Color.WHITE)
+			"queen":
+				for i in boss_hp:
+					draw_rect(Rect2(-21.0 + i * 15.0, H / 2.0 - 16.0, 12, 8),
+							Color(0.92, 0.68, 0.18))
+			"cobra":
+				if stunned:
+					draw_string(font, Vector2(-W / 2.0, -H / 2.0 - 4), "zzz",
+							HORIZONTAL_ALIGNMENT_CENTER, W, 18, WIND_BLUE)
+		_draw_art_chain_badge(font)
+		_draw_art_rings(rect)
+		return
+	if hazard == "stone":
+		_art(rect, "base", "stone")
+		if stone_hits <= 1:
+			_art(rect, "hazard", "stone_cracks_2")
+			_art(rect, "hazard", "stone_gold_vein")
+		elif stone_hits == 2:
+			_art(rect, "hazard", "stone_cracks_1")
+		_draw_art_rings(rect)
+		return
+
+	# A playing card: base, identity (or mod regalia), then trouble.
+	_art(rect, "base", "card_blank")
+	if washed:
+		# FILLED: water to the brim hides everything.
+		_art(rect, "hazard", "water_4")
+		if washed_show_suit:  # Magnifying Glass
+			_art(rect, "suit_corner", CardArt.suit_name(suit))
+		_draw_art_chain_badge(font)
+		_draw_art_rings(rect)
+		return
+	var mod_key := "lucky" if two_plus else mod
+	if mod_key == "":
+		var center_name := ("face_%s_%s" % [CardArt.rank_name(rank),
+				CardArt.suit_name(suit)]) if rank >= 11 \
+				else "pip_" + CardArt.suit_name(suit)
+		_art(rect, "center", center_name)
+	else:
+		_art(rect, "mod_wash", mod_key)
+		_art(rect, "mod_frame", mod_key)
+		if mod_key in ["plus", "minus", "bumper"]:
+			_art(rect, "mod_emblem", mod_key + "_arrow_up", Color.WHITE,
+					CardArt.arrow_rotation(boost_dir))
+		else:
+			_art(rect, "mod_emblem", mod_key)
+	_draw_art_rank_suit(rect)
+
+	# Hazards ride over the face; the code's motion rides over the art.
+	match hazard:
+		"fire":
+			_art(rect, "hazard", "fire_%d" % CardArt.fire_level(rank))
+			_draw_fire(rect)
+		"water":
+			_art(rect, "hazard", "water_%d" % clampi(water_level, 1, 4))
+		"wind":
+			_art(rect, "hazard", "wind")
+			_draw_wind_swirl()
+			if show_hazard_intent:
+				_art(rect, "hazard", "wind_arrow_up", Color.WHITE,
+						CardArt.arrow_rotation(wind_dir))
+		"bomb":
+			var alert := 0.55 + 0.45 * sin(_t * 6.0 + _phase)
+			_art(rect, "hazard", "bomb")
+			_art(rect, "hazard", "bomb_alert_ring", Color(1, 1, 1, alert))
+			_art(rect, "hazard", "bomb_fuse_badge_%d" % fuse
+					if fuse >= 1 and fuse <= 5 else "bomb_fuse_badge_blank")
+
+	# The in-the-path tells for the NEXT victim.
+	match incoming:
+		"fire":
+			_art(rect, "hazard", "fire_telegraph_sparks")
+		"water":
+			_art(rect, "hazard", "water_telegraph_seep")
+		"wind":
+			for k in 3:
+				var wy := rect.end.y - 14.0 + k * 4.0
+				var sweep := 8.0 * sin(_t * 3.2 + _phase + k * 1.4)
+				draw_line(Vector2(rect.position.x + 10.0 + sweep, wy),
+						Vector2(rect.position.x + 34.0 + sweep, wy),
+						Color(WIND_BLUE.r, WIND_BLUE.g, WIND_BLUE.b, 0.7), 2.0)
+
+	# Job pieces, curses, and the Queen's honey.
+	match objective:
+		"key":
+			_art(rect, "special", "key")
+		"chest":
+			_art(rect, "special", "chest")
+		"bullet":
+			_art(rect, "special", "bullet_yours")
+		"hisbullet":
+			_art(rect, "special", "bullet_his")
+		"redeal":
+			var rc := Vector2(W / 2.0 - 16, H / 2.0 - 16)
+			draw_arc(rc, 9.0, 0.7, TAU - 0.4, 14, WIND_BLUE, 3.0)
+			var tip := rc + Vector2.RIGHT.rotated(0.7) * 9.0
+			draw_colored_polygon(PackedVector2Array([
+				tip + Vector2(4, -4), tip + Vector2(-4, -4), tip + Vector2(0, 5)]),
+				WIND_BLUE)
+	if honey:
+		_art(rect, "special", "honey")
+	if boom and mod != "":
+		_art(rect, "rider", "explosive")
+	if eights_wild and rank == 8:
+		_art(rect, "rider", "wild8_badge")
+	if cursed:
+		_art(rect, "special", "cursed")
+	_draw_art_chain_badge(font)
+	_draw_art_rings(rect)
 
 
 ## The card back: a plain deep-red field with a lighter border.

@@ -9,11 +9,13 @@ extends RefCounted
 
 static var display: FontFile
 static var card: FontFile
+static var numbers: FontFile  # Oswald: UI numerals, safe combo digits
 
 
 static func setup() -> void:
 	display = _try("res://assets/fonts/display.ttf")
 	card = _try("res://assets/fonts/card.ttf")
+	numbers = _try("res://assets/fonts/brand/Oswald-SemiBold.woff2")
 
 
 static func _try(path: String) -> FontFile:

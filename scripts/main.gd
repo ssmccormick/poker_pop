@@ -67,6 +67,7 @@ var _boss_ticks: Control  # HP segment marks over the banner bar
 var _kit_plate: Panel
 var _kit_title: Label
 var _kit_btns: Array = []  # provision slot buttons
+var _kit_icons: Array = [] # framed provision icons on those buttons
 var _sleeve_btn: Button    # Ace up the Sleeve, top row of the kit
 var _kit_sig := ""         # last-rendered kit state, to skip rebuilds
 const DECK_STACK_MAX := 60  # backs to pool for the literal stack
@@ -77,6 +78,7 @@ var _deck_stack_cards: Array = []  # one drawn back per card in the shoe
 var _deck_peek: ColorRect  # click the stack: what's left, out of order
 var _deck_peek_grid: Control
 var _deck_peek_count: Label
+var _cardgrid_layer: ColorRect  # art-kit debug: every combo in a grid
 var target_bar_fill: ColorRect
 var hand_display: Node2D
 var community_display: Node2D
@@ -159,6 +161,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_audio_buses()
 	FontLib.setup()
+	CardArt.validate()  # warn about any index entry missing its file
 	_load_settings()
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
@@ -251,6 +254,10 @@ func _ready() -> void:
 						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
 						"min_bet": 10, "goal": "safe"}, false)
 				trail._confirm_bet()
+			"cardgrid":
+				_dismiss_splash()
+				menu_layer.visible = false
+				_open_cardgrid()
 			"trailpick":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -542,6 +549,90 @@ func _update_labels() -> void:
 	_update_preview()
 
 
+# --- Art-kit debug grid: every mod/hazard/special combo on one screen ------
+
+func _open_cardgrid() -> void:
+	if _cardgrid_layer != null:
+		_cardgrid_layer.queue_free()
+	# Reveal-everything flags for the grid only; restored on close.
+	PlayingCard.eights_wild = true
+	PlayingCard.show_hazard_intent = true
+	_cardgrid_layer = ColorRect.new()
+	_cardgrid_layer.color = Color("15100c")
+	_cardgrid_layer.size = VIEW
+	_cardgrid_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui_root.add_child(_cardgrid_layer)
+	var title := _label(_cardgrid_layer, "CARD ART — EVERY COMBO", Vector2(0, 14), 34, GOLD)
+	title.size = Vector2(VIEW.x, 50)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var states: Array = [
+		["5 of Spades", func(c: PlayingCard) -> void: c.rank = 5],
+		["King of Hearts", func(c: PlayingCard) -> void: c.rank = 13; c.suit = 1],
+		["Card back", func(c: PlayingCard) -> void: c.face_down = true],
+		["Mult", func(c: PlayingCard) -> void: c.mod = "mult"],
+		["Chip", func(c: PlayingCard) -> void: c.mod = "chip"],
+		["Plus →", func(c: PlayingCard) -> void: c.mod = "plus"; c.boost_dir = Vector2i.RIGHT],
+		["Minus ←", func(c: PlayingCard) -> void: c.mod = "minus"; c.boost_dir = Vector2i.LEFT],
+		["Bumper ↓", func(c: PlayingCard) -> void: c.mod = "bumper"; c.boost_dir = Vector2i.DOWN],
+		["Gold", func(c: PlayingCard) -> void: c.mod = "gold"],
+		["Wild", func(c: PlayingCard) -> void: c.mod = "wild"],
+		["Lucky 2+", func(c: PlayingCard) -> void: c.rank = 2; c.two_plus = true],
+		["Explosive mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.boom = true],
+		["Crazy 8 (wild)", func(c: PlayingCard) -> void: c.rank = 8],
+		["Fire on an Ace", func(c: PlayingCard) -> void: c.rank = 14; c.hazard = "fire"],
+		["Fire on a 2", func(c: PlayingCard) -> void: c.rank = 2; c.hazard = "fire"],
+		["Water 1/4", func(c: PlayingCard) -> void: c.hazard = "water"; c.water_level = 1],
+		["Water 3/4", func(c: PlayingCard) -> void: c.hazard = "water"; c.water_level = 3],
+		["FILLED", func(c: PlayingCard) -> void: c.hazard = "water"; c.water_level = 4; c.washed = true],
+		["Wind (vane) ↑", func(c: PlayingCard) -> void: c.hazard = "wind"; c.wind_dir = Vector2i.UP],
+		["Bomb, fuse 5", func(c: PlayingCard) -> void: c.hazard = "bomb"; c.fuse = 5],
+		["Bomb, fuse 1", func(c: PlayingCard) -> void: c.hazard = "bomb"; c.fuse = 1],
+		["Stone, fresh", func(c: PlayingCard) -> void: c.hazard = "stone"; c.stone_hits = 3],
+		["Stone, 1 left", func(c: PlayingCard) -> void: c.hazard = "stone"; c.stone_hits = 1],
+		["Fire incoming", func(c: PlayingCard) -> void: c.incoming = "fire"],
+		["Water incoming", func(c: PlayingCard) -> void: c.incoming = "water"],
+		["The Key", func(c: PlayingCard) -> void: c.objective = "key"],
+		["The Chest", func(c: PlayingCard) -> void: c.objective = "chest"],
+		["Your bullet", func(c: PlayingCard) -> void: c.objective = "bullet"],
+		["His bullet", func(c: PlayingCard) -> void: c.objective = "hisbullet"],
+		["Cursed", func(c: PlayingCard) -> void: c.cursed = true],
+		["Honeyed", func(c: PlayingCard) -> void: c.honey = true],
+		["The Safe", func(c: PlayingCard) -> void: c.is_safe = true; c.combo = [3, 9, 5, 2]; c.combo_progress = 2],
+		["Cobra tail", func(c: PlayingCard) -> void: c.snake_tail = true],
+		["Jack of All Trades", func(c: PlayingCard) -> void: c.boss = "jack"; c.boss_hp = 2500; c.rank = 11; c.suit = 2],
+		["Queen Bee", func(c: PlayingCard) -> void: c.boss = "queen"; c.boss_hp = 2; c.rank = 12; c.suit = 1],
+		["King Cobra", func(c: PlayingCard) -> void: c.boss = "cobra"; c.rank = 9],
+		["The Outlaw (card)", func(c: PlayingCard) -> void: c.boss = "outlaw"; c.rank = 10; c.suit = 3],
+	]
+	var cols := 10
+	for i in states.size():
+		var cell := Vector2(110 + (i % cols) * 190.0, 170 + (i / cols) * 232.0)
+		var pc := PlayingCard.new()
+		pc.rank = 7
+		pc.suit = 0
+		(states[i][1] as Callable).call(pc)
+		pc.material = Themes.current_material()
+		pc.scale = Vector2(1.35, 1.35)
+		pc.position = cell
+		_cardgrid_layer.add_child(pc)
+		var lbl := _label(_cardgrid_layer, String(states[i][0]),
+				Vector2(cell.x - 90, cell.y + 82), 15, DIM)
+		lbl.size = Vector2(180, 24)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var close := _button(_cardgrid_layer, "CLOSE", Vector2(810, 1008), Vector2(300, 54))
+	close.add_theme_font_size_override("font_size", 20)
+	close.pressed.connect(_close_cardgrid)
+
+
+func _close_cardgrid() -> void:
+	if _cardgrid_layer != null:
+		_cardgrid_layer.queue_free()
+		_cardgrid_layer = null
+	# Back to the game's own rules for the reveal flags.
+	PlayingCard.eights_wild = board.eights_wild
+	PlayingCard.show_hazard_intent = trail.has_relic("weathervane")
+
+
 ## Riffle through the undealt pile — shuffled for display, so the
 ## draw order stays the dealer's secret.
 func _open_deck_peek() -> void:
@@ -614,6 +705,11 @@ func _update_kit() -> void:
 		btn.position = Vector2(PANEL_R, 574 + (i + 1) * spacing)
 		btn.size = Vector2(300, bh)
 		btn.pivot_offset = btn.size / 2.0
+		var icon: TextureRect = _kit_icons[i]
+		icon.position = Vector2(8, 6)
+		icon.size = Vector2(bh - 12, bh - 12)
+		icon.texture = CardArt.provision_icon(trail.provisions[i]) \
+				if i < trail.provisions.size() else null
 		if i < trail.provisions.size():
 			var p: Dictionary = TrailMode.PROVISIONS[trail.provisions[i]]
 			btn.disabled = false
@@ -1828,6 +1924,13 @@ func _build_ui() -> void:
 		kb.pressed.connect(func() -> void:
 			trail.use_provision(slot))
 		_kit_btns.append(kb)
+		# The kit's framed provision icon rides the left edge.
+		var ic := TextureRect.new()
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		kb.add_child(ic)
+		_kit_icons.append(ic)
 	_kit_plate.visible = false
 	_kit_title.visible = false
 	_sleeve_btn.visible = false
@@ -2577,7 +2680,7 @@ func _debug_seed_hazards() -> void:
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss", "trailbj", "trailpick":
+		"trailhazard", "trailheist", "trailboss", "trailbj", "trailpick", "cardgrid":
 			await get_tree().create_timer(4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
