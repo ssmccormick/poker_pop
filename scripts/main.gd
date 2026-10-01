@@ -162,6 +162,12 @@ func _ready() -> void:
 	_setup_audio_buses()
 	FontLib.setup()
 	CardArt.validate()  # warn about any index entry missing its file
+	# The brand cursor, tip at the arrow point, for every pointer shape
+	# the game uses.
+	var cursor: Texture2D = load("res://assets/art/brand/cursor.png")
+	if cursor != null:
+		Input.set_custom_mouse_cursor(cursor, Input.CURSOR_ARROW, Vector2(20, 16))
+		Input.set_custom_mouse_cursor(cursor, Input.CURSOR_POINTING_HAND, Vector2(20, 16))
 	_load_settings()
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
