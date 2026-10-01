@@ -847,8 +847,9 @@ func _draw_art(rect: Rect2) -> void:
 		return
 	var mod_key := "lucky" if two_plus else mod
 	if mod_key == "":
+		# Faces exist for J/Q/K only — the Ace wears the big pip.
 		var center_name := ("face_%s_%s" % [CardArt.rank_name(rank),
-				CardArt.suit_name(suit)]) if rank >= 11 \
+				CardArt.suit_name(suit)]) if rank >= 11 and rank <= 13 \
 				else "pip_" + CardArt.suit_name(suit)
 		_art(rect, "center", center_name)
 	else:
