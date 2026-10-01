@@ -392,7 +392,8 @@ func _update_labels() -> void:
 			status_label.add_theme_color_override("font_color", OFFWHITE)
 
 	outlaw.visible = outlaw.dying or (mode_kind == "trail" and game_started \
-			and not menu_open and trail.in_room and trail.room_goal == "outlaw")
+			and not menu_open and trail.in_room \
+			and trail.room_goal in ["outlaw", "boss"])
 	# The scene's light falls on the table and the dust, never on the
 	# cards or the HUD.
 	var tint := parallax.ambient_tint()
@@ -459,6 +460,11 @@ func _update_labels() -> void:
 			target_label.text = "TABLE %d / %d      %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, bname]
 			_style_boss_bar(bhp, bhp_max)
+			# The boss wears his medallion in the right gutter too.
+			if bcard != null:
+				outlaw.kind = bcard.boss
+				outlaw.set_display(bhp, maxi(bhp_max, 1))
+				outlaw.grit = -1
 		elif trail.room_goal == "safe":
 			var digits := PackedStringArray()
 			for d in trail.room_combo:
@@ -492,6 +498,8 @@ func _update_labels() -> void:
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					trail.room_grit, trail._outlaw_bar()]
 			_style_boss_bar(trail.room_outlaw_hp, trail.room_outlaw_max)
+			outlaw.kind = "outlaw"
+			outlaw.grit = trail.room_grit
 		elif trail.room_goal == "purge":
 			var quota := trail.purge_quota()
 			target_label.text = "TABLE %d / %d      PURGE  %d / %d CLEARED  ·  %d ON THE TABLE" % \
