@@ -1247,9 +1247,14 @@ func _render_tarot() -> void:
 		# The Fool: face-down fate.
 		var fool: Button = main._button(_tarot_cards_box, "",
 				Vector2(start_x + _offers.size() * 330, 0), Vector2(300, 380))
-		_tarot_face(fool, "LUCK OF THE DRAW", "Face-down fate", "?",
-				"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)),
-				false, 64)
+		var fool_tier := _apply_poster(fool, "luck_of_the_draw")
+		if fool_tier != "":
+			_poster_face(fool, "LUCK OF THE DRAW", fool_tier, "Face-down fate",
+					"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)))
+		else:
+			_tarot_face(fool, "LUCK OF THE DRAW", "Face-down fate", "?",
+					"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)),
+					false, 64)
 		fool.pressed.connect(func() -> void:
 			_choose_offer(_fate_offer, true))
 
@@ -1265,8 +1270,13 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			wares.append("%d relics" % int(m.relics))
 		if m.forge:
 			wares.append("forge")
-		_tarot_face(b, String(m.name), "Safe haven", String(m.line),
-				"%s\nNo bet — browse free" % "  ·  ".join(wares))
+		var shop_tier := _apply_poster(b, "traveling_merchant")
+		if shop_tier != "":
+			_poster_face(b, String(m.name), shop_tier, String(m.line),
+					"%s\nNo bet — browse free" % "  ·  ".join(wares))
+		else:
+			_tarot_face(b, String(m.name), "Safe haven", String(m.line),
+					"%s\nNo bet — browse free" % "  ·  ".join(wares))
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
@@ -1303,10 +1313,89 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					offer.get("minutes", 4)]
 		if offer.has("boss"):
 			bet_line = "ALL IN"
-		_tarot_face(b, offer.tarot, "%s table" % offer.label, goal_line,
-				"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line],
-				offer.has("boss"))
+		var tier := _apply_poster(b, _poster_job(String(offer.tarot)))
+		if tier != "":
+			_poster_face(b, offer.tarot, tier, goal_line,
+					"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line])
+		else:
+			_tarot_face(b, offer.tarot, "%s table" % offer.label, goal_line,
+					"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line],
+					offer.has("boss"))
 	return b
+
+
+## The round-2 room-offer posters: parchment base, tier ribbon, job
+## emblem, stacked under the button's text. Returns the job's tier
+## name on success, "" when the kit (or this job's emblem) is absent.
+static var _poster_index := {}
+static var _poster_index_loaded := false
+
+
+## "DEALER'S CALL" -> "dealers_call", "CRAZY 8s" -> "crazy_8s".
+func _poster_job(tarot_name: String) -> String:
+	return tarot_name.to_lower().replace("'", "").replace(" ", "_")
+
+
+func _apply_poster(b: Button, job: String) -> String:
+	if not _poster_index_loaded:
+		_poster_index_loaded = true
+		var path := "res://assets/art/r2/posters_index.json"
+		if FileAccess.file_exists(path):
+			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+			if typeof(parsed) == TYPE_DICTIONARY:
+				_poster_index = parsed
+	if _poster_index.is_empty():
+		return ""
+	var layers: Dictionary = _poster_index.get("layers", {})
+	var tier := String(_poster_index.get("job_tier", {}).get(job, "risky"))
+	var files: Array = [
+		String(layers.get("base", {}).get("poster", "")),
+		String(layers.get("tier", {}).get(tier, "")),
+		String(layers.get("emblem", {}).get(job, ""))]
+	var texes: Array = []
+	for f in files:
+		var p: String = "res://assets/art/r2/" + String(f)
+		if f == "" or not ResourceLoader.exists(p):
+			return ""
+		texes.append(load(p))
+	# The poster replaces the button chrome outright — paper, not oak.
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	# 500x700 canvas at 0.6 = a 300x420 card.
+	b.size = Vector2(300, 420)
+	b.pivot_offset = b.size / 2.0
+	for t in texes:
+		var tr := TextureRect.new()
+		tr.texture = t
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_SCALE
+		tr.position = Vector2.ZERO
+		tr.size = Vector2(300, 420)
+		tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(tr)
+	return tier
+
+
+## Text over a poster, in the manifest's boxes (scaled 500x700 -> 0.6):
+## Rye ink title, the tier name on the ribbon, goal and stakes in the
+## stats block under the printed divider.
+func _poster_face(b: Button, head: String, tier: String, body: String,
+		foot: String) -> void:
+	# Long job names (LUCK OF THE DRAW, STAGECOACH HAUL) drop a size
+	# instead of clipping against the title box.
+	var title := _face_label(b, head, 52.0, 58.0,
+			26 if head.length() <= 12 else 19, UiKit.POSTER_INK)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if FontLib.display != null:
+		title.add_theme_font_override("font", FontLib.display)
+	var ribbon := _face_label(b, tier.to_upper(), 128.0, 20.0, 13,
+			Color(0.95, 0.93, 0.88))
+	ribbon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var bodyl := _face_label(b, body, 302.0, 48.0, 15, UiKit.POSTER_INK)
+	bodyl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var footl := _face_label(b, foot, 348.0, 40.0, 13, UiKit.POSTER_INK)
+	footl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 
 ## Lays a clean face over a tarot button: gold name, a hairline rule,
@@ -2469,6 +2558,7 @@ func _show_pick_now() -> void:
 	for i in pick_count:
 		var card_data := _random_card_offer(0.25 if _in_chest_pick else PICK_MOD_CHANCE)
 		var holder: Button = main._button(_pick_box, "", Vector2(start_x + i * 220, 0), Vector2(170, 240))
+		UiKit.style_shop_slot(holder)
 		var pc := PlayingCard.new()
 		pc.rank = card_data.rank
 		pc.suit = card_data.suit
@@ -2695,6 +2785,7 @@ func _show_shop() -> void:
 		var row := i / 5
 		var holder: Button = main._button(_shop_box, "",
 				Vector2(265 + col * 220, row * 280), Vector2(170, 250))
+		UiKit.style_shop_slot(holder)
 		var pc := PlayingCard.new()
 		pc.rank = offer.data.rank
 		pc.suit = offer.data.suit
@@ -2769,6 +2860,7 @@ func _render_shop_relics() -> void:
 		var cost := _price(RELIC_PRICES[r.rarity])
 		var btn: Button = main._button(_shop_relic_box, "",
 				Vector2(0, 44 + i * 172), Vector2(400, 158))
+		UiKit.style_shop_slot(btn)
 		var icon := RelicIcon.new()
 		icon.relic_id = slot.id
 		icon.position = Vector2(50, 79)
@@ -2827,6 +2919,7 @@ func _render_shop_provisions() -> void:
 		var cost := _price(int(p.price))
 		var btn: Button = main._button(_shop_prov_box, "",
 				Vector2(0, 40 + i * 140), Vector2(210, 126))
+		UiKit.style_shop_slot(btn)
 		var picon := TextureRect.new()
 		picon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		picon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -2838,9 +2931,11 @@ func _render_shop_provisions() -> void:
 		var name_l := _face_label(btn, p.name, 10.0, 26.0, 18, main.GOLD)
 		name_l.position.x = 10
 		name_l.size.x = 190
-		var desc_l := _face_label(btn, p.desc, 38.0, 56.0, 13, main.OFFWHITE)
+		# Keep the blurb clear of the icon in the right column; three
+		# short lines fit at 12.
+		var desc_l := _face_label(btn, p.desc, 38.0, 58.0, 12, main.OFFWHITE)
 		desc_l.position.x = 10
-		desc_l.size.x = 190
+		desc_l.size.x = 142
 		var price_l := _face_label(btn, "%d chips" % cost, 96.0, 24.0, 16, main.GOLD)
 		price_l.position.x = 10
 		price_l.size.x = 190
@@ -2892,7 +2987,7 @@ func _wrap_label(parent: Control, text: String, rect: Rect2, font_size: int,
 func _make_stat_tip(layer: Control) -> PanelContainer:
 	var tip := PanelContainer.new()
 	tip.add_theme_stylebox_override("panel",
-			UiKit.panel_box(UiKit.PANEL_BG, UiKit.PANEL_EDGE, 4, 2, 6))
+			UiKit.tooltip_box())
 	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tip.visible = false
 	var lbl := Label.new()
@@ -3141,7 +3236,7 @@ func build_ui() -> void:
 		_bet_amount = _max_bet()
 		_refresh_bet_labels())
 	_bet_stake_label = _center(bet_layer, "", 560, 36, main.GOLD)
-	_bet_deal_btn = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70))
+	_bet_deal_btn = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70), true)
 	_bet_deal_btn.add_theme_font_size_override("font_size", 28)
 	_bet_deal_btn.pressed.connect(_confirm_bet)
 	var bet_back := func() -> void:
@@ -3194,13 +3289,35 @@ func build_ui() -> void:
 	relic_layer = _layer()
 	_screen_title(relic_layer, "THE STRONGBOX")
 	_relic_sub = _center(relic_layer, "The stagecoach job pays in more than chips.", 210, 22, main.DIM)
-	UiKit.plate(relic_layer, Rect2(660, 300, 600, 480))
-	_relic_icon = RelicIcon.new()
-	_relic_icon.position = Vector2(960, 440)
-	_relic_icon.scale = Vector2(2.6, 2.6)
-	relic_layer.add_child(_relic_icon)
-	_relic_name = _center(relic_layer, "", 560, 40, main.GOLD)
-	_relic_desc = _center(relic_layer, "", 630, 24, main.OFFWHITE)
+	# The hero strongbox — open, padlock off the hasp, glow baked in —
+	# with the leather plate as the no-art fallback.
+	var strongbox: Texture2D = null
+	if ResourceLoader.exists("res://assets/art/r2/hero/strongbox_600x480.png"):
+		strongbox = load("res://assets/art/r2/hero/strongbox_600x480.png")
+	if strongbox != null:
+		var sb_rect := TextureRect.new()
+		sb_rect.texture = strongbox
+		sb_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		sb_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		sb_rect.position = Vector2(660, 250)
+		sb_rect.size = Vector2(600, 480)
+		sb_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		relic_layer.add_child(sb_rect)
+		_relic_icon = RelicIcon.new()
+		# The prize floats in the glow above the open lid.
+		_relic_icon.position = Vector2(960, 400)
+		_relic_icon.scale = Vector2(2.6, 2.6)
+		relic_layer.add_child(_relic_icon)
+		_relic_name = _center(relic_layer, "", 745, 40, main.GOLD)
+		_relic_desc = _center(relic_layer, "", 802, 24, main.OFFWHITE)
+	else:
+		UiKit.plate(relic_layer, Rect2(660, 300, 600, 480))
+		_relic_icon = RelicIcon.new()
+		_relic_icon.position = Vector2(960, 440)
+		_relic_icon.scale = Vector2(2.6, 2.6)
+		relic_layer.add_child(_relic_icon)
+		_relic_name = _center(relic_layer, "", 560, 40, main.GOLD)
+		_relic_desc = _center(relic_layer, "", 630, 24, main.OFFWHITE)
 	var take: Button = main._button(relic_layer, "TAKE IT", Vector2(810, 850), Vector2(300, 64))
 	take.add_theme_font_size_override("font_size", 26)
 	take.pressed.connect(func() -> void:
@@ -3257,8 +3374,8 @@ func _hide_all() -> void:
 
 
 func _screen_title(parent: Control, text: String) -> void:
-	var t := _center(parent, text, 100, 64, main.GOLD)
-	t.add_theme_color_override("font_color", main.GOLD)
+	var t := _center(parent, text, 100, 64, UiKit.BRASS_HI)
+	t.add_theme_color_override("font_color", UiKit.BRASS_HI)
 
 
 func _center(parent: Control, text: String, y: float, font_size: int, color: Color) -> Label:

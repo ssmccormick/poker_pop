@@ -1,0 +1,22 @@
+{
+ "backdrops": {
+  "shop_merchant_camp": {
+   "file": "backdrops/shop_merchant_camp_1920x1080.png",
+   "size": [
+    1920,
+    1080
+   ],
+   "notes": "Shared merchant camp. Center ~1100px kept quiet for shelves; dim with modulate ~0.6 behind UI."
+  }
+ },
+ "hero": {
+  "strongbox": {
+   "file": "hero/strongbox_600x480.png",
+   "size": [
+    600,
+    480
+   ],
+   "notes": "Relic-reveal hero, transparent. Glow is baked in; lid is open with the padlock hanging off the hasp."
+  }
+ }
+}

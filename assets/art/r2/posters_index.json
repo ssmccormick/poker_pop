@@ -1,0 +1,129 @@
+{
+ "canvas_px": [
+  500,
+  700
+ ],
+ "note": "Posters share the card canvas: draw layers at (0,0) in order base -> tier/<tier> -> emblem/<job>, then draw title (Rye, #3A3126, centered at y\u2248150px@2x) and stats text (Oswald) in-engine. full/<job>.png is a pre-composed version with title + tier label baked in.",
+ "layers": {
+  "base": {
+   "poster": "posters/base/poster.png"
+  },
+  "tier": {
+   "steady": "posters/tier/steady.png",
+   "risky": "posters/tier/risky.png",
+   "dangerous": "posters/tier/dangerous.png",
+   "boss": "posters/tier/boss.png",
+   "fate": "posters/tier/fate.png",
+   "purge": "posters/tier/purge.png",
+   "merchant": "posters/tier/merchant.png"
+  },
+  "emblem": {
+   "the_jack": "posters/emblem/the_jack.png",
+   "the_queen": "posters/emblem/the_queen.png",
+   "the_king": "posters/emblem/the_king.png",
+   "high_noon": "posters/emblem/high_noon.png",
+   "limit_table": "posters/emblem/limit_table.png",
+   "pot_limit": "posters/emblem/pot_limit.png",
+   "no_limit": "posters/emblem/no_limit.png",
+   "bank_job": "posters/emblem/bank_job.png",
+   "stagecoach_haul": "posters/emblem/stagecoach_haul.png",
+   "gold_mine": "posters/emblem/gold_mine.png",
+   "royal_hunt": "posters/emblem/royal_hunt.png",
+   "dealers_call": "posters/emblem/dealers_call.png",
+   "texas_holdem": "posters/emblem/texas_holdem.png",
+   "crazy_8s": "posters/emblem/crazy_8s.png",
+   "blackjack": "posters/emblem/blackjack.png",
+   "showdown": "posters/emblem/showdown.png",
+   "the_roundup": "posters/emblem/the_roundup.png",
+   "wanted": "posters/emblem/wanted.png",
+   "the_census": "posters/emblem/the_census.png",
+   "land_rush": "posters/emblem/land_rush.png",
+   "traveling_merchant": "posters/emblem/traveling_merchant.png",
+   "luck_of_the_draw": "posters/emblem/luck_of_the_draw.png",
+   "powder_keg": "posters/emblem/powder_keg.png",
+   "wildfire": "posters/emblem/wildfire.png",
+   "flash_flood": "posters/emblem/flash_flood.png",
+   "dust_devil": "posters/emblem/dust_devil.png"
+  },
+  "full": {
+   "the_jack": "posters/full/the_jack.png",
+   "the_queen": "posters/full/the_queen.png",
+   "the_king": "posters/full/the_king.png",
+   "high_noon": "posters/full/high_noon.png",
+   "limit_table": "posters/full/limit_table.png",
+   "pot_limit": "posters/full/pot_limit.png",
+   "no_limit": "posters/full/no_limit.png",
+   "bank_job": "posters/full/bank_job.png",
+   "stagecoach_haul": "posters/full/stagecoach_haul.png",
+   "gold_mine": "posters/full/gold_mine.png",
+   "royal_hunt": "posters/full/royal_hunt.png",
+   "dealers_call": "posters/full/dealers_call.png",
+   "texas_holdem": "posters/full/texas_holdem.png",
+   "crazy_8s": "posters/full/crazy_8s.png",
+   "blackjack": "posters/full/blackjack.png",
+   "showdown": "posters/full/showdown.png",
+   "the_roundup": "posters/full/the_roundup.png",
+   "wanted": "posters/full/wanted.png",
+   "the_census": "posters/full/the_census.png",
+   "land_rush": "posters/full/land_rush.png",
+   "traveling_merchant": "posters/full/traveling_merchant.png",
+   "luck_of_the_draw": "posters/full/luck_of_the_draw.png",
+   "powder_keg": "posters/full/powder_keg.png",
+   "wildfire": "posters/full/wildfire.png",
+   "flash_flood": "posters/full/flash_flood.png",
+   "dust_devil": "posters/full/dust_devil.png"
+  }
+ },
+ "job_tier": {
+  "the_jack": "boss",
+  "the_queen": "boss",
+  "the_king": "boss",
+  "high_noon": "dangerous",
+  "limit_table": "steady",
+  "pot_limit": "risky",
+  "no_limit": "dangerous",
+  "bank_job": "risky",
+  "stagecoach_haul": "risky",
+  "gold_mine": "steady",
+  "royal_hunt": "dangerous",
+  "dealers_call": "risky",
+  "texas_holdem": "risky",
+  "crazy_8s": "steady",
+  "blackjack": "risky",
+  "showdown": "boss",
+  "the_roundup": "risky",
+  "wanted": "dangerous",
+  "the_census": "steady",
+  "land_rush": "risky",
+  "traveling_merchant": "merchant",
+  "luck_of_the_draw": "fate",
+  "powder_keg": "purge",
+  "wildfire": "purge",
+  "flash_flood": "purge",
+  "dust_devil": "purge"
+ },
+ "tier_colors": {
+  "steady": "#3e6a4a",
+  "risky": "#9a7a3a",
+  "dangerous": "#8a2a1e",
+  "boss": "#1d1713",
+  "fate": "#5a4470",
+  "purge": "#a0501e",
+  "merchant": "#5a3b22"
+ },
+ "text_areas_px": {
+  "title": [
+   80,
+   100,
+   420,
+   180
+  ],
+  "tier_label_center_y": 228,
+  "stats": [
+   80,
+   520,
+   420,
+   640
+  ]
+ }
+}

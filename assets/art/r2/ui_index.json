@@ -1,0 +1,556 @@
+{
+ "canvas": [
+  1920,
+  1080
+ ],
+ "note": "All textures are 1:1 pixel size for the 1920x1080 canvas. margins = [left, top, right, bottom] for StyleBoxTexture.texture_margin_*; content = suggested content_margin_*. axis_stretch: stretch unless noted.",
+ "items": {
+  "panel_plate": {
+   "file": "ui/panel_plate.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "HUD plates, menus, ledger, strongbox plate. Rivets live inside the 24px corners.",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    22,
+    18,
+    22,
+    18
+   ]
+  },
+  "panel_plate_plain": {
+   "file": "ui/panel_plate_plain.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "Same plate without rivets, for small or nested panels.",
+   "margins": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    16,
+    12,
+    16,
+    12
+   ]
+  },
+  "panel_inset": {
+   "file": "ui/panel_inset.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Recessed well: YOUR HAND, kit icon boxes, card slots, deck viewer cells.",
+   "margins": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    10,
+    8,
+    10,
+    8
+   ]
+  },
+  "tooltip": {
+   "file": "ui/tooltip.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Hover tooltips / card stat sheets (PanelContainer, ~380 wide).",
+   "margins": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    14,
+    10,
+    14,
+    10
+   ]
+  },
+  "panel_shadow": {
+   "file": "ui/panel_shadow.png",
+   "size": [
+    64,
+    64
+   ],
+   "group": "panel",
+   "notes": "Soft drop shadow: draw behind any panel, expanded 14px each side and offset (0, 6).",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch"
+  },
+  "poster_paper": {
+   "file": "ui/poster_paper.png",
+   "size": [
+    240,
+    240
+   ],
+   "group": "panel",
+   "notes": "Wanted-poster paper for the tutor popup (stretch to 800x440). Nails sit in the top corners.",
+   "margins": [
+    48,
+    48,
+    48,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    44,
+    40,
+    44,
+    36
+   ]
+  },
+  "button_normal": {
+   "file": "ui/button_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (dark oak, brass rim). State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_hover": {
+   "file": "ui/button_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (dark oak, brass rim). State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_pressed": {
+   "file": "ui/button_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (dark oak, brass rim). State: pressed. Offset label +2px down when pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_disabled": {
+   "file": "ui/button_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (dark oak, brass rim). State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_normal": {
+   "file": "ui/button_primary_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood face): PLAY HAND, THE TRAIL, BUY. State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_hover": {
+   "file": "ui/button_primary_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood face): PLAY HAND, THE TRAIL, BUY. State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_pressed": {
+   "file": "ui/button_primary_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood face): PLAY HAND, THE TRAIL, BUY. State: pressed. Offset label +2px down when pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_disabled": {
+   "file": "ui/button_primary_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood face): PLAY HAND, THE TRAIL, BUY. State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "shop_slot_normal": {
+   "file": "ui/shop_slot_normal.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop shelf slot (170x250 / 210x126). Well for the item at top, price row in the bottom 48px. State: normal.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_hover": {
+   "file": "ui/shop_slot_hover.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop shelf slot (170x250 / 210x126). Well for the item at top, price row in the bottom 48px. State: hover.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_selected": {
+   "file": "ui/shop_slot_selected.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop shelf slot (170x250 / 210x126). Well for the item at top, price row in the bottom 48px. State: selected.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_disabled": {
+   "file": "ui/shop_slot_disabled.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop shelf slot (170x250 / 210x126). Well for the item at top, price row in the bottom 48px. State: disabled.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "bar_track": {
+   "file": "ui/bar_track.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Banner progress bar / timer track (1160x16).",
+   "margins": [
+    8,
+    6,
+    8,
+    6
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_gold": {
+   "file": "ui/bar_fill_gold.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Score-progress fill (sits inside bar_track, inset 0).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_red": {
+   "file": "ui/bar_fill_red.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Boss-health fill; draw one per segment with a 3px gap.",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_green": {
+   "file": "ui/bar_fill_green.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Valid/ready fill (arcade drain bar when healthy).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_track": {
+   "file": "ui/slider_track.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider groove.",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_fill": {
+   "file": "ui/slider_fill.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider grabber_area (filled part).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_grabber": {
+   "file": "ui/slider_grabber.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle (not 9-slice)."
+  },
+  "slider_grabber_hover": {
+   "file": "ui/slider_grabber_hover.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle, hover."
+  },
+  "divider": {
+   "file": "ui/divider.png",
+   "size": [
+    240,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Horizontal rule with diamond end-caps (3-slice; stretch horizontally only).",
+   "margins": [
+    28,
+    0,
+    28,
+    0
+   ],
+   "axis_stretch": "stretch"
+  },
+  "divider_center_diamond": {
+   "file": "ui/divider_center_diamond.png",
+   "size": [
+    32,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Optional center ornament placed over divider."
+  },
+  "panel_grain_tile": {
+   "file": "ui/panel_grain_tile.png",
+   "size": [
+    256,
+    256
+   ],
+   "group": "texture",
+   "notes": "Seamless 256px grain. Optional: tile over large panels at 10-20% opacity for extra grit."
+  },
+  "vignette": {
+   "file": "ui/vignette.png",
+   "size": [
+    1920,
+    1080
+   ],
+   "group": "texture",
+   "notes": "Full-screen vignette overlay for menus/shop (draw above backgrounds, below UI)."
+  }
+ }
+}

@@ -1,0 +1,116 @@
+{
+ "colors": {
+  "coal_ground": "#15100C",
+  "panel": "#241910",
+  "panel_hot": "#2E2117",
+  "panel_well": "#0F0A07",
+  "ink": "#120C08",
+  "oak": "#3A2618",
+  "brass": "#B08A4A",
+  "brass_hi": "#D9B572",
+  "bone": "#E6D5B0",
+  "bone_dim": "#9A8A68",
+  "gold_hot": "#E8C547",
+  "oxblood": "#7C1F16",
+  "red_functional": "#B8402C",
+  "green_valid": "#7FAE6A",
+  "felt": "#1C2E25",
+  "felt_hi": "#27402F",
+  "poster_paper": "#D8CBA8",
+  "poster_ink": "#3A3126",
+  "poster_red": "#8A3A30",
+  "disabled_rim": "#5A5048",
+  "disabled_text": "#6F6A62"
+ },
+ "color_roles": {
+  "screen titles": "brass_hi (#D9B572); keep gold_hot for live numbers only",
+  "score / chips / payouts that change": "gold_hot",
+  "body text": "bone",
+  "secondary text": "bone_dim",
+  "errors, boss HP, danger tier": "red_functional (#B8402C, toned from #C23B3B to sit with oxblood)",
+  "valid chain / ready": "green_valid"
+ },
+ "type": {
+  "ruling": "Rye for display; Oswald for every number, label and small UI string; Old Standard TT for prose at 20px or larger. Retire Zilla Slab and the sans currently used for body text.",
+  "roles": {
+   "display_xl": {
+    "face": "Rye",
+    "size": 72,
+    "use": "screen titles (FATE DEALS, THE CARD SHARP, TABLE CLEARED)",
+    "color": "brass_hi",
+    "tracking": 2
+   },
+   "display_l": {
+    "face": "Rye",
+    "size": 44,
+    "use": "panel headlines (SCORE 0), announcer uses 58",
+    "color": "gold_hot"
+   },
+   "button": {
+    "face": "Rye",
+    "size": 28,
+    "use": "buttons, all caps; 24 for 54px-tall buttons",
+    "color": "bone"
+   },
+   "number_l": {
+    "face": "Oswald SemiBold",
+    "size": 34,
+    "use": "chips, targets, HANDS LEFT values",
+    "color": "gold_hot"
+   },
+   "number_m": {
+    "face": "Oswald SemiBold",
+    "size": 24,
+    "use": "payout values, prices"
+   },
+   "label": {
+    "face": "Oswald Regular",
+    "size": 20,
+    "tracking": 3,
+    "case": "upper",
+    "use": "panel eyebrows (PAYOUTS, KIT, YOUR HAND), stat labels",
+    "color": "bone_dim"
+   },
+   "label_s": {
+    "face": "Oswald Regular",
+    "size": 17,
+    "tracking": 2,
+    "use": "controls legend, footnotes"
+   },
+   "body": {
+    "face": "Old Standard TT Regular",
+    "size": 22,
+    "line_height": 1.35,
+    "use": "descriptions, tutor poster body, tooltips prose"
+   },
+   "body_emph": {
+    "face": "Old Standard TT Bold",
+    "size": 22
+   },
+   "body_min": {
+    "note": "never set Old Standard below 20px at 1080p; use Oswald 17-18 for anything smaller"
+   }
+  },
+  "tradeoff": "Old Standard is high-contrast and thin; it reads well at 20px+ but not at 14-16px, which is why small strings move to Oswald."
+ },
+ "shape": {
+  "panel_radius": 6,
+  "button_radius": 6,
+  "rim_width": 3,
+  "rivet_inset": 13,
+  "panel_shadow": {
+   "offset": [
+    0,
+    6
+   ],
+   "blur": 10,
+   "alpha": 0.6,
+   "color": "#000000"
+  }
+ },
+ "motion": {
+  "button_hover_ms": 90,
+  "button_press_offset_px": 2,
+  "panel_open_ms": 160
+ }
+}

@@ -37,6 +37,20 @@ class Layer extends Node2D:
 				draw_colored_polygon(p, tint)
 
 
+## A painted round-2 layer: one seamless 2400px texture drawn twice,
+## wrapped by the same offset math as the silhouettes. Speed 0 = the
+## static sky plate.
+class ArtLayer extends Layer:
+	var texture: Texture2D
+
+	func _draw() -> void:
+		if texture == null:
+			return
+		draw_texture(texture, Vector2.ZERO)
+		if speed > 0.0:
+			draw_texture(texture, Vector2(ParallaxScene.TILE_W, 0.0))
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	# Gutter panels + play-area dim sit ABOVE every layer, added last
@@ -73,6 +87,11 @@ func set_scene(new_kind: String, new_variant := 0) -> void:
 		c.queue_free()
 	_layers.clear()
 	_sky_bands.clear()
+	_art_ambient = Color.TRANSPARENT
+	if _try_art_scene(kind, variant):
+		queue_redraw()
+		_add_overlays()
+		return
 	match kind:
 		"trail_day":
 			_sky([Color("6d5a3a"), Color("8a6c42"), Color("a5804e")])
@@ -119,6 +138,62 @@ func set_scene(new_kind: String, new_variant := 0) -> void:
 			_add_layer(10, Color("070812"), _ground(900, 40, 1.2))
 	queue_redraw()
 	_add_overlays()
+
+
+# --- Painted scenes (round-2 art kit) -------------------------------------
+
+const SCENES_DIR := "res://assets/art/r2/"
+
+static var _scene_index := {}
+static var _scene_index_loaded := false
+
+var _art_ambient := Color.TRANSPARENT  # alpha 0 = no painted override
+
+
+## Builds the painted version of a scene from scenes_index.json: the
+## static sky plate plus far/mid/near strips tiling at their manifest
+## depths. Plains ships as neutral grey and takes each layer's tint
+## from one of six variants (index = level % 6). Any missing file
+## falls the whole scene back to the procedural silhouettes.
+func _try_art_scene(k: String, v: int) -> bool:
+	if not _scene_index_loaded:
+		_scene_index_loaded = true
+		var path := SCENES_DIR + "scenes_index.json"
+		if FileAccess.file_exists(path):
+			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+			if typeof(parsed) == TYPE_DICTIONARY:
+				_scene_index = parsed.get("scenes", {})
+	if not _scene_index.has(k):
+		return false
+	var sc: Dictionary = _scene_index[k]
+	var variant_tints := {}
+	if sc.get("tintable", false):
+		var variants: Array = sc.get("variants", [])
+		if not variants.is_empty():
+			variant_tints = variants[posmod(v, variants.size())]
+	# Load every file before adding any node, so a partial kit never
+	# leaves a half-painted sky over procedural ground.
+	var loaded: Array = []
+	for layer_info in sc.get("layers", []):
+		var p: String = SCENES_DIR + String(layer_info.get("file", ""))
+		if not ResourceLoader.exists(p):
+			return false
+		loaded.append({"tex": load(p), "depth": float(layer_info.get("depth", 0)),
+				"id": String(layer_info.get("id", ""))})
+	for entry in loaded:
+		var l := ArtLayer.new()
+		l.texture = entry.tex
+		l.speed = entry.depth
+		if variant_tints.has(entry.id):
+			l.modulate = Color(String(variant_tints[entry.id]))
+		add_child(l)
+		if l.speed > 0.0:
+			_layers.append(l)
+	var ambient_hex := String(variant_tints.get("ambient",
+			sc.get("ambient_tint", "")))
+	if ambient_hex != "":
+		_art_ambient = Color(ambient_hex)
+	return true
 
 
 func _sky(colors: Array) -> void:
@@ -179,6 +254,8 @@ func _add_overlays() -> void:
 ## The scene's light, for tinting the table and dust — day is warm,
 ## night runs cool, storms go green-gray.
 func ambient_tint() -> Color:
+	if _art_ambient.a > 0.0:
+		return _art_ambient
 	match kind:
 		"trail_day", "canyon", "plains":
 			return Color(1.0, 0.95, 0.84)

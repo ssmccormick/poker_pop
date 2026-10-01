@@ -9,7 +9,7 @@ const LOGO_HORIZONTAL := preload("res://assets/art/brand/logo_horizontal.png")
 const BG := Color("15100c")
 const GOLD := Color("e8c547")
 const OFFWHITE := Color("e6d5b0")
-const RED := Color("c23b3b")
+const RED := Color("b8402c")  # functional red, toned to sit with oxblood
 const DIM := Color("9a8a68")
 
 # Arcade mode difficulty curve. No hand limit — the draining meter is
@@ -62,7 +62,7 @@ var meta_label: Label
 var meter_back: ColorRect
 var meter_fill: ColorRect
 var target_label: Label
-var target_bar_back: ColorRect
+var target_bar_back: Panel
 var _boss_ticks: Control  # HP segment marks over the banner bar
 var _kit_plate: Panel
 var _kit_title: Label
@@ -79,7 +79,7 @@ var _deck_peek: ColorRect  # click the stack: what's left, out of order
 var _deck_peek_grid: Control
 var _deck_peek_count: Label
 var _cardgrid_layer: ColorRect  # art-kit debug: every combo in a grid
-var target_bar_fill: ColorRect
+var target_bar_fill: Panel
 var hand_display: Node2D
 var community_display: Node2D
 var _community_label: Label
@@ -161,6 +161,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_audio_buses()
 	FontLib.setup()
+	UiKit.setup()  # round-2 painted chrome, when the kit is installed
 	CardArt.validate()  # warn about any index entry missing its file
 	# The brand cursor, tip at the arrow point, for every pointer shape
 	# the game uses.
@@ -745,15 +746,16 @@ func _update_kit() -> void:
 ## the Outlaw). max_hp 0 restores the plain gold progress fill.
 func _style_boss_bar(hp: int, max_hp: int) -> void:
 	if max_hp <= 0:
-		target_bar_fill.color = GOLD
+		target_bar_fill.add_theme_stylebox_override("panel", UiKit.bar_box("gold"))
 		if _boss_ticks != null:
 			_boss_ticks.visible = false
 		return
-	target_bar_fill.color = RED
+	target_bar_fill.add_theme_stylebox_override("panel", UiKit.bar_box("red"))
 	target_bar_fill.size.x = BAR_W * clampf(float(hp) / float(max_hp), 0.0, 1.0)
 	_boss_ticks.visible = true
 	# One notch per life — or ten even notches for a score-pool boss
-	# like the Jack, whose max runs to the thousands.
+	# like the Jack, whose max runs to the thousands. The 3px gaps cut
+	# the red fill into the kit's per-segment pills.
 	var seg := max_hp if max_hp <= 12 else 10
 	if _boss_ticks.get_child_count() != seg - 1:
 		for c in _boss_ticks.get_children():
@@ -761,7 +763,7 @@ func _style_boss_bar(hp: int, max_hp: int) -> void:
 		for i in range(1, seg):
 			var t := ColorRect.new()
 			t.color = Color(0, 0, 0, 0.55)
-			t.position = Vector2(BAR_W * i / seg, 0.0)
+			t.position = Vector2(BAR_W * i / seg, 3.0)
 			t.size = Vector2(3, 10)
 			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			_boss_ticks.add_child(t)
@@ -1822,15 +1824,17 @@ func _build_ui() -> void:
 
 	# Arcade banner: level target and progress, big across the board top.
 	target_label = _label(hud_root, "", Vector2(380, 8), 40, GOLD)
-	target_bar_back = ColorRect.new()
-	target_bar_back.color = Color("2a2a2a")
+	target_bar_back = Panel.new()
+	target_bar_back.add_theme_stylebox_override("panel", UiKit.bar_box("track"))
 	target_bar_back.position = Vector2(380, 74)
 	target_bar_back.size = Vector2(1160, 16)
+	target_bar_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_root.add_child(target_bar_back)
-	target_bar_fill = ColorRect.new()
-	target_bar_fill.color = GOLD
-	target_bar_fill.position = Vector2(383, 77)
-	target_bar_fill.size = Vector2(0, 10)
+	target_bar_fill = Panel.new()
+	target_bar_fill.add_theme_stylebox_override("panel", UiKit.bar_box("gold"))
+	target_bar_fill.position = Vector2(380, 74)
+	target_bar_fill.size = Vector2(0, 16)
+	target_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_root.add_child(target_bar_fill)
 	target_label.visible = false
 	target_bar_back.visible = false
@@ -1839,7 +1843,7 @@ func _build_ui() -> void:
 	_boss_ticks.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	target_bar_fill.add_child(_boss_ticks)
 
-	var play_btn := _button(hud_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60))
+	var play_btn := _button(hud_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60), true)
 	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
@@ -1913,12 +1917,22 @@ func _build_ui() -> void:
 	for hand_name in names:
 		name_lines.append(hand_name)
 		value_lines.append(str(Poker.BASE_SCORES[hand_name]))
-	_payout_names = _label(hud_root, "\n".join(name_lines), Vector2(PANEL_R, 180), 18, OFFWHITE)
-	_payout_names.add_theme_constant_override("line_spacing", 2)
-	_payout_values = _label(hud_root, "\n".join(value_lines), Vector2(PANEL_R, 180), 18, GOLD)
+	_payout_names = _label(hud_root, "\n".join(name_lines), Vector2(PANEL_R, 180), 20, OFFWHITE)
+	# Hand names read as prose — Old Standard serif per the type ruling.
+	if FontLib.body != null:
+		_payout_names.add_theme_font_override("font", FontLib.body)
+	_payout_values = _label(hud_root, "\n".join(value_lines), Vector2(PANEL_R, 180), 20, GOLD)
 	_payout_values.size = Vector2(300, 400)
 	_payout_values.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_payout_values.add_theme_constant_override("line_spacing", 2)
+	if FontLib.numbers != null:
+		_payout_values.add_theme_font_override("font", FontLib.numbers)
+	# Serif names and Oswald values have different natural line heights;
+	# pin both columns to one shared row pitch so the table stays ruled.
+	var row_pitch := 30.0
+	for pl: Label in [_payout_names, _payout_values]:
+		var f: Font = pl.get_theme_font("font")
+		pl.add_theme_constant_override("line_spacing",
+				int(row_pitch - f.get_height(20)))
 
 	_label(hud_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
 			Vector2(PANEL_R, 860), 16, DIM)
@@ -2179,7 +2193,7 @@ func _build_menu() -> void:
 	how_btn.add_theme_font_size_override("font_size", 20)
 	how_btn.pressed.connect(_start_tutorial)
 
-	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66))
+	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66), true)
 	trail_btn.add_theme_font_size_override("font_size", 26)
 	trail_btn.pressed.connect(func() -> void:
 		trail.open_buyin())
@@ -2284,7 +2298,7 @@ func _build_profiles_and_tutor() -> void:
 	stats_layer.size = VIEW
 	stats_layer.visible = false
 	ui_root.add_child(stats_layer)
-	var st := _label(stats_layer, "THE LEDGER", Vector2(0, 110), 64, GOLD)
+	var st := _label(stats_layer, "THE LEDGER", Vector2(0, 110), 64, UiKit.BRASS_HI)
 	st.size = Vector2(VIEW.x, 90)
 	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var headers := ["AT THE TABLES", "ON THE TRAIL", "OTHER SADDLES"]
@@ -2319,12 +2333,13 @@ func _build_profiles_and_tutor() -> void:
 	var panel := Panel.new()
 	panel.position = Vector2(560, 300)
 	panel.size = Vector2(800, 440)
-	panel.add_theme_stylebox_override("panel",
-			UiKit.panel_box(UiKit.POSTER_PAPER, UiKit.POSTER_EDGE, 2, 4, 14))
+	panel.add_theme_stylebox_override("panel", UiKit.poster_box())
 	tutor_layer.add_child(panel)
-	var nails := UiKit.Rivets.new()
-	nails.plate_size = Vector2(800, 440)
-	panel.add_child(nails)
+	if not UiKit.has_art():
+		# The painted paper bakes its own nail heads.
+		var nails := UiKit.Rivets.new()
+		nails.plate_size = Vector2(800, 440)
+		panel.add_child(nails)
 	_tutor_title = _label(tutor_layer, "", Vector2(560, 324), 40, RED)
 	_tutor_title.size = Vector2(800, 60)
 	_tutor_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2347,6 +2362,9 @@ func _build_profiles_and_tutor() -> void:
 	_tutor_body.custom_minimum_size = Vector2(655, 0)
 	_tutor_body.add_theme_font_size_override("font_size", 26)
 	_tutor_body.add_theme_color_override("font_color", UiKit.POSTER_INK)
+	# Poster prose in Old Standard — ink on paper.
+	if FontLib.body != null:
+		_tutor_body.add_theme_font_override("font", FontLib.body)
 	_tutor_scroll.add_child(_tutor_body)
 	var ok := _button(tutor_layer, "GOT IT", Vector2(810, 660), Vector2(300, 60))
 	ok.add_theme_font_size_override("font_size", 24)
@@ -2354,14 +2372,15 @@ func _build_profiles_and_tutor() -> void:
 
 	# Hover tooltip for board cards — above the HUD, ignores the mouse.
 	_tooltip = PanelContainer.new()
-	_tooltip.add_theme_stylebox_override("panel",
-			UiKit.panel_box(UiKit.PANEL_BG, UiKit.PANEL_EDGE, 4, 2, 6))
+	_tooltip.add_theme_stylebox_override("panel", UiKit.tooltip_box())
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip.visible = false
 	_tooltip_label = Label.new()
 	_tooltip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tooltip_label.custom_minimum_size = Vector2(360, 0)
-	_tooltip_label.add_theme_font_size_override("font_size", 19)
+	_tooltip_label.add_theme_font_size_override("font_size", 20)
+	if FontLib.body != null:
+		_tooltip_label.add_theme_font_override("font", FontLib.body)
 	_tooltip_label.add_theme_color_override("font_color", OFFWHITE)
 	_tooltip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tooltip.add_child(_tooltip_label)
@@ -2369,17 +2388,21 @@ func _build_profiles_and_tutor() -> void:
 
 	# A soft radial vignette framing play — above the HUD, below every
 	# full-screen layer (menus/trail screens are built after this).
-	var vin_grad := Gradient.new()
-	vin_grad.set_color(0, Color(0, 0, 0, 0))
-	vin_grad.add_point(0.62, Color(0, 0, 0, 0))
-	vin_grad.set_color(vin_grad.get_point_count() - 1, Color(0, 0, 0, 0.32))
-	var vin_tex := GradientTexture2D.new()
-	vin_tex.gradient = vin_grad
-	vin_tex.fill = GradientTexture2D.FILL_RADIAL
-	vin_tex.fill_from = Vector2(0.5, 0.5)
-	vin_tex.fill_to = Vector2(0.5, -0.15)
-	vin_tex.width = 512
-	vin_tex.height = 512
+	# The round-2 kit paints one; the gradient is the fallback.
+	var vin_tex: Texture2D = UiKit.tex("vignette")
+	if vin_tex == null:
+		var vin_grad := Gradient.new()
+		vin_grad.set_color(0, Color(0, 0, 0, 0))
+		vin_grad.add_point(0.62, Color(0, 0, 0, 0))
+		vin_grad.set_color(vin_grad.get_point_count() - 1, Color(0, 0, 0, 0.32))
+		var vin_fallback := GradientTexture2D.new()
+		vin_fallback.gradient = vin_grad
+		vin_fallback.fill = GradientTexture2D.FILL_RADIAL
+		vin_fallback.fill_from = Vector2(0.5, 0.5)
+		vin_fallback.fill_to = Vector2(0.5, -0.15)
+		vin_fallback.width = 512
+		vin_fallback.height = 512
+		vin_tex = vin_fallback
 	var vignette := TextureRect.new()
 	vignette.texture = vin_tex
 	vignette.stretch_mode = TextureRect.STRETCH_SCALE
@@ -2414,7 +2437,7 @@ func _build_options() -> void:
 	options_layer.visible = false
 	ui_root.add_child(options_layer)
 
-	var title := _label(options_layer, "OPTIONS", Vector2(0, 110), 72, GOLD)
+	var title := _label(options_layer, "OPTIONS", Vector2(0, 110), 72, UiKit.BRASS_HI)
 	title.size = Vector2(VIEW.x, 100)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
@@ -2615,14 +2638,18 @@ func _label(parent: Control, text: String, pos: Vector2, size: int, color: Color
 	l.position = pos
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
-	# Big type gets the western display font when one is installed.
+	# The round-2 type ruling: Rye for display sizes, Oswald for every
+	# other UI string (prose call sites switch to FontLib.body).
 	if size >= 36 and FontLib.display != null:
 		l.add_theme_font_override("font", FontLib.display)
+	elif FontLib.label != null:
+		l.add_theme_font_override("font", FontLib.label)
 	parent.add_child(l)
 	return l
 
 
-func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> Button:
+func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2,
+		primary := false) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.position = pos
@@ -2632,30 +2659,9 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2) -> 
 	# simple consistent sound.
 	b.pressed.connect(func() -> void:
 		board._play_sound(Board.SFX_CLICK, 1.15, -14.0))
-	# Leather and brass: resting buttons wear the dimmed edge, gold
-	# arrives on hover, and the pressed state sits down flat.
-	var sb := UiKit.panel_box(UiKit.PANEL_BG, UiKit.PANEL_EDGE, 4, 2, 4)
-	sb.shadow_offset = Vector2(0, 3)
-	sb.content_margin_top = 0
-	sb.content_margin_bottom = 0
-	b.add_theme_stylebox_override("normal", sb)
-	var hover: StyleBoxFlat = sb.duplicate()
-	hover.bg_color = UiKit.PANEL_BG_HOVER
-	hover.border_color = GOLD
-	b.add_theme_stylebox_override("hover", hover)
-	var pressed: StyleBoxFlat = hover.duplicate()
-	pressed.bg_color = UiKit.PANEL_BG_PRESSED
-	pressed.shadow_size = 0
-	b.add_theme_stylebox_override("pressed", pressed)
-	var disabled: StyleBoxFlat = sb.duplicate()
-	disabled.bg_color = UiKit.PANEL_BG_DISABLED
-	disabled.border_color = Color(DIM.r, DIM.g, DIM.b, 0.4)
-	disabled.shadow_size = 0
-	b.add_theme_stylebox_override("disabled", disabled)
-	b.add_theme_color_override("font_color", OFFWHITE)
-	b.add_theme_color_override("font_hover_color", GOLD)
-	b.add_theme_color_override("font_pressed_color", GOLD)
-	b.add_theme_color_override("font_disabled_color", DIM)
+	# Painted oak (or oxblood for the big calls to action) with a flat
+	# leather fallback — the kit owns every state.
+	UiKit.style_button(b, primary)
 	b.add_theme_font_size_override("font_size", 17)
 	if FontLib.display != null:
 		b.add_theme_font_override("font", FontLib.display)

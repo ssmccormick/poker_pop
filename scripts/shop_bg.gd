@@ -14,12 +14,26 @@ const ROPE := Color(0.3, 0.24, 0.16)
 const LANTERN := Color(0.95, 0.78, 0.4)
 
 
+## The round-2 painted camp, when installed; the vector camp below
+## remains the fallback.
+var _art: Texture2D
+
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	size = Vector2(1920, 1080)
+	var p := "res://assets/art/r2/backdrops/shop_merchant_camp_1920x1080.png"
+	if ResourceLoader.exists(p):
+		_art = load(p)
+		queue_redraw()
 
 
 func _draw() -> void:
+	if _art != null:
+		# Dimmed behind the shelves, per the kit's note.
+		draw_texture_rect(_art, Rect2(Vector2.ZERO, size), false,
+				Color(0.62, 0.62, 0.62))
+		return
 	# Distant ridge along the top, behind the title.
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(0, 190), Vector2(0, 120), Vector2(420, 155), Vector2(900, 105),

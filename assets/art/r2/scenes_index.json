@@ -1,0 +1,305 @@
+{
+ "note": "Per scene: sky (1920x1080, opaque, static) then far/mid/near (2400x1080, transparent, horizontally seamless; tile while drifting). All layers are full-height canvases: draw at y=0. depth = suggested scroll factor (bigger = nearer/faster). ambient_tint tints table surface + dust only.",
+ "layer_size": [
+  2400,
+  1080
+ ],
+ "sky_size": [
+  1920,
+  1080
+ ],
+ "scenes": {
+  "trail_day": {
+   "mood": "dusty tan noon, purple mesas, saguaros, fence line",
+   "ambient_tint": "#D8B880",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/trail_day/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/trail_day/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/trail_day/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/trail_day/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ]
+  },
+  "trail_dusk": {
+   "mood": "rose and amber sunset, distant town, telegraph line",
+   "ambient_tint": "#C87A50",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/trail_dusk/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/trail_dusk/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/trail_dusk/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/trail_dusk/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ]
+  },
+  "trail_night": {
+   "mood": "deep blue night, stars, moon, near-black ground",
+   "ambient_tint": "#5A6A90",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/trail_night/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/trail_night/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/trail_night/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/trail_night/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ]
+  },
+  "storm": {
+   "mood": "green-black storm, rock spires, dead trees, lightning",
+   "ambient_tint": "#6A7A5A",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/storm/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/storm/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/storm/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/storm/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ]
+  },
+  "canyon": {
+   "mood": "golden sky, red-rock mesas and spires, boulders",
+   "ambient_tint": "#E0A060",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/canyon/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/canyon/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/canyon/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/canyon/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ]
+  },
+  "plains": {
+   "mood": "grassland bands; neutral light-grey art, tinted per variant with modulate",
+   "ambient_tint": "#C8C090",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/plains/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/plains/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/plains/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/plains/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ],
+   "tintable": true,
+   "variants": [
+    {
+     "name": "spring",
+     "sky": "#B9CCD8",
+     "far": "#8FA3B4",
+     "mid": "#7E9A5C",
+     "near": "#3E5A2C",
+     "ambient": "#A8C090"
+    },
+    {
+     "name": "golden",
+     "sky": "#F0D8A8",
+     "far": "#C8A478",
+     "mid": "#B89A48",
+     "near": "#6A5222",
+     "ambient": "#E8C890"
+    },
+    {
+     "name": "sage_dusk",
+     "sky": "#C8B0A0",
+     "far": "#8A7A88",
+     "mid": "#7A8A60",
+     "near": "#3A3A2C",
+     "ambient": "#B0A090"
+    },
+    {
+     "name": "lavender",
+     "sky": "#C8B8D8",
+     "far": "#9A88B0",
+     "mid": "#8A8A68",
+     "near": "#3E3448",
+     "ambient": "#B8A8C8"
+    },
+    {
+     "name": "rust_autumn",
+     "sky": "#E0B898",
+     "far": "#A87A68",
+     "mid": "#A8642E",
+     "near": "#4A2A18",
+     "ambient": "#D89870"
+    },
+    {
+     "name": "moonlit",
+     "sky": "#5A6A88",
+     "far": "#3E4A66",
+     "mid": "#3A4A48",
+     "near": "#161C24",
+     "ambient": "#6A7A98"
+    }
+   ],
+   "variant_note": "Art is neutral light grey. Set each layer's modulate to the variant hex (sky/far/mid/near); variant index = level % len(variants)."
+  },
+  "homestead": {
+   "mood": "violet dusk, windmills, barn, wheat line",
+   "ambient_tint": "#9A7AA0",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/homestead/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/homestead/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/homestead/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/homestead/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ]
+  },
+  "stars": {
+   "mood": "heavy starfield and Milky Way, minimal ground",
+   "ambient_tint": "#4A5878",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "scenes/stars/sky.png",
+     "depth": 0,
+     "tiles": false
+    },
+    {
+     "id": "far",
+     "file": "scenes/stars/far.png",
+     "depth": 5,
+     "tiles": true
+    },
+    {
+     "id": "mid",
+     "file": "scenes/stars/mid.png",
+     "depth": 12,
+     "tiles": true
+    },
+    {
+     "id": "near",
+     "file": "scenes/stars/near.png",
+     "depth": 30,
+     "tiles": true
+    }
+   ]
+  }
+ }
+}
