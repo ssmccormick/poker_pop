@@ -1,0 +1,61 @@
+{
+ "note": "The Outlaw wanted set. Use card/wanted_outlaw on the room-offer screen (same 500x700 canvas as posters; can replace posters/full/showdown) and a banner when that table is chosen. The reward amount is drawn in-engine on the blank dashed line; *_example_reward files are reference only.",
+ "card": {
+  "file": "outlaw/card/wanted_outlaw.png",
+  "size": [
+   500,
+   700
+  ],
+  "reward_text": {
+   "center_x": 250,
+   "baseline_y": 648,
+   "font": "Rye",
+   "size": 48,
+   "color": "#8A3A30"
+  }
+ },
+ "portrait": {
+  "file": "outlaw/card/portrait_outlaw_ink_512.png",
+  "size": [
+   512,
+   512
+  ],
+  "notes": "Printed-ink bust, matches the poster; use for the duel HUD next to the HP/grit bars or wherever the Outlaw is named."
+ },
+ "banner": {
+  "file": "outlaw/banner/outlaw_banner_1600x360.png",
+  "size": [
+   1600,
+   360
+  ],
+  "blank": "outlaw/banner/outlaw_banner_1600x360_blank.png",
+  "notes": "Announcement banner when the Showdown table is picked: slide/drop in from the top, hold ~1.5s, then shrink into the top bar. _blank has no text if you want to animate WANTED / THE OUTLAW yourself.",
+  "reward_text": {
+   "center_x": 1383,
+   "baseline_y": 240,
+   "font": "Rye",
+   "size": 58,
+   "color": "#8A3A30"
+  }
+ },
+ "topbar": {
+  "file": "outlaw/banner/outlaw_topbar_1160x120.png",
+  "size": [
+   1160,
+   120
+  ],
+  "notes": "Slim plaque for the top bar during the Showdown table (sits over the 1160-wide bar area; move the HP bar just below it).",
+  "reward_text": {
+   "center_x": 1038,
+   "baseline_y": 87,
+   "font": "Rye",
+   "size": 36,
+   "color": "#8A3A30"
+  }
+ },
+ "examples": [
+  "outlaw/card/wanted_outlaw_example_reward.png",
+  "outlaw/banner/outlaw_banner_1600x360_example_reward.png",
+  "outlaw/banner/outlaw_topbar_1160x120_example_reward.png"
+ ]
+}

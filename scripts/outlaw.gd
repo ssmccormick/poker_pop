@@ -22,6 +22,13 @@ var kind := "outlaw":
 		if kind != value:
 			kind = value
 			queue_redraw()
+# A composed character from the outlaw kit (Bounty tables); when set,
+# it replaces the medallion art entirely.
+var spec := {}:
+	set(value):
+		if spec != value:
+			spec = value
+			queue_redraw()
 # Player grit pips under the bar (Showdown only); -1 hides the row.
 var grit := -1:
 	set(value):
@@ -123,19 +130,23 @@ func die() -> void:
 
 
 func _draw() -> void:
+	# A Bounty outlaw composed from the character kit, when one rides
+	# this table — the wanted-poster face, in the flesh.
+	if not spec.is_empty():
+		var draws: Array = CharacterKit.layer_draws(spec)
+		if not draws.is_empty():
+			var box := Rect2(-95, -110, 190, 190)
+			for d in draws:
+				draw_texture_rect(d.tex, box, false, d.color)
+			_draw_flash(Vector2(86, -16))
+			_draw_segments()
+			return
 	# The kit's medallion portrait when it exists, with the muzzle
 	# flash and the segment bars layered on; code-drawn fallback below.
 	var portrait := CardArt.tex("boss_portrait", kind)
 	if portrait != null:
 		draw_texture_rect(portrait, Rect2(-95, -110, 190, 190), false)
-		if _flash > 0.02:
-			var mm := Vector2(86, -16)
-			var fc := FLASH
-			fc.a = _flash
-			for k in 6:
-				var fray := Vector2.RIGHT.rotated(TAU * k / 6.0 + 0.3)
-				draw_line(mm + fray * 4.0, mm + fray * (12.0 + 10.0 * _flash), fc, 3.0)
-			draw_circle(mm, 6.0 * _flash + 2.0, fc)
+		_draw_flash(Vector2(86, -16))
 		_draw_segments()
 		return
 	# Shoulders / poncho.
@@ -172,6 +183,18 @@ func _draw() -> void:
 	draw_rect(Rect2(-70, 112, 140, 10), HP_BACK)
 	if max_hp > 0 and hp > 0:
 		draw_rect(Rect2(-68, 114, 136.0 * hp / max_hp, 6), HP_RED)
+
+
+## The muzzle flash, shared by every portrait style.
+func _draw_flash(mm: Vector2) -> void:
+	if _flash <= 0.02:
+		return
+	var fc := FLASH
+	fc.a = _flash
+	for k in 6:
+		var fray := Vector2.RIGHT.rotated(TAU * k / 6.0 + 0.3)
+		draw_line(mm + fray * 4.0, mm + fray * (12.0 + 10.0 * _flash), fc, 3.0)
+	draw_circle(mm, 6.0 * _flash + 2.0, fc)
 
 
 ## The kit's segment bars: his health in hp segments (at most ten —

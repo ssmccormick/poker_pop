@@ -1,0 +1,569 @@
+{
+ "canvas_px": [
+  512,
+  512
+ ],
+ "viewbox": 200,
+ "note": "Portrait = stack slot layers at (0,0) in `order`. For each chosen variant draw `under` (if any, no tint), then `file` with modulate = the slot's tint, then `detail` (if any, no tint). Slots are optional except head; skip any not chosen. Tintable art is drawn in neutral greys, so modulate gives the exact palette hex on the lightest areas.",
+ "order": [
+  "background",
+  "hair_back",
+  "body",
+  "chest",
+  "head",
+  "mouth",
+  "facial_hair",
+  "eyes",
+  "brows",
+  "scar",
+  "hair_front",
+  "mask",
+  "hat"
+ ],
+ "slots": {
+  "background": {
+   "tint": null,
+   "variants": {
+    "plain": {
+     "detail": "slots/background/plain_detail.png"
+    },
+    "hatched": {
+     "detail": "slots/background/hatched_detail.png"
+    },
+    "dark": {
+     "detail": "slots/background/dark_detail.png"
+    }
+   }
+  },
+  "hair_back": {
+   "tint": "hair",
+   "variants": {
+    "long": {
+     "file": "slots/hair_back/long.png"
+    },
+    "braid": {
+     "file": "slots/hair_back/braid.png"
+    }
+   }
+  },
+  "body": {
+   "tint": "coat",
+   "variants": {
+    "duster": {
+     "under": "slots/body/duster_under.png",
+     "file": "slots/body/duster.png"
+    },
+    "vest": {
+     "under": "slots/body/vest_under.png",
+     "file": "slots/body/vest.png",
+     "detail": "slots/body/vest_detail.png"
+    },
+    "poncho": {
+     "file": "slots/body/poncho.png",
+     "detail": "slots/body/poncho_detail.png"
+    },
+    "sheepskin": {
+     "file": "slots/body/sheepskin.png",
+     "detail": "slots/body/sheepskin_detail.png"
+    }
+   }
+  },
+  "chest": {
+   "tint": null,
+   "variants": {
+    "bandolier": {
+     "detail": "slots/chest/bandolier_detail.png"
+    },
+    "suspenders": {
+     "detail": "slots/chest/suspenders_detail.png"
+    },
+    "bolo": {
+     "detail": "slots/chest/bolo_detail.png"
+    }
+   }
+  },
+  "head": {
+   "tint": "skin",
+   "variants": {
+    "oval": {
+     "file": "slots/head/oval.png"
+    },
+    "square": {
+     "file": "slots/head/square.png"
+    },
+    "gaunt": {
+     "file": "slots/head/gaunt.png"
+    },
+    "round": {
+     "file": "slots/head/round.png"
+    }
+   }
+  },
+  "mouth": {
+   "tint": null,
+   "variants": {
+    "neutral": {
+     "detail": "slots/mouth/neutral_detail.png"
+    },
+    "grimace": {
+     "detail": "slots/mouth/grimace_detail.png"
+    },
+    "smirk": {
+     "detail": "slots/mouth/smirk_detail.png"
+    }
+   }
+  },
+  "facial_hair": {
+   "tint": "hair",
+   "variants": {
+    "stubble": {
+     "file": "slots/facial_hair/stubble.png"
+    },
+    "mustache": {
+     "file": "slots/facial_hair/mustache.png"
+    },
+    "full_beard": {
+     "file": "slots/facial_hair/full_beard.png"
+    },
+    "goatee": {
+     "file": "slots/facial_hair/goatee.png"
+    }
+   }
+  },
+  "eyes": {
+   "tint": null,
+   "variants": {
+    "narrow": {
+     "detail": "slots/eyes/narrow_detail.png"
+    },
+    "wide": {
+     "detail": "slots/eyes/wide_detail.png"
+    },
+    "squint": {
+     "detail": "slots/eyes/squint_detail.png"
+    },
+    "eyepatch": {
+     "detail": "slots/eyes/eyepatch_detail.png"
+    }
+   }
+  },
+  "brows": {
+   "tint": "hair",
+   "variants": {
+    "heavy": {
+     "file": "slots/brows/heavy.png",
+     "detail": "slots/brows/heavy_detail.png"
+    },
+    "thin": {
+     "file": "slots/brows/thin.png"
+    },
+    "arched": {
+     "file": "slots/brows/arched.png"
+    }
+   }
+  },
+  "scar": {
+   "tint": null,
+   "variants": {
+    "brow": {
+     "detail": "slots/scar/brow_detail.png"
+    },
+    "cheek": {
+     "detail": "slots/scar/cheek_detail.png"
+    },
+    "x": {
+     "detail": "slots/scar/x_detail.png"
+    }
+   }
+  },
+  "hair_front": {
+   "tint": "hair",
+   "variants": {
+    "short": {
+     "file": "slots/hair_front/short.png"
+    },
+    "long": {
+     "file": "slots/hair_front/long.png"
+    },
+    "shaggy": {
+     "file": "slots/hair_front/shaggy.png"
+    },
+    "bare": {
+     "file": "slots/hair_front/bare.png"
+    }
+   }
+  },
+  "mask": {
+   "tint": "mask",
+   "variants": {
+    "bandana": {
+     "file": "slots/mask/bandana.png",
+     "detail": "slots/mask/bandana_detail.png"
+    },
+    "neck_scarf": {
+     "file": "slots/mask/neck_scarf.png",
+     "detail": "slots/mask/neck_scarf_detail.png"
+    }
+   }
+  },
+  "hat": {
+   "tint": "hat",
+   "variants": {
+    "wide_brim": {
+     "file": "slots/hat/wide_brim.png",
+     "detail": "slots/hat/wide_brim_detail.png"
+    },
+    "derby": {
+     "file": "slots/hat/derby.png",
+     "detail": "slots/hat/derby_detail.png"
+    },
+    "flat_gambler": {
+     "file": "slots/hat/flat_gambler.png",
+     "detail": "slots/hat/flat_gambler_detail.png"
+    },
+    "sombrero": {
+     "file": "slots/hat/sombrero.png",
+     "detail": "slots/hat/sombrero_detail.png"
+    }
+   }
+  }
+ },
+ "palettes": {
+  "skin": {
+   "fair": "#e8cfae",
+   "tan": "#d2a77e",
+   "olive": "#c4a274",
+   "brown": "#a0714a",
+   "deep": "#6e4a30",
+   "weathered": "#c9b48c"
+  },
+  "hair": {
+   "black": "#2a221a",
+   "brown": "#5a3b22",
+   "auburn": "#7a3a1e",
+   "blond": "#b8944e",
+   "grey": "#9a948a",
+   "white": "#d8d2c4"
+  },
+  "coat": {
+   "oilcloth": "#3a3024",
+   "dust": "#7a6648",
+   "slate": "#4a4a46",
+   "oxblood": "#5e2219",
+   "olive": "#4a4a30",
+   "black": "#24201c"
+  },
+  "mask": {
+   "red": "#9a3a2e",
+   "indigo": "#2e3e5e",
+   "black": "#2a2620",
+   "ochre": "#9a7a3a",
+   "sage": "#5a6a4a",
+   "bone": "#d8cba8"
+  },
+  "hat": {
+   "brown": "#4a3a2a",
+   "black": "#24201c",
+   "tan": "#9a8060",
+   "grey": "#6a6660",
+   "bone": "#c8b890",
+   "rust": "#7a4a2e"
+  }
+ },
+ "presets": {
+  "the_outlaw": {
+   "name": "THE OUTLAW",
+   "layers": {
+    "background": "hatched",
+    "body": "duster",
+    "chest": "bandolier",
+    "head": "oval",
+    "eyes": "narrow",
+    "brows": "heavy",
+    "scar": "brow",
+    "hair_front": "short",
+    "mask": "bandana",
+    "hat": "wide_brim"
+   },
+   "tints": {
+    "skin": "weathered",
+    "hair": "black",
+    "coat": "oilcloth",
+    "mask": "red",
+    "hat": "brown"
+   }
+  },
+  "calico_rose": {
+   "name": "CALICO ROSE",
+   "layers": {
+    "background": "hatched",
+    "hair_back": "long",
+    "body": "vest",
+    "chest": "bolo",
+    "head": "oval",
+    "mouth": "smirk",
+    "eyes": "wide",
+    "brows": "arched",
+    "hair_front": "long",
+    "mask": "neck_scarf",
+    "hat": "flat_gambler"
+   },
+   "tints": {
+    "skin": "fair",
+    "hair": "auburn",
+    "coat": "oxblood",
+    "mask": "indigo",
+    "hat": "black"
+   }
+  },
+  "one_eye_silas": {
+   "name": "ONE-EYE SILAS",
+   "layers": {
+    "background": "dark",
+    "body": "sheepskin",
+    "head": "square",
+    "mouth": "grimace",
+    "facial_hair": "full_beard",
+    "eyes": "eyepatch",
+    "brows": "heavy",
+    "scar": "cheek",
+    "hair_front": "shaggy",
+    "hat": "derby"
+   },
+   "tints": {
+    "skin": "tan",
+    "hair": "grey",
+    "coat": "dust",
+    "hat": "black"
+   }
+  },
+  "dusty_vane": {
+   "name": "DUSTY VANE",
+   "layers": {
+    "background": "plain",
+    "body": "duster",
+    "chest": "suspenders",
+    "head": "gaunt",
+    "mouth": "neutral",
+    "facial_hair": "mustache",
+    "eyes": "squint",
+    "brows": "thin",
+    "hair_front": "short",
+    "hat": "wide_brim"
+   },
+   "tints": {
+    "skin": "weathered",
+    "hair": "blond",
+    "coat": "dust",
+    "hat": "tan"
+   }
+  },
+  "el_coyote": {
+   "name": "EL COYOTE",
+   "layers": {
+    "background": "hatched",
+    "body": "poncho",
+    "chest": "bandolier",
+    "head": "round",
+    "mouth": "smirk",
+    "facial_hair": "goatee",
+    "eyes": "narrow",
+    "brows": "heavy",
+    "scar": "x",
+    "hair_front": "short",
+    "hat": "sombrero"
+   },
+   "tints": {
+    "skin": "olive",
+    "hair": "black",
+    "coat": "dust",
+    "hat": "tan"
+   }
+  },
+  "big_ollie_tate": {
+   "name": "BIG OLLIE TATE",
+   "sub": "RIDES WITH SILAS",
+   "layers": {
+    "background": "plain",
+    "body": "vest",
+    "chest": "suspenders",
+    "head": "round",
+    "mouth": "grimace",
+    "facial_hair": "stubble",
+    "eyes": "wide",
+    "brows": "thin",
+    "hair_front": "bare"
+   },
+   "tints": {
+    "skin": "brown",
+    "hair": "black",
+    "coat": "slate"
+   }
+  },
+  "the_kid": {
+   "name": "THE KID",
+   "sub": "RIDES WITH THE OUTLAW",
+   "layers": {
+    "background": "hatched",
+    "body": "duster",
+    "head": "gaunt",
+    "eyes": "narrow",
+    "brows": "thin",
+    "hair_front": "shaggy",
+    "mask": "bandana",
+    "hat": "flat_gambler"
+   },
+   "tints": {
+    "skin": "fair",
+    "hair": "brown",
+    "coat": "black",
+    "mask": "black",
+    "hat": "grey"
+   }
+  },
+  "widow_marsh": {
+   "name": "WIDOW MARSH",
+   "layers": {
+    "background": "dark",
+    "hair_back": "braid",
+    "body": "sheepskin",
+    "head": "oval",
+    "mouth": "neutral",
+    "eyes": "squint",
+    "brows": "arched",
+    "scar": "brow",
+    "hair_front": "long",
+    "mask": "neck_scarf",
+    "hat": "wide_brim"
+   },
+   "tints": {
+    "skin": "deep",
+    "hair": "black",
+    "coat": "olive",
+    "mask": "ochre",
+    "hat": "black"
+   }
+  }
+ },
+ "rules": [
+  "always pick a mouth when mask is not bandana",
+  "mouth and facial_hair are hidden by mask=bandana; skip them when it is on (cheaper, cleaner)",
+  "hair_front=bare is meant for hat=none",
+  "hair_back renders behind the body: keep it first after background",
+  "eyes=eyepatch already includes its strap; avoid scar=brow with it"
+ ],
+ "frame": "frame.png",
+ "posters": {
+  "card_template": {
+   "file": "templates/wanted_card_template.png",
+   "size": [
+    500,
+    700
+   ],
+   "no_subtitle": "templates/wanted_card_template_nosub.png",
+   "portrait_box_px": [
+    110,
+    208,
+    280,
+    280
+   ],
+   "name": {
+    "center_x": 250,
+    "baseline_y": 536,
+    "font": "Rye",
+    "size": 50,
+    "color": "#3A3126",
+    "max_width": 400
+   },
+   "subtitle": {
+    "center_x": 250,
+    "baseline_y": 180,
+    "font": "Oswald SemiBold",
+    "size": 23,
+    "tracking": 10,
+    "color": "#8A3A30",
+    "default": "DEAD OR ALIVE"
+   },
+   "reward": {
+    "center_x": 250,
+    "baseline_y": 648,
+    "font": "Rye",
+    "size": 48,
+    "color": "#8A3A30"
+   }
+  },
+  "banner_template": {
+   "file": "templates/wanted_banner_1600x360_template.png",
+   "size": [
+    1600,
+    360
+   ],
+   "no_subtitle": "templates/wanted_banner_1600x360_template_nosub.png",
+   "portrait_box_px": [
+    69,
+    43,
+    274,
+    274
+   ],
+   "name": {
+    "center_x": 800,
+    "baseline_y": 295,
+    "font": "Rye",
+    "size": 54,
+    "color": "#3A3126"
+   },
+   "subtitle": {
+    "center_x": 800,
+    "baseline_y": 223,
+    "font": "Oswald SemiBold",
+    "size": 25,
+    "tracking": 11,
+    "color": "#8A3A30"
+   },
+   "reward": {
+    "center_x": 1383,
+    "baseline_y": 240,
+    "font": "Rye",
+    "size": 58,
+    "color": "#8A3A30"
+   }
+  },
+  "topbar_template": {
+   "file": "templates/wanted_topbar_1160x120_template.png",
+   "size": [
+    1160,
+    120
+   ],
+   "portrait_box_px": [
+    20,
+    14,
+    91,
+    91
+   ],
+   "line": {
+    "center_x": 580,
+    "baseline_y": 101,
+    "font": "Oswald SemiBold",
+    "size": 16,
+    "tracking": 5,
+    "color": "#8A3A30",
+    "text": "<NAME> \u00b7 <SUBTITLE>"
+   },
+   "reward": {
+    "center_x": 1038,
+    "baseline_y": 87,
+    "font": "Rye",
+    "size": 36,
+    "color": "#8A3A30"
+   }
+  },
+  "subtitle_ideas": [
+   "DEAD OR ALIVE",
+   "RIDES WITH THE <BOSS> GANG",
+   "ALIVE ONLY",
+   "FOR TRAIN ROBBERY",
+   "FOR CARD CHEATING"
+  ]
+ },
+ "how_to_build_a_poster": "Compose the portrait from slots (order + tints), scale it into portrait_box_px on the template, then draw name / subtitle / reward text with the specs. The template already has the portrait frame."
+}

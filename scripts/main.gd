@@ -240,6 +240,19 @@ func _ready() -> void:
 			"trailtarot":
 				menu_layer.visible = false
 				trail._start_run(0)
+				# Showcase the wanted poster: force a bounty into the rack.
+				for offer in trail._offers:
+					if offer.kind == "play":
+						offer.tarot = "BOUNTY"
+						offer.label = "Bounty"
+						offer["goal"] = "outlaw"
+						offer.odds = 3.0
+						offer["outlaw_hp"] = 6
+						offer["outlaws"] = trail._roll_posse(2)
+						offer.hands = 13
+						offer.target = 0
+						break
+				trail._render_tarot()
 			"trailbet", "trailroom", "trailhazard":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -291,9 +304,10 @@ func _ready() -> void:
 			"trailoutlaw":
 				menu_layer.visible = false
 				trail._start_run(0)
-				trail._choose_offer({"kind": "play", "tarot": "SHOWDOWN",
-						"label": "The Outlaw", "target": 0, "hands": 10, "odds": 2.5,
-						"min_bet": 10, "goal": "outlaw", "outlaw_hp": 6}, false)
+				trail._choose_offer({"kind": "play", "tarot": "BOUNTY",
+						"label": "Bounty", "target": 0, "hands": 13, "odds": 3.0,
+						"min_bet": 10, "goal": "outlaw", "outlaw_hp": 6,
+						"posse": 2}, false)
 				trail._confirm_bet()
 			"trailboss":
 				menu_layer.visible = false
@@ -470,6 +484,7 @@ func _update_labels() -> void:
 			# The boss wears his medallion in the right gutter too.
 			if bcard != null:
 				outlaw.kind = bcard.boss
+				outlaw.spec = {}
 				outlaw.set_display(bhp, maxi(bhp_max, 1))
 				outlaw.grit = -1
 		elif trail.room_goal == "safe":
@@ -501,11 +516,17 @@ func _update_labels() -> void:
 					float(trail.room_wins) / float(maxi(trail.room_wins_needed, 1)),
 					0.0, 1.0)
 		elif trail.room_goal == "outlaw":
-			target_label.text = "TABLE %d / %d      THE OUTLAW  ·  GRIT %d  ·  SCORE %d+" % \
+			var posse_note := ""
+			if trail.room_outlaws.size() > 1:
+				posse_note = "  (%d OF %d)" % [trail.room_outlaw_idx + 1,
+						trail.room_outlaws.size()]
+			target_label.text = "TABLE %d / %d      BOUNTY: %s%s  ·  GRIT %d  ·  SCORE %d+" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
+					trail.current_outlaw_name(), posse_note,
 					trail.room_grit, trail._outlaw_bar()]
 			_style_boss_bar(trail.room_outlaw_hp, trail.room_outlaw_max)
 			outlaw.kind = "outlaw"
+			outlaw.spec = trail.current_outlaw_spec()
 			outlaw.grit = trail.room_grit
 		elif trail.room_goal == "purge":
 			var quota := trail.purge_quota()
@@ -767,6 +788,54 @@ func _style_boss_bar(hp: int, max_hp: int) -> void:
 			t.size = Vector2(3, 10)
 			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			_boss_ticks.add_child(t)
+
+
+## The WANTED banner that drops when a bounty table opens: the kit's
+## paper with the outlaw's face, name, the red line, and the pot inked
+## as the reward. Slides in, holds, and rides off. Skipped in
+## screenshot mode, where it would curtain the board.
+func show_wanted_banner(spec: Dictionary, subtitle: String, reward: int) -> void:
+	if spec.is_empty() or OS.get_environment("POKERPOP_SHOT") != "":
+		return
+	var info: Dictionary = CharacterKit.poster_info("banner_template")
+	var tpl: Texture2D = CharacterKit.tex(String(info.get("file", "")))
+	if tpl == null:
+		return
+	var holder := Control.new()
+	holder.position = Vector2(160, -380)
+	holder.size = Vector2(1600, 360)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.z_index = 80
+	var paper := TextureRect.new()
+	paper.texture = tpl
+	paper.size = Vector2(1600, 360)
+	paper.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(paper)
+	CharacterKit.add_portrait(holder, spec, Rect2(69, 43, 274, 274))
+	var sub := _label(holder, subtitle, Vector2(0, 196), 25, Color("8a3a30"))
+	sub.size = Vector2(1600, 32)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if FontLib.numbers != null:
+		sub.add_theme_font_override("font", FontLib.numbers)
+	var name_l := _label(holder, String(spec.get("name", "")), Vector2(0, 238), 54,
+			Color("3a3126"))
+	name_l.size = Vector2(1600, 64)
+	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var reward_l := _label(holder, "$%d" % reward, Vector2(1166, 180), 58,
+			Color("8a3a30"))
+	reward_l.size = Vector2(434, 72)
+	reward_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hud_root.add_child(holder)
+	board._play_sound(Board.SFX_REVOLVERS.pick_random(), 0.9, -12.0)
+	var tw := holder.create_tween()
+	tw.tween_property(holder, "position:y", 36.0, 0.5) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(1.7)
+	tw.tween_property(holder, "modulate:a", 0.0, 0.4)
+	tw.parallel().tween_property(holder, "position:y", -80.0, 0.4) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(holder.queue_free)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1408,7 +1477,7 @@ const TUTOR := {
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
 	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house at a FACE-DOWN table, corners showing. Start a chain from a face-up card, then HIT one card at a time: each face-down card you select flips ON THE SPOT and its pips join your sum (faces 10, aces 11 or 1). Hits are binding — no clearing, no take-backs — and if a flip carries you past 21 you BUST right there. PLAY HAND to stand: the dealer flips his hole card and draws to beat you or bust. Every hand turns another random card face-up. Win enough rounds to clear."],
-	"goal_outlaw": ["SHOWDOWN", "The Outlaw waits. Clear YOUR bullets (gold) in scoring hands to shoot him. HIS bullets (red) are waiting slugs: clear a card carrying one and he SHOOTS you for it — build your hands AROUND them. Weak hands under the posted score give him a free shot too. Run out of GRIT and you're done — gun him down first."],
+	"goal_outlaw": ["THE BOUNTY", "A wanted gun holds this table. Clear YOUR bullets (gold) in scoring hands to shoot. HIS bullets (red) are waiting slugs: clear a card carrying one and he SHOOTS you for it — build your hands AROUND them. Weak hands under the posted score give him a free shot too. Some bounties ride with a gang: drop one and the next steps up fresh. Run out of GRIT and the bounty stands."],
 	"goal_collect": ["THE ROUNDUP", "The table calls for particular cardboard: a count of one SUIT, a stack of one RANK, or cards of many DIFFERENT ranks. Only cards actually cleared in scoring hands count — the banner tracks the tally."],
 	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot: clear a card from each of the 25 cells. A claimed plot wears a gold ring — fill the whole homestead to take the table."],
 	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand to claim it. The chest cracks open once you CLEAR THE TABLE — coin, a card of your choosing, or even a charm. Purely optional — the room's real goal still rules."],

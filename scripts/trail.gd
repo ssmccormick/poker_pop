@@ -218,8 +218,10 @@ var room_collect_done := 0
 var room_collect_kinds := {}     # census variant: distinct ranks seen
 var room_wins_needed := 3        # blackjack: rounds to take off the dealer
 var room_wins := 0
-var room_outlaw_hp := 5          # showdown: the Outlaw's health...
+var room_outlaw_hp := 5          # bounty: the current outlaw's health...
 var room_outlaw_max := 5
+var room_outlaws: Array = []     # the posse, leader first (character specs)
+var room_outlaw_idx := 0
 var room_grit := 3               # ...and yours
 const OUTLAW_GRIT := 3
 const OUTLAW_BAR_BASE := 75      # score under this and he fires (+ per region)
@@ -1157,13 +1159,16 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
 				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
 				+ OUTLAW_CHANCE:
-			# The duel: clear YOUR bullets to shoot, dodge HIS.
-			offer.tarot = "SHOWDOWN"
-			offer.label = "The Outlaw"
-			offer.odds = 2.5
+			# The bounty: a wanted gun — or a whole posse, hunted down
+			# one head at a time. Clear YOUR bullets to shoot, dodge HIS.
+			var posse := 1 + randi() % mini(region, 3)
+			offer.tarot = "BOUNTY"
+			offer.label = "Bounty"
+			offer.odds = 2.0 + 0.5 * posse
 			offer["goal"] = "outlaw"
-			offer["outlaw_hp"] = 6 + region
-			offer.hands = 10
+			offer["outlaw_hp"] = 5 + region
+			offer["outlaws"] = _roll_posse(posse)
+			offer.hands = 10 + 3 * (posse - 1)
 			offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
 				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
@@ -1298,7 +1303,14 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "blackjack":
 			goal_line = "Beat the dealer %d times — hazards in play" % offer.wins
 		elif offer.get("goal", "") == "outlaw":
-			goal_line = "Gun down the Outlaw (%d HP)" % offer.outlaw_hp
+			var gang: Array = offer.get("outlaws", [])
+			if gang.size() > 1:
+				goal_line = "Hunt down a gang of %d — %d HP a head" % [
+						gang.size(), offer.outlaw_hp]
+			else:
+				goal_line = "Gun down %s (%d HP)" % [
+						String(gang[0].name) if not gang.is_empty() else "the Outlaw",
+						offer.outlaw_hp]
 		elif offer.get("goal", "") == "collect":
 			goal_line = _collect_goal_text(offer)
 		elif offer.get("goal", "") == "landrush":
@@ -1313,6 +1325,8 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					offer.get("minutes", 4)]
 		if offer.has("boss"):
 			bet_line = "ALL IN"
+		if offer.get("goal", "") == "outlaw" and _apply_wanted_poster(b, offer):
+			return b
 		var tier := _apply_poster(b, _poster_job(String(offer.tarot)))
 		if tier != "":
 			_poster_face(b, offer.tarot, tier, goal_line,
@@ -1322,6 +1336,65 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line],
 					offer.has("boss"))
 	return b
+
+
+## The BOUNTY offer is a real wanted poster: the leader's composed
+## portrait on the card template, name in Rye ink, DEAD OR ALIVE in
+## red, and the reward inked on the dashed line. Returns false when
+## the character kit is absent (the tier-poster path takes over).
+func _apply_wanted_poster(b: Button, offer: Dictionary) -> bool:
+	var outlaws: Array = offer.get("outlaws", [])
+	if outlaws.is_empty() or not CharacterKit.available():
+		return false
+	var leader: Dictionary = outlaws[0]
+	var reward := int(round(float(offer.min_bet) * float(offer.odds)))
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	b.size = Vector2(300, 420)
+	b.pivot_offset = b.size / 2.0
+	# THE OUTLAW riding alone gets his hand-finished poster; everyone
+	# else is set from the template at 0.6 scale (500x700 -> 300x420).
+	var baked: Texture2D = null
+	if outlaws.size() == 1 and String(leader.get("id", "")) == "the_outlaw" \
+			and ResourceLoader.exists("res://assets/art/wanted/card/wanted_outlaw.png"):
+		baked = load("res://assets/art/wanted/card/wanted_outlaw.png")
+	var tpl := baked
+	if tpl == null:
+		# The plain template bakes DEAD OR ALIVE; we letter our own red
+		# line (gang size, HP), so take the blank-subtitle version.
+		var info := CharacterKit.poster_info("card_template")
+		tpl = CharacterKit.tex(String(info.get("no_subtitle",
+				info.get("file", ""))))
+	if tpl == null:
+		return false
+	var paper := TextureRect.new()
+	paper.texture = tpl
+	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	paper.stretch_mode = TextureRect.STRETCH_SCALE
+	paper.size = Vector2(300, 420)
+	paper.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(paper)
+	if baked == null:
+		CharacterKit.add_portrait(b, leader, Rect2(66, 125, 168, 168))
+		var sub_text := "GANG OF %d · %d HP EACH · ANTE %d" % [outlaws.size(),
+				int(offer.outlaw_hp), int(offer.min_bet)] if outlaws.size() > 1 \
+				else "DEAD OR ALIVE · %d HP · ANTE %d" % [int(offer.outlaw_hp),
+				int(offer.min_bet)]
+		var subtitle := _face_label(b, sub_text, 92.0, 20.0, 13, Color("8a3a30"))
+		subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var who := String(leader.get("name", "THE OUTLAW"))
+		var name_size := 28 if who.length() <= 12 else 20
+		var name_l := _face_label(b, who, 322.0 - name_size - 6, name_size + 12.0,
+				name_size, UiKit.POSTER_INK)
+		name_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		if FontLib.display != null:
+			name_l.add_theme_font_override("font", FontLib.display)
+	var reward_l := _face_label(b, "$%d" % reward, 359.0, 34.0, 26, Color("8a3a30"))
+	reward_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if FontLib.display != null:
+		reward_l.add_theme_font_override("font", FontLib.display)
+	return true
 
 
 ## The round-2 room-offer posters: parchment base, tier ribbon, job
@@ -1453,6 +1526,10 @@ func _collect_goal_text(o: Dictionary) -> String:
 func _odds_text(odds: float) -> String:
 	if is_equal_approx(odds, 1.5):
 		return "3 : 2"
+	if is_equal_approx(odds, 2.5):
+		return "5 : 2"
+	if is_equal_approx(odds, 3.5):
+		return "7 : 2"
 	return "%d : 1" % maxi(1, int(round(odds)))
 
 
@@ -1542,7 +1619,13 @@ func _bet_goal_text(o: Dictionary) -> String:
 		"blackjack":
 			return "Beat the dealer %d times — a face-down table, blind hits, and a real dealer playing out his hand" % o.wins
 		"outlaw":
-			return "Duel: shoot the Outlaw %d times — and defuse his lit bullets before they fire" % o.outlaw_hp
+			var gang: Array = o.get("outlaws", [])
+			var who := String(gang[0].name) if not gang.is_empty() else "the Outlaw"
+			if gang.size() > 1:
+				return "Bounty: gun down %s and the gang riding behind — %d heads at %d HP each, one at a time" \
+						% [who, gang.size(), o.outlaw_hp]
+			return "Bounty: shoot %s %d times — and step around the waiting slugs" \
+					% [who, o.outlaw_hp]
 		"collect":
 			return _collect_goal_text(o)
 		"landrush":
@@ -1621,6 +1704,13 @@ func _start_room() -> void:
 	room_outlaw_hp = int(current_offer.get("outlaw_hp", 5))
 	room_outlaw_max = room_outlaw_hp
 	room_grit = OUTLAW_GRIT
+	# The posse is on the books before the first card lands, so the
+	# HUD names the right head from frame one.
+	room_outlaws = current_offer.get("outlaws", [])
+	room_outlaw_idx = 0
+	if room_outlaws.is_empty() and room_goal == "outlaw" \
+			and CharacterKit.available():
+		room_outlaws = _roll_posse(int(current_offer.get("posse", 1)))
 	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
 			+ (1 if has_relic("horseshoe") else 0)
 	room_time_left = 0.0
@@ -1688,7 +1778,10 @@ func _seed_room_specials() -> void:
 		main.board.set_blackjack_facedown()
 	elif room_goal == "outlaw":
 		_outlaw_dead_pending = false
+		main.outlaw.spec = current_outlaw_spec()
 		main.outlaw.appear(room_outlaw_hp)
+		main.show_wanted_banner(current_outlaw_spec(), _bounty_subtitle(),
+				bounty_reward())
 		for i in 2:
 			main.board.spawn_objective("bullet")
 		for i in 2:
@@ -1876,11 +1969,11 @@ func on_hand_played(result: Dictionary) -> void:
 			main.flash_red()
 			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 0.8, -5.0)
 			if room_grit <= 0:
-				_room_failed("GUNNED DOWN AT THE SHOWDOWN")
+				_room_failed("GUNNED DOWN — THE BOUNTY STOOD")
 				return
-			_announce_after_settle(("YOU CAUGHT HIS BULLET — GRIT %d"
+			_announce_after_settle("YOU CAUGHT HIS BULLET — GRIT %d" % room_grit
 					if int(result.get("bullets_his", 0)) > 0
-					else "THE OUTLAW FIRES — GRIT %d") % room_grit)
+					else "%s FIRES — GRIT %d" % [current_outlaw_name(), room_grit])
 		_replenish_bullets()
 	if room_goal == "purge":
 		# Quota met AND the table clean — a wildfire can overshoot its
@@ -2175,7 +2268,10 @@ func _fire_bullet(from: Vector2, delay: float, hp_after: int, kills: bool) -> vo
 		if kills:
 			main.outlaw.die()
 			_outlaw_dead_pending = false
-			_room_cleared()
+			if room_outlaw_idx < room_outlaws.size() - 1:
+				_next_outlaw()
+			else:
+				_room_cleared()
 		else:
 			main.outlaw.flinch())
 
@@ -2195,6 +2291,72 @@ func _deal_dealer() -> void:
 ## Score an Outlaw hand must reach or he takes a free shot.
 func _outlaw_bar() -> int:
 	return OUTLAW_BAR_BASE + 15 * (room_index / REGION_SIZE)
+
+
+## Rolls a bounty posse: a named leader off the wanted wall (presets
+## that ride for themselves), then seeded gang members who keep their
+## faces for the whole run.
+func _roll_posse(n: int) -> Array:
+	var out: Array = []
+	if not CharacterKit.available():
+		return out
+	var leader := {}
+	var leader_ids: Array = []
+	for id in CharacterKit.preset_ids():
+		if String(CharacterKit.preset(id).get("sub", "")) == "":
+			leader_ids.append(id)
+	if not leader_ids.is_empty():
+		leader = CharacterKit.preset(leader_ids.pick_random())
+	if leader.is_empty():
+		leader = CharacterKit.random_spec(randi())
+	out.append(leader)
+	for i in n - 1:
+		var member: Dictionary = CharacterKit.random_spec(randi(),
+				"RIDES WITH " + String(leader.name))
+		var guard := 0
+		while String(member.name) == String(leader.name) and guard < 8:
+			member = CharacterKit.random_spec(randi(),
+					"RIDES WITH " + String(leader.name))
+			guard += 1
+		out.append(member)
+	return out
+
+
+## The outlaw currently holding the table (empty when no kit).
+func current_outlaw_spec() -> Dictionary:
+	if room_outlaw_idx < room_outlaws.size():
+		return room_outlaws[room_outlaw_idx]
+	return {}
+
+
+func current_outlaw_name() -> String:
+	return String(current_outlaw_spec().get("name", "THE OUTLAW"))
+
+
+## The red line on the wanted paper.
+func _bounty_subtitle() -> String:
+	if room_outlaws.size() > 1:
+		return "GANG OF %d · DEAD OR ALIVE" % room_outlaws.size()
+	return "DEAD OR ALIVE"
+
+
+## The bounty figure inked on the poster: the pot this table pays.
+func bounty_reward() -> int:
+	return int(round(stake * stake_odds))
+
+
+## One head of the posse down — the next rides in at full strength.
+func _next_outlaw() -> void:
+	var downed := current_outlaw_name()
+	room_outlaw_idx += 1
+	room_outlaw_hp = room_outlaw_max
+	main._announce("%s DOWN — %s RIDES IN" % [downed, current_outlaw_name()])
+	await get_tree().create_timer(0.9).timeout
+	if not in_room or room_goal != "outlaw":
+		return
+	main.outlaw.spec = current_outlaw_spec()
+	main.outlaw.appear(room_outlaw_hp)
+	_replenish_bullets()
 
 
 ## Keeps two of each bullet kind on the duel board.
