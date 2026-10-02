@@ -113,7 +113,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | TEXAS HOLD'EM | Variant: persistent 5-card community, pick 2 hole cards, best playable subset of the 7 scores; RE-DEAL card refreshes the community (shipped) |
 | CRAZY 8s | Variant: every 8 is WILD, but the board crawls with a mixed hazard storm (8 + region seeded, replenished each hand); score target (shipped) |
 | BLACKJACK | Variant: poker off — the table is dealt FACE-DOWN (corners up); chain blind hits, then the dealer flips his hole card and draws out his hand like a real dealer; 3+region wins to clear; hazard storm of 5 + region, replenished (shipped) |
-| SHOWDOWN | The Outlaw duel: clear YOUR gold bullets to shoot him (6+region HP). HIS red bullets are waiting slugs — no fuse, no countdown: clear a card carrying one and he SHOOTS you for it (−1 grit each), so build hands AROUND them (at most two ride the board). Weak hands under the posted score give him free shots; 3 GRIT (shipped; the fuse version was tried and reverted) |
+| BOUNTY | The wanted-gun duel (formerly SHOWDOWN): clear YOUR gold bullets to shoot (5+region HP a head). HIS red bullets are waiting slugs — no fuse, no countdown: clear a card carrying one and he SHOOTS you for it (−1 grit each), so build hands AROUND them (at most two ride the board). Weak hands under the posted score give him free shots; 3 GRIT. Bounties ride in POSSES of 1 + rand(region) heads (max 3), fought one at a time — drop one and the next rides in at full HP; hands 10+3/(extra head), odds 2.5/3.0/3.5. Every outlaw is a character-kit face: preset leaders (The Outlaw, Calico Rose, One-Eye Silas, Dusty Vane, El Coyote, Widow Marsh...), seeded random gang members with generated names. The offer is a WANTED poster (leader portrait, name, gang line, reward = ante×odds); a wanted banner drops when the table opens (shipped) |
 
 **Goal vs limit**: every non-boss room now rolls its challenge type
 independently — 50% a HAND BUDGET, 50% ON THE CLOCK (plain score
@@ -187,16 +187,18 @@ quarter clockwise every hand.
   burn through the card backs (a hazarded card is always face-up),
   and the storm rules still apply — 5 + region, replenished, no
   ambient roll.
-- **SHOWDOWN — the Outlaw**: an Outlaw portrait in the RIGHT gutter
-  (the deck pile holds the left corner now). YOUR bullet cards and
-  HIS bullet cards spawn among the deals.
+- **BOUNTY — the wanted guns**: the current outlaw's composed
+  character portrait stands in the RIGHT gutter (the deck pile holds
+  the left corner now). YOUR bullet cards and HIS bullet cards spawn
+  among the deals.
   Clear YOUR bullets in scoring hands → shots that damage him. Clear
   HIS bullets → he shoots YOU. He also shoots if your scored hand is
   below a posted threshold. Shots cost DUEL HP (separate, ~3 grit for
-  the room; 0 = room failed). Kill him to clear — a puzzle fight where
-  you'll trade some blood. His health lives in the banner as a RED
-  SEGMENTED HEALTH BAR (one notch per life), the same bar the bosses
-  wear — no more bare numbers at the top.
+  the room; 0 = room failed). Kill every head of the posse to clear —
+  gang members ride in one at a time at full HP. His health lives in
+  the banner as a RED SEGMENTED HEALTH BAR (one notch per life), the
+  same bar the bosses wear; the banner names the head and counts the
+  posse (2 OF 3).
 
 Technical wrinkle flagged early: constraint rooms (Suit/Hand Locked)
 change what counts as a playable hand, so `Board.has_playable_hand()`
