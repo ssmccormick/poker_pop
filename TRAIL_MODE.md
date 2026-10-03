@@ -96,9 +96,9 @@ sweetened with a small chip kicker for trusting the cards.
 Rooms are named for poker and the West (the tarot naming retired):
 | Card | Room |
 | --- | --- |
-| LIMIT TABLE | Normal, steady tier 1:1 (shipped) |
-| POT LIMIT | Normal, risky tier 3:2 (shipped) |
-| NO LIMIT | Normal, dangerous tier 2:1 (shipped) |
+| EASY MONEY | Normal, steady tier 1:1 (renamed from LIMIT TABLE — the betting-structure names meant nothing here) (shipped) |
+| FAT POT | Normal, risky tier 3:2 (renamed from POT LIMIT) (shipped) |
+| HIGH STAKES | Normal, dangerous tier 2:1 (renamed from NO LIMIT) (shipped) |
 | TRAVELING MERCHANT | Shop — Peddler / Collector / Card Sharp, rolled per stop (shipped) |
 | POWDER KEG | Purge room: bombs (shipped) |
 | WILDFIRE | Purge room: fire (shipped) |
@@ -145,8 +145,8 @@ quarter clockwise every hand.
 
 ## NEXT — Stage B: the poker economy (user-designed, queued)
 
-- **Score rooms go on the clock**: plain LIMIT/POT LIMIT/NO LIMIT
-  tables become TIME-limited (unlimited hands), merging HIGH NOON into
+- **Score rooms go on the clock**: plain EASY MONEY/FAT POT/HIGH
+  STAKES tables become TIME-limited (unlimited hands), merging HIGH NOON into
   the standard tables. CONDITION rooms (purges, heist, treasure,
   called hands, variants, Bounty) roll 50/50 — except BANK JOB,
   STAGECOACH and GOLD MINE, which ALWAYS run on the clock.

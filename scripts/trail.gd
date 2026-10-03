@@ -33,13 +33,14 @@ const TABLES := [
 	{"name": "HIGH ROLLER", "cost": 1000, "chips": 500, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
 ]
 
-# Room risk tiers offered by the draw, named for poker betting
-# structures. "hands" is the budget the table deals you — it shrinks
-# as the trail deepens; the player doesn't haggle over it.
+# Room risk tiers offered by the draw, named for what they pay — a
+# safe grind, a sweetened pot, a rich table that'll bleed you.
+# "hands" is the budget the table deals you — it shrinks as the
+# trail deepens; the player doesn't haggle over it.
 const RISKS := [
-	{"tarot": "LIMIT TABLE", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10},
-	{"tarot": "POT LIMIT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8},
-	{"tarot": "NO LIMIT", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7},
+	{"tarot": "EASY MONEY", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10},
+	{"tarot": "FAT POT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8},
+	{"tarot": "HIGH STAKES", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7},
 ]
 
 # Entering a room costs its ANTE (the house keeps it, win or lose),
@@ -1331,7 +1332,8 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			bet_line = "ALL IN"
 		if offer.get("goal", "") == "outlaw" and _apply_wanted_poster(b, offer):
 			return b
-		var tier := _apply_poster(b, _poster_job(String(offer.tarot)))
+		var tier := _apply_poster(b, _poster_job(String(offer.tarot)),
+				_offer_tier(offer))
 		if tier != "":
 			_poster_face(b, offer.tarot, tier, goal_line,
 					"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line])
@@ -1408,12 +1410,39 @@ static var _poster_index := {}
 static var _poster_index_loaded := false
 
 
+# The plain tables were renamed after round 2 shipped; their poster
+# emblems (chip stacks, scaling with the stakes) keep the old ids.
+const POSTER_JOB_ALIASES := {
+	"easy_money": "limit_table",
+	"fat_pot": "pot_limit",
+	"high_stakes": "no_limit",
+}
+
+
 ## "DEALER'S CALL" -> "dealers_call", "CRAZY 8s" -> "crazy_8s".
 func _poster_job(tarot_name: String) -> String:
-	return tarot_name.to_lower().replace("'", "").replace(" ", "_")
+	var job := tarot_name.to_lower().replace("'", "").replace(" ", "_")
+	return String(POSTER_JOB_ALIASES.get(job, job))
 
 
-func _apply_poster(b: Button, job: String) -> String:
+## The ribbon tells the truth: a table's tier comes from the odds it
+## actually posts, not from a fixed per-job list — a 1:1 HIGH NOON is
+## STEADY, a 2:1 GOLD MINE is DANGEROUS. Purges and bosses keep their
+## own ribbons.
+func _offer_tier(offer: Dictionary) -> String:
+	if offer.has("boss"):
+		return "boss"
+	if String(offer.get("goal", "")) == "purge":
+		return "purge"
+	var odds := float(offer.get("odds", 1.0))
+	if odds <= 1.0:
+		return "steady"
+	if odds <= 1.6:
+		return "risky"
+	return "dangerous"
+
+
+func _apply_poster(b: Button, job: String, tier_override := "") -> String:
 	if not _poster_index_loaded:
 		_poster_index_loaded = true
 		var path := "res://assets/art/r2/posters_index.json"
@@ -1424,7 +1453,8 @@ func _apply_poster(b: Button, job: String) -> String:
 	if _poster_index.is_empty():
 		return ""
 	var layers: Dictionary = _poster_index.get("layers", {})
-	var tier := String(_poster_index.get("job_tier", {}).get(job, "risky"))
+	var tier := tier_override if tier_override != "" \
+			else String(_poster_index.get("job_tier", {}).get(job, "risky"))
 	var files: Array = [
 		String(layers.get("base", {}).get("poster", "")),
 		String(layers.get("tier", {}).get(tier, "")),
