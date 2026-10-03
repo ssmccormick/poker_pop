@@ -84,6 +84,11 @@ var hand_display: Node2D
 var community_display: Node2D
 var _community_label: Label
 var outlaw: OutlawPortrait
+var _bounty_plaque: Control        # the WANTED strip over the banner area
+var _plaque_line: Label
+var _plaque_reward: Label
+var _plaque_portrait: Control      # rebuilt whenever the head changes
+var _plaque_face := ""
 var _community_plate: Panel
 var _payout_names: Label
 var _payout_values: Label
@@ -441,6 +446,11 @@ func _update_labels() -> void:
 	target_label.visible = show_arcade or show_trail
 	target_bar_back.visible = show_arcade or show_trail
 	target_bar_fill.visible = show_arcade or show_trail
+	# Every table resets the banner strip; the bounty branch below
+	# claims it back with the WANTED plaque and a dropped bar.
+	_bounty_plaque.visible = false
+	target_bar_back.position.y = 74.0
+	target_bar_fill.position.y = 74.0
 	if show_arcade:
 		var h := 892.0 * meter / 100.0
 		meter_fill.position.y = 104.0 + (892.0 - h)
@@ -528,6 +538,7 @@ func _update_labels() -> void:
 			outlaw.kind = "outlaw"
 			outlaw.spec = trail.current_outlaw_spec()
 			outlaw.grit = trail.room_grit
+			_update_bounty_plaque(posse_note)
 		elif trail.room_goal == "purge":
 			var quota := trail.purge_quota()
 			target_label.text = "TABLE %d / %d      PURGE  %d / %d CLEARED  ·  %d ON THE TABLE" % \
@@ -788,6 +799,29 @@ func _style_boss_bar(hp: int, max_hp: int) -> void:
 			t.size = Vector2(3, 10)
 			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			_boss_ticks.add_child(t)
+
+
+## Dresses the WANTED plaque for the current head of the posse and
+## drops the HP bar just below it, onto the table rim. Leaves the
+## plain banner label alone when the kit (or the spec) is missing.
+func _update_bounty_plaque(posse_note: String) -> void:
+	var spec: Dictionary = trail.current_outlaw_spec()
+	if spec.is_empty() or _plaque_line == null:
+		return
+	_bounty_plaque.visible = true
+	target_label.visible = false
+	target_bar_back.position.y = 122.0
+	target_bar_fill.position.y = 122.0
+	var who := trail.current_outlaw_name()
+	_plaque_line.text = "%s%s  ·  DEAD OR ALIVE  ·  SCORE %d+" % [
+			who, posse_note, trail._outlaw_bar()]
+	_plaque_reward.text = "$%d" % trail.bounty_reward()
+	if _plaque_face != who:
+		_plaque_face = who
+		if _plaque_portrait != null:
+			_plaque_portrait.queue_free()
+		_plaque_portrait = CharacterKit.add_portrait(_bounty_plaque, spec,
+				Rect2(20, 14, 91, 91))
 
 
 ## The WANTED banner that drops when a bounty table opens: the kit's
@@ -1911,6 +1945,33 @@ func _build_ui() -> void:
 	_boss_ticks = Control.new()
 	_boss_ticks.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	target_bar_fill.add_child(_boss_ticks)
+
+	# The bounty plaque: the kit's slim WANTED strip over the banner
+	# area during bounty tables; the HP bar drops just below it onto
+	# the table rim. Built empty when the character kit is absent.
+	_bounty_plaque = Control.new()
+	_bounty_plaque.position = Vector2(380, -6)
+	_bounty_plaque.size = Vector2(1160, 120)
+	_bounty_plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bounty_plaque.visible = false
+	var plaque_tpl: Texture2D = CharacterKit.tex(String(
+			CharacterKit.poster_info("topbar_template").get("file", "")))
+	if plaque_tpl != null:
+		var plaque_paper := TextureRect.new()
+		plaque_paper.texture = plaque_tpl
+		plaque_paper.size = Vector2(1160, 120)
+		plaque_paper.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		plaque_paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bounty_plaque.add_child(plaque_paper)
+		_plaque_line = _label(_bounty_plaque, "", Vector2(160, 84), 16, Color("8a3a30"))
+		_plaque_line.size = Vector2(840, 22)
+		_plaque_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if FontLib.numbers != null:
+			_plaque_line.add_theme_font_override("font", FontLib.numbers)
+		_plaque_reward = _label(_bounty_plaque, "", Vector2(880, 44), 36, Color("8a3a30"))
+		_plaque_reward.size = Vector2(316, 46)
+		_plaque_reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hud_root.add_child(_bounty_plaque)
 
 	var play_btn := _button(hud_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60), true)
 	play_btn.add_theme_font_size_override("font_size", 24)

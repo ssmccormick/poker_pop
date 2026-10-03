@@ -104,7 +104,7 @@ Rooms are named for poker and the West (the tarot naming retired):
 | WILDFIRE | Purge room: fire (shipped) |
 | DUST STORM | Purge room: wind (shipped) |
 | FLASH FLOOD | Purge room: water (shipped) |
-| GOLD MINE | Board choked with stone; break N to clear, gold cards turn up in the rubble (shipped) |
+| GOLD MINE | Board choked with stone; break N to clear, gold cards turn up in the rubble. Always ON THE CLOCK (5 min, no hand limit) — collapsing seams wait for no hand count (shipped) |
 | BANK JOB | Heist room (crack the safe — shipped) |
 | STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs ON THE CLOCK (unlimited hands, ~1 min per pair, fixed by the table) — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
 | DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
@@ -147,8 +147,9 @@ quarter clockwise every hand.
 
 - **Score rooms go on the clock**: plain LIMIT/POT LIMIT/NO LIMIT
   tables become TIME-limited (unlimited hands), merging HIGH NOON into
-  the standard tables. CONDITION rooms (purges, mine, heist, treasure,
-  called hands, variants, Outlaw) stay HAND-limited.
+  the standard tables. CONDITION rooms (purges, heist, treasure,
+  called hands, variants, Bounty) roll 50/50 — except BANK JOB,
+  STAGECOACH and GOLD MINE, which ALWAYS run on the clock.
 - **CALL / RAISE / ALL IN** replaces the free bet dial:
   each room has a SET bet amount. CALL = play the room as offered.
   RAISE = bigger bet AND the room gains an extra complication (a
@@ -197,8 +198,10 @@ quarter clockwise every hand.
   the room; 0 = room failed). Kill every head of the posse to clear —
   gang members ride in one at a time at full HP. His health lives in
   the banner as a RED SEGMENTED HEALTH BAR (one notch per life), the
-  same bar the bosses wear; the banner names the head and counts the
-  posse (2 OF 3).
+  same bar the bosses wear; during the duel the whole banner strip is
+  the kit's slim WANTED plaque — mini portrait, name, DEAD OR ALIVE,
+  the score bar, and the reward on the dashed plate — with the HP bar
+  dropped just below it onto the table rim.
 
 Technical wrinkle flagged early: constraint rooms (Suit/Hand Locked)
 change what counts as a playable hand, so `Board.has_playable_hand()`
