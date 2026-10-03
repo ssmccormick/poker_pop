@@ -65,18 +65,6 @@ static func suit_name(suit: int) -> String:
 	return SUIT_KEYS[clampi(suit, 0, 3)]
 
 
-## Fire severity 1..4 from the burning card's rank (the kit's ladder:
-## A–J burn low, 3–2 are all but consumed).
-static func fire_level(rank: int) -> int:
-	if rank >= 11:
-		return 1
-	if rank >= 7:
-		return 2
-	if rank >= 4:
-		return 3
-	return 4
-
-
 ## Facing rotation for *_arrow_up layers: radians to turn an up-arrow
 ## to the given grid direction.
 static func arrow_rotation(dir: Vector2i) -> float:

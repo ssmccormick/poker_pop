@@ -1152,12 +1152,26 @@ func _draw_fire(rect: Rect2) -> void:
 	draw_rect(Rect2(glow.position + Vector2(0, glow.size.y * 0.58),
 			Vector2(glow.size.x, glow.size.y * 0.42)),
 			Color(1.0, 0.55, 0.15, 0.08 + 0.12 * burn + flicker))
-	_draw_flame_body(rect, rect.size.y * lerpf(0.30, 1.02, burn), 0.0,
-			0.9, Color(0.62, 0.13, 0.05, 0.82))
-	_draw_flame_body(rect, rect.size.y * lerpf(0.20, 0.78, burn), 2.6,
-			1.25, Color(0.93, 0.44, 0.12, 0.85))
-	_draw_flame_body(rect, rect.size.y * lerpf(0.12, 0.50, burn), 5.2,
-			1.7, Color(1.0, 0.86, 0.46, 0.85))
+	# Four bodies back-to-front, each breathing on its own clock —
+	# alpha and height swell and fade out of step, so the colors mix
+	# and swirl through each other instead of sitting in fixed bands.
+	var bodies := [
+		[lerpf(0.30, 1.02, burn), 0.0, 0.9, Color(0.62, 0.13, 0.05, 0.80), 1.3, 0.0],
+		[lerpf(0.22, 0.82, burn), 2.6, 1.25, Color(0.93, 0.44, 0.12, 0.78), 1.9, 2.1],
+		[lerpf(0.16, 0.62, burn), 7.9, 1.5, Color(0.99, 0.62, 0.20, 0.66), 2.6, 4.0],
+		[lerpf(0.12, 0.50, burn), 5.2, 1.8, Color(1.0, 0.87, 0.48, 0.80), 3.4, 1.1],
+	]
+	for b in bodies:
+		var h_frac: float = b[0]
+		var seed_off: float = b[1]
+		var speed_mul: float = b[2]
+		var col: Color = b[3]
+		var rate: float = b[4]
+		var off: float = b[5]
+		var breathe := 0.5 + 0.5 * sin(_t * rate + _phase + off)
+		col.a *= 0.55 + 0.45 * breathe
+		_draw_flame_body(rect, rect.size.y * h_frac * (0.88 + 0.16 * breathe),
+				seed_off, speed_mul, col)
 	_draw_embers(rect, burn)
 
 
@@ -1172,7 +1186,9 @@ func _draw_flame_body(rect: Rect2, max_h: float, seed_off: float,
 	var floor_y := rect.end.y - 2.0
 	var pts := PackedVector2Array()
 	pts.append(Vector2(left, floor_y))
-	var n := 22
+	# Dense sampling keeps the tongue tips ROUNDED — the sine fields
+	# are smooth, so more points means soft licks, not spikes.
+	var n := 36
 	for i in n + 1:
 		var u := float(i) / n
 		var a := 0.5 + 0.5 * sin(u * 9.4 + _t * 4.2 * speed_mul + _phase + seed_off)

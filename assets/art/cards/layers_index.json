@@ -1,270 +1,265 @@
 {
- "card_canvas_px": [
-  500,
-  700
- ],
- "icon_canvas_px": [
-  256,
-  256
- ],
- "layers": {
-  "base": {
-   "card_blank": "cards/base/card_blank.png",
-   "card_back": "cards/base/card_back.png",
-   "stone": "cards/base/stone.png",
-   "safe": "cards/base/safe.png",
-   "cobra_tail": "cards/base/cobra_tail.png"
-  },
-  "rank": {
-   "2_black": "cards/rank/2_black.png",
-   "2_red": "cards/rank/2_red.png",
-   "3_black": "cards/rank/3_black.png",
-   "3_red": "cards/rank/3_red.png",
-   "4_black": "cards/rank/4_black.png",
-   "4_red": "cards/rank/4_red.png",
-   "5_black": "cards/rank/5_black.png",
-   "5_red": "cards/rank/5_red.png",
-   "6_black": "cards/rank/6_black.png",
-   "6_red": "cards/rank/6_red.png",
-   "7_black": "cards/rank/7_black.png",
-   "7_red": "cards/rank/7_red.png",
-   "8_black": "cards/rank/8_black.png",
-   "8_red": "cards/rank/8_red.png",
-   "9_black": "cards/rank/9_black.png",
-   "9_red": "cards/rank/9_red.png",
-   "10_black": "cards/rank/10_black.png",
-   "10_red": "cards/rank/10_red.png",
-   "J_black": "cards/rank/J_black.png",
-   "J_red": "cards/rank/J_red.png",
-   "Q_black": "cards/rank/Q_black.png",
-   "Q_red": "cards/rank/Q_red.png",
-   "K_black": "cards/rank/K_black.png",
-   "K_red": "cards/rank/K_red.png",
-   "A_black": "cards/rank/A_black.png",
-   "A_red": "cards/rank/A_red.png"
-  },
-  "suit_corner": {
-   "spades": "cards/suit_corner/spades.png",
-   "hearts": "cards/suit_corner/hearts.png",
-   "diamonds": "cards/suit_corner/diamonds.png",
-   "clubs": "cards/suit_corner/clubs.png"
-  },
-  "center": {
-   "pip_spades": "cards/center/pip_spades.png",
-   "face_J_spades": "cards/center/face_J_spades.png",
-   "face_Q_spades": "cards/center/face_Q_spades.png",
-   "face_K_spades": "cards/center/face_K_spades.png",
-   "face_A_spades": "cards/center/face_A_spades.png",
-   "pip_hearts": "cards/center/pip_hearts.png",
-   "face_J_hearts": "cards/center/face_J_hearts.png",
-   "face_Q_hearts": "cards/center/face_Q_hearts.png",
-   "face_K_hearts": "cards/center/face_K_hearts.png",
-   "face_A_hearts": "cards/center/face_A_hearts.png",
-   "pip_diamonds": "cards/center/pip_diamonds.png",
-   "face_J_diamonds": "cards/center/face_J_diamonds.png",
-   "face_Q_diamonds": "cards/center/face_Q_diamonds.png",
-   "face_K_diamonds": "cards/center/face_K_diamonds.png",
-   "face_A_diamonds": "cards/center/face_A_diamonds.png",
-   "pip_clubs": "cards/center/pip_clubs.png",
-   "face_J_clubs": "cards/center/face_J_clubs.png",
-   "face_Q_clubs": "cards/center/face_Q_clubs.png",
-   "face_K_clubs": "cards/center/face_K_clubs.png",
-   "face_A_clubs": "cards/center/face_A_clubs.png"
-  },
-  "mod_wash": {
-   "mult": "cards/mod_wash/mult.png",
-   "chip": "cards/mod_wash/chip.png",
-   "plus": "cards/mod_wash/plus.png",
-   "minus": "cards/mod_wash/minus.png",
-   "bumper": "cards/mod_wash/bumper.png",
-   "gold": "cards/mod_wash/gold.png",
-   "wild": "cards/mod_wash/wild.png",
-   "lucky": "cards/mod_wash/lucky.png"
-  },
-  "mod_frame": {
-   "mult": "cards/mod_frame/mult.png",
-   "chip": "cards/mod_frame/chip.png",
-   "plus": "cards/mod_frame/plus.png",
-   "minus": "cards/mod_frame/minus.png",
-   "bumper": "cards/mod_frame/bumper.png",
-   "gold": "cards/mod_frame/gold.png",
-   "wild": "cards/mod_frame/wild.png",
-   "lucky": "cards/mod_frame/lucky.png"
-  },
-  "mod_emblem": {
-   "mult": "cards/mod_emblem/mult.png",
-   "chip": "cards/mod_emblem/chip.png",
-   "plus_arrow_up": "cards/mod_emblem/plus_arrow_up.png",
-   "minus_arrow_up": "cards/mod_emblem/minus_arrow_up.png",
-   "bumper_arrow_up": "cards/mod_emblem/bumper_arrow_up.png",
-   "gold": "cards/mod_emblem/gold.png",
-   "wild": "cards/mod_emblem/wild.png",
-   "lucky": "cards/mod_emblem/lucky.png"
-  },
-  "rider": {
-   "explosive": "cards/rider/explosive.png",
-   "wild8_badge": "cards/rider/wild8_badge.png"
-  },
-  "hazard": {
-   "fire_1": "cards/hazard/fire_1.png",
-   "water_1": "cards/hazard/water_1.png",
-   "fire_2": "cards/hazard/fire_2.png",
-   "water_2": "cards/hazard/water_2.png",
-   "fire_3": "cards/hazard/fire_3.png",
-   "water_3": "cards/hazard/water_3.png",
-   "fire_4": "cards/hazard/fire_4.png",
-   "water_4": "cards/hazard/water_4.png",
-   "fire_telegraph_sparks": "cards/hazard/fire_telegraph_sparks.png",
-   "water_telegraph_seep": "cards/hazard/water_telegraph_seep.png",
-   "wind": "cards/hazard/wind.png",
-   "wind_arrow_up": "cards/hazard/wind_arrow_up.png",
-   "bomb": "cards/hazard/bomb.png",
-   "bomb_alert_ring": "cards/hazard/bomb_alert_ring.png",
-   "bomb_fuse_badge_blank": "cards/hazard/bomb_fuse_badge_blank.png",
-   "bomb_fuse_badge_1": "cards/hazard/bomb_fuse_badge_1.png",
-   "bomb_fuse_badge_2": "cards/hazard/bomb_fuse_badge_2.png",
-   "bomb_fuse_badge_3": "cards/hazard/bomb_fuse_badge_3.png",
-   "bomb_fuse_badge_4": "cards/hazard/bomb_fuse_badge_4.png",
-   "bomb_fuse_badge_5": "cards/hazard/bomb_fuse_badge_5.png",
-   "stone_cracks_1": "cards/hazard/stone_cracks_1.png",
-   "stone_cracks_2": "cards/hazard/stone_cracks_2.png",
-   "stone_gold_vein": "cards/hazard/stone_gold_vein.png"
-  },
-  "special": {
-   "key": "cards/special/key.png",
-   "chest": "cards/special/chest.png",
-   "bullet_yours": "cards/special/bullet_yours.png",
-   "bullet_his": "cards/special/bullet_his.png",
-   "cursed": "cards/special/cursed.png",
-   "honey": "cards/special/honey.png"
-  },
-  "boss": {
-   "jack_card": "cards/boss/jack_card.png",
-   "jack_card_titled": "cards/boss/jack_card_titled.png",
-   "queen_card": "cards/boss/queen_card.png",
-   "queen_card_titled": "cards/boss/queen_card_titled.png",
-   "cobra_card": "cards/boss/cobra_card.png",
-   "cobra_card_titled": "cards/boss/cobra_card_titled.png",
-   "outlaw_card": "cards/boss/outlaw_card.png",
-   "outlaw_card_titled": "cards/boss/outlaw_card_titled.png",
-   "boss_frame": "cards/boss/boss_frame.png"
-  },
-  "boss_portrait": {
-   "jack": "cards/boss_portrait/jack.png",
-   "queen": "cards/boss_portrait/queen.png",
-   "cobra": "cards/boss_portrait/cobra.png",
-   "outlaw": "cards/boss_portrait/outlaw.png"
-  },
-  "ui": {
-   "hp_segment_full": "ui/hp_segment_full.png",
-   "hp_segment_empty": "ui/hp_segment_empty.png",
-   "grit_full": "ui/grit_full.png",
-   "grit_empty": "ui/grit_empty.png",
-   "suit_spades": "ui/suit_spades.png",
-   "suit_hearts": "ui/suit_hearts.png",
-   "suit_diamonds": "ui/suit_diamonds.png",
-   "suit_clubs": "ui/suit_clubs.png"
-  },
-  "relic_glyph": {
-   "horseshoe": "relics/glyph/horseshoe.png",
-   "card_sleeve": "relics/glyph/card_sleeve.png",
-   "snake_oil": "relics/glyph/snake_oil.png",
-   "tin_star": "relics/glyph/tin_star.png",
-   "rabbits_foot": "relics/glyph/rabbits_foot.png",
-   "bomb_squad_badge": "relics/glyph/bomb_squad_badge.png",
-   "chisel": "relics/glyph/chisel.png",
-   "fire_blanket": "relics/glyph/fire_blanket.png",
-   "weathervane": "relics/glyph/weathervane.png",
-   "magnifying_glass": "relics/glyph/magnifying_glass.png",
-   "gold_tooth": "relics/glyph/gold_tooth.png",
-   "mirror_shades": "relics/glyph/mirror_shades.png",
-   "second_wind": "relics/glyph/second_wind.png",
-   "bankroll_clip": "relics/glyph/bankroll_clip.png",
-   "dowsing_rod": "relics/glyph/dowsing_rod.png",
-   "saddlebags": "relics/glyph/saddlebags.png",
-   "lucky_chip": "relics/glyph/lucky_chip.png"
-  },
-  "relic_framed": {
-   "horseshoe": "relics/framed/horseshoe.png",
-   "card_sleeve": "relics/framed/card_sleeve.png",
-   "snake_oil": "relics/framed/snake_oil.png",
-   "tin_star": "relics/framed/tin_star.png",
-   "rabbits_foot": "relics/framed/rabbits_foot.png",
-   "bomb_squad_badge": "relics/framed/bomb_squad_badge.png",
-   "chisel": "relics/framed/chisel.png",
-   "fire_blanket": "relics/framed/fire_blanket.png",
-   "weathervane": "relics/framed/weathervane.png",
-   "magnifying_glass": "relics/framed/magnifying_glass.png",
-   "gold_tooth": "relics/framed/gold_tooth.png",
-   "mirror_shades": "relics/framed/mirror_shades.png",
-   "second_wind": "relics/framed/second_wind.png",
-   "bankroll_clip": "relics/framed/bankroll_clip.png",
-   "dowsing_rod": "relics/framed/dowsing_rod.png",
-   "saddlebags": "relics/framed/saddlebags.png",
-   "lucky_chip": "relics/framed/lucky_chip.png"
-  },
-  "relic_frame": {
-   "common": "relics/frame/common.png",
-   "rare": "relics/frame/rare.png",
-   "legendary": "relics/frame/legendary.png"
-  },
-  "provision_glyph": {
-   "canteen": "provisions/glyph/canteen.png",
-   "dynamite_stick": "provisions/glyph/dynamite_stick.png",
-   "barbers_razor": "provisions/glyph/barbers_razor.png",
-   "pocket_flask": "provisions/glyph/pocket_flask.png",
-   "fresh_deck": "provisions/glyph/fresh_deck.png",
-   "gold_pan": "provisions/glyph/gold_pan.png",
-   "branding_iron": "provisions/glyph/branding_iron.png",
-   "rattlesnake_tonic": "provisions/glyph/rattlesnake_tonic.png"
-  },
-  "provision_framed": {
-   "canteen": "provisions/framed/canteen.png",
-   "dynamite_stick": "provisions/framed/dynamite_stick.png",
-   "barbers_razor": "provisions/framed/barbers_razor.png",
-   "pocket_flask": "provisions/framed/pocket_flask.png",
-   "fresh_deck": "provisions/framed/fresh_deck.png",
-   "gold_pan": "provisions/framed/gold_pan.png",
-   "branding_iron": "provisions/framed/branding_iron.png",
-   "rattlesnake_tonic": "provisions/framed/rattlesnake_tonic.png"
-  },
-  "provision_frame": {
-   "targeted": "provisions/frame/targeted.png",
-   "instant": "provisions/frame/instant.png"
-  }
- },
- "how_to_stack": {
-  "note": "Every file in cards/ is a 500x700 transparent PNG on the same canvas. Draw them at (0,0) in this order; skip any layer the card doesn't have.",
-  "order": [
-   "base (card_blank | stone | safe | cobra_tail | card_back)",
-   "center (pip_<suit>, face_<J|Q|K>_<suit>, or face_A_<suit> for Aces) - omit when the card has a mod",
-   "mod_wash/<mod> (full-bleed)",
-   "mod_frame/<mod>",
-   "mod_emblem/<mod> (directional: *_arrow_up, rotate per facing)",
-   "rank/<rank>_<black|red>",
-   "suit_corner/<suit>",
-   "hazard/*",
-   "special/*",
-   "rider/*",
-   "bosses: boss/<name>_card (no title, corners clear) -> rank -> suit_corner -> boss/boss_frame. boss/<name>_card_titled bakes the name in for menus/reveals and should NOT get rank/suit layers"
-  ],
-  "fire_levels": "suggested A-J:1, 10-7:2, 6-4:3, 3-2:4",
-  "icons": "relics/ and provisions/: glyph/, frame/, framed/. 256x256 transparent.",
-  "mod_colors": {
-   "mult": "#8f4a34",
-   "chip": "#4b6272",
-   "plus": "#5e7447",
-   "minus": "#83403a",
-   "bumper": "#9a6b40",
-   "gold": "#b38c3e",
-   "wild": "#644a70",
-   "lucky": "#56703f"
-  },
-  "changelog": [
-   "r2: clubs seam closed (pip_clubs, suit_corner/clubs, face_*_clubs, ui/suit_clubs regenerated)",
-   "r2: added center/face_A_<suit> x4",
-   "r2: corner suits drawn as halo pass + ink pass (no internal halo lines)",
-   "r2: boss/<name>_card no longer bakes the title (it collided with the corner index); titled copies are boss/<name>_card_titled"
-  ]
- }
+    "card_canvas_px":  [
+                           500,
+                           700
+                       ],
+    "icon_canvas_px":  [
+                           256,
+                           256
+                       ],
+    "layers":  {
+                   "base":  {
+                                "card_blank":  "cards/base/card_blank.png",
+                                "card_back":  "cards/base/card_back.png",
+                                "stone":  "cards/base/stone.png",
+                                "safe":  "cards/base/safe.png",
+                                "cobra_tail":  "cards/base/cobra_tail.png"
+                            },
+                   "rank":  {
+                                "2_black":  "cards/rank/2_black.png",
+                                "2_red":  "cards/rank/2_red.png",
+                                "3_black":  "cards/rank/3_black.png",
+                                "3_red":  "cards/rank/3_red.png",
+                                "4_black":  "cards/rank/4_black.png",
+                                "4_red":  "cards/rank/4_red.png",
+                                "5_black":  "cards/rank/5_black.png",
+                                "5_red":  "cards/rank/5_red.png",
+                                "6_black":  "cards/rank/6_black.png",
+                                "6_red":  "cards/rank/6_red.png",
+                                "7_black":  "cards/rank/7_black.png",
+                                "7_red":  "cards/rank/7_red.png",
+                                "8_black":  "cards/rank/8_black.png",
+                                "8_red":  "cards/rank/8_red.png",
+                                "9_black":  "cards/rank/9_black.png",
+                                "9_red":  "cards/rank/9_red.png",
+                                "10_black":  "cards/rank/10_black.png",
+                                "10_red":  "cards/rank/10_red.png",
+                                "J_black":  "cards/rank/J_black.png",
+                                "J_red":  "cards/rank/J_red.png",
+                                "Q_black":  "cards/rank/Q_black.png",
+                                "Q_red":  "cards/rank/Q_red.png",
+                                "K_black":  "cards/rank/K_black.png",
+                                "K_red":  "cards/rank/K_red.png",
+                                "A_black":  "cards/rank/A_black.png",
+                                "A_red":  "cards/rank/A_red.png"
+                            },
+                   "suit_corner":  {
+                                       "spades":  "cards/suit_corner/spades.png",
+                                       "hearts":  "cards/suit_corner/hearts.png",
+                                       "diamonds":  "cards/suit_corner/diamonds.png",
+                                       "clubs":  "cards/suit_corner/clubs.png"
+                                   },
+                   "center":  {
+                                  "pip_spades":  "cards/center/pip_spades.png",
+                                  "face_J_spades":  "cards/center/face_J_spades.png",
+                                  "face_Q_spades":  "cards/center/face_Q_spades.png",
+                                  "face_K_spades":  "cards/center/face_K_spades.png",
+                                  "face_A_spades":  "cards/center/face_A_spades.png",
+                                  "pip_hearts":  "cards/center/pip_hearts.png",
+                                  "face_J_hearts":  "cards/center/face_J_hearts.png",
+                                  "face_Q_hearts":  "cards/center/face_Q_hearts.png",
+                                  "face_K_hearts":  "cards/center/face_K_hearts.png",
+                                  "face_A_hearts":  "cards/center/face_A_hearts.png",
+                                  "pip_diamonds":  "cards/center/pip_diamonds.png",
+                                  "face_J_diamonds":  "cards/center/face_J_diamonds.png",
+                                  "face_Q_diamonds":  "cards/center/face_Q_diamonds.png",
+                                  "face_K_diamonds":  "cards/center/face_K_diamonds.png",
+                                  "face_A_diamonds":  "cards/center/face_A_diamonds.png",
+                                  "pip_clubs":  "cards/center/pip_clubs.png",
+                                  "face_J_clubs":  "cards/center/face_J_clubs.png",
+                                  "face_Q_clubs":  "cards/center/face_Q_clubs.png",
+                                  "face_K_clubs":  "cards/center/face_K_clubs.png",
+                                  "face_A_clubs":  "cards/center/face_A_clubs.png"
+                              },
+                   "mod_wash":  {
+                                    "mult":  "cards/mod_wash/mult.png",
+                                    "chip":  "cards/mod_wash/chip.png",
+                                    "plus":  "cards/mod_wash/plus.png",
+                                    "minus":  "cards/mod_wash/minus.png",
+                                    "bumper":  "cards/mod_wash/bumper.png",
+                                    "gold":  "cards/mod_wash/gold.png",
+                                    "wild":  "cards/mod_wash/wild.png",
+                                    "lucky":  "cards/mod_wash/lucky.png"
+                                },
+                   "mod_frame":  {
+                                     "mult":  "cards/mod_frame/mult.png",
+                                     "chip":  "cards/mod_frame/chip.png",
+                                     "plus":  "cards/mod_frame/plus.png",
+                                     "minus":  "cards/mod_frame/minus.png",
+                                     "bumper":  "cards/mod_frame/bumper.png",
+                                     "gold":  "cards/mod_frame/gold.png",
+                                     "wild":  "cards/mod_frame/wild.png",
+                                     "lucky":  "cards/mod_frame/lucky.png"
+                                 },
+                   "mod_emblem":  {
+                                      "mult":  "cards/mod_emblem/mult.png",
+                                      "chip":  "cards/mod_emblem/chip.png",
+                                      "plus_arrow_up":  "cards/mod_emblem/plus_arrow_up.png",
+                                      "minus_arrow_up":  "cards/mod_emblem/minus_arrow_up.png",
+                                      "bumper_arrow_up":  "cards/mod_emblem/bumper_arrow_up.png",
+                                      "gold":  "cards/mod_emblem/gold.png",
+                                      "wild":  "cards/mod_emblem/wild.png",
+                                      "lucky":  "cards/mod_emblem/lucky.png"
+                                  },
+                   "rider":  {
+                                 "explosive":  "cards/rider/explosive.png",
+                                 "wild8_badge":  "cards/rider/wild8_badge.png"
+                             },
+                   "hazard":  {
+                                  "water_1":  "cards/hazard/water_1.png",
+                                  "water_2":  "cards/hazard/water_2.png",
+                                  "water_3":  "cards/hazard/water_3.png",
+                                  "water_4":  "cards/hazard/water_4.png",
+                                  "water_telegraph_seep":  "cards/hazard/water_telegraph_seep.png",
+                                  "wind":  "cards/hazard/wind.png",
+                                  "wind_arrow_up":  "cards/hazard/wind_arrow_up.png",
+                                  "bomb":  "cards/hazard/bomb.png",
+                                  "bomb_alert_ring":  "cards/hazard/bomb_alert_ring.png",
+                                  "bomb_fuse_badge_blank":  "cards/hazard/bomb_fuse_badge_blank.png",
+                                  "bomb_fuse_badge_1":  "cards/hazard/bomb_fuse_badge_1.png",
+                                  "bomb_fuse_badge_2":  "cards/hazard/bomb_fuse_badge_2.png",
+                                  "bomb_fuse_badge_3":  "cards/hazard/bomb_fuse_badge_3.png",
+                                  "bomb_fuse_badge_4":  "cards/hazard/bomb_fuse_badge_4.png",
+                                  "bomb_fuse_badge_5":  "cards/hazard/bomb_fuse_badge_5.png",
+                                  "stone_cracks_1":  "cards/hazard/stone_cracks_1.png",
+                                  "stone_cracks_2":  "cards/hazard/stone_cracks_2.png",
+                                  "stone_gold_vein":  "cards/hazard/stone_gold_vein.png"
+                              },
+                   "special":  {
+                                   "key":  "cards/special/key.png",
+                                   "chest":  "cards/special/chest.png",
+                                   "bullet_yours":  "cards/special/bullet_yours.png",
+                                   "bullet_his":  "cards/special/bullet_his.png",
+                                   "cursed":  "cards/special/cursed.png",
+                                   "honey":  "cards/special/honey.png"
+                               },
+                   "boss":  {
+                                "jack_card":  "cards/boss/jack_card.png",
+                                "jack_card_titled":  "cards/boss/jack_card_titled.png",
+                                "queen_card":  "cards/boss/queen_card.png",
+                                "queen_card_titled":  "cards/boss/queen_card_titled.png",
+                                "cobra_card":  "cards/boss/cobra_card.png",
+                                "cobra_card_titled":  "cards/boss/cobra_card_titled.png",
+                                "outlaw_card":  "cards/boss/outlaw_card.png",
+                                "outlaw_card_titled":  "cards/boss/outlaw_card_titled.png",
+                                "boss_frame":  "cards/boss/boss_frame.png"
+                            },
+                   "boss_portrait":  {
+                                         "jack":  "cards/boss_portrait/jack.png",
+                                         "queen":  "cards/boss_portrait/queen.png",
+                                         "cobra":  "cards/boss_portrait/cobra.png",
+                                         "outlaw":  "cards/boss_portrait/outlaw.png"
+                                     },
+                   "ui":  {
+                              "hp_segment_full":  "ui/hp_segment_full.png",
+                              "hp_segment_empty":  "ui/hp_segment_empty.png",
+                              "grit_full":  "ui/grit_full.png",
+                              "grit_empty":  "ui/grit_empty.png",
+                              "suit_spades":  "ui/suit_spades.png",
+                              "suit_hearts":  "ui/suit_hearts.png",
+                              "suit_diamonds":  "ui/suit_diamonds.png",
+                              "suit_clubs":  "ui/suit_clubs.png"
+                          },
+                   "relic_glyph":  {
+                                       "horseshoe":  "relics/glyph/horseshoe.png",
+                                       "card_sleeve":  "relics/glyph/card_sleeve.png",
+                                       "snake_oil":  "relics/glyph/snake_oil.png",
+                                       "tin_star":  "relics/glyph/tin_star.png",
+                                       "rabbits_foot":  "relics/glyph/rabbits_foot.png",
+                                       "bomb_squad_badge":  "relics/glyph/bomb_squad_badge.png",
+                                       "chisel":  "relics/glyph/chisel.png",
+                                       "fire_blanket":  "relics/glyph/fire_blanket.png",
+                                       "weathervane":  "relics/glyph/weathervane.png",
+                                       "magnifying_glass":  "relics/glyph/magnifying_glass.png",
+                                       "gold_tooth":  "relics/glyph/gold_tooth.png",
+                                       "mirror_shades":  "relics/glyph/mirror_shades.png",
+                                       "second_wind":  "relics/glyph/second_wind.png",
+                                       "bankroll_clip":  "relics/glyph/bankroll_clip.png",
+                                       "dowsing_rod":  "relics/glyph/dowsing_rod.png",
+                                       "saddlebags":  "relics/glyph/saddlebags.png",
+                                       "lucky_chip":  "relics/glyph/lucky_chip.png"
+                                   },
+                   "relic_framed":  {
+                                        "horseshoe":  "relics/framed/horseshoe.png",
+                                        "card_sleeve":  "relics/framed/card_sleeve.png",
+                                        "snake_oil":  "relics/framed/snake_oil.png",
+                                        "tin_star":  "relics/framed/tin_star.png",
+                                        "rabbits_foot":  "relics/framed/rabbits_foot.png",
+                                        "bomb_squad_badge":  "relics/framed/bomb_squad_badge.png",
+                                        "chisel":  "relics/framed/chisel.png",
+                                        "fire_blanket":  "relics/framed/fire_blanket.png",
+                                        "weathervane":  "relics/framed/weathervane.png",
+                                        "magnifying_glass":  "relics/framed/magnifying_glass.png",
+                                        "gold_tooth":  "relics/framed/gold_tooth.png",
+                                        "mirror_shades":  "relics/framed/mirror_shades.png",
+                                        "second_wind":  "relics/framed/second_wind.png",
+                                        "bankroll_clip":  "relics/framed/bankroll_clip.png",
+                                        "dowsing_rod":  "relics/framed/dowsing_rod.png",
+                                        "saddlebags":  "relics/framed/saddlebags.png",
+                                        "lucky_chip":  "relics/framed/lucky_chip.png"
+                                    },
+                   "relic_frame":  {
+                                       "common":  "relics/frame/common.png",
+                                       "rare":  "relics/frame/rare.png",
+                                       "legendary":  "relics/frame/legendary.png"
+                                   },
+                   "provision_glyph":  {
+                                           "canteen":  "provisions/glyph/canteen.png",
+                                           "dynamite_stick":  "provisions/glyph/dynamite_stick.png",
+                                           "barbers_razor":  "provisions/glyph/barbers_razor.png",
+                                           "pocket_flask":  "provisions/glyph/pocket_flask.png",
+                                           "fresh_deck":  "provisions/glyph/fresh_deck.png",
+                                           "gold_pan":  "provisions/glyph/gold_pan.png",
+                                           "branding_iron":  "provisions/glyph/branding_iron.png",
+                                           "rattlesnake_tonic":  "provisions/glyph/rattlesnake_tonic.png"
+                                       },
+                   "provision_framed":  {
+                                            "canteen":  "provisions/framed/canteen.png",
+                                            "dynamite_stick":  "provisions/framed/dynamite_stick.png",
+                                            "barbers_razor":  "provisions/framed/barbers_razor.png",
+                                            "pocket_flask":  "provisions/framed/pocket_flask.png",
+                                            "fresh_deck":  "provisions/framed/fresh_deck.png",
+                                            "gold_pan":  "provisions/framed/gold_pan.png",
+                                            "branding_iron":  "provisions/framed/branding_iron.png",
+                                            "rattlesnake_tonic":  "provisions/framed/rattlesnake_tonic.png"
+                                        },
+                   "provision_frame":  {
+                                           "targeted":  "provisions/frame/targeted.png",
+                                           "instant":  "provisions/frame/instant.png"
+                                       }
+               },
+    "how_to_stack":  {
+                         "note":  "Every file in cards/ is a 500x700 transparent PNG on the same canvas. Draw them at (0,0) in this order; skip any layer the card doesn\u0027t have.",
+                         "order":  [
+                                       "base (card_blank | stone | safe | cobra_tail | card_back)",
+                                       "center (pip_\u003csuit\u003e, face_\u003cJ|Q|K\u003e_\u003csuit\u003e, or face_A_\u003csuit\u003e for Aces) - omit when the card has a mod",
+                                       "mod_wash/\u003cmod\u003e (full-bleed)",
+                                       "mod_frame/\u003cmod\u003e",
+                                       "mod_emblem/\u003cmod\u003e (directional: *_arrow_up, rotate per facing)",
+                                       "rank/\u003crank\u003e_\u003cblack|red\u003e",
+                                       "suit_corner/\u003csuit\u003e",
+                                       "hazard/*",
+                                       "special/*",
+                                       "rider/*",
+                                       "bosses: boss/\u003cname\u003e_card (no title, corners clear) -\u003e rank -\u003e suit_corner -\u003e boss/boss_frame. boss/\u003cname\u003e_card_titled bakes the name in for menus/reveals and should NOT get rank/suit layers"
+                                   ],
+                         "fire_levels":  "suggested A-J:1, 10-7:2, 6-4:3, 3-2:4",
+                         "icons":  "relics/ and provisions/: glyph/, frame/, framed/. 256x256 transparent.",
+                         "mod_colors":  {
+                                            "mult":  "#8f4a34",
+                                            "chip":  "#4b6272",
+                                            "plus":  "#5e7447",
+                                            "minus":  "#83403a",
+                                            "bumper":  "#9a6b40",
+                                            "gold":  "#b38c3e",
+                                            "wild":  "#644a70",
+                                            "lucky":  "#56703f"
+                                        },
+                         "changelog":  [
+                                           "r2: clubs seam closed (pip_clubs, suit_corner/clubs, face_*_clubs, ui/suit_clubs regenerated)",
+                                           "r2: added center/face_A_\u003csuit\u003e x4",
+                                           "r2: corner suits drawn as halo pass + ink pass (no internal halo lines)",
+                                           "r2: boss/\u003cname\u003e_card no longer bakes the title (it collided with the corner index); titled copies are boss/\u003cname\u003e_card_titled"
+                                       ]
+                     }
 }
