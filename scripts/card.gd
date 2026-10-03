@@ -733,6 +733,28 @@ func _art(rect: Rect2, group: String, name: String, tint := Color.WHITE,
 		draw_texture_rect(t, rect, false, tint)
 
 
+## One kit layer drawn as a corner BADGE: the layer's canvas center
+## lands on `anchor` (normalized card coords) at `scale_f` of the
+## card size, so markers ride the free top-right / bottom-left
+## corners instead of covering the face. Rotation spins around the
+## badge center, selection lift re-applied as in _art.
+func _art_badge(rect: Rect2, group: String, name: String, anchor: Vector2,
+		scale_f: float, tint := Color.WHITE, rot := 0.0) -> void:
+	var t := CardArt.tex(group, name)
+	if t == null:
+		return
+	var sub_size := rect.size * scale_f
+	var center := rect.position + rect.size * anchor
+	if rot != 0.0:
+		var lift := Vector2(0, -8) if selected else Vector2.ZERO
+		draw_set_transform(center + lift, rot, Vector2.ONE)
+		draw_texture_rect(t, Rect2(-sub_size / 2.0, sub_size), false, tint)
+		draw_set_transform(lift, 0.0, Vector2.ONE)
+	else:
+		draw_texture_rect(t, Rect2(center - sub_size / 2.0, sub_size),
+				false, tint)
+
+
 ## Border-only selection ring for art cards (a filled stylebox would
 ## paint over the artwork).
 func _art_ring(col: Color) -> StyleBoxFlat:
@@ -778,6 +800,16 @@ func _draw_art_rank_suit(rect: Rect2) -> void:
 	var ink := "red" if suit == 1 or suit == 2 else "black"
 	_art(rect, "rank", "%s_%s" % [CardArt.rank_name(rank), ink])
 	_art(rect, "suit_corner", CardArt.suit_name(suit))
+
+
+## The Ace wears a big letter like the Jack, Queen and King — the
+## ringed ceremonial center read as a special card at a glance.
+func _draw_art_ace(rect: Rect2) -> void:
+	var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
+	var ink := Color("a73a2a") if suit == 1 or suit == 2 else Color("292117")
+	draw_string(font, Vector2(rect.position.x,
+			rect.position.y + rect.size.y * 0.5 + 24.0), "A",
+			HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 66, ink)
 
 
 ## The full kit stack for this card's state, plus the interaction
@@ -846,25 +878,36 @@ func _draw_art(rect: Rect2) -> void:
 		_draw_art_rings(rect)
 		return
 	var mod_key := "lucky" if two_plus else mod
-	if mod_key == "":
-		var center_name := ("face_%s_%s" % [CardArt.rank_name(rank),
-				CardArt.suit_name(suit)]) if rank >= 11 \
-				else "pip_" + CardArt.suit_name(suit)
-		_art(rect, "center", center_name)
-	else:
+	# Faces and Aces keep their big letter even when a mod rides the
+	# card: the wash and frame still dress it, but the emblem drops to
+	# the free bottom-left corner instead of covering the letter.
+	var lettered := rank >= 11
+	if mod_key != "":
 		_art(rect, "mod_wash", mod_key)
 		_art(rect, "mod_frame", mod_key)
-		if mod_key in ["plus", "minus", "bumper"]:
-			_art(rect, "mod_emblem", mod_key + "_arrow_up", Color.WHITE,
-					CardArt.arrow_rotation(boost_dir))
+	if mod_key == "" or lettered:
+		if rank == 14:
+			_draw_art_ace(rect)
+		elif rank >= 11:
+			_art(rect, "center", "face_%s_%s" % [CardArt.rank_name(rank),
+					CardArt.suit_name(suit)])
 		else:
-			_art(rect, "mod_emblem", mod_key)
+			_art(rect, "center", "pip_" + CardArt.suit_name(suit))
+	if mod_key != "":
+		var emb_anchor := Vector2(0.24, 0.78) if lettered else Vector2(0.5, 0.5)
+		var emb_scale := 0.52 if lettered else 1.0
+		if mod_key in ["plus", "minus", "bumper"]:
+			_art_badge(rect, "mod_emblem", mod_key + "_arrow_up", emb_anchor,
+					emb_scale, Color.WHITE, CardArt.arrow_rotation(boost_dir))
+		else:
+			_art_badge(rect, "mod_emblem", mod_key, emb_anchor, emb_scale)
 	_draw_art_rank_suit(rect)
 
 	# Hazards ride over the face; the code's motion rides over the art.
 	match hazard:
 		"fire":
-			_art(rect, "hazard", "fire_%d" % CardArt.fire_level(rank))
+			# No still art here — the painted flames fought the live
+			# ones; the fire is all motion now.
 			_draw_fire(rect)
 		"water":
 			_art(rect, "hazard", "water_%d" % clampi(water_level, 1, 4))
@@ -875,16 +918,25 @@ func _draw_art(rect: Rect2) -> void:
 				_art(rect, "hazard", "wind_arrow_up", Color.WHITE,
 						CardArt.arrow_rotation(wind_dir))
 		"bomb":
+			# The dynamite rides the free top-right corner — center
+			# stage belongs to the card's own face.
 			var alert := 0.55 + 0.45 * sin(_t * 6.0 + _phase)
-			_art(rect, "hazard", "bomb")
+			var bomb_at := Vector2(0.76, 0.21)
+			_art_badge(rect, "hazard", "bomb", bomb_at, 0.55)
+			# The alert ring stays card-sized — a whole-card pulse
+			# reads from across the board.
 			_art(rect, "hazard", "bomb_alert_ring", Color(1, 1, 1, alert))
-			_art(rect, "hazard", "bomb_fuse_badge_%d" % fuse
-					if fuse >= 1 and fuse <= 5 else "bomb_fuse_badge_blank")
+			_art_badge(rect, "hazard", "bomb_fuse_badge_%d" % fuse
+					if fuse >= 1 and fuse <= 5 else "bomb_fuse_badge_blank",
+					bomb_at, 0.55)
 
 	# The in-the-path tells for the NEXT victim.
 	match incoming:
 		"fire":
-			_art(rect, "hazard", "fire_telegraph_sparks")
+			# Small live flames licking the bottom edge — the still
+			# spark art never read as motion.
+			_draw_flame_layer(rect, 11.0, 5, 6.0, Color(0.9, 0.46, 0.16, 0.6))
+			_draw_flame_layer(rect, 6.5, 6, 7.6, Color(1.0, 0.85, 0.5, 0.65))
 		"water":
 			_art(rect, "hazard", "water_telegraph_seep")
 		"wind":
@@ -1088,18 +1140,69 @@ func _draw_pixel_map(map: Array, center: Vector2, px: float, col: Color) -> void
 
 ## The card is ablaze, and the fire GROWS as the rank burns down: on
 ## an Ace the tongues barely clear the bottom edge; by rank 2 the card
-## is all but consumed. Three layers — deep red at the back, orange,
-## then a bright core — translucent so the rank survives.
+## is all but consumed. All live paint, no still art: a pulsing heat
+## glow, three smooth flame bodies back-to-front (ember red, orange,
+## bright core), and embers breaking off the tips.
 func _draw_fire(rect: Rect2) -> void:
 	var burn := clampf(1.0 - (float(rank) - 2.0) / 12.0, 0.0, 1.0)
-	var flicker := 0.05 * sin(_t * 9.0 + _phase)
-	draw_rect(rect.grow(-2), Color(0.95, 0.45, 0.1, 0.08 + 0.14 * burn + flicker))
-	_draw_flame_layer(rect, rect.size.y * lerpf(0.26, 1.0, burn), 4, 5.1,
-			Color(0.72, 0.16, 0.05, 0.75))
-	_draw_flame_layer(rect, rect.size.y * lerpf(0.17, 0.74, burn), 5, 6.3,
-			Color(0.9, 0.46, 0.16, 0.8))
-	_draw_flame_layer(rect, rect.size.y * lerpf(0.10, 0.46, burn), 6, 7.9,
-			Color(1.0, 0.85, 0.5, 0.8))
+	var flicker := 0.04 * sin(_t * 9.0 + _phase)
+	var glow := rect.grow(-2)
+	draw_rect(glow, Color(0.95, 0.45, 0.1, 0.05 + 0.09 * burn + flicker))
+	# The heat pools low on the card.
+	draw_rect(Rect2(glow.position + Vector2(0, glow.size.y * 0.58),
+			Vector2(glow.size.x, glow.size.y * 0.42)),
+			Color(1.0, 0.55, 0.15, 0.08 + 0.12 * burn + flicker))
+	_draw_flame_body(rect, rect.size.y * lerpf(0.30, 1.02, burn), 0.0,
+			0.9, Color(0.62, 0.13, 0.05, 0.82))
+	_draw_flame_body(rect, rect.size.y * lerpf(0.20, 0.78, burn), 2.6,
+			1.25, Color(0.93, 0.44, 0.12, 0.85))
+	_draw_flame_body(rect, rect.size.y * lerpf(0.12, 0.50, burn), 5.2,
+			1.7, Color(1.0, 0.86, 0.46, 0.85))
+	_draw_embers(rect, burn)
+
+
+## One smooth flame body rising from the bottom edge. Two drifting
+## waves multiplied (plus a fast shimmer) make tongues that split,
+## merge and lick upward instead of marching in step; the power curve
+## sharpens the peaks while the valleys stay low and round.
+func _draw_flame_body(rect: Rect2, max_h: float, seed_off: float,
+		speed_mul: float, col: Color) -> void:
+	var left := rect.position.x + 2.0
+	var width := rect.size.x - 4.0
+	var floor_y := rect.end.y - 2.0
+	var pts := PackedVector2Array()
+	pts.append(Vector2(left, floor_y))
+	var n := 22
+	for i in n + 1:
+		var u := float(i) / n
+		var a := 0.5 + 0.5 * sin(u * 9.4 + _t * 4.2 * speed_mul + _phase + seed_off)
+		var b := 0.5 + 0.5 * sin(u * 15.7 - _t * 6.1 * speed_mul
+				+ _phase * 1.7 + seed_off * 2.3)
+		var c := 0.5 + 0.5 * sin(u * 23.0 + _t * 9.5 * speed_mul + seed_off * 3.1)
+		var h := max_h * (0.16 + 0.84 * pow(0.30 + 0.56 * a * b + 0.14 * c, 1.6))
+		# The blaze roots a little lower at the card's edges.
+		h *= 0.72 + 0.28 * sin(u * PI)
+		pts.append(Vector2(left + width * u, floor_y - h))
+	pts.append(Vector2(left + width, floor_y))
+	draw_colored_polygon(pts, col)
+
+
+## Sparks lifting off the fire: born at the flame line, swaying as
+## they rise, winking out near the top of their arc.
+func _draw_embers(rect: Rect2, burn: float) -> void:
+	var count := 3 + int(burn * 3.0)
+	var flame_top := rect.end.y - 4.0 - rect.size.y * lerpf(0.10, 0.55, burn)
+	for k in count:
+		var cycle := fposmod(_t * (0.55 + 0.17 * k) + k * 0.37 + _phase, 1.0)
+		var u := fposmod(0.13 + 0.31 * k + 0.05 * sin(_t + k), 1.0)
+		var x := rect.position.x + 4.0 + (rect.size.x - 8.0) * u \
+				+ 5.0 * sin(cycle * 7.0 + k * 2.0)
+		var y := lerpf(rect.end.y - 8.0, flame_top - 26.0, cycle)
+		var fade := (1.0 - cycle) * (0.55 + 0.45 * sin(_t * 11.0 + k * 3.0))
+		if fade <= 0.05:
+			continue
+		draw_circle(Vector2(x, maxf(y, rect.position.y + 4.0)),
+				1.6 + 0.8 * (1.0 - cycle), Color(1.0, 0.72, 0.3, 0.75 * fade))
 
 
 ## One strip of flame tongues along the bottom edge; peaks breathe
