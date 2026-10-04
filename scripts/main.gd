@@ -85,6 +85,8 @@ var community_display: Node2D
 var _community_label: Label
 var outlaw: OutlawPortrait
 var _bounty_plaque: Control        # the WANTED strip over the banner area
+var _hp_label: Label               # the rider's HP pips, trail only
+var _hp_pips: Array = []
 var _plaque_line: Label
 var _plaque_reward: Label
 var _plaque_portrait: Control      # rebuilt whenever the head changes
@@ -241,6 +243,11 @@ func _ready() -> void:
 			"trailselect":
 				menu_layer.visible = false
 				trail.open_select()
+			"trailcamp":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail.hp = 6
+				trail._choose_offer({"kind": "camp", "tarot": "THE CAMPFIRE"}, false)
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -456,6 +463,15 @@ func _update_labels() -> void:
 	target_label.visible = show_arcade or show_trail
 	target_bar_back.visible = show_arcade or show_trail
 	target_bar_fill.visible = show_arcade or show_trail
+	# The rider's HP pips ride the left column through the whole trail.
+	var show_hp := mode_kind == "trail" and game_started and not menu_open
+	_hp_label.visible = show_hp
+	for i in _hp_pips.size():
+		var pip: Panel = _hp_pips[i]
+		pip.visible = show_hp
+		if show_hp:
+			pip.add_theme_stylebox_override("panel",
+					UiKit.bar_box("red") if i < trail.hp else UiKit.bar_box("track"))
 	# Every table resets the banner strip; the bounty branch below
 	# claims it back with the WANTED plaque and a dropped bar.
 	_bounty_plaque.visible = false
@@ -540,14 +556,12 @@ func _update_labels() -> void:
 			if trail.room_outlaws.size() > 1:
 				posse_note = "  (%d OF %d)" % [trail.room_outlaw_idx + 1,
 						trail.room_outlaws.size()]
-			target_label.text = "TABLE %d / %d      BOUNTY: %s%s  ·  GRIT %d  ·  SCORE %d+" % \
+			target_label.text = "TABLE %d / %d      BOUNTY: %s%s  ·  SCORE %d+" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
-					trail.current_outlaw_name(), posse_note,
-					trail.room_grit, trail._outlaw_bar()]
+					trail.current_outlaw_name(), posse_note, trail._outlaw_bar()]
 			_style_boss_bar(trail.room_outlaw_hp, trail.room_outlaw_max)
 			outlaw.kind = "outlaw"
 			outlaw.spec = trail.current_outlaw_spec()
-			outlaw.grit = trail.room_grit
 			_update_bounty_plaque(posse_note)
 		elif trail.room_goal == "purge":
 			var quota := trail.purge_quota()
@@ -1551,7 +1565,9 @@ const TUTOR := {
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
 	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house at a FACE-DOWN table, corners showing. Start a chain from a face-up card, then HIT one card at a time: each face-down card you select flips ON THE SPOT and its pips join your sum (faces 10, aces 11 or 1). Hits are binding — no clearing, no take-backs — and if a flip carries you past 21 you BUST right there. PLAY HAND to stand: the dealer flips his hole card and draws to beat you or bust. Every hand turns another random card face-up. Win enough rounds to clear."],
-	"goal_outlaw": ["THE BOUNTY", "A wanted gun holds this table. Clear YOUR bullets (gold) in scoring hands to shoot. HIS bullets (red) are waiting slugs: clear a card carrying one and he SHOOTS you for it — build your hands AROUND them. Weak hands under the posted score give him a free shot too. Some bounties ride with a gang: drop one and the next steps up fresh. Run out of GRIT and the bounty stands."],
+	"goal_outlaw": ["THE BOUNTY", "A wanted gun holds this table. Clear YOUR bullets (gold) in scoring hands to shoot. HIS bullets (red) are waiting slugs: clear a card carrying one and he SHOOTS you for it — build your hands AROUND them. Weak hands under the posted score give him a free shot too. Some bounties ride with a gang: drop one and the next steps up fresh. Every shot he lands costs HP — run dry and the ride is over."],
+	"campfire": ["THE CAMPFIRE", "A rest stop on the trail — pick ONE comfort. REST sleeps off the road and recovers HP. TEND A CARD brands a plain deck card with a random enhancement. CAST ONE OFF burns a card from the deck for good. Then the fire dies down and the trail calls."],
+	"hp": ["YOUR HIDE", "The trail hurts now: a flame card burning all the way down sears you, dynamite going off blasts you, every outlaw bullet costs you, and losing a table leaves a mark. The red pips under your score are all that stands between you and a shallow grave — campfires along the trail patch you up."],
 	"goal_collect": ["THE ROUNDUP", "The table calls for particular cardboard: a count of one SUIT, a stack of one RANK, or cards of many DIFFERENT ranks. Only cards actually cleared in scoring hands count — the banner tracks the tally."],
 	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot: clear a card from each of the 25 cells. A claimed plot wears a gold ring — fill the whole homestead to take the table."],
 	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand to claim it. The chest cracks open once you CLEAR THE TABLE — coin, a card of your choosing, or even a charm. Purely optional — the room's real goal still rules."],
@@ -1970,9 +1986,21 @@ func _build_ui() -> void:
 	UiKit.hrule(hud_root, Vector2(PANEL_X, 96), 300)
 
 	score_label = _label(hud_root, "", Vector2(PANEL_X, 140), 40, GOLD)
-	status_label = _label(hud_root, "", Vector2(PANEL_X, 204), 28, OFFWHITE)
-	deck_label = _label(hud_root, "", Vector2(PANEL_X, 246), 20, OFFWHITE)
-	meta_label = _label(hud_root, "", Vector2(PANEL_X, 276), 16, DIM)
+	# The rider's HP, trail only: red segment pills, the same language
+	# as the boss bar.
+	_hp_label = _label(hud_root, "HP", Vector2(PANEL_X, 193), 15, DIM)
+	_hp_label.visible = false
+	for i in 10:
+		var pip := Panel.new()
+		pip.position = Vector2(PANEL_X + 38 + i * 26.0, 196)
+		pip.size = Vector2(22, 12)
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pip.visible = false
+		hud_root.add_child(pip)
+		_hp_pips.append(pip)
+	status_label = _label(hud_root, "", Vector2(PANEL_X, 216), 28, OFFWHITE)
+	deck_label = _label(hud_root, "", Vector2(PANEL_X, 252), 20, OFFWHITE)
+	meta_label = _label(hud_root, "", Vector2(PANEL_X, 282), 16, DIM)
 
 	# Arcade banner: level target and progress, big across the board top.
 	target_label = _label(hud_root, "", Vector2(380, 8), 40, GOLD)

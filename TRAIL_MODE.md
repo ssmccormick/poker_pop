@@ -651,3 +651,26 @@ Kit art: assets/art/playable (select cards + HUD portraits).
 Mobile/tablet layout kit delivered alongside and TABLED for later —
 lives in Downloads\PokerPop_Mobile_Layouts (spec JSON + mocks), not
 yet in the project.
+
+## Rider HP and campfires (Oct 2026)
+
+The rider carries 10 HP for the whole run (red segment pips under
+SCORE, same visual language as the boss bar; saved with the run).
+GRIT is retired. What hurts:
+
+- A flame card burning ALL THE WAY DOWN: 1 HP per burnt-out card.
+- Dynamite detonating: 2 HP per bomb - and the blast is no longer a
+  table loss: the bomb takes itself off the board and play goes on.
+- Outlaw lead: every bullet caught or weak-hand free shot, 1 HP.
+- Losing a table: 2 HP on top of the stake and the curse (Second
+  Wind spares both on its one forgiveness).
+
+Zero HP = LAID LOW: the run ends on the spot, save cleared, the
+house keeps the chips. The Doctor's pocket watch snapshots HP with
+the hand, so a rewound hand gives the blood back.
+
+THE CAMPFIRE: a rest stop once per region (room 4, between the two
+shops), offered on the tarot wall as a poster with a code-drawn
+fire. One comfort per stop: REST (+5 HP), TEND A CARD (a plain deck
+card takes a random enhancement), or CAST ONE OFF (burn any deck
+card, free). Then the trail calls.

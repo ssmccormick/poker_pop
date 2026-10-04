@@ -1717,6 +1717,11 @@ const UNDO_CARD_PROPS := ["rank", "suit", "mod", "boom", "two_plus",
 var undo_enabled := false  # trail arms it when the Doctor sits down
 var undo_state := {}
 
+# What the last hazard tick cost the table — trail turns these into
+# rider HP damage (burnt-out flames sear, dynamite blasts).
+var last_tick_burned := 0
+var last_tick_detonated := 0
+
 
 func has_undo() -> bool:
 	return not undo_state.is_empty()
@@ -2432,11 +2437,13 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		if grid[p].rank < 2:
 			burned.append(p)
 	var exploded := false
+	var detonated: Array = []
 	for p in grid:
 		if grid[p].hazard == "bomb" and not grid[p].hazard_fresh:
 			grid[p].fuse -= 1
 			if grid[p].fuse <= 0:
 				exploded = true
+				detonated.append(p)
 	# WIND strips the table every round: each standing wind card blows
 	# the first card in its facing direction clean off the board,
 	# unscored — its direction just turned a quarter above. Safes,
@@ -2462,7 +2469,8 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		grid[p].hazard_fresh = false
 	_aim_spreaders()
 	return {"burned": burned, "ignited": ignited, "exploded": exploded,
-			"soaked": soaked, "flooded": flooded, "blown": wind_blown}
+			"detonated": detonated, "soaked": soaked, "flooded": flooded,
+			"blown": wind_blown}
 
 
 ## Hazards on the table from the deal fight from hand one — only
@@ -2527,6 +2535,8 @@ func _aim_spreaders() -> void:
 ## Runs the per-hand hazard tick with animations: called by trail after
 ## a scoring hand fully resolves. Returns true if a bomb detonated.
 func tick_hazards(tick_fire := true) -> bool:
+	last_tick_burned = 0
+	last_tick_detonated = 0
 	var any := false
 	for p in grid:
 		var hz: String = grid[p].hazard
@@ -2555,20 +2565,26 @@ func tick_hazards(tick_fire := true) -> bool:
 			_fx(cell_center(cell), "embers")
 	for cell in res.burned:
 		_fx(cell_center(cell), "embers")
+	var detonated: Array = res.get("detonated", [])
 	if res.exploded:
+		# A detonation is a blast, not a loss: the bomb takes itself
+		# (and the rider's HP, which trail collects) and play goes on.
 		_play_sound(SFX_DYNAMITES.pick_random(), 1.0, -3.0)
 		shake_requested.emit(11.0)
-		for p in grid:
-			if grid[p].hazard == "bomb" and grid[p].fuse <= 0:
-				_fx(cell_center(p), "smoke")
+		for cell: Vector2i in detonated:
+			_fx(cell_center(cell), "smoke")
+			_fx(cell_center(cell), "sparks")
 	var burned: Array = res.burned
+	last_tick_burned = burned.size()
+	last_tick_detonated = detonated.size()
+	var gone: Array = burned + detonated
 	var blown: Array = res.get("blown", [])
-	if not burned.is_empty() or not blown.is_empty():
+	if not gone.is_empty() or not blown.is_empty():
 		var btw := create_tween().set_parallel(true)
 		var goners: Array = []
-		if not burned.is_empty():
+		if not gone.is_empty():
 			_play_sound(SFX_POPS.pick_random(), 0.75, -6.0)
-			for cell: Vector2i in burned:
+			for cell: Vector2i in gone:
 				var card: PlayingCard = grid[cell]
 				grid.erase(cell)
 				goners.append(card)

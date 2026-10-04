@@ -224,8 +224,7 @@ var room_outlaw_hp := 5          # bounty: the current outlaw's health...
 var room_outlaw_max := 5
 var room_outlaws: Array = []     # the posse, leader first (character specs)
 var room_outlaw_idx := 0
-var room_grit := 3               # ...and yours
-const OUTLAW_GRIT := 3
+# (Grit retired: outlaw lead now hits the rider's run-wide HP.)
 const OUTLAW_BAR_BASE := 75      # score under this and he fires (+ per region)
 var relics: Array = []   # relic ids held this run
 var provisions: Array = []       # provision ids in the kit (max 3, dupes fine)
@@ -245,6 +244,12 @@ const CHARACTERS := {
 }
 const LASER_DIRS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 var character := "the_gambler"   # the rider this run
+# The rider's HITPOINTS, run-wide: burnt-out flames, dynamite, outlaw
+# lead and lost tables all take their pound of flesh; campfires give
+# some back. Zero and the trail claims the rider.
+const MAX_HP := 10
+const CAMP_REST_HP := 5
+var hp := MAX_HP
 var laser_used := false          # one shot per table (the Machine)
 var _aiming_laser := false
 var watch_uses_left := 1         # turns left this table (the Doctor)
@@ -288,6 +293,10 @@ var _buyin_tier_btns: Array = []
 var upgrades_layer: ColorRect    # the OUTFITTER: meta upgrades for $cash
 var select_layer: ColorRect      # pick your rider before the buy-in
 var _select_cards := {}          # id -> TextureRect (full card art)
+var camp_layer: ColorRect        # the campfire: rest, tend, or cast off
+var _camp_hp_label: Label
+var _camp_rest_btn: Button
+var _camp_mode := ""             # "" | "tend" | "burn" — deck view purpose
 var _up_cash: Label
 var _up_rows: Array = []         # [{id, status: Label, btn: Button}]
 var _sleeve_pc: PlayingCard      # the sleeve on show beside its row
@@ -409,6 +418,7 @@ func _save_run() -> void:
 	cf.set_value("run", "provisions", prov_arr)
 	cf.set_value("run", "sleeve", sleeve_card)
 	cf.set_value("run", "character", character)
+	cf.set_value("run", "hp", hp)
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
@@ -456,6 +466,7 @@ func _load_run() -> bool:
 	character = String(cf.get_value("run", "character", "the_gambler"))
 	if not CHARACTERS.has(character):
 		character = "the_gambler"
+	hp = clampi(int(cf.get_value("run", "hp", MAX_HP)), 1, MAX_HP)
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
@@ -688,7 +699,7 @@ func use_watch() -> void:
 	room_score = int(_watch_snapshot.room_score)
 	room_hands_left = int(_watch_snapshot.room_hands_left)
 	room_wins = int(_watch_snapshot.room_wins)
-	room_grit = int(_watch_snapshot.room_grit)
+	hp = int(_watch_snapshot.hp)
 	room_outlaw_hp = int(_watch_snapshot.room_outlaw_hp)
 	room_outlaw_idx = int(_watch_snapshot.room_outlaw_idx)
 	room_stones_broken = int(_watch_snapshot.room_stones_broken)
@@ -716,7 +727,7 @@ func _on_hand_committing() -> void:
 		return
 	_watch_snapshot = {
 		"room_score": room_score, "room_hands_left": room_hands_left,
-		"room_wins": room_wins, "room_grit": room_grit,
+		"room_wins": room_wins, "hp": hp,
 		"room_outlaw_hp": room_outlaw_hp, "room_outlaw_idx": room_outlaw_idx,
 		"room_stones_broken": room_stones_broken,
 		"room_chests_opened": room_chests_opened,
@@ -729,6 +740,31 @@ func _on_hand_committing() -> void:
 
 func character_name() -> String:
 	return String(CHARACTERS.get(character, {}).get("name", "The Gambler"))
+
+
+## The trail hurts: burnt-out flames, dynamite, outlaw lead, lost
+## tables. Returns false when the damage ends the run — callers must
+## stop what they were doing.
+func take_damage(amount: int, why := "") -> bool:
+	if amount <= 0 or not run_active:
+		return true
+	hp = maxi(0, hp - amount)
+	main.flash_red()
+	main.board._play_sound(Board.SFX_POPS.pick_random(), 0.42, -4.0)
+	if hp > 0:
+		if why != "":
+			main._announce("%s — HP %d" % [why, hp], main.RED)
+		_save_run()
+		return true
+	# The trail claims the rider.
+	in_room = false
+	main.board.locked = true
+	main.stat_bump("trail_deaths")
+	_clear_run_save()
+	_end_run("LAID LOW",
+			"%s\nThe trail took its last pound of flesh.\n%s won't finish this ride." \
+			% [why if why != "" else "The last blow landed.", character_name()], 0)
+	return false
 
 
 # --- Provisions -----------------------------------------------------------
@@ -1194,6 +1230,7 @@ func _start_run(tier: int) -> void:
 	sleeve_card = _fresh_sleeve()
 	sleeve_used = false
 	_aiming_sleeve = false
+	hp = MAX_HP
 	burns_used = 0
 	_second_wind_used = false
 	_fire_tick_flip = false
@@ -1265,13 +1302,17 @@ func _make_offers() -> Array:
 			"boss": kind,
 		}]
 	var offers: Array = []
-	# Shops appear twice per 7-room region.
+	# Shops appear twice per 7-room region; a campfire glows once,
+	# between them.
 	var want_shop := room_index % REGION_SIZE in [2, 5]
+	var want_camp := room_index % REGION_SIZE == 3
 	var risk_pool := RISKS.duplicate()
 	risk_pool.shuffle()
 	for i in 3:
 		if want_shop and i == 1:
 			offers.append(_make_shop_offer())
+		elif want_camp and i == 1:
+			offers.append({"kind": "camp", "tarot": "THE CAMPFIRE"})
 		else:
 			offers.append(_make_one_offer(false, risk_pool[i % risk_pool.size()]))
 	return offers
@@ -1525,6 +1566,15 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		else:
 			_tarot_face(b, String(m.name), "Safe haven", String(m.line),
 					"%s\nNo bet — browse free" % "  ·  ".join(wares))
+	elif offer.kind == "camp":
+		if _apply_camp_poster(b):
+			_poster_face(b, "CAMPFIRE", "rest stop",
+					"Rest your bones, tend a card, or cast one to the flames",
+					"No bet — one comfort\nHP %d / %d" % [hp, MAX_HP])
+		else:
+			_tarot_face(b, "THE CAMPFIRE", "Rest stop",
+					"Rest, tend a card, or cast one to the flames",
+					"No bet — one comfort\nHP %d / %d" % [hp, MAX_HP])
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
@@ -1580,6 +1630,40 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line],
 					offer.has("boss"))
 	return b
+
+
+## The campfire's poster: parchment and steady ribbon from the kit,
+## with a code-drawn fire in the emblem well (no painted emblem for
+## it yet). False when the poster kit is absent.
+func _apply_camp_poster(b: Button) -> bool:
+	var tier := _apply_poster(b, "", "steady")
+	if tier == "":
+		return false
+	# Logs crossed under three licks of flame, at the emblem circle.
+	var cx := 150.0
+	var cy := 232.0
+	for ang in [-0.5, 0.5]:
+		var log := ColorRect.new()
+		log.color = Color("4a3020")
+		log.size = Vector2(66, 9)
+		log.position = Vector2(cx - 33, cy + 26)
+		log.pivot_offset = Vector2(33, 4.5)
+		log.rotation = ang
+		log.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(log)
+	var flames := [[26.0, 44.0, Color("b8402c")], [18.0, 32.0, Color("e8862c")],
+			[10.0, 20.0, Color("f0c060")]]
+	for f in flames:
+		var w: float = f[0]
+		var h: float = f[1]
+		var poly := Polygon2D.new()
+		poly.polygon = PackedVector2Array([
+			Vector2(cx - w, cy + 26), Vector2(cx - w * 0.4, cy + 4 - h * 0.4),
+			Vector2(cx, cy + 26 - h), Vector2(cx + w * 0.5, cy + 8 - h * 0.3),
+			Vector2(cx + w, cy + 26)])
+		poly.color = f[2]
+		b.add_child(poly)
+	return true
 
 
 ## The BOUNTY offer is a real wanted poster: the leader's composed
@@ -1695,8 +1779,13 @@ func _apply_poster(b: Button, job: String, tier_override := "") -> String:
 			else String(_poster_index.get("job_tier", {}).get(job, "risky"))
 	var files: Array = [
 		String(layers.get("base", {}).get("poster", "")),
-		String(layers.get("tier", {}).get(tier, "")),
-		String(layers.get("emblem", {}).get(job, ""))]
+		String(layers.get("tier", {}).get(tier, ""))]
+	# Jobs without a painted emblem (the campfire) draw their own.
+	var emblem := String(layers.get("emblem", {}).get(job, ""))
+	if emblem != "":
+		files.append(emblem)
+	elif job != "":
+		return ""
 	var texes: Array = []
 	for f in files:
 		var p: String = "res://assets/art/r2/" + String(f)
@@ -1824,6 +1913,8 @@ func _choose_offer_now(offer: Dictionary, from_fate: bool) -> void:
 	tarot_layer.visible = false
 	if offer.kind == "shop":
 		_show_shop()
+	elif offer.kind == "camp":
+		_show_camp()
 	elif offer.has("boss"):
 		# The house demands everything at a boss table.
 		main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 0.9, -6.0)
@@ -1953,6 +2044,7 @@ func _start_room() -> void:
 	main.board.undo_enabled = character == "the_doctor"
 	_chest_rewards.clear()  # unopened luck doesn't carry between tables
 	_chest_won_cards.clear()
+	main.tutor_show("hp")
 	match character:
 		"the_machine":
 			main.tutor_show("laser")
@@ -1987,7 +2079,6 @@ func _start_room() -> void:
 	room_wins = 0
 	room_outlaw_hp = int(current_offer.get("outlaw_hp", 5))
 	room_outlaw_max = room_outlaw_hp
-	room_grit = OUTLAW_GRIT
 	# The posse is on the books before the first card lands, so the
 	# HUD names the right head from frame one.
 	room_outlaws = current_offer.get("outlaws", [])
@@ -2260,16 +2351,14 @@ func on_hand_played(result: Dictionary) -> void:
 		if result.score < _outlaw_bar():
 			caught += 1
 		if caught > 0:
-			room_grit -= caught
+			# No more grit: outlaw lead comes straight out of the
+			# rider's HP.
 			main.outlaw.shoot()
-			main.flash_red()
 			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 0.8, -5.0)
-			if room_grit <= 0:
-				_room_failed("GUNNED DOWN — THE BOUNTY STOOD")
+			if not take_damage(caught,
+					"YOU CAUGHT HIS BULLET" if int(result.get("bullets_his", 0)) > 0
+					else "%s FIRES" % current_outlaw_name()):
 				return
-			_announce_after_settle("YOU CAUGHT HIS BULLET — GRIT %d" % room_grit
-					if int(result.get("bullets_his", 0)) > 0
-					else "%s FIRES — GRIT %d" % [current_outlaw_name(), room_grit])
 		_replenish_bullets()
 	if room_goal == "purge":
 		# Quota met AND the table clean — a wildfire can overshoot its
@@ -2781,9 +2870,19 @@ func _tick_room_hazards() -> void:
 	if has_relic("fire_blanket"):
 		_fire_tick_flip = not _fire_tick_flip
 		tick_fire = _fire_tick_flip
-	var exploded: bool = await main.board.tick_hazards(tick_fire)
-	if exploded and in_room:
-		_room_failed("KABOOM — THE BOMB WENT OFF")
+	await main.board.tick_hazards(tick_fire)
+	if not in_room:
+		return
+	# The trail hurts now: flames that burn a card all the way down
+	# sear the rider, and dynamite going off is worse — but neither
+	# ends the table on its own anymore.
+	var burns: int = main.board.last_tick_burned
+	var blasts: int = main.board.last_tick_detonated
+	if burns > 0 and not take_damage(burns,
+			"THE FIRE BURNS DOWN TO YOU" if burns == 1
+			else "%d FIRES BURN DOWN TO YOU" % burns):
+		return
+	if blasts > 0 and not take_damage(2 * blasts, "CAUGHT IN THE BLAST"):
 		return
 	if in_room and main.board.board_ablaze():
 		# Every card burning: nothing left to save.
@@ -2917,6 +3016,9 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	else:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 		main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
+		# Losing a table leaves a mark on the rider too.
+		if not take_damage(2):
+			return
 	main._announce(reason, main.RED)
 	_after_board_settles(_retry_room)
 
@@ -3472,6 +3574,77 @@ func _leave_shop() -> void:
 		_show_tarot()
 
 
+# --- The campfire: one comfort before the trail calls again ---------------
+
+func _show_camp() -> void:
+	_hide_all()
+	_camp_mode = ""
+	main.tutor_show("campfire")
+	_camp_hp_label.text = "HP  %d / %d" % [hp, MAX_HP]
+	_camp_rest_btn.disabled = hp >= MAX_HP
+	main.board._play_sound(Board.SFX_MATCHES.pick_random(), 0.8, -10.0)
+	camp_layer.visible = true
+
+
+## One comfort taken — the fire dies down and the trail calls.
+func _leave_camp() -> void:
+	main.board._play_sound(Board.SFX_MATCHES.pick_random(), 0.6, -12.0)
+	room_index += 1
+	if room_index >= ROOMS_TOTAL:
+		_trail_complete()
+	else:
+		_save_run()
+		_show_tarot()
+
+
+func _camp_rest() -> void:
+	hp = mini(MAX_HP, hp + CAMP_REST_HP)
+	main.stat_bump("campfire_rests")
+	main._announce("RESTED BY THE FIRE — HP %d" % hp)
+	_save_run()
+	_leave_camp()
+
+
+## TEND or CAST OFF both ride the deck viewer, in a campfire mode.
+func _camp_open_deck(mode: String) -> void:
+	camp_layer.visible = false
+	_camp_mode = mode
+	_deck_view_burn = false
+	_remove_info.text = "Pick a plain card — the fire brands it with a random enhancement." \
+			if mode == "tend" else "Pick a card to cast into the flames — gone for good."
+	_remove_info.add_theme_color_override("font_color", main.OFFWHITE)
+	_populate_deck_view()
+
+
+func _camp_pick(idx: int) -> void:
+	if idx >= deck.size():
+		return
+	var d: Dictionary = deck[idx]
+	if _camp_mode == "tend":
+		if d.get("cursed", false):
+			_remove_info.text = "THE FIRE WON'T TAKE A CURSE — cast it off instead."
+			_remove_info.add_theme_color_override("font_color", main.RED)
+			return
+		if String(d.get("mod", "")) != "" or d.get("boom", false):
+			_remove_info.text = "ALREADY ENHANCED — pick an honest card."
+			_remove_info.add_theme_color_override("font_color", main.RED)
+			return
+		var mod := _random_mod()
+		d["mod"] = mod
+		main.stat_bump("campfire_tends")
+		main._announce("TENDED BY FIRELIGHT — %s" % mod.to_upper())
+		main.board._play_sound(Board.SFX_MATCHES.pick_random(), 1.1, -6.0)
+	else:
+		deck.remove_at(idx)
+		main.stat_bump("campfire_burns")
+		main._announce("CAST INTO THE FLAMES")
+		main.board._play_sound(Board.SFX_MATCHES.pick_random(), 0.9, -6.0)
+	_camp_mode = ""
+	remove_layer.visible = false
+	_save_run()
+	_leave_camp()
+
+
 func _show_remove() -> void:
 	shop_layer.visible = false
 	_deck_view_burn = true
@@ -3528,6 +3701,9 @@ func _populate_deck_view() -> void:
 		holder.mouse_exited.connect(func() -> void:
 			_deck_tip.visible = false)
 		holder.pressed.connect(func() -> void:
+			if _camp_mode != "":
+				_camp_pick(idx)
+				return
 			if not _deck_view_burn or _shop_burned_here:
 				return
 			if chips < _burn_price():
@@ -3702,6 +3878,44 @@ func build_ui() -> void:
 	upgrades_layer.add_child(_sleeve_pc)
 	_back_button(upgrades_layer, back_to_menu, "MENU")
 
+	# THE CAMPFIRE — one comfort per stop: rest, tend, or cast off.
+	camp_layer = _layer()
+	_screen_title(camp_layer, "THE CAMPFIRE")
+	_center(camp_layer, "The fire crackles low. One comfort before the trail calls again.", 200, 22, main.DIM)
+	_camp_hp_label = _center(camp_layer, "", 246, 30, main.GOLD)
+	var camp_opts := [
+		["REST", "Sleep off the road.\nRecover %d HP." % CAMP_REST_HP],
+		["TEND A CARD", "Hold a plain card to the light —\nit takes a random enhancement."],
+		["CAST ONE OFF", "Feed a card to the flames.\nGone from the deck for good."],
+	]
+	for i in camp_opts.size():
+		var opt: Array = camp_opts[i]
+		var cb: Button = main._button(camp_layer, "",
+				Vector2(340.0 + i * 430.0, 360), Vector2(380, 240))
+		var head: Label = main._label(camp_layer, String(opt[0]),
+				Vector2(340.0 + i * 430.0, 392), 30, main.GOLD)
+		head.size = Vector2(380, 40)
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var body := _wrap_label(camp_layer, String(opt[1]),
+				Rect2(370.0 + i * 430.0, 452, 320, 110), 18, main.OFFWHITE)
+		body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		match i:
+			0:
+				_camp_rest_btn = cb
+				cb.pressed.connect(_camp_rest)
+			1:
+				cb.pressed.connect(func() -> void:
+					_camp_open_deck("tend"))
+			2:
+				cb.pressed.connect(func() -> void:
+					_camp_open_deck("burn"))
+	var camp_leave: Button = main._button(camp_layer, "BACK ON THE TRAIL",
+			Vector2(760, 740), Vector2(400, 60))
+	camp_leave.add_theme_font_size_override("font_size", 20)
+	camp_leave.pressed.connect(_leave_camp)
+
 	tarot_layer = _layer()
 	_screen_title(tarot_layer, "FATE DEALS")
 	_tarot_info = _center(tarot_layer, "", 230, 24, main.OFFWHITE)
@@ -3843,7 +4057,10 @@ func build_ui() -> void:
 	_deck_tip_label = _deck_tip.get_child(0) as Label
 	var remove_back := func() -> void:
 		remove_layer.visible = false
-		if _deck_view_burn:
+		if _camp_mode != "":
+			_camp_mode = ""
+			_show_camp()
+		elif _deck_view_burn:
 			_show_shop()
 		else:
 			_show_tarot()
@@ -3873,7 +4090,8 @@ func _layer() -> ColorRect:
 
 func _hide_all() -> void:
 	for l in [select_layer, buyin_layer, upgrades_layer, tarot_layer, bet_layer,
-			pick_layer, shop_layer, remove_layer, relic_layer, end_layer]:
+			pick_layer, shop_layer, camp_layer, remove_layer, relic_layer,
+			end_layer]:
 		if l:
 			l.visible = false
 
