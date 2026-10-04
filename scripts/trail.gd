@@ -233,7 +233,24 @@ var _aiming_slot := -1           # kit slot waiting on a target, -1 = none
 # ACE UP THE SLEEVE: the hidden card you can trade onto the table once
 # per room — the card you take waits up the sleeve for another table.
 var sleeve_card := {}            # {rank, suit, mod, boom, two_plus}
-var sleeve_used := false         # one swap per table
+var sleeve_used := false         # one swap per table (the Gambler)
+# --- Playable characters: three riders, one signature ability each.
+const CHARACTERS := {
+	"the_gambler": {"name": "The Gambler", "ability": "ACE UP THE SLEEVE",
+			"line": "Once per table, trade the card up his sleeve for any plain card on the felt."},
+	"the_machine": {"name": "The Machine", "ability": "THE LASER",
+			"line": "Once per table, burn a card clean off the felt. Upgrades extend the beam into a cross."},
+	"the_doctor": {"name": "The Doctor", "ability": "THE POCKET WATCH",
+			"line": "Turn the last hand back as if it never happened. Upgrades wind in extra uses."},
+}
+const LASER_DIRS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+var character := "the_gambler"   # the rider this run
+var laser_used := false          # one shot per table (the Machine)
+var _aiming_laser := false
+var watch_uses_left := 1         # turns left this table (the Doctor)
+var _watch_snapshot := {}        # trail-side state alongside board.undo_state
+var laser_level := 0             # meta: beam arms unlocked (0..4)
+var watch_level := 0             # meta: extra turns per table (0..2)
 var _aiming_sleeve := false
 var _shop_stock_provisions: Array = []   # [{id, bought}] on the shelf
 var burns_used := 0      # run-wide: each burn costs more than the last
@@ -269,6 +286,8 @@ var _buyin_cash_label: Label
 var _buyin_resume_btn: Button
 var _buyin_tier_btns: Array = []
 var upgrades_layer: ColorRect    # the OUTFITTER: meta upgrades for $cash
+var select_layer: ColorRect      # pick your rider before the buy-in
+var _select_cards := {}          # id -> TextureRect (full card art)
 var _up_cash: Label
 var _up_rows: Array = []         # [{id, status: Label, btn: Button}]
 var _sleeve_pc: PlayingCard      # the sleeve on show beside its row
@@ -316,6 +335,7 @@ func _ready() -> void:
 	_load_meta()
 	main.board.safe_cracked.connect(on_safe_cracked)
 	main.board.provision_targeted.connect(_on_provision_target)
+	main.board.hand_committing.connect(_on_hand_committing)
 	main.board.boss_defeated.connect(func() -> void:
 		# Scored kills clear the room via result.boss_defeated inside
 		# on_hand_played (in_room is already false here). This catches
@@ -334,6 +354,11 @@ func _load_meta() -> void:
 	sleeve_rank = clampi(int(cf.get_value("meta", "sleeve_rank", 2)), 2, 14)
 	meta_bankroll = clampi(int(cf.get_value("meta", "bankroll", 0)), 0, 5)
 	meta_provisions = clampi(int(cf.get_value("meta", "provisions", 0)), 0, 2)
+	laser_level = clampi(int(cf.get_value("meta", "laser", 0)), 0, 4)
+	watch_level = clampi(int(cf.get_value("meta", "watch", 0)), 0, 2)
+	character = String(cf.get_value("meta", "character", "the_gambler"))
+	if not CHARACTERS.has(character):
+		character = "the_gambler"
 
 
 func _save_meta() -> void:
@@ -344,6 +369,9 @@ func _save_meta() -> void:
 	cf.set_value("meta", "sleeve_rank", sleeve_rank)
 	cf.set_value("meta", "bankroll", meta_bankroll)
 	cf.set_value("meta", "provisions", meta_provisions)
+	cf.set_value("meta", "laser", laser_level)
+	cf.set_value("meta", "watch", watch_level)
+	cf.set_value("meta", "character", character)
 	cf.save(main.profile_path("trail_meta.cfg"))
 
 
@@ -380,6 +408,7 @@ func _save_run() -> void:
 		prov_arr.append(id)
 	cf.set_value("run", "provisions", prov_arr)
 	cf.set_value("run", "sleeve", sleeve_card)
+	cf.set_value("run", "character", character)
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
@@ -424,6 +453,9 @@ func _load_run() -> bool:
 	sleeve_card = cf.get_value("run", "sleeve", {})
 	if sleeve_card.is_empty():
 		sleeve_card = _fresh_sleeve()  # runs saved before the sleeve existed
+	character = String(cf.get_value("run", "character", "the_gambler"))
+	if not CHARACTERS.has(character):
+		character = "the_gambler"
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
@@ -564,6 +596,141 @@ func _do_sleeve_swap(card: PlayingCard) -> void:
 	_save_run()
 
 
+# --- Signature abilities (the other two riders) ---------------------------
+
+## The KIT's top button fires whichever signature the rider carries.
+func use_signature() -> void:
+	match character:
+		"the_machine":
+			use_laser()
+		"the_doctor":
+			use_watch()
+		_:
+			use_sleeve()
+
+
+## THE MACHINE's laser: arms the beam (or powers it down again).
+func use_laser() -> void:
+	if _aiming_laser:
+		main.board.pending_provision = ""
+		_aiming_laser = false
+		main._announce("POWERED DOWN", main.DIM)
+		return
+	if not in_room or not main.game_started or main.board.busy \
+			or main.board.locked or main.board.blackjack_presenting:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	if laser_used:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce("THE LASER IS SPENT — one shot per table", main.RED)
+		return
+	_aiming_slot = -1  # only one thing aims at a time
+	_aiming_sleeve = false
+	_aiming_laser = true
+	main.board.pending_provision = "laser"
+	main._announce("TARGET A CARD — right-click to power down", main.GOLD)
+
+
+## The beam: the target plus one more card per unlocked arm (up,
+## right, down, left). Safes, bosses and coils deflect it; job
+## pieces caught in the burn resurface, dynamite-style.
+func _do_laser(target: PlayingCard) -> void:
+	laser_used = true
+	var cells: Array = [target.grid_pos]
+	for i in mini(laser_level, LASER_DIRS.size()):
+		cells.append(target.grid_pos + (LASER_DIRS[i] as Vector2i))
+	var cards: Array = []
+	var pieces: Array = []
+	for cell in cells:
+		if not main.board.grid.has(cell):
+			continue
+		var c: PlayingCard = main.board.grid[cell]
+		if c.is_safe or c.boss != "" or c.snake_tail:
+			continue  # the beam glances off
+		if c.objective in ["key", "chest"]:
+			pieces.append(c.objective)
+		if c.hazard == "stone" and room_goal == "mine":
+			room_stones_broken += 1
+		cards.append(c)
+	main._announce("THE LASER FIRES")
+	main.stat_bump("laser_shots")
+	await main.board.laser_destroy(target.position, cards)
+	for piece in pieces:
+		if room_goal == "chest" and in_room:
+			main.board.spawn_objective(String(piece))
+			main._announce("THE %s TURNS UP ELSEWHERE" % String(piece).to_upper())
+
+
+## THE DOCTOR's pocket watch: the last hand un-happens — cards,
+## score, grit, the spent hand, all of it. The clock, if one runs,
+## keeps its seconds.
+func use_watch() -> void:
+	if not in_room or not main.game_started or main.board.busy \
+			or main.board.locked or main.board.blackjack_presenting \
+			or _outlaw_dead_pending:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	if watch_uses_left <= 0:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce("THE WATCH IS WOUND DOWN — no more turns this table", main.RED)
+		return
+	if room_goal == "blackjack":
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce("THE DEALER GUARDS HIS DEAL — no rewinds at blackjack", main.RED)
+		return
+	if _watch_snapshot.is_empty() or not main.board.has_undo():
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce("NOTHING TO TURN BACK — play a hand first", main.RED)
+		return
+	if not main.board.restore_state():
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	room_score = int(_watch_snapshot.room_score)
+	room_hands_left = int(_watch_snapshot.room_hands_left)
+	room_wins = int(_watch_snapshot.room_wins)
+	room_grit = int(_watch_snapshot.room_grit)
+	room_outlaw_hp = int(_watch_snapshot.room_outlaw_hp)
+	room_outlaw_idx = int(_watch_snapshot.room_outlaw_idx)
+	room_stones_broken = int(_watch_snapshot.room_stones_broken)
+	room_chests_opened = int(_watch_snapshot.room_chests_opened)
+	room_collect_done = int(_watch_snapshot.room_collect_done)
+	room_collect_kinds = _watch_snapshot.room_collect_kinds.duplicate()
+	room_require = _watch_snapshot.room_require.duplicate(true)
+	chips = int(_watch_snapshot.chips)
+	cash = int(_watch_snapshot.cash)
+	_watch_snapshot = {}
+	watch_uses_left -= 1
+	main.stat_bump("hands_unwound")
+	main.board._play_sound(Board.SFX_FLIP, 0.7, -6.0)
+	main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 0.8, -10.0, 0.1)
+	main._announce("THE WATCH TURNS BACK — THAT HAND NEVER HAPPENED")
+	_save_meta()
+	_save_run()
+
+
+## Board signal, fired as a valid hand commits: the Doctor notes the
+## room as it stands, to pair with the board's own snapshot.
+func _on_hand_committing() -> void:
+	if not in_room or character != "the_doctor":
+		_watch_snapshot = {}
+		return
+	_watch_snapshot = {
+		"room_score": room_score, "room_hands_left": room_hands_left,
+		"room_wins": room_wins, "room_grit": room_grit,
+		"room_outlaw_hp": room_outlaw_hp, "room_outlaw_idx": room_outlaw_idx,
+		"room_stones_broken": room_stones_broken,
+		"room_chests_opened": room_chests_opened,
+		"room_collect_done": room_collect_done,
+		"room_collect_kinds": room_collect_kinds.duplicate(),
+		"room_require": room_require.duplicate(true),
+		"chips": chips, "cash": cash,
+	}
+
+
+func character_name() -> String:
+	return String(CHARACTERS.get(character, {}).get("name", "The Gambler"))
+
+
 # --- Provisions -----------------------------------------------------------
 
 ## Kit capacity: three slots, four with the Saddlebags relic.
@@ -639,6 +806,19 @@ func _apply_instant_provision(id: String) -> void:
 
 ## The aimed provision or sleeve picked a card (null = holstered).
 func _on_provision_target(card) -> void:
+	if _aiming_laser:
+		if card == null:
+			_aiming_laser = false
+			main._announce("POWERED DOWN", main.DIM)
+			return
+		if card.is_safe or card.boss != "" or card.snake_tail:
+			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+			main._announce("THE BEAM GLANCES OFF — pick a softer target", main.RED)
+			return  # still aiming
+		_aiming_laser = false
+		main.board.pending_provision = ""
+		_do_laser(card)
+		return
 	if _aiming_sleeve:
 		if card == null:
 			_aiming_sleeve = false
@@ -829,6 +1009,41 @@ func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 
 # --- Flow: entry ----------------------------------------------------------
 
+## THE TRAIL's first stop: pick your rider. Falls straight through
+## to the buy-in when the character art isn't installed.
+func open_select() -> void:
+	if _select_cards.is_empty():
+		open_buyin()
+		return
+	main.transition(_open_select_now)
+
+
+func _open_select_now() -> void:
+	main.menu_layer.visible = false
+	main.menu_open = false
+	_hide_all()
+	_refresh_select()
+	select_layer.visible = true
+
+
+func _refresh_select() -> void:
+	for id in _select_cards:
+		var tr: TextureRect = _select_cards[id]
+		var suffix := "_selected" if id == character else ""
+		var p := "res://assets/art/playable/full/%s%s.png" % [id, suffix]
+		if ResourceLoader.exists(p):
+			tr.texture = load(p)
+
+
+func _pick_character(id: String) -> void:
+	if not CHARACTERS.has(id) or character == id:
+		return
+	character = id
+	main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+	_save_meta()  # the trail remembers the last rider saddled
+	_refresh_select()
+
+
 func open_buyin() -> void:
 	main.transition(_open_buyin_now)
 
@@ -875,6 +1090,10 @@ func upgrade_cost(id: String) -> int:
 	match id:
 		"sleeve":
 			return 0 if sleeve_rank >= 14 else sleeve_upgrade_cost()
+		"laser":
+			return 0 if laser_level >= 4 else 30 * (laser_level + 1)
+		"watch":
+			return 0 if watch_level >= 2 else 50 * (watch_level + 1)
 		"bankroll":
 			return 0 if meta_bankroll >= 5 else 20 * (meta_bankroll + 1)
 		"provisions":
@@ -891,6 +1110,10 @@ func _buy_upgrade(id: String) -> void:
 	match id:
 		"sleeve":
 			sleeve_rank += 1
+		"laser":
+			laser_level += 1
+		"watch":
+			watch_level += 1
 		"bankroll":
 			meta_bankroll += 1
 		"provisions":
@@ -917,6 +1140,18 @@ func _refresh_upgrades() -> void:
 				btn.text = "FULLY SHARPENED — AN ACE" if cost <= 0 \
 						else "RAISE TO %s — $%d" % [String(RANK_CHARS.get(
 								sleeve_rank + 1, str(sleeve_rank + 1))), cost]
+			"laser":
+				status.text = "Beam burns %d card%s%s" % [1 + laser_level,
+						"" if laser_level == 0 else "s",
+						"" if laser_level == 0 else " in a cross"]
+				btn.text = "EXTEND THE BEAM — $%d" % cost if cost > 0 \
+						else "A FULL CROSS"
+			"watch":
+				status.text = "Level %d / 2  ·  %d turn%s back per table" \
+						% [watch_level, 1 + watch_level,
+						"" if watch_level == 0 else "s"]
+				btn.text = "WIND ANOTHER TURN — $%d" % cost if cost > 0 \
+						else "WOUND TO THE LIMIT"
 			"bankroll":
 				status.text = "Level %d / 5  ·  +%d chips at every buy-in" \
 						% [meta_bankroll, 20 * meta_bankroll]
@@ -1708,11 +1943,23 @@ func _confirm_bet() -> void:
 func _start_room() -> void:
 	in_room = true
 	main.stat_max("deepest_table", room_index + 1)
-	sleeve_used = false  # one swap per table, fresh each sit-down
+	sleeve_used = false  # one signature use per table, fresh each sit-down
 	_aiming_sleeve = false
+	laser_used = false
+	_aiming_laser = false
+	watch_uses_left = 1 + watch_level
+	_watch_snapshot = {}
+	main.board.undo_state = {}
+	main.board.undo_enabled = character == "the_doctor"
 	_chest_rewards.clear()  # unopened luck doesn't carry between tables
 	_chest_won_cards.clear()
-	main.tutor_show("sleeve")
+	match character:
+		"the_machine":
+			main.tutor_show("laser")
+		"the_doctor":
+			main.tutor_show("watch")
+		_:
+			main.tutor_show("sleeve")
 	room_score = 0
 	room_target = current_offer.target
 	room_goal = current_offer.get("goal", "")
@@ -1757,7 +2004,8 @@ func _start_room() -> void:
 				current_offer.get("minutes", 3)))
 		room_hands_left = 999
 	main.mode_kind = "trail"
-	main.mode_label_text = "Trail · %s" % _table().name.capitalize()
+	main.mode_label_text = "Trail · %s · %s" % [_table().name.capitalize(),
+			character_name()]
 	main.board.custom_deck = deck.duplicate(true)
 	main.game_started = true
 	main.game_over = false
@@ -3351,6 +3599,46 @@ func _end_run(title: String, body: String, _payout: int) -> void:
 # --- UI construction ------------------------------------------------------
 
 func build_ui() -> void:
+	# CHOOSE YOUR RIDER — three finished character cards from the kit;
+	# the screen only exists when the art is installed.
+	select_layer = _layer()
+	_screen_title(select_layer, "CHOOSE YOUR RIDER")
+	var rider_ids := ["the_gambler", "the_machine", "the_doctor"]
+	for i in rider_ids.size():
+		var id: String = rider_ids[i]
+		var art := "res://assets/art/playable/full/%s.png" % id
+		if not ResourceLoader.exists(art):
+			continue
+		var x := 462.0 + i * 348.0
+		var b: Button = main._button(select_layer, "", Vector2(x, 206),
+				Vector2(300, 450))
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		var tr := TextureRect.new()
+		tr.texture = load(art)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_SCALE
+		tr.size = Vector2(300, 450)
+		tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(tr)
+		_select_cards[id] = tr
+		b.pressed.connect(func() -> void:
+			_pick_character(id))
+		var ch: Dictionary = CHARACTERS[id]
+		var ab: Label = main._label(select_layer, String(ch.ability),
+				Vector2(x, 668), 18, main.GOLD)
+		ab.size = Vector2(300, 26)
+		ab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var line := _wrap_label(select_layer, String(ch.line),
+				Rect2(x - 10, 698, 320, 70), 15, main.DIM)
+		line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var ride: Button = main._button(select_layer, "RIDE ON",
+			Vector2(810, 860), Vector2(300, 64), true)
+	ride.add_theme_font_size_override("font_size", 24)
+	ride.pressed.connect(open_buyin)
+	_back_button(select_layer, back_to_menu, "MENU")
+
 	buyin_layer = _layer()
 	_screen_title(buyin_layer, "THE TRAIL")
 	_buyin_cash_label = _center(buyin_layer, "", 240, 30, main.GOLD)
@@ -3378,8 +3666,12 @@ func build_ui() -> void:
 	_center(upgrades_layer, "Permanent gear, paid in $cash banked from finished rides.", 200, 22, main.DIM)
 	_up_cash = _center(upgrades_layer, "", 246, 30, main.GOLD)
 	var updefs := [
-		["sleeve", "ACE UP THE SLEEVE",
-			"The hidden swap card every run starts with — once per table, trade it for any plain card on the felt. Raising it raises its starting rank, all the way to an Ace."],
+		["sleeve", "ACE UP THE SLEEVE — THE GAMBLER",
+			"His hidden swap card — once per table, trade it for any plain card on the felt. Raising it raises its starting rank, all the way to an Ace."],
+		["laser", "THE LASER — THE MACHINE",
+			"One shot per table burns a card clean off the felt. Each upgrade extends the beam one more card — up, right, down, left — into a full cross."],
+		["watch", "THE POCKET WATCH — THE DOCTOR",
+			"Turns the last hand back: cards, score, the spent hand, all of it. Each upgrade winds in another turn per table."],
 		["bankroll", "BANKROLL",
 			"Ride out heavier: +20 starting chips on every buy-in, per level, at every stake."],
 		["provisions", "PACKED KIT",
@@ -3387,26 +3679,26 @@ func build_ui() -> void:
 	]
 	for i in updefs.size():
 		var def: Array = updefs[i]
-		var top := 320.0 + i * 190.0
-		UiKit.plate(upgrades_layer, Rect2(440, top, 1040, 170))
+		var top := 292.0 + i * 140.0
+		UiKit.plate(upgrades_layer, Rect2(440, top, 1040, 128))
 		var name_l: Label = main._label(upgrades_layer, String(def[1]),
-				Vector2(560, top + 22), 28, main.GOLD)
-		name_l.size = Vector2(560, 36)
+				Vector2(560, top + 12), 24, main.GOLD)
+		name_l.size = Vector2(580, 32)
 		_wrap_label(upgrades_layer, String(def[2]),
-				Rect2(560, top + 64, 570, 92), 17, main.OFFWHITE)
+				Rect2(560, top + 48, 570, 72), 15, main.OFFWHITE)
 		var status := _wrap_label(upgrades_layer, "",
-				Rect2(1170, top + 24, 290, 64), 19, main.DIM)
+				Rect2(1170, top + 12, 290, 54), 16, main.DIM)
 		var buy: Button = main._button(upgrades_layer, "",
-				Vector2(1170, top + 96), Vector2(290, 52))
-		buy.add_theme_font_size_override("font_size", 17)
+				Vector2(1170, top + 70), Vector2(290, 46))
+		buy.add_theme_font_size_override("font_size", 15)
 		var uid := String(def[0])
 		buy.pressed.connect(func() -> void:
 			_buy_upgrade(uid))
 		_up_rows.append({"id": uid, "status": status, "btn": buy})
 	_sleeve_pc = PlayingCard.new()
 	_sleeve_pc.material = Themes.current_material()
-	_sleeve_pc.position = Vector2(505, 405)
-	_sleeve_pc.scale = Vector2(1.1, 1.1)
+	_sleeve_pc.position = Vector2(502, 356)
+	_sleeve_pc.scale = Vector2(0.9, 0.9)
 	upgrades_layer.add_child(_sleeve_pc)
 	_back_button(upgrades_layer, back_to_menu, "MENU")
 
@@ -3580,8 +3872,8 @@ func _layer() -> ColorRect:
 
 
 func _hide_all() -> void:
-	for l in [buyin_layer, upgrades_layer, tarot_layer, bet_layer, pick_layer,
-			shop_layer, remove_layer, relic_layer, end_layer]:
+	for l in [select_layer, buyin_layer, upgrades_layer, tarot_layer, bet_layer,
+			pick_layer, shop_layer, remove_layer, relic_layer, end_layer]:
 		if l:
 			l.visible = false
 

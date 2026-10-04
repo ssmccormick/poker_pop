@@ -18,6 +18,7 @@ signal refill_done                    # internal: refill finished or skipped
 signal safe_cracked                   # the combo chain opened the safe
 signal boss_defeated                  # the room's boss is down
 signal provision_targeted(card)       # aimed provision picked a card (null = holstered)
+signal hand_committing                # a valid submit is about to resolve
 
 const GAP := 8
 const CELL_W := PlayingCard.W + GAP
@@ -676,6 +677,11 @@ func play_hand() -> void:
 		if card.is_safe:
 			_crack_safe()
 			return
+	# The Doctor's pocket watch: remember the table exactly as it
+	# stands before this hand rewrites it.
+	hand_committing.emit()
+	if undo_enabled:
+		snapshot_state()
 	if selected.size() > 3:
 		for card in selected:
 			if card.boss == "queen" or card.honey:
@@ -1698,6 +1704,145 @@ func provision_clean(card: PlayingCard) -> void:
 
 
 ## Dynamite: one card leaves the table outright, then gravity settles.
+# --- The pocket watch: whole-board undo snapshots -------------------------
+
+## Every card property the watch must carry back. `hazard` sits
+## before `fuse` so the fuse setter can place its ambient spark.
+const UNDO_CARD_PROPS := ["rank", "suit", "mod", "boom", "two_plus",
+		"cursed", "washed", "hazard", "hazard_fresh", "fuse", "stone_hits",
+		"water_level", "wind_dir", "next_dir", "boost_dir", "objective",
+		"bullet_timer", "is_safe", "combo_progress", "boss", "boss_hp",
+		"honey", "snake_tail", "stunned", "face_down"]
+
+var undo_enabled := false  # trail arms it when the Doctor sits down
+var undo_state := {}
+
+
+func has_undo() -> bool:
+	return not undo_state.is_empty()
+
+
+## Captures the full table before a hand resolves. Blackjack rounds
+## pace themselves through a presentation and never rewind.
+func snapshot_state() -> void:
+	if blackjack_target > 0:
+		undo_state = {}
+		return
+	var cards := {}
+	var cobra_order: Array = []
+	for p in grid:
+		var card: PlayingCard = grid[p]
+		var props := {}
+		for key in UNDO_CARD_PROPS:
+			props[key] = card.get(key)
+		props["combo"] = card.combo.duplicate()
+		if card.boss == "cobra":
+			props["cobra_stack"] = card.cobra_stack.duplicate(true)
+			for seg in card.cobra_body:
+				cobra_order.append(seg.grid_pos)
+		cards[p] = props
+	undo_state = {
+		"cards": cards,
+		"cobra_body": cobra_order,
+		"deck": deck.duplicate(true),
+		"hazards_spawned": hazards_spawned.duplicate(true),
+		"pending_hazards": _pending_refill_hazards.duplicate(),
+		"landrush": landrush_marks.duplicate(true),
+		"jack_bar": jack_bar,
+		"community": holdem_community.duplicate(true),
+	}
+
+
+## Rebuilds the table from the last snapshot — the hand un-happens.
+## One rewind per snapshot: restoring consumes it.
+func restore_state() -> bool:
+	if undo_state.is_empty() or busy or locked:
+		return false
+	for card in grid.values():
+		card.queue_free()
+	grid.clear()
+	selected.clear()
+	selection_changed.emit()
+	var mat := Themes.current_material()
+	var head: PlayingCard = null
+	var cards: Dictionary = undo_state.cards
+	for p in cards:
+		var props: Dictionary = cards[p]
+		var card := PlayingCard.new()
+		for key in UNDO_CARD_PROPS:
+			card.set(key, props[key])
+		card.combo = props["combo"].duplicate()
+		card.grid_pos = p
+		card.position = cell_center(p)
+		card.material = mat
+		add_child(card)
+		grid[p] = card
+		if card.boss == "cobra":
+			head = card
+			card.cobra_stack = props.get("cobra_stack", []).duplicate(true)
+	if head != null:
+		head.cobra_body = []
+		for gp in undo_state.cobra_body:
+			if grid.has(gp):
+				head.cobra_body.append(grid[gp])
+	deck = undo_state.deck.duplicate(true)
+	hazards_spawned = undo_state.hazards_spawned.duplicate(true)
+	_pending_refill_hazards = undo_state.pending_hazards.duplicate()
+	landrush_marks = undo_state.landrush.duplicate(true)
+	jack_bar = undo_state.jack_bar
+	holdem_community = undo_state.community.duplicate(true)
+	community_changed.emit()
+	undo_state = {}
+	queue_redraw()
+	return true
+
+
+## The Machine's laser: vaporizes every given card at once (the
+## caller has already culled what the beam glances off), one teal
+## flash per cell and a single refill after.
+func laser_destroy(origin: Vector2, cards: Array) -> void:
+	if busy or locked or cards.is_empty():
+		return
+	busy = true
+	clear_selection()
+	_play_sound(SFX_POPS.pick_random(), 1.7, -6.0)
+	_play_sound(SFX_DYNAMITES.pick_random(), 2.2, -16.0, 0.05)
+	# Beam flashes from the strike point out to each burned cell.
+	var beams: Array = []
+	for card in cards:
+		if card.position.distance_to(origin) < 1.0:
+			continue
+		var beam := Line2D.new()
+		beam.points = PackedVector2Array([origin, card.position])
+		beam.width = 6.0
+		beam.default_color = Color(0.5, 0.85, 0.77, 0.9)
+		beam.z_index = 30
+		add_child(beam)
+		beams.append(beam)
+	var tw := create_tween().set_parallel(true)
+	for card in cards:
+		if not grid.has(card.grid_pos) or grid[card.grid_pos] != card:
+			continue
+		grid.erase(card.grid_pos)
+		_fx(card.position, "sparks", Color(0.5, 0.85, 0.77))
+		_fx(card.position, "smoke")
+		tw.tween_property(card, "scale", Vector2.ZERO, 0.22) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+		tw.tween_property(card, "modulate", Color(0.6, 1.5, 1.35), 0.22)
+	for beam in beams:
+		tw.tween_property(beam, "modulate:a", 0.0, 0.3)
+	shake_requested.emit(8.0)
+	await tw.finished
+	for card in cards:
+		card.queue_free()
+	for beam in beams:
+		beam.queue_free()
+	await _fall_and_fill(false)
+	if not has_playable_hand():
+		dead_board.emit()
+	busy = false
+
+
 func provision_destroy(card: PlayingCard) -> void:
 	if busy or locked or not grid.has(card.grid_pos):
 		return

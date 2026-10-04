@@ -238,6 +238,9 @@ func _ready() -> void:
 				trail.open_buyin()
 			"upgrades":
 				trail.open_upgrades()
+			"trailselect":
+				menu_layer.visible = false
+				trail.open_select()
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -742,18 +745,48 @@ func _update_kit() -> void:
 	_sleeve_btn.position = Vector2(PANEL_R, 574)
 	_sleeve_btn.size = Vector2(300, bh)
 	_sleeve_btn.pivot_offset = _sleeve_btn.size / 2.0
-	if trail._aiming_sleeve:
-		_sleeve_btn.disabled = false
-		_sleeve_btn.text = "AIMING…"
-		_sleeve_btn.tooltip_text = "Pick a card on the table to swap — right-click or press again to holster."
-	elif trail.sleeve_used:
-		_sleeve_btn.disabled = true
-		_sleeve_btn.text = "SLEEVE — SPENT"
-		_sleeve_btn.tooltip_text = "One swap per table. It comes back at the next sit-down."
-	else:
-		_sleeve_btn.disabled = false
-		_sleeve_btn.text = "SLEEVE  %s" % trail.sleeve_label()
-		_sleeve_btn.tooltip_text = "ACE UP THE SLEEVE — once per table, trade this card for any plain card on the table; what you take rides up the sleeve to another table. Upgrade its starting rank at the trail buy-in."
+	match trail.character:
+		"the_machine":
+			if trail._aiming_laser:
+				_sleeve_btn.disabled = false
+				_sleeve_btn.text = "AIMING…"
+				_sleeve_btn.tooltip_text = "Pick a card on the table to burn — right-click or press again to power down."
+			elif trail.laser_used:
+				_sleeve_btn.disabled = true
+				_sleeve_btn.text = "LASER — SPENT"
+				_sleeve_btn.tooltip_text = "One shot per table. It recharges at the next sit-down."
+			else:
+				_sleeve_btn.disabled = false
+				_sleeve_btn.text = "LASER  ×%d" % (1 + trail.laser_level)
+				_sleeve_btn.tooltip_text = "THE LASER — once per table, burn a card clean off the felt%s. Extend the beam at the Outfitter." \
+						% ("" if trail.laser_level == 0
+						else " (plus %d more in a cross)" % trail.laser_level)
+		"the_doctor":
+			if trail.watch_uses_left <= 0:
+				_sleeve_btn.disabled = true
+				_sleeve_btn.text = "WATCH — WOUND DOWN"
+				_sleeve_btn.tooltip_text = "No more turns this table. It rewinds at the next sit-down."
+			elif not board.has_undo():
+				_sleeve_btn.disabled = true
+				_sleeve_btn.text = "POCKET WATCH  ×%d" % trail.watch_uses_left
+				_sleeve_btn.tooltip_text = "THE POCKET WATCH — turns the last hand back. Play a hand first."
+			else:
+				_sleeve_btn.disabled = false
+				_sleeve_btn.text = "POCKET WATCH  ×%d" % trail.watch_uses_left
+				_sleeve_btn.tooltip_text = "THE POCKET WATCH — press to turn the last hand back: cards, score, the spent hand, all of it. Wind in extra turns at the Outfitter."
+		_:
+			if trail._aiming_sleeve:
+				_sleeve_btn.disabled = false
+				_sleeve_btn.text = "AIMING…"
+				_sleeve_btn.tooltip_text = "Pick a card on the table to swap — right-click or press again to holster."
+			elif trail.sleeve_used:
+				_sleeve_btn.disabled = true
+				_sleeve_btn.text = "SLEEVE — SPENT"
+				_sleeve_btn.tooltip_text = "One swap per table. It comes back at the next sit-down."
+			else:
+				_sleeve_btn.disabled = false
+				_sleeve_btn.text = "SLEEVE  %s" % trail.sleeve_label()
+				_sleeve_btn.tooltip_text = "ACE UP THE SLEEVE — once per table, trade this card for any plain card on the table; what you take rides up the sleeve to another table. Upgrade its starting rank at the trail buy-in."
 	for i in _kit_btns.size():
 		var btn: Button = _kit_btns[i]
 		btn.position = Vector2(PANEL_R, 574 + (i + 1) * spacing)
@@ -1525,6 +1558,8 @@ const TUTOR := {
 	"relics": ["RELICS", "Run-wide charms — carry as many as you can afford. Each one quietly bends the rules in your favor for the rest of the ride."],
 	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots (good SADDLEBAGS add a fourth). Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
 	"sleeve": ["ACE UP THE SLEEVE", "You ride with a hidden card — the SLEEVE row atop your kit. Once per table, click it and pick a plain card on the table: they trade places, and the card you take waits up your sleeve for another table. Raise its starting rank with $cash at the trail buy-in."],
+	"laser": ["THE LASER", "The Machine carries a beam — the LASER row atop your kit. Once per table, click it and pick a card: the beam burns it clean off the felt, unscored. Safes, bosses and coils deflect it. Each Outfitter upgrade extends the beam one more card into a cross."],
+	"watch": ["THE POCKET WATCH", "The Doctor carries his watch — the row atop your kit. After any hand, press it and the hand UN-HAPPENS: the cards return, the score and the spent hand come back, grit and bosses rewind. The clock, if one runs, keeps ticking. More turns per table await at the Outfitter."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
 # tooltip with its full story instead.)
@@ -2088,7 +2123,7 @@ func _build_ui() -> void:
 	_sleeve_btn = _button(hud_root, "—", Vector2(PANEL_R, 574), Vector2(300, 56))
 	_sleeve_btn.add_theme_font_size_override("font_size", 19)
 	_sleeve_btn.pressed.connect(func() -> void:
-		trail.use_sleeve())
+		trail.use_signature())
 	for i in 4:
 		var kb := _button(hud_root, "—", Vector2(PANEL_R, 574 + (i + 1) * 64), Vector2(300, 56))
 		kb.add_theme_font_size_override("font_size", 19)
@@ -2340,7 +2375,7 @@ func _build_menu() -> void:
 	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66), true)
 	trail_btn.add_theme_font_size_override("font_size", 26)
 	trail_btn.pressed.connect(func() -> void:
-		trail.open_buyin())
+		trail.open_select())
 	# The Outfitter: every $cash meta upgrade, right beside the ride.
 	var upgrades_btn := _button(menu_layer, "UPGRADES", Vector2(1250, 336), Vector2(210, 66))
 	upgrades_btn.add_theme_font_size_override("font_size", 20)

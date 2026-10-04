@@ -1,0 +1,95 @@
+{
+ "canvas_px": [
+  600,
+  900
+ ],
+ "note": "Character-select cards. Stack at (0,0): frame/<id> -> portrait/<id> -> trim/<id> -> text (draw in-engine from this file, or use full/<id>) -> selected.png / locked.png as state overlays.",
+ "text_specs_px": {
+  "name": {
+   "center_x": 300,
+   "baseline_y": 662,
+   "font": "Rye",
+   "size": 50,
+   "color": "#E6D5B0",
+   "outline": "#1E1812"
+  },
+  "tagline": {
+   "center_x": 300,
+   "baseline_y": 720,
+   "font": "Oswald SemiBold",
+   "size": 21,
+   "tracking": 5,
+   "color": "accent2"
+  },
+  "flavor": {
+   "box": [
+    68,
+    736,
+    464,
+    132
+   ],
+   "font": "Old Standard TT",
+   "size": 25,
+   "line_height": 1.3,
+   "color": "#CDBF9A",
+   "align": "center"
+  }
+ },
+ "portrait_window_px": [
+  68,
+  60,
+  464,
+  540
+ ],
+ "characters": {
+  "the_gambler": {
+   "title": "THE GAMBLER",
+   "tagline": "WHAT HE LOST IS STILL ON THE TABLE",
+   "flavor": "He remembers nothing but the Trail. To win back what he lost, he must face the Dealer again.",
+   "description_from_shiloh": "A gunslinger that gambled his life away, he remembers nothing but the Trail, to gain what he lost he must face the dealer again.",
+   "accent": "#8a2a1e",
+   "accent2": "#c86a34",
+   "emblem": "ace",
+   "frame": "frame/the_gambler.png",
+   "portrait": "portrait/the_gambler.png",
+   "trim": "trim/the_gambler.png",
+   "full": "full/the_gambler.png",
+   "full_selected": "full/the_gambler_selected.png",
+   "hud_portrait": "hud/the_gambler_512.png"
+  },
+  "the_machine": {
+   "title": "THE MACHINE",
+   "tagline": "DESTINATION: END OF THE TRAIL",
+   "flavor": "Origin: unknown. Memory: damaged. Directive: reach the end of the Trail.",
+   "description_from_shiloh": "Sent from another time? Dimension? It does not have that information in its damaged systems, all its programmed to do is reach the end of the trail.",
+   "accent": "#2e5e5a",
+   "accent2": "#7fd8c4",
+   "emblem": "gear",
+   "frame": "frame/the_machine.png",
+   "portrait": "portrait/the_machine.png",
+   "trim": "trim/the_machine.png",
+   "full": "full/the_machine.png",
+   "full_selected": "full/the_machine_selected.png",
+   "hud_portrait": "hud/the_machine_512.png"
+  },
+  "the_doctor": {
+   "title": "THE DOCTOR",
+   "tagline": "THE DEALER HAS HIS TIME MACHINE",
+   "flavor": "The Dealer holds his time machine. Until he wins it back, the loop never ends.",
+   "description_from_shiloh": "Inspired by both Doctor Who and Doc from Back to the Future. The Dealer has the Time Machine, that's what keeps him in this never ending loop.",
+   "accent": "#5a3a7a",
+   "accent2": "#d9b572",
+   "emblem": "clock",
+   "frame": "frame/the_doctor.png",
+   "portrait": "portrait/the_doctor.png",
+   "trim": "trim/the_doctor.png",
+   "full": "full/the_doctor.png",
+   "full_selected": "full/the_doctor_selected.png",
+   "hud_portrait": "hud/the_doctor_512.png"
+  }
+ },
+ "overlays": {
+  "selected": "overlay/selected.png",
+  "locked": "overlay/locked.png"
+ }
+}

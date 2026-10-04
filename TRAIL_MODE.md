@@ -626,3 +626,28 @@ levers, all pulled toward the player:
   crazy-8s storm 6 base (was 8), blackjack 4 (was 5).
 - Goals: purge quota +2 per region (was +3); GOLD MINE 16 stones,
   10 seeded (was 20/12).
+
+## Playable characters (Oct 2026)
+
+Three riders, picked on CHOOSE YOUR RIDER before the buy-in (the
+trail remembers the last saddle; saves carry the rider). Each has a
+SIGNATURE ability in the kit panel top row, once per table unless
+upgraded at the Outfitter:
+
+- THE GAMBLER — Ace up the Sleeve (the existing sleeve system, now
+  his alone). Upgrade: starting rank, 2 through Ace.
+- THE MACHINE — The Laser: burn one card clean off the felt,
+  unscored. Safes, bosses and coils deflect the beam; job pieces
+  caught in it resurface, dynamite-style; lasered stones count
+  toward the mine quota. Upgrades (4): each extends the beam one
+  more card — up, right, down, left — into a full cross.
+- THE DOCTOR — The Pocket Watch: the last hand un-happens. The board
+  snapshots before every hand (cards, deck, hazards, fuses, bosses)
+  and the room state rides along (score, grit, hands, chips, cash);
+  restoring consumes the snapshot, the clock keeps its seconds, and
+  blackjack never rewinds. Upgrades (2): extra turns per table.
+
+Kit art: assets/art/playable (select cards + HUD portraits).
+Mobile/tablet layout kit delivered alongside and TABLED for later —
+lives in Downloads\PokerPop_Mobile_Layouts (spec JSON + mocks), not
+yet in the project.
