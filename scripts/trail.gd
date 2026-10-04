@@ -1860,6 +1860,17 @@ func _seed_room_specials() -> void:
 	# Opening seeds fight from hand one — spreading, soaking, burning
 	# down, fuses lit. Only mid-room arrivals sit a round out.
 	main.board.season_hazards()
+	# A heavy seed — the GOLD MINE's rock above all — can bury every
+	# move before the first hand. The dead-board reshuffle has to run
+	# at the deal too, not just after hands.
+	while main.board.busy:
+		await get_tree().process_frame
+	if in_room and not main.board.has_playable_hand():
+		main._announce("NO MOVES — RESHUFFLE")
+		for i in 3:
+			await main.board.shuffle_board()
+			if not in_room or main.board.has_playable_hand():
+				break
 	_tutor_room_intros()
 
 
