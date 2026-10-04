@@ -803,13 +803,26 @@ func _draw_art_rank_suit(rect: Rect2) -> void:
 
 
 ## The Ace wears a big letter like the Jack, Queen and King — the
-## ringed ceremonial center read as a special card at a glance.
+## kit's own ornate corner letter (ink, halo and all), cropped out of
+## the rank layer and scaled up to center stage, so the style matches
+## the painted faces exactly.
 func _draw_art_ace(rect: Rect2) -> void:
-	var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
-	var ink := Color("a73a2a") if suit == 1 or suit == 2 else Color("292117")
-	draw_string(font, Vector2(rect.position.x,
-			rect.position.y + rect.size.y * 0.5 + 24.0), "A",
-			HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 66, ink)
+	var ink := "red" if suit == 1 or suit == 2 else "black"
+	var t := CardArt.tex("rank", "A_" + ink)
+	if t == null:
+		var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
+		var col := Color("a73a2a") if ink == "red" else Color("292117")
+		draw_string(font, Vector2(rect.position.x,
+				rect.position.y + rect.size.y * 0.5 + 24.0), "A",
+				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 66, col)
+		return
+	var ts := t.get_size()
+	# The top-left corner letter's home in the layer canvas.
+	var region := Rect2(ts.x * 0.030, ts.y * 0.064, ts.x * 0.220, ts.y * 0.165)
+	var dst_h := rect.size.y * 0.44
+	var dst := Vector2(dst_h * region.size.x / region.size.y, dst_h)
+	draw_texture_rect_region(t,
+			Rect2(rect.position + rect.size / 2.0 - dst / 2.0, dst), region)
 
 
 ## The full kit stack for this card's state, plus the interaction
