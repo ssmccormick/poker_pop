@@ -293,8 +293,9 @@ var upgrades_layer: ColorRect    # the OUTFITTER: meta upgrades for $cash
 var select_layer: ColorRect      # pick your rider before the buy-in
 var _select_cards := {}          # id -> TextureRect (full card art)
 var camp_layer: ColorRect        # the campfire: rest, tend, or cast off
+var _camp_scene: CampScene       # the animated night camp behind it all
 var _camp_hp_label: Label
-var _camp_rest_btn: Button
+var _camp_rest_btn: BaseButton
 var _camp_mode := ""             # "" | "tend" | "burn" — deck view purpose
 var _up_cash: Label
 var _up_rows: Array = []         # [{id, status: Label, btn: Button}]
@@ -1637,10 +1638,29 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 	return b
 
 
-## The campfire's poster: parchment and steady ribbon from the kit,
-## with a code-drawn fire in the emblem well (no painted emblem for
-## it yet). False when the poster kit is absent.
+## The campfire's poster: the design pack's REST STOP band and
+## campfire medallion on the kit parchment. Falls back to the steady
+## ribbon with a code-drawn fire, then to no poster at all.
 func _apply_camp_poster(b: Button) -> bool:
+	var base_p := "res://assets/art/r2/posters/base/poster.png"
+	var tier_p := "res://assets/art/campfire/poster/tier_rest_stop.png"
+	var emblem_p := "res://assets/art/campfire/poster/emblem_campfire.png"
+	if ResourceLoader.exists(base_p) and ResourceLoader.exists(tier_p) \
+			and ResourceLoader.exists(emblem_p):
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		b.size = Vector2(300, 420)
+		b.pivot_offset = b.size / 2.0
+		for p in [base_p, tier_p, emblem_p]:
+			var tr := TextureRect.new()
+			tr.texture = load(p)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_SCALE
+			tr.size = Vector2(300, 420)
+			tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			b.add_child(tr)
+		return true
 	var tier := _apply_poster(b, "", "steady")
 	if tier == "":
 		return false
@@ -3587,6 +3607,8 @@ func _show_camp() -> void:
 	main.tutor_show("campfire")
 	_camp_hp_label.text = "HP  %d / %d" % [hp, MAX_HP]
 	_camp_rest_btn.disabled = hp >= MAX_HP
+	# The chosen rider takes the log by the fire.
+	_camp_scene.setup(character)
 	main.board._play_sound(Board.SFX_MATCHES.pick_random(), 0.8, -10.0)
 	camp_layer.visible = true
 
@@ -3884,42 +3906,83 @@ func build_ui() -> void:
 	_back_button(upgrades_layer, back_to_menu, "MENU")
 
 	# THE CAMPFIRE — one comfort per stop: rest, tend, or cast off.
+	# With the design kit in: the living night camp behind baked
+	# choice cards on the right (per the mock); flat plates otherwise.
 	camp_layer = _layer()
+	_camp_scene = CampScene.new()
+	camp_layer.add_child(_camp_scene)
 	_screen_title(camp_layer, "THE CAMPFIRE")
 	_center(camp_layer, "The fire crackles low. One comfort before the trail calls again.", 200, 22, main.DIM)
 	_camp_hp_label = _center(camp_layer, "", 246, 30, main.GOLD)
-	var camp_opts := [
-		["REST", "Sleep off the road.\nRecover %d HP." % CAMP_REST_HP],
-		["TEND A CARD", "Hold a plain card to the light —\nit takes a random enhancement."],
-		["CAST ONE OFF", "Feed a card to the flames.\nGone from the deck for good."],
-	]
-	for i in camp_opts.size():
-		var opt: Array = camp_opts[i]
-		var cb: Button = main._button(camp_layer, "",
-				Vector2(340.0 + i * 430.0, 360), Vector2(380, 240))
-		var head: Label = main._label(camp_layer, String(opt[0]),
-				Vector2(340.0 + i * 430.0, 392), 30, main.GOLD)
-		head.size = Vector2(380, 40)
-		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var body := _wrap_label(camp_layer, String(opt[1]),
-				Rect2(370.0 + i * 430.0, 452, 320, 110), 18, main.OFFWHITE)
-		body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		match i:
-			0:
-				_camp_rest_btn = cb
-				cb.pressed.connect(_camp_rest)
-			1:
-				cb.pressed.connect(func() -> void:
-					_camp_open_deck("tend"))
-			2:
-				cb.pressed.connect(func() -> void:
-					_camp_open_deck("burn"))
-	var camp_leave: Button = main._button(camp_layer, "BACK ON THE TRAIL",
-			Vector2(760, 740), Vector2(400, 60))
-	camp_leave.add_theme_font_size_override("font_size", 20)
-	camp_leave.pressed.connect(_leave_camp)
+	var camp_art := ResourceLoader.exists(
+			"res://assets/art/campfire/choices/full_rest_normal.png")
+	if camp_art:
+		var camp_ids := ["rest", "tend", "cast"]
+		for i in camp_ids.size():
+			var id: String = camp_ids[i]
+			var tb := TextureButton.new()
+			tb.texture_normal = load(
+					"res://assets/art/campfire/choices/full_%s_normal.png" % id)
+			tb.texture_hover = load(
+					"res://assets/art/campfire/choices/full_%s_hover.png" % id)
+			tb.texture_pressed = load(
+					"res://assets/art/campfire/choices/full_%s_selected.png" % id)
+			if id == "rest":
+				tb.texture_disabled = load(
+						"res://assets/art/campfire/choices/full_rest_disabled.png")
+			tb.ignore_texture_size = true
+			tb.stretch_mode = TextureButton.STRETCH_SCALE
+			tb.position = Vector2(1012.0 + i * 300.0, 335)
+			tb.size = Vector2(272, 346)
+			tb.focus_mode = Control.FOCUS_NONE
+			camp_layer.add_child(tb)
+			match i:
+				0:
+					_camp_rest_btn = tb
+					tb.pressed.connect(_camp_rest)
+				1:
+					tb.pressed.connect(func() -> void:
+						_camp_open_deck("tend"))
+				2:
+					tb.pressed.connect(func() -> void:
+						_camp_open_deck("burn"))
+		var camp_leave: Button = main._button(camp_layer, "BACK ON THE TRAIL",
+				Vector2(1110, 745), Vector2(590, 86))
+		camp_leave.add_theme_font_size_override("font_size", 28)
+		camp_leave.pressed.connect(_leave_camp)
+	else:
+		var camp_opts := [
+			["REST", "Sleep off the road.\nRecover %d HP." % CAMP_REST_HP],
+			["TEND A CARD", "Hold a plain card to the light —\nit takes a random enhancement."],
+			["CAST ONE OFF", "Feed a card to the flames.\nGone from the deck for good."],
+		]
+		for i in camp_opts.size():
+			var opt: Array = camp_opts[i]
+			var cb: Button = main._button(camp_layer, "",
+					Vector2(340.0 + i * 430.0, 360), Vector2(380, 240))
+			var head: Label = main._label(camp_layer, String(opt[0]),
+					Vector2(340.0 + i * 430.0, 392), 30, main.GOLD)
+			head.size = Vector2(380, 40)
+			head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var body := _wrap_label(camp_layer, String(opt[1]),
+					Rect2(370.0 + i * 430.0, 452, 320, 110), 18, main.OFFWHITE)
+			body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			match i:
+				0:
+					_camp_rest_btn = cb
+					cb.pressed.connect(_camp_rest)
+				1:
+					cb.pressed.connect(func() -> void:
+						_camp_open_deck("tend"))
+				2:
+					cb.pressed.connect(func() -> void:
+						_camp_open_deck("burn"))
+		var camp_leave: Button = main._button(camp_layer, "BACK ON THE TRAIL",
+				Vector2(760, 740), Vector2(400, 60))
+		camp_leave.add_theme_font_size_override("font_size", 20)
+		camp_leave.pressed.connect(_leave_camp)
 
 	tarot_layer = _layer()
 	_screen_title(tarot_layer, "FATE DEALS")

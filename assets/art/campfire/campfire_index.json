@@ -1,0 +1,139 @@
+{
+ "scene": {
+  "size": [
+   1920,
+   1080
+  ],
+  "fire_base_px": [
+   820,
+   860
+  ],
+  "seat_px": [
+   560,
+   862
+  ],
+  "draw_order": [
+   "sky (opaque)",
+   "land",
+   "glow (additive or normal, pulse alpha 0.8-1.0)",
+   "rider/<character_id>",
+   "flames_1..3 (cycle ~8 fps)",
+   "sparks_1..3 (drift up, fade)",
+   "smoke (slow scroll up, 25% alpha)",
+   "UI"
+  ],
+  "ui_safe_area": "Title + HP on the top 300px (sky). Choice cards sit in a row from y\u2248560 to 1000 on the left/right of the fire, or across the bottom; keep the rider + fire (x 420-960, y 600-900) clear on desktop.",
+  "layers": {
+   "sky": "scene/sky.png",
+   "land": "scene/land.png",
+   "glow": "scene/glow.png",
+   "flames_1": "scene/flames_1.png",
+   "sparks_1": "scene/sparks_1.png",
+   "flames_2": "scene/flames_2.png",
+   "sparks_2": "scene/sparks_2.png",
+   "flames_3": "scene/flames_3.png",
+   "sparks_3": "scene/sparks_3.png",
+   "smoke": "scene/smoke.png",
+   "riders": {
+    "the_gambler": "scene/rider_the_gambler.png",
+    "the_machine": "scene/rider_the_machine.png",
+    "the_doctor": "scene/rider_the_doctor.png"
+   }
+  }
+ },
+ "poster": {
+  "emblem": "poster/emblem_campfire.png",
+  "tier": "poster/tier_rest_stop.png",
+  "full": "poster/full_campfire.png",
+  "note": "Same stack as the other posters: posters/base/poster -> poster/tier_rest_stop -> poster/emblem_campfire, then title + stats text in-engine."
+ },
+ "choices": {
+  "size": [
+   440,
+   560
+  ],
+  "art_box_px": [
+   130,
+   46,
+   180,
+   180
+  ],
+  "text": {
+   "title": {
+    "center_x": 220,
+    "baseline_y": 300,
+    "font": "Rye",
+    "size": 38,
+    "color": "#E8C547"
+   },
+   "line1": {
+    "center_x": 220,
+    "baseline_y": 364,
+    "font": "Old Standard TT",
+    "size": 24,
+    "color": "#E6D5B0"
+   },
+   "line2": {
+    "center_x": 220,
+    "baseline_y": 396,
+    "font": "Old Standard TT",
+    "size": 24,
+    "color": "#E6D5B0"
+   },
+   "effect": {
+    "center_x": 220,
+    "baseline_y": 497,
+    "font": "Oswald SemiBold",
+    "size": 24,
+    "tracking": 4,
+    "color": "#E8C547"
+   }
+  },
+  "states": [
+   "normal",
+   "hover",
+   "selected",
+   "disabled"
+  ],
+  "disabled_rule": "REST is disabled at full HP (effect plate reads FULL HP)",
+  "options": {
+   "rest": {
+    "title": "REST",
+    "line1": "Sleep off the road.",
+    "line2": "Recover 5 HP.",
+    "effect": "+5 HP"
+   },
+   "tend": {
+    "title": "TEND A CARD",
+    "line1": "Hold a plain card to the light.",
+    "line2": "It takes a random enhancement.",
+    "effect": "ENHANCE 1"
+   },
+   "cast": {
+    "title": "CAST ONE OFF",
+    "line1": "Feed a card to the flames.",
+    "line2": "Gone from the deck for good.",
+    "effect": "REMOVE 1"
+   }
+  },
+  "files": {
+   "frame_normal": "choices/frame_normal.png",
+   "frame_hover": "choices/frame_hover.png",
+   "frame_selected": "choices/frame_selected.png",
+   "frame_disabled": "choices/frame_disabled.png",
+   "art_rest": "choices/art_rest.png",
+   "full_rest_normal": "choices/full_rest_normal.png",
+   "full_rest_hover": "choices/full_rest_hover.png",
+   "full_rest_selected": "choices/full_rest_selected.png",
+   "full_rest_disabled": "choices/full_rest_disabled.png",
+   "art_tend": "choices/art_tend.png",
+   "full_tend_normal": "choices/full_tend_normal.png",
+   "full_tend_hover": "choices/full_tend_hover.png",
+   "full_tend_selected": "choices/full_tend_selected.png",
+   "art_cast": "choices/art_cast.png",
+   "full_cast_normal": "choices/full_cast_normal.png",
+   "full_cast_hover": "choices/full_cast_hover.png",
+   "full_cast_selected": "choices/full_cast_selected.png"
+  }
+ }
+}
