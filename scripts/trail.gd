@@ -1402,6 +1402,10 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.label = "Royal Hunt"
 				offer.odds = 5.0
 				offer["require"] = [["Royal Flush", 1]]
+				# The hunt always runs on the clock (set below):
+				# stalking one royal on a hand budget was a coin
+				# flip, not a hunt.
+				offer["minutes"] = 4
 			else:
 				offer.tarot = "DEALER'S CALL"
 				offer.label = "Called Hands"
@@ -1493,11 +1497,12 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer.hands = MAX_HANDS_BUY
 			offer.target = 0
 	# Every job deals as either a HAND BUDGET or a COUNTDOWN (50/50) —
-	# except the BANK JOB, the STAGECOACH and the GOLD MINE, which
-	# always run on the clock: vaults, schedules and collapsing seams
-	# wait for no hand count. Plain score tables that draw the clock
-	# take the HIGH NOON name.
-	if String(offer.get("goal", "")) in ["safe", "chest", "mine"] or randf() < 0.5:
+	# except the BANK JOB, the STAGECOACH, the GOLD MINE and the
+	# ROYAL HUNT, which always run on the clock: vaults, schedules,
+	# collapsing seams and stalked royals wait for no hand count.
+	# Plain score tables that draw the clock take the HIGH NOON name.
+	if String(offer.get("goal", "")) in ["safe", "chest", "mine"] \
+			or String(offer.get("tarot", "")) == "ROYAL HUNT" or randf() < 0.5:
 		offer["limit"] = "time"
 		if not offer.has("minutes"):
 			offer["minutes"] = clampi(roundi(int(offer.hands) * 0.35), 2,
