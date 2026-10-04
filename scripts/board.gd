@@ -1848,6 +1848,38 @@ func laser_destroy(origin: Vector2, cards: Array) -> void:
 	busy = false
 
 
+## The Shell Game: two neighbors trade places, cards crossing in the
+## air. Everything rides along — hazards, fuses, job pieces.
+func provision_swap(a: PlayingCard, b: PlayingCard) -> void:
+	if busy or locked:
+		return
+	if not grid.has(a.grid_pos) or grid[a.grid_pos] != a \
+			or not grid.has(b.grid_pos) or grid[b.grid_pos] != b:
+		return
+	busy = true
+	clear_selection()
+	var pa := a.grid_pos
+	var pb := b.grid_pos
+	grid[pa] = b
+	grid[pb] = a
+	a.grid_pos = pb
+	b.grid_pos = pa
+	a.z_index = 16
+	b.z_index = 15
+	_play_sound(SFX_SHUFFLES.pick_random(), 1.35, -8.0)
+	_play_sound(SFX_FLIP, 1.1, -10.0, 0.12)
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(a, "position", cell_center(pb), 0.3) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(b, "position", cell_center(pa), 0.3) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await tw.finished
+	a.z_index = 0
+	b.z_index = 0
+	_aim_spreaders()
+	busy = false
+
+
 func provision_destroy(card: PlayingCard) -> void:
 	if busy or locked or not grid.has(card.grid_pos):
 		return

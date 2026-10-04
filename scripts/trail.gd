@@ -128,7 +128,7 @@ const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
 
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
 const MAX_RELICS := 999  # no satchel limit — the price is the gate
-const RELIC_PRICES := [150, 300, 600]  # by rarity C/R/L — carry is unlimited, so they cost dear
+const RELIC_PRICES := [150, 300, 600, 1000]  # by rarity C/R/L/EPIC — carry is unlimited, so they cost dear
 
 # Traveling merchants: each shop stop is a different trader, rolled
 # per room, with their own stock — some deal only in relics.
@@ -158,6 +158,8 @@ const PROVISIONS := {
 		"desc": "Re-roll one card's rank and suit"},
 	"gold_pan": {"name": "Gold Pan", "kind": "target", "price": 65,
 		"desc": "Turn one plain card solid GOLD"},
+	"shell_game": {"name": "Shell Game", "kind": "target", "price": 50,
+		"desc": "Swap two neighboring cards - pick one, then its neighbor"},
 	"fresh_deck": {"name": "Fresh Deck", "kind": "instant", "price": 55,
 		"desc": "Re-deal every plain and enhanced card on the table"},
 	"pocket_flask": {"name": "Pocket Flask", "kind": "instant", "price": 60,
@@ -183,6 +185,7 @@ const RELICS := {
 	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combos use only ranks 2-6"},
 	"saddlebags": {"name": "Saddlebags", "rarity": 1, "desc": "A 4th slot in your provision kit"},
 	"lucky_chip": {"name": "Lucky Chip", "rarity": 2, "desc": "10% chance a hand costs no hand"},
+	"chuck_wagon": {"name": "Chuck Wagon", "rarity": 3, "desc": "A random provision at every table's start"},
 }
 
 var main: Node2D  # set by main.gd before build()
@@ -297,6 +300,7 @@ var _camp_scene: CampScene       # the animated night camp behind it all
 var _camp_hp_label: Label
 var _camp_rest_btn: BaseButton
 var _camp_mode := ""             # "" | "tend" | "burn" — deck view purpose
+var _swap_first: PlayingCard = null  # the Shell Game's first pick
 var _up_cash: Label
 var _up_rows: Array = []         # [{id, status: Label, btn: Button}]
 var _sleeve_pc: PlayingCard      # the sleeve on show beside its row
@@ -795,6 +799,7 @@ func use_provision(slot: int) -> void:
 		# Second press holsters the aimed provision.
 		main.board.pending_provision = ""
 		_aiming_slot = -1
+		_swap_first = null
 		main._announce("HOLSTERED", main.DIM)
 		return
 	if not in_room or not main.game_started or main.board.busy \
@@ -809,6 +814,7 @@ func use_provision(slot: int) -> void:
 		return
 	_aiming_sleeve = false  # only one thing aims at a time
 	_aiming_slot = slot
+	_swap_first = null
 	main.board.pending_provision = id
 	main._announce("PICK A CARD FOR THE %s — right-click to holster"
 			% String(p.name).to_upper(), main.GOLD)
@@ -872,9 +878,11 @@ func _on_provision_target(card) -> void:
 		return
 	if _aiming_slot < 0 or _aiming_slot >= provisions.size():
 		_aiming_slot = -1
+		_swap_first = null
 		return
 	if card == null:
 		_aiming_slot = -1
+		_swap_first = null
 		main._announce("HOLSTERED", main.DIM)
 		return
 	var id: String = provisions[_aiming_slot]
@@ -883,6 +891,32 @@ func _on_provision_target(card) -> void:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
 		main._announce(why, main.RED)
 		return  # still aiming — pick another card or holster
+	if id == "shell_game":
+		# Two picks: the first card waits while you choose its neighbor.
+		if _swap_first == null or not is_instance_valid(_swap_first) \
+				or not main.board.grid.has(_swap_first.grid_pos) \
+				or main.board.grid[_swap_first.grid_pos] != _swap_first:
+			_swap_first = card
+			main.board._play_sound(Board.SFX_FLIP, 1.3, -10.0)
+			main.board._fx(card.position, "pop", main.GOLD)
+			main._announce("NOW PICK THE CARD BESIDE IT — right-click to holster",
+					main.GOLD)
+			return  # still aiming
+		if card == _swap_first:
+			_swap_first = null
+			main._announce("UNPICKED — choose the first card again", main.DIM)
+			return
+		var dp: Vector2i = card.grid_pos - _swap_first.grid_pos
+		if absi(dp.x) + absi(dp.y) != 1:
+			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+			main._announce("THEY MUST SIT SIDE BY SIDE", main.RED)
+			return  # still aiming
+		var first := _swap_first
+		_swap_first = null
+		_spend_provision(_aiming_slot)
+		main._announce("THE SHELL GAME — WATCH THE CARDS")
+		await main.board.provision_swap(first, card)
+		return
 	var slot := _aiming_slot
 	_spend_provision(slot)
 	_apply_target_provision(id, card)
@@ -910,6 +944,9 @@ func _provision_refusal(id: String, card: PlayingCard) -> String:
 			if card.boss != "" or card.is_safe or card.snake_tail \
 					or card.cursed or card.hazard == "stone":
 				return "NOTHING THERE TO SHAVE"
+		"shell_game":
+			if card.is_safe or card.boss != "" or card.snake_tail:
+				return "TOO HEAVY TO SHUFFLE — pick an ordinary card"
 	return ""
 
 
@@ -2063,6 +2100,7 @@ func _start_room() -> void:
 	_aiming_sleeve = false
 	laser_used = false
 	_aiming_laser = false
+	_swap_first = null
 	watch_uses_left = 1 + watch_level
 	_watch_snapshot = {}
 	main.board.undo_state = {}
@@ -2070,6 +2108,12 @@ func _start_room() -> void:
 	_chest_rewards.clear()  # unopened luck doesn't carry between tables
 	_chest_won_cards.clear()
 	main.tutor_show("hp")
+	# The Chuck Wagon rolls in with supplies at every table.
+	if has_relic("chuck_wagon") and provisions.size() < kit_size():
+		var ration := _random_provision()
+		if gain_provision(ration):
+			main._announce("THE CHUCK WAGON PROVIDES — %s"
+					% String(PROVISIONS[ration].name).to_upper())
 	match character:
 		"the_machine":
 			main.tutor_show("laser")

@@ -688,3 +688,13 @@ card, free). Then the trail calls.
 - The Weathervane relic is retired - the wind particles already blow
   the right way, so its arrows and next-victim telegraphs are free
   information for everyone now. Stale saves drop it cleanly.
+
+## Shell Game and Chuck Wagon (Oct 2026)
+
+- SHELL GAME (provision, 50 chips, targeted twice): swap two
+  neighboring cards. Pick one, then the card beside it - they cross
+  in the air with everything riding along (hazards, fuses, job
+  pieces). Safes, bosses and coils are too heavy to shuffle.
+- CHUCK WAGON (relic, EPIC - the new fourth rarity, $1000 base): a
+  random provision rolls into the kit at every table's start (when
+  there is room). RELIC_PRICES grows to [150, 300, 600, 1000].

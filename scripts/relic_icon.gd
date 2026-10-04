@@ -128,6 +128,20 @@ func _draw() -> void:
 			draw_rect(Rect2(3, -2, 14, 4), WOOD)
 			draw_circle(Vector2(-10, 6), 2.2, GOLD)
 			draw_circle(Vector2(10, 6), 2.2, GOLD)
+		"chuck_wagon":
+			# The covered wagon, loaded with rations.
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(-15, -4), Vector2(-13, -14), Vector2(-8, -17),
+				Vector2(8, -17), Vector2(13, -14), Vector2(15, -4)]), CANVAS)
+			for k in 3:
+				draw_line(Vector2(-8.0 + k * 8.0, -16), Vector2(-9.0 + k * 9.0, -4),
+						Color(0.62, 0.54, 0.4), 1.5)
+			draw_rect(Rect2(-17, -4, 34, 10), WOOD)
+			draw_rect(Rect2(-17, -4, 34, 3), Color(0.4, 0.29, 0.17))
+			draw_circle(Vector2(-9, 10), 6, Color(0.4, 0.29, 0.17))
+			draw_circle(Vector2(-9, 10), 2.5, GOLD)
+			draw_circle(Vector2(9, 10), 6, Color(0.4, 0.29, 0.17))
+			draw_circle(Vector2(9, 10), 2.5, GOLD)
 		"lucky_chip":
 			draw_circle(Vector2.ZERO, 16, RED)
 			for k in 6:
