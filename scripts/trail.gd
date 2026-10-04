@@ -1952,9 +1952,9 @@ func on_hand_played(result: Dictionary) -> void:
 			if room_chests_opened >= room_chests_needed:
 				_room_cleared()
 				return
-			# The job's not done: a fresh pair hits the board.
+			# The job's not done: the tick's treasure check deals a
+			# fresh pair once the board settles.
 			_consume_hand()
-			_respawn_treasure()
 			return
 		# An AMBIENT chest keeps its secret: the reward is rolled now
 		# but only cracked open once the table is cleared.
@@ -2074,11 +2074,9 @@ func on_hand_played(result: Dictionary) -> void:
 		if _require_left() == 0:
 			_room_cleared()
 			return
-	if room_goal == "chest":
-		# A key or chest played without its partner (or blown/shoved
-		# off the board) is no longer a fail — a fresh one turns up.
-		# The hand spent finding it is the price.
-		_replace_lost_treasure()
+	# Lost keys and chests (played without a partner, blown off by
+	# wind, burned out) respawn from the hazard tick's settle check —
+	# one place, after everything that can remove a card has acted.
 	_consume_hand()
 
 
@@ -2098,35 +2096,35 @@ func _consume_hand() -> void:
 		_tick_room_hazards()
 
 
-## A key or chest went missing without its partner: once the board
-## settles, whichever piece is gone reappears on a fresh card.
+## The ONE treasure respawn, run from the hazard tick after every
+## hand settles: however a key or chest left the table — played solo,
+## opened as a pair, blown off by a gust, burned out — whatever is
+## missing turns up on a fresh card. Plain rooms only reunite ORPHANS
+## (an ambient pair that is wholly gone was opened, not lost).
 func _replace_lost_treasure() -> void:
 	while main.board.busy:
 		await get_tree().process_frame
-	if not in_room or room_goal != "chest":
+	if not in_room:
 		return
-	var respawned := false
-	if not main.board.has_objective("key"):
+	var has_key: bool = main.board.has_objective("key")
+	var has_chest: bool = main.board.has_objective("chest")
+	if has_key and has_chest:
+		return
+	if room_goal != "chest" and has_key == has_chest:
+		return
+	if not has_key:
 		main.board.spawn_objective("key")
-		respawned = true
-	if not main.board.has_objective("chest"):
+	if not has_chest:
 		main.board.spawn_objective("chest")
-		respawned = true
-	if respawned:
-		main.board._play_sound(Board.SFX_FLIP, 1.2, -8.0)
+	if main.board.has_objective("key") == has_key \
+			and main.board.has_objective("chest") == has_chest:
+		return  # no clean card to carry it this hand; the next tick retries
+	main.board._play_sound(Board.SFX_FLIP, 1.2, -8.0)
+	if room_goal == "chest" and not has_key and not has_chest:
+		main._announce("ANOTHER KEY, ANOTHER CHEST  (%d / %d)"
+				% [room_chests_opened, room_chests_needed])
+	else:
 		main._announce("A NEW LEAD ON THE LOOT")
-
-
-## Treasure rooms demand several pairs: once the board settles from
-## the opened one, a fresh key and chest are dealt onto plain cards.
-func _respawn_treasure() -> void:
-	while main.board.busy:
-		await get_tree().process_frame
-	if not in_room or room_goal != "chest":
-		return
-	main.board.spawn_key_and_chest()
-	main._announce("ANOTHER KEY, ANOTHER CHEST  (%d / %d)"
-			% [room_chests_opened, room_chests_needed])
 
 
 func on_safe_cracked() -> void:
@@ -2529,6 +2527,11 @@ func _tick_room_hazards() -> void:
 		# Every card burning: nothing left to save.
 		_room_failed("THE WHOLE TABLE'S ABLAZE")
 		return
+	# Whatever the hand or the hazards carried off, the treasure
+	# comes back: the gust can blow the key or chest clean off the
+	# table, and the job must stay winnable.
+	if in_room:
+		_replace_lost_treasure()
 	# A fire can burn ITSELF out on the tick — that counts too.
 	if room_goal == "purge" and in_room \
 			and purged_count() >= purge_quota() and purge_left() == 0:
