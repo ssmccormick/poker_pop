@@ -306,6 +306,13 @@ func _ready() -> void:
 						"label": "Twenty-One", "target": 0, "hands": 8, "odds": 1.5,
 						"min_bet": 10, "goal": "blackjack", "wins": 3}, false)
 				trail._confirm_bet()
+			"trailholdem":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail._choose_offer({"kind": "play", "tarot": "TEXAS HOLD'EM",
+						"label": "Hold'em", "target": 1200, "hands": 9, "odds": 1.5,
+						"min_bet": 10, "goal": "holdem"}, false)
+				trail._confirm_bet()
 			"trailoutlaw":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -1828,6 +1835,13 @@ func _refresh_community() -> void:
 	for child in community_display.get_children():
 		child.queue_free()
 	var cards: Array = board.panel_cards()
+	# Big cards, slightly fanned: they overlap just enough that the
+	# whole street fits the plate (each card's rank corner stays
+	# clear), and spread back out when the panel holds fewer.
+	var avail := 292.0 / community_display.scale.x
+	var pitch := 74.0
+	if cards.size() > 1:
+		pitch = minf(74.0, (avail - PlayingCard.W) / (cards.size() - 1))
 	for i in cards.size():
 		var data: Dictionary = cards[i]
 		var mc := PlayingCard.new()
@@ -1837,7 +1851,7 @@ func _refresh_community() -> void:
 		# until the player commits a hand.
 		mc.face_down = i == 1 and board.blackjack_hole_hidden \
 				and not board.blackjack_dealer_cards.is_empty()
-		mc.position = Vector2(i * 74.0 + 46.0, 0)
+		mc.position = Vector2(PlayingCard.W / 2.0 + i * pitch, 0)
 		mc.material = Themes.current_material()
 		community_display.add_child(mc)
 
@@ -2004,8 +2018,8 @@ func _build_ui() -> void:
 	# Hold'em community cards (visible only when a community is live).
 	_community_label = _label(hud_root, "COMMUNITY", Vector2(PANEL_X, 646), 18, DIM)
 	community_display = Node2D.new()
-	community_display.position = Vector2(PANEL_X + 26, 730)
-	community_display.scale = Vector2(0.62, 0.62)
+	community_display.position = Vector2(PANEL_X + 4, 734)
+	community_display.scale = Vector2(0.95, 0.95)
 	hud_root.add_child(community_display)
 
 	# The Showdown's Outlaw, waiting in the left column.
@@ -2830,7 +2844,7 @@ func _debug_seed_hazards() -> void:
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss", "trailbj", "trailpick", "cardgrid":
+		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid":
 			await get_tree().create_timer(4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
