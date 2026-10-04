@@ -607,3 +607,22 @@ saves).
 9. **Seeded/daily runs** — same tarot sequence for everyone once
    leaderboards exist (ties into tabled Supabase plan).
 10. "Heavy" modifier (counts as two of its rank) — too rule-warping?
+
+## Balance pass — easier overall (Oct 2026)
+
+The ride to the Queen was starving riders out. One pass, many small
+levers, all pulled toward the player:
+
+- Targets: TARGET_STEP 200 -> 165; HIGH STAKES scale 1.5 -> 1.4.
+- Hand budgets: 10/8/7 -> 11/9/8, and depth now costs at most ONE
+  hand (was one per region) — the old curve had region-2 HIGH
+  STAKES demanding ~560/hand.
+- Economy: blinds climb 6/table (was 8); starting stacks 140/300/600
+  (were 100/250/500); the post-boss price wall is 6x per boss (was
+  10x) — a won 3:1 boss all-in only quadruples the stack, so the old
+  wall cut real wealth more than half right before the Queen.
+- Hazards: room step .055 (was .08), seed count grows every 5 tables
+  (was 4), refill chance climbs slower and caps at 16% (was 20%);
+  crazy-8s storm 6 base (was 8), blackjack 4 (was 5).
+- Goals: purge quota +2 per region (was +3); GOLD MINE 16 stones,
+  10 seeded (was 20/12).

@@ -15,10 +15,11 @@ const BOSS_ROOMS := {6: "jack", 13: "queen", 20: "cobra"}
 const JACK_ROOM := 6
 const QUEEN_ROOM := 13
 # Beyond the Jack the trail plays for real money: every cost — antes,
-# bets, shop goods, relics, the forge — runs 10×, and beyond the
-# Queen it jumps 10× again (100× the frontier prices). All-in riders
-# carry stacks that keep pace.
-const POST_BOSS_COST_MULT := 10
+# bets, shop goods, relics, the forge — runs 6×, and beyond the
+# Queen it jumps 6× again (36× the frontier prices). A won boss
+# all-in quadruples the stack (3:1), so the wall stings without
+# flattening riders who limped through.
+const POST_BOSS_COST_MULT := 6
 const BOSSES := {
 	"jack": {"tarot": "THE JACK", "name": "Jack of All Trades", "hands": 30},
 	"queen": {"tarot": "THE QUEEN", "name": "Queen Bee", "hands": 14},
@@ -28,9 +29,9 @@ const BOSSES := {
 # Buy-in tables: [name, cash cost, starting chips, cash-out rate,
 # target multiplier, blind multiplier]
 const TABLES := [
-	{"name": "PENNY ANTE", "cost": 0, "chips": 100, "rate": 1.0, "target_mult": 1.0, "blind_mult": 1.0},
-	{"name": "TABLE STAKES", "cost": 250, "chips": 250, "rate": 1.5, "target_mult": 1.35, "blind_mult": 1.5},
-	{"name": "HIGH ROLLER", "cost": 1000, "chips": 500, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
+	{"name": "PENNY ANTE", "cost": 0, "chips": 140, "rate": 1.0, "target_mult": 1.0, "blind_mult": 1.0},
+	{"name": "TABLE STAKES", "cost": 250, "chips": 300, "rate": 1.5, "target_mult": 1.35, "blind_mult": 1.5},
+	{"name": "HIGH ROLLER", "cost": 1000, "chips": 600, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
 ]
 
 # Room risk tiers offered by the draw, named for what they pay — a
@@ -38,9 +39,9 @@ const TABLES := [
 # "hands" is the budget the table deals you — it shrinks as the
 # trail deepens; the player doesn't haggle over it.
 const RISKS := [
-	{"tarot": "EASY MONEY", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 10},
-	{"tarot": "FAT POT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 8},
-	{"tarot": "HIGH STAKES", "label": "Dangerous", "target_scale": 1.5, "odds": 2.0, "hands": 7},
+	{"tarot": "EASY MONEY", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 11},
+	{"tarot": "FAT POT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 9},
+	{"tarot": "HIGH STAKES", "label": "Dangerous", "target_scale": 1.4, "odds": 2.0, "hands": 8},
 ]
 
 # Entering a room costs its ANTE (the house keeps it, win or lose),
@@ -54,26 +55,26 @@ const WIN_LINGER_SECS := 2.5  # savour a cleared table before the pick
 # tarot decides only the room's GOAL.
 const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
 const HAZARD_BASE_CHANCE := 0.20
-const HAZARD_ROOM_STEP := 0.08   # + per room index — deep tables always bite
+const HAZARD_ROOM_STEP := 0.055  # + per room index — deep tables always bite
 const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
-const HAZARD_COUNT_ROOMS := 4    # seed count grows every N tables
+const HAZARD_COUNT_ROOMS := 5    # seed count grows every N tables
 const HAZARD_COUNT_MAX := 6
 # Every refill can deal danger: chance per fresh card, climbing with
 # depth. Purge rooms are exempt (extra hazards would warp the goal).
 const REFILL_HAZARD_BASE := 0.03
-const REFILL_HAZARD_STEP := 0.008  # + per room index
-const REFILL_HAZARD_MAX := 0.20
+const REFILL_HAZARD_STEP := 0.006  # + per room index
+const REFILL_HAZARD_MAX := 0.16
 const OBJECTIVE_CHANCE := 0.12   # heist/treasure rooms, from room 2 on
 const PURGE_CHANCE := 0.12       # purge rooms: clear a QUOTA of one hazard kind
 const COLLECT_CHANCE := 0.08     # roundup rooms: clear called suits/ranks
 const LANDRUSH_CHANCE := 0.07    # land rush: clear a card from every cell
 const PURGE_SEED := 4            # hazards on the table at the deal
 const PURGE_QUOTA_BASE := 10     # total to clear (+ per region below)
-const PURGE_QUOTA_REGION := 3    # deeper tables demand more
+const PURGE_QUOTA_REGION := 2    # deeper tables demand more
 const PURGE_FLOOR := 4           # trickle keeps at least this many on board
 const PURGE_TRICKLE := 2         # at most this many arrive per hand
-const CRAZY8_HAZARDS_BASE := 8   # crazy-8s hazard storm (+1 per region)
-const BLACKJACK_HAZARDS_BASE := 5  # blackjack table hazards (+1 per region)
+const CRAZY8_HAZARDS_BASE := 6   # crazy-8s hazard storm (+1 per region)
+const BLACKJACK_HAZARDS_BASE := 4  # blackjack table hazards (+1 per region)
 const REQUIRE_CHANCE := 0.10     # called-hands rooms: play the demanded hands
 const ROYAL_CHANCE := 0.10       # of called-hands rooms (region 2+): THE WORLD
 const TIMED_MAX_MINUTES := 6     # the most time a clock table will sell
@@ -88,8 +89,8 @@ const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 # GOLD MINE instead (its own room type).
 const PURGE_TAROTS := {"bomb": "POWDER KEG", "fire": "WILDFIRE",
 		"wind": "DUST STORM", "water": "FLASH FLOOD"}
-const GOLD_MINE_QUOTA := 20        # break them ALL — the full seam
-const GOLD_MINE_STONE_SEED := 12   # stones seeded (about half the board)
+const GOLD_MINE_QUOTA := 16        # break them ALL — the full seam
+const GOLD_MINE_STONE_SEED := 10   # stones seeded (under half the board)
 const GOLD_MINE_FLOOR := 6         # trickle keeps at least this many standing
 const GOLD_MINE_TRICKLE := 2       # at most this many ride in per hand
 # Called-hands templates by region: [hand name, count] — exact hands
@@ -109,9 +110,9 @@ const REQUIRE_POOLS := [
 ]
 
 const BASE_TARGET := 1000         # table 1 target before scaling
-const TARGET_STEP := 200          # + per table (21-table curve)
+const TARGET_STEP := 165          # + per table (21-table curve)
 const BLIND_BASE := 25            # table 1 ante / minimum bet
-const BLIND_STEP := 8             # + per table cleared — the floor climbs
+const BLIND_STEP := 6             # + per table cleared — the floor climbs
 const SHOP_CARD_PRICE := 40       # plain card
 const SHOP_DUP_PRICE := 50        # exact duplicate of a card you own
 const SHOP_MOD_PRICE := 80        # chip/mult enhanced card
@@ -1059,7 +1060,9 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		"tarot": risk.tarot,
 		"label": risk.label,
 		"target": _target_for(room_index, risk),
-		"hands": maxi(1, int(risk.hands) - region),
+		# Depth costs ONE hand at most — the climbing targets are
+		# squeeze enough without the budget draining too.
+		"hands": maxi(1, int(risk.hands) - mini(region, 1)),
 		"odds": float(risk.odds),
 		"min_bet": _blind_for(room_index),
 	}
