@@ -674,3 +674,17 @@ shops), offered on the tarot wall as a poster with a code-drawn
 fire. One comfort per stop: REST (+5 HP), TEND A CARD (a plain deck
 card takes a random enhancement), or CAST ONE OFF (burn any deck
 card, free). Then the trail calls.
+
+## The Joker, honest stakes, and a retired relic (Oct 2026)
+
+- Lucky 2+ is gone. A PLUS boost past an Ace now wraps the card into
+  THE JOKER: a trickster deuce in the lucky green suit that holds
+  ONE enhancement at a time (chip, mult, gold, wild, plus, minus or
+  bumper) and swaps to a DIFFERENT one every hand on the board tick.
+  Whatever he holds when scored is what he does. The sleeve carries
+  him between tables; old 2+ saves load as Jokers.
+- THE STAKES screen re-spaced: the info block (five lines on a
+  retry) now clears the BET row entirely.
+- The Weathervane relic is retired - the wind particles already blow
+  the right way, so its arrows and next-victim telegraphs are free
+  information for everyone now. Stale saves drop it cleanly.

@@ -175,7 +175,6 @@ const RELICS := {
 	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
 	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
 	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
-	"weathervane": {"name": "Weathervane", "rarity": 1, "desc": "Wind cards show which way they blow"},
 	"magnifying_glass": {"name": "Magnifying Glass", "rarity": 1, "desc": "Filled cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
@@ -231,7 +230,7 @@ var provisions: Array = []       # provision ids in the kit (max 3, dupes fine)
 var _aiming_slot := -1           # kit slot waiting on a target, -1 = none
 # ACE UP THE SLEEVE: the hidden card you can trade onto the table once
 # per room — the card you take waits up the sleeve for another table.
-var sleeve_card := {}            # {rank, suit, mod, boom, two_plus}
+var sleeve_card := {}            # {rank, suit, mod, boom, joker}
 var sleeve_used := false         # one swap per table (the Gambler)
 # --- Playable characters: three riders, one signature ability each.
 const CHARACTERS := {
@@ -455,7 +454,9 @@ func _load_run() -> bool:
 						or raw_mod == "chipsplode"})
 	relics.clear()
 	for id in cf.get_value("run", "relics", PackedStringArray()):
-		relics.append(String(id))
+		# Retired relics (the Weathervane) fall off resumed runs.
+		if RELICS.has(String(id)):
+			relics.append(String(id))
 	provisions.clear()
 	for id in cf.get_value("run", "provisions", PackedStringArray()):
 		if PROVISIONS.has(String(id)):
@@ -506,7 +507,6 @@ func _apply_relic_effects() -> void:
 	main.board.chip_bonus = Board.CHIP_BONUS * (2 if has_relic("gold_tooth") else 1)
 	main.board.mult_factor = 2.0 if has_relic("mirror_shades") else Board.MULT_FACTOR
 	PlayingCard.washed_show_suit = has_relic("magnifying_glass")
-	PlayingCard.show_hazard_intent = has_relic("weathervane")
 
 
 func _gain_relic(id: String) -> void:
@@ -528,7 +528,7 @@ const SUIT_CHARS := ["♠", "♥", "♦", "♣"]
 ## A new run's sleeve: the meta-upgraded rank, in a random suit.
 func _fresh_sleeve() -> Dictionary:
 	return {"rank": sleeve_rank, "suit": randi_range(0, 3),
-			"mod": "", "boom": false, "two_plus": false}
+			"mod": "", "boom": false, "joker": false}
 
 
 ## "A♥"-style label for whatever is up the sleeve right now.
@@ -537,8 +537,8 @@ func sleeve_label() -> String:
 		return "—"
 	var r := int(sleeve_card.rank)
 	var txt: String = RANK_CHARS.get(r, str(r))
-	if bool(sleeve_card.get("two_plus", false)):
-		txt = "2+"
+	if bool(sleeve_card.get("joker", sleeve_card.get("two_plus", false))):
+		txt = "JOKER"
 	if String(sleeve_card.get("mod", "")) != "":
 		txt += " · %s" % String(sleeve_card.mod).to_upper()
 	return "%s%s" % [txt, SUIT_CHARS[int(sleeve_card.suit)]]
@@ -588,12 +588,12 @@ func _sleeve_refusal(card: PlayingCard) -> String:
 ## place. What you took rides along to the next table.
 func _do_sleeve_swap(card: PlayingCard) -> void:
 	var taken := {"rank": card.rank, "suit": card.suit, "mod": card.mod,
-			"boom": card.boom, "two_plus": card.two_plus}
+			"boom": card.boom, "joker": card.joker}
 	card.rank = int(sleeve_card.rank)
 	card.suit = int(sleeve_card.suit)
 	card.mod = String(sleeve_card.get("mod", ""))
 	card.boom = bool(sleeve_card.get("boom", false))
-	card.two_plus = bool(sleeve_card.get("two_plus", false))
+	card.joker = bool(sleeve_card.get("joker", sleeve_card.get("two_plus", false)))
 	if card.mod in ["plus", "minus", "bumper"]:
 		card.boost_dir = Board.HAZARD_DIRS.pick_random()
 	card.queue_redraw()
@@ -3738,7 +3738,7 @@ func _deck_stat_text(d: Dictionary) -> String:
 		"gold":
 			text += "GOLD\nPays $1 of real, bankable cash when played."
 		"plus":
-			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it. Boosting an ACE wraps it into a lucky 2+ that DOUBLES any hand it scores in."
+			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it. Boosting an ACE wraps it into THE JOKER — a trickster holding one enhancement at a time, swapping every hand."
 		"minus":
 			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank — and a 2 ground lower is DESTROYED, unscored. The arrow turns a quarter every hand — time it."
 		"bumper":
@@ -3935,26 +3935,28 @@ func build_ui() -> void:
 
 	bet_layer = _layer()
 	_screen_title(bet_layer, "THE STAKES")
-	_bet_info = _center(bet_layer, "", 250, 26, main.OFFWHITE)
-	_bet_amount_label = _center(bet_layer, "", 395, 36, main.OFFWHITE)
+	_bet_info = _center(bet_layer, "", 240, 26, main.OFFWHITE)
+	# The info block runs four lines (five on a retry) — the bet row
+	# sits well below so nothing ever overlaps it.
+	_bet_amount_label = _center(bet_layer, "", 468, 36, main.OFFWHITE)
 	# Poker presets: MIN sits at the blind, RAISE doubles the bet each
 	# press, ALL IN shoves the whole stack.
-	var bet_min: Button = main._button(bet_layer, "MIN", Vector2(640, 445), Vector2(200, 60))
+	var bet_min: Button = main._button(bet_layer, "MIN", Vector2(640, 524), Vector2(200, 60))
 	bet_min.add_theme_font_size_override("font_size", 24)
 	bet_min.pressed.connect(func() -> void:
 		_bet_amount = int(current_offer.min_bet)
 		_refresh_bet_labels())
-	var bet_raise: Button = main._button(bet_layer, "RAISE ×2", Vector2(860, 445), Vector2(200, 60))
+	var bet_raise: Button = main._button(bet_layer, "RAISE ×2", Vector2(860, 524), Vector2(200, 60))
 	bet_raise.add_theme_font_size_override("font_size", 24)
 	bet_raise.pressed.connect(func() -> void:
 		_bet_amount = mini(_bet_amount * 2, _max_bet())
 		_refresh_bet_labels())
-	var bet_allin: Button = main._button(bet_layer, "ALL IN", Vector2(1080, 445), Vector2(200, 60))
+	var bet_allin: Button = main._button(bet_layer, "ALL IN", Vector2(1080, 524), Vector2(200, 60))
 	bet_allin.add_theme_font_size_override("font_size", 24)
 	bet_allin.pressed.connect(func() -> void:
 		_bet_amount = _max_bet()
 		_refresh_bet_labels())
-	_bet_stake_label = _center(bet_layer, "", 560, 36, main.GOLD)
+	_bet_stake_label = _center(bet_layer, "", 622, 36, main.GOLD)
 	_bet_deal_btn = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70), true)
 	_bet_deal_btn.add_theme_font_size_override("font_size", 28)
 	_bet_deal_btn.pressed.connect(_confirm_bet)

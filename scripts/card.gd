@@ -100,7 +100,9 @@ const SUIT_PIXELS := [SPADE_PX, HEART_PX, DIAMOND_PX, CLUB_PX]
 # Magnifying Glass relic: soaked cards still reveal their suit.
 static var washed_show_suit := false
 # Weathervane relic: hazards telegraph the card they strike next.
-static var show_hazard_intent := false
+# Always on since the Weathervane relic retired: wind arrows and
+# next-victim telegraphs are free information now.
+static var show_hazard_intent := true
 # CRAZY 8s room: every 8 on the board is wild (drawn with a W badge).
 static var eights_wild := false
 
@@ -117,13 +119,14 @@ var rank := 2:
 	set(value):
 		rank = value
 		if rank != 2:
-			two_plus = false
+			joker = false
 		queue_redraw()
-# The wrapped Ace: a PLUS boost past Ace turns the card into a lucky
-# "2+" deuce — scoring it DOUBLES the whole hand.
-var two_plus := false:
+# THE JOKER: a PLUS boost past Ace wraps the card into the deck's
+# trickster — it holds ONE enhancement at a time and swaps to a
+# different one every hand (the board rerolls `mod` on its tick).
+var joker := false:
 	set(value):
-		two_plus = value
+		joker = value
 		queue_redraw()
 var suit := 0
 var grid_pos := Vector2i.ZERO
@@ -437,8 +440,8 @@ static func _make_boxes() -> void:
 
 
 func rank_text() -> String:
-	if two_plus:
-		return "2+"
+	if joker:
+		return "JKR"
 	match rank:
 		11: return "J"
 		12: return "Q"
@@ -565,8 +568,8 @@ func _draw() -> void:
 						Color("3a3a40"))
 			return
 		_draw_mod_face(rect)
-		if two_plus:
-			# The wrapped Ace announces its luck.
+		if joker:
+			# The trickster announces itself.
 			draw_rect(rect.grow(-5), Color(BOOST_GREEN.r, BOOST_GREEN.g,
 					BOOST_GREEN.b, 0.55), false, 2.5)
 		var col := suit_color()
@@ -890,14 +893,17 @@ func _draw_art(rect: Rect2) -> void:
 		_draw_art_chain_badge(font)
 		_draw_art_rings(rect)
 		return
-	var mod_key := "lucky" if two_plus else mod
+	var mod_key := mod
+	# THE JOKER wears the lucky wash and frame as his own suit, with
+	# whatever enhancement he's holding THIS hand as the center emblem.
+	var skin := "lucky" if joker else mod_key
 	# Faces and Aces keep their big letter even when a mod rides the
 	# card: the wash and frame still dress it, but the emblem drops to
 	# the free bottom-left corner instead of covering the letter.
 	var lettered := rank >= 11
-	if mod_key != "":
-		_art(rect, "mod_wash", mod_key)
-		_art(rect, "mod_frame", mod_key)
+	if skin != "":
+		_art(rect, "mod_wash", skin)
+		_art(rect, "mod_frame", skin)
 	if mod_key == "" or lettered:
 		if rank == 14:
 			_draw_art_ace(rect)
@@ -914,6 +920,12 @@ func _draw_art(rect: Rect2) -> void:
 					emb_scale, Color.WHITE, CardArt.arrow_rotation(boost_dir))
 		else:
 			_art_badge(rect, "mod_emblem", mod_key, emb_anchor, emb_scale)
+	if joker:
+		# A small nameplate so the shifting power reads as one card.
+		var jfont: Font = FontLib.numbers if FontLib.numbers != null \
+				else ThemeDB.fallback_font
+		draw_string(jfont, Vector2(rect.position.x, rect.end.y - 14.0), "JOKER",
+				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, Color("2a4a2a"))
 	_draw_art_rank_suit(rect)
 
 	# Hazards ride over the face; the code's motion rides over the art.

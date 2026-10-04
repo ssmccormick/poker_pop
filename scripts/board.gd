@@ -98,6 +98,8 @@ func queue_refill_hazards(kind: String, count: int) -> void:
 	for i in count:
 		_pending_refill_hazards.append(kind)
 const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
+# Everything THE JOKER can hold — he draws a different one each hand.
+const JOKER_MODS := ["chip", "mult", "gold", "wild", "plus", "minus", "bumper"]
 # Ledger of every hazard ever put on this board, by kind. Purge rooms
 # read cleared = spawned − still standing, which is exact no matter
 # HOW a hazard left (played, burned out, gusted, shoved, blown up).
@@ -985,10 +987,14 @@ func play_hand() -> void:
 			if not c.is_safe and c.boss == "" and not c.snake_tail \
 					and not c.cursed and c.hazard != "stone":
 				if adata.mod == "plus" and c.rank >= 14:
-					# Nowhere up from an Ace: it wraps into a lucky
-					# 2+ that DOUBLES any hand it scores in.
+					# Nowhere up from an Ace: it wraps into THE JOKER —
+					# a trickster deuce holding one enhancement at a
+					# time, swapping to another every hand.
 					c.rank = 2
-					c.two_plus = true
+					c.joker = true
+					c.mod = JOKER_MODS.pick_random()
+					c.boost_dir = HAZARD_DIRS.pick_random()
+					_spawn_float_text("THE JOKER!", c.position)
 				elif adata.mod == "plus":
 					c.rank += 1
 				elif c.rank <= 2:
@@ -1662,7 +1668,6 @@ func _apply_card_mods(result: Dictionary) -> void:
 	var mults := 0
 	var chip_cards := 0
 	var gold_cards := 0
-	var doublers := 0
 	for card in selected:
 		if card.mod == "mult":
 			mults += 1
@@ -1670,13 +1675,8 @@ func _apply_card_mods(result: Dictionary) -> void:
 			chip_cards += 1
 		elif card.mod == "gold":
 			gold_cards += 1
-		if card.two_plus:
-			doublers += 1
 	if mults > 0:
 		result.score = int(result.score * pow(mult_factor, mults))
-	if doublers > 0:
-		# Lucky 2+ deuces (wrapped Aces) double the hand, stacking.
-		result.score = int(result.score * pow(2.0, doublers))
 	if chip_cards > 0:
 		result["bonus_chips"] = chip_cards * chip_bonus
 	if gold_cards > 0:
@@ -1708,7 +1708,7 @@ func provision_clean(card: PlayingCard) -> void:
 
 ## Every card property the watch must carry back. `hazard` sits
 ## before `fuse` so the fuse setter can place its ambient spark.
-const UNDO_CARD_PROPS := ["rank", "suit", "mod", "boom", "two_plus",
+const UNDO_CARD_PROPS := ["rank", "suit", "mod", "boom", "joker",
 		"cursed", "washed", "hazard", "hazard_fresh", "fuse", "stone_hits",
 		"water_level", "wind_dir", "next_dir", "boost_dir", "objective",
 		"bullet_timer", "is_safe", "combo_progress", "boss", "boss_hp",
@@ -2371,9 +2371,15 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	# EVERY directional card swings its arrow a quarter turn (clockwise)
 	# each hand — plus/minus/bumper mods AND wind hazards. Time the
-	# clear to aim the effect where you want it.
+	# clear to aim the effect where you want it. THE JOKER swaps to a
+	# different enhancement entirely.
 	for p in grid:
-		if grid[p].mod in ["plus", "minus", "bumper"]:
+		if grid[p].joker:
+			var pool := JOKER_MODS.duplicate()
+			pool.erase(grid[p].mod)
+			grid[p].mod = pool.pick_random()
+			grid[p].boost_dir = HAZARD_DIRS.pick_random()
+		elif grid[p].mod in ["plus", "minus", "bumper"]:
 			var bd: Vector2i = grid[p].boost_dir
 			grid[p].boost_dir = Vector2i(-bd.y, bd.x)
 		if grid[p].hazard == "wind":

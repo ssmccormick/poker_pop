@@ -307,7 +307,7 @@ func _ready() -> void:
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail._hide_all()
-				trail._pending_relic_reward = "weathervane"
+				trail._pending_relic_reward = "horseshoe"
 				trail._show_relic_reward_now()
 			"trailbj":
 				menu_layer.visible = false
@@ -647,7 +647,7 @@ func _open_cardgrid() -> void:
 		["Bumper ↓", func(c: PlayingCard) -> void: c.mod = "bumper"; c.boost_dir = Vector2i.DOWN],
 		["Gold", func(c: PlayingCard) -> void: c.mod = "gold"],
 		["Wild", func(c: PlayingCard) -> void: c.mod = "wild"],
-		["Lucky 2+", func(c: PlayingCard) -> void: c.rank = 2; c.two_plus = true],
+		["The Joker (MULT now)", func(c: PlayingCard) -> void: c.rank = 2; c.joker = true; c.mod = "mult"],
 		["Explosive mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.boom = true],
 		["Crazy 8 (wild)", func(c: PlayingCard) -> void: c.rank = 8],
 		["Fire on an Ace", func(c: PlayingCard) -> void: c.rank = 14; c.hazard = "fire"],
@@ -699,9 +699,9 @@ func _close_cardgrid() -> void:
 	if _cardgrid_layer != null:
 		_cardgrid_layer.queue_free()
 		_cardgrid_layer = null
-	# Back to the game's own rules for the reveal flags.
+	# Back to the game's own rules for the reveal flags (hazard intent
+	# stays on for everyone since the Weathervane retired).
 	PlayingCard.eights_wild = board.eights_wild
-	PlayingCard.show_hazard_intent = trail.has_relic("weathervane")
 
 
 ## Riffle through the undealt pile — shuffled for display, so the
@@ -967,16 +967,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _preview_mod_text(result: Dictionary) -> String:
 	var parts := ""
 	var mults := 0
-	var doublers := 0
 	for card in board.selected:
 		if card.mod == "mult":
 			mults += 1
-		if card.two_plus:
-			doublers += 1
 	if mults > 0:
 		parts += "  ×%s MULT" % String.num(pow(board.mult_factor, mults), 2)
-	if doublers > 0:
-		parts += "  ×%d LUCKY 2+" % int(pow(2.0, doublers))
 	if result.has("bonus_chips"):
 		parts += "  +%d chips" % int(result.bonus_chips)
 	if result.has("cash_earned"):
@@ -1514,7 +1509,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"gold":
 			lines.append("GOLD — pays $1 of permanent cash when played.")
 		"plus":
-			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand. Boosting an ACE wraps it into a lucky 2+ that DOUBLES any hand it scores in.")
+			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand. Boosting an ACE wraps it into THE JOKER.")
 		"minus":
 			lines.append("MINUS — clearing it drops the aimed card one rank; a 2 ground lower is DESTROYED (unscored). The arrow turns each hand.")
 		"bumper":
@@ -1523,8 +1518,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("WILD — counts as ANY rank and suit.")
 	if PlayingCard.eights_wild and card.rank == 8 and not card.washed:
 		lines.append("CRAZY 8s — this 8 counts as WILD: any rank, any suit.")
-	if card.two_plus:
-		lines.append("LUCKY 2+ — a wrapped Ace: scoring this card DOUBLES the whole hand.")
+	if card.joker:
+		lines.append("THE JOKER — a wrapped Ace turned trickster: he holds ONE enhancement at a time and swaps to a different one every hand. Right now he rides as %s." % (card.mod.to_upper() if card.mod != "" else "NOTHING"))
 	if card.incoming != "":
 		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
 	if card.boom:
