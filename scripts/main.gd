@@ -755,7 +755,9 @@ func _update_kit() -> void:
 		_kit_sig = ""
 		return
 	var sig := str(trail.provisions) + str(trail._aiming_slot) + str(trail.kit_size()) \
-			+ str(trail.sleeve_card) + str(trail.sleeve_used) + str(trail._aiming_sleeve)
+			+ str(trail.sleeve_card) + str(trail.sleeve_used) + str(trail._aiming_sleeve) \
+			+ trail.character + str(trail.laser_used) + str(trail._aiming_laser) \
+			+ str(trail.laser_level) + str(trail.watch_uses_left) + str(board.has_undo())
 	if sig == _kit_sig:
 		return
 	_kit_sig = sig
