@@ -1734,9 +1734,20 @@ func has_undo() -> bool:
 ## Captures the full table before a hand resolves. Blackjack rounds
 ## pace themselves through a presentation and never rewind.
 func snapshot_state() -> void:
+	undo_state = build_state_snapshot()
+
+
+## Applies any snapshot (the watch's, or a saved room) to the table.
+func apply_state_snapshot(state: Dictionary) -> bool:
+	undo_state = state
+	return restore_state()
+
+
+## The full table as pure data — every card, the deck, the ledgers.
+## {} for blackjack rounds, which pace themselves and never rewind.
+func build_state_snapshot() -> Dictionary:
 	if blackjack_target > 0:
-		undo_state = {}
-		return
+		return {}
 	var cards := {}
 	var cobra_order: Array = []
 	for p in grid:
@@ -1750,7 +1761,7 @@ func snapshot_state() -> void:
 			for seg in card.cobra_body:
 				cobra_order.append(seg.grid_pos)
 		cards[p] = props
-	undo_state = {
+	return {
 		"cards": cards,
 		"cobra_body": cobra_order,
 		"deck": deck.duplicate(true),

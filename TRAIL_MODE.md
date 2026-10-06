@@ -723,3 +723,15 @@ gold under the emblem once it has seasoned.
 - The generic THE OUTLAW name is gone: that preset face rides on
   under a generated name, every bounty poster letters its name from
   the template, and the baked THE OUTLAW card retires.
+
+## Stable offers and seamless resume (Oct 2026)
+
+- Fate deals each room's offers ONCE: viewing the deck, backing out
+  to the menu, or reloading a save never reshuffles the wall. The
+  offers ride in the run save.
+- Mid-table resume: the live table is photographed (board, deck,
+  hazards, counters, stake, clock) on every settled save and on
+  M-to-menu, and RESUME sits you back down at the exact stage you
+  left - no scar, no refund games. Only a mid-round blackjack,
+  which paces itself, falls back to the old outlay-back fresh
+  sit-down. The photograph clears the moment a table ends.

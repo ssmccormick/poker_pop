@@ -275,6 +275,8 @@ var current_offer := {}
 var stake := 0
 var _offers: Array = []
 var _fate_offer := {}
+var _offers_room := -1       # the room those offers were dealt for
+var _room_save := {}         # mid-table photograph for seamless resume
 
 # UI
 var buyin_layer: ColorRect
@@ -430,6 +432,15 @@ func _save_run() -> void:
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
 	cf.set_value("run", "pending_hard", pending_is_retry)
+	cf.set_value("run", "offers", _offers)
+	cf.set_value("run", "fate", _fate_offer)
+	cf.set_value("run", "offers_room", _offers_room)
+	# Photograph the live table whenever it CAN be photographed, so
+	# even a hard app close resumes at the same stage. A busy board
+	# keeps the previous (pre-hand) photograph instead.
+	if in_room and not main.board.busy:
+		_room_save = _capture_room_state()
+	cf.set_value("run", "room_state", _room_save)
 	cf.save(main.profile_path("trail_run.cfg"))
 
 
@@ -486,6 +497,10 @@ func _load_run() -> bool:
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
 	pending_is_retry = cf.get_value("run", "pending_hard", true)
+	_offers = cf.get_value("run", "offers", [])
+	_fate_offer = cf.get_value("run", "fate", {})
+	_offers_room = int(cf.get_value("run", "offers_room", -1))
+	_room_save = cf.get_value("run", "room_state", {})
 	_shop_stock_room = -1  # resumed runs sit at a tarot or a retry bet
 	run_active = true
 	return true
@@ -1287,6 +1302,8 @@ func _start_run(tier: int) -> void:
 	_second_wind_used = false
 	_fire_tick_flip = false
 	_shop_stock_room = -1
+	_offers_room = -1
+	_room_save = {}
 	pending_retry = {}
 	run_active = true
 	main.score = 0
@@ -1299,6 +1316,14 @@ func _resume_run() -> void:
 	if _load_run():
 		main.score = 0
 		_apply_relic_effects()
+		if not _room_save.is_empty():
+			# The photographed table: back to the exact stage you
+			# stood up from.
+			main.menu_open = false
+			main.menu_layer.visible = false
+			_hide_all()
+			_restore_room_state()
+			return
 		if not pending_retry.is_empty():
 			# A failed room still bars the way — back to its table.
 			if _short_stacked(_cheapest_seat(room_index)):
@@ -1332,8 +1357,13 @@ func _show_tarot_now() -> void:
 	# Bankruptcy check against the coming room's cheapest seat.
 	if _short_stacked(_cheapest_seat(room_index)):
 		return
-	_offers = _make_offers()
-	_fate_offer = _make_one_offer(true)
+	# Fate deals each room's offers ONCE: peeking at the deck, the
+	# menu, or a saved game never reshuffles the wall.
+	if _offers_room != room_index or _offers.is_empty():
+		_offers = _make_offers()
+		_fate_offer = _make_one_offer(true)
+		_offers_room = room_index
+		_save_run()
 	_render_tarot()
 	tarot_layer.visible = true
 
@@ -2993,6 +3023,7 @@ func _tick_room_hazards() -> void:
 
 func _room_cleared() -> void:
 	in_room = false
+	_room_save = {}  # the photograph is stale the moment the table ends
 	_aiming_slot = -1
 	_aiming_sleeve = false
 	main.board.pending_provision = ""
@@ -3096,6 +3127,7 @@ func on_time_up() -> void:
 
 func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	in_room = false
+	_room_save = {}
 	_chest_rewards.clear()  # the chest went down with the table
 	_chest_won_cards.clear()
 	main.board.locked = true
@@ -3133,22 +3165,135 @@ func _after_board_settles(then: Callable) -> void:
 
 ## Player bailed mid-room (M to menu): the stake is already spent, so it
 ## counts as a fail — scar applied, and the room still awaits on resume.
+## The live table as pure data: board photograph plus every room
+## counter and the stake on the line. {} when it can't be taken
+## (busy board, or a mid-round blackjack pacing itself).
+func _capture_room_state() -> Dictionary:
+	if main.board.busy:
+		return {}
+	var snap: Dictionary = main.board.build_state_snapshot()
+	if snap.is_empty():
+		return {}
+	return {
+		"board": snap,
+		"offer": current_offer.duplicate(true),
+		"stake": stake, "stake_odds": stake_odds,
+		"room_score": room_score, "room_hands_left": room_hands_left,
+		"room_time_left": room_time_left, "room_wins": room_wins,
+		"room_outlaw_hp": room_outlaw_hp, "room_outlaw_idx": room_outlaw_idx,
+		"room_stones_broken": room_stones_broken,
+		"room_chests_opened": room_chests_opened,
+		"room_collect_done": room_collect_done,
+		"room_collect_kinds": room_collect_kinds.duplicate(),
+		"room_require": room_require.duplicate(true),
+		"room_combo": room_combo.duplicate(),
+		"sleeve_used": sleeve_used, "laser_used": laser_used,
+		"watch_uses_left": watch_uses_left,
+	}
+
+
+## Sits the rider back down exactly where they stood up: same board,
+## same counters, same stake, no scar.
+func _restore_room_state() -> void:
+	var rs := _room_save
+	_room_save = {}
+	current_offer = rs.offer.duplicate(true)
+	stake = int(rs.stake)
+	stake_odds = float(rs.stake_odds)
+	room_score = int(rs.room_score)
+	room_target = int(current_offer.get("target", 0))
+	room_goal = String(current_offer.get("goal", ""))
+	if room_goal == "timed":
+		room_goal = ""
+	room_limit = String(current_offer.get("limit", "hands"))
+	if current_offer.has("boss"):
+		room_goal = "boss"
+		room_limit = "hands"
+	room_hands_left = int(rs.room_hands_left)
+	room_time_left = float(rs.room_time_left)
+	room_wins = int(rs.room_wins)
+	room_wins_needed = int(current_offer.get("wins", 3))
+	room_outlaw_hp = int(rs.room_outlaw_hp)
+	room_outlaw_max = int(current_offer.get("outlaw_hp", 5))
+	room_outlaws = current_offer.get("outlaws", [])
+	room_outlaw_idx = int(rs.room_outlaw_idx)
+	room_stones_broken = int(rs.room_stones_broken)
+	room_stones_needed = int(current_offer.get("stones", 1))
+	room_chests_needed = int(current_offer.get("chest_count", 1))
+	room_chests_opened = int(rs.room_chests_opened)
+	room_collect_need = int(current_offer.get("collect_need", 0))
+	room_collect_done = int(rs.room_collect_done)
+	room_collect_kinds = rs.room_collect_kinds.duplicate()
+	room_require = rs.room_require.duplicate(true)
+	room_require_total = 0
+	for r in current_offer.get("require", []):
+		room_require_total += int(r[1])
+	room_combo = rs.room_combo.duplicate()
+	sleeve_used = bool(rs.sleeve_used)
+	laser_used = bool(rs.laser_used)
+	watch_uses_left = int(rs.watch_uses_left)
+	_outlaw_dead_pending = false
+	_watch_snapshot = {}
+	_aiming_slot = -1
+	_aiming_sleeve = false
+	_aiming_laser = false
+	_swap_first = null
+	in_room = true
+	main.mode_kind = "trail"
+	main.mode_label_text = "Trail · %s · %s" % [_table().name.capitalize(),
+			character_name()]
+	main.game_started = true
+	main.game_over = false
+	main.play_music("boss" if current_offer.has("boss") else "room")
+	if current_offer.has("boss"):
+		main.parallax.set_scene("storm")
+	else:
+		var looks := ["trail_day", "trail_dusk", "trail_night"]
+		main.parallax.set_scene(looks[clampi(room_index / REGION_SIZE, 0, 2)])
+	main.board.visible = true
+	main.board.locked = false
+	main.board.suppress_refill = false
+	main.board.custom_deck = deck.duplicate(true)
+	main.board.undo_enabled = character == "the_doctor"
+	main.board.refill_hazard_chance = 0.0 if room_goal == "purge" \
+			else clampf(REFILL_HAZARD_BASE + REFILL_HAZARD_STEP * room_index,
+			0.0, REFILL_HAZARD_MAX)
+	main.board.apply_state_snapshot(rs.board)
+	if room_goal == "crazy8":
+		main.board.eights_wild = true
+		PlayingCard.eights_wild = true
+		main.board.apply_theme()
+	elif room_goal == "landrush":
+		main.board.landrush_active = true
+		main.board.queue_redraw()
+	elif room_goal == "outlaw":
+		main.outlaw.spec = current_outlaw_spec()
+		main.outlaw.appear(room_outlaw_hp)
+	main._announce("BACK AT THE TABLE — right where you left it")
+
+
+## Player bailed mid-room (M to menu): the table is photographed as
+## it stands — resume sits you right back down, no scar, no refund
+## games. Only an unphotographable table (mid-round blackjack) falls
+## back to the old outlay-back fresh sit-down.
 func on_abandon_room() -> void:
 	if not in_room:
 		return
+	_room_save = _capture_room_state()
 	in_room = false
 	_aiming_slot = -1
 	_aiming_sleeve = false
+	_aiming_laser = false
+	_swap_first = null
 	main.board.pending_provision = ""
-	# No penalty for stepping away: the whole outlay comes back and the
-	# table is saved — returning restarts it like a fresh sit-down.
-	if current_offer.has("boss"):
-		chips += stake
-	else:
-		chips += stake + int(current_offer.get("min_bet", 0))
-	stake = 0
-	pending_retry = current_offer.duplicate(true)
-	pending_is_retry = false
+	if _room_save.is_empty():
+		if current_offer.has("boss"):
+			chips += stake
+		else:
+			chips += stake + int(current_offer.get("min_bet", 0))
+		stake = 0
+		pending_retry = current_offer.duplicate(true)
+		pending_is_retry = false
 	_save_run()
 
 
@@ -3856,6 +4001,7 @@ func _deck_stat_text(d: Dictionary) -> String:
 func _end_run(title: String, body: String, _payout: int) -> void:
 	_hide_all()
 	run_active = false
+	_room_save = {}
 	main.game_started = false
 	if title in ["BUSTED OUT", "BLINDED OUT"]:
 		main.stat_bump("trail_busts")
