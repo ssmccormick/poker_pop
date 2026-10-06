@@ -391,16 +391,16 @@ func _update_ambient() -> void:
 			p.position = Vector2.ZERO
 			p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 			p.emission_rect_extents = Vector2(20, 26)
-			p.amount = 5
+			p.amount = 9
 			p.lifetime = 0.55
 			p.direction = Vector2(wind_dir)
-			p.spread = 12.0
+			p.spread = 10.0
 			p.gravity = Vector2.ZERO
-			p.initial_velocity_min = 60.0
-			p.initial_velocity_max = 110.0
+			p.initial_velocity_min = 70.0
+			p.initial_velocity_max = 120.0
 			p.scale_amount_min = 1.5
 			p.scale_amount_max = 3.0
-			p.color = Color(0.7, 0.8, 0.85, 0.6)
+			p.color = Color(0.7, 0.8, 0.85, 0.75)
 	_ambient = p
 	add_child(p)
 
@@ -640,8 +640,10 @@ func _draw() -> void:
 		"fire":
 			_draw_fire(rect)
 		"wind":
-			# The swirl's particles carry the direction; no arrow.
+			# The swirl is the body; the streaming chevrons carry the
+			# direction the gust takes.
 			_draw_wind_swirl()
+			_draw_wind_stream(rect)
 		"water":
 			if not washed:
 				# The washed branch already drew the full tank.
@@ -955,9 +957,10 @@ func _draw_art(rect: Rect2) -> void:
 		"water":
 			_art(rect, "hazard", "water_%d" % clampi(water_level, 1, 4))
 		"wind":
-			# No medallion, no arrow: the living swirl and its
-			# particles ARE the wind.
+			# No medallion, no arrow: the living swirl is the body and
+			# the streaming chevrons carry the direction.
 			_draw_wind_swirl()
+			_draw_wind_stream(rect)
 		"bomb":
 			# The dynamite rides the free top-right corner â€” center
 			# stage belongs to the card's own face.
@@ -1314,6 +1317,24 @@ func _draw_flood(rect: Rect2, frac: float) -> void:
 			var by := lerpf(body.end.y - 6.0, level + 6.0, cycle)
 			draw_circle(Vector2(bx, by), 2.0, Color(0.85, 0.95, 1.0,
 					0.7 * (1.0 - cycle * 0.4)))
+
+
+## The gust's DIRECTION, worn on the card: little chevron streaks
+## sliding across the face the way the wind blows, fading in and out
+## as they travel.
+func _draw_wind_stream(rect: Rect2) -> void:
+	var dir := Vector2(wind_dir)
+	var perp := Vector2(-dir.y, dir.x)
+	var reach := minf(rect.size.x, rect.size.y) * 0.5
+	for k in 3:
+		var slide := fposmod(_t * 0.9 + k * 0.33 + _phase, 1.0)
+		var center := dir * lerpf(-0.8, 0.8, slide) * reach \
+				+ perp * (k - 1) * 14.0
+		var a := 0.8 * sin(slide * PI)
+		var col := Color(0.84, 0.92, 0.96, a)
+		draw_line(center - dir * 11.0, center + dir * 11.0, col, 2.5)
+		draw_line(center + dir * 11.0, center + dir * 6.0 + perp * 4.0, col, 2.0)
+		draw_line(center + dir * 11.0, center + dir * 6.0 - perp * 4.0, col, 2.0)
 
 
 ## Caught in a twister: translucent streaks orbiting the whole card,

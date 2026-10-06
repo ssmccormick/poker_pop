@@ -2566,9 +2566,24 @@ func _consume_hand() -> void:
 	else:
 		room_hands_left -= 1
 	if room_hands_left <= 0:
-		_room_failed()
+		_last_hand_verdict()
 	else:
 		_tick_room_hazards()
+
+
+## The last hand is spent — but that very hand may have WON the
+## table (a purge counts the grid, which only empties once the pops
+## settle), so the verdict waits for the board before ruling.
+func _last_hand_verdict() -> void:
+	while main.board.busy:
+		await get_tree().process_frame
+	if not in_room:
+		return  # the hand's own win already closed the table
+	if room_goal == "purge" and purged_count() >= purge_quota() \
+			and purge_left() == 0:
+		_room_cleared()
+		return
+	_room_failed()
 
 
 ## The ONE treasure respawn, run from the hazard tick after every

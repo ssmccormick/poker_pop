@@ -2419,9 +2419,10 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 ## Board mutation only — no animation — so it's headless-testable.
 func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	# EVERY directional card swings its arrow a quarter turn (clockwise)
-	# each hand — plus/minus/bumper mods AND wind hazards. Time the
-	# clear to aim the effect where you want it. THE JOKER swaps to a
-	# different enhancement entirely.
+	# each hand — plus/minus/bumper mods turn here; WIND turns at the
+	# END of the tick, after it blows, so the direction the dust was
+	# streaming is the direction the gust actually takes. THE JOKER
+	# swaps to a different enhancement entirely.
 	for p in grid:
 		if grid[p].joker:
 			var pool := JOKER_MODS.duplicate()
@@ -2431,9 +2432,6 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 		elif grid[p].mod in ["plus", "minus", "bumper"]:
 			var bd: Vector2i = grid[p].boost_dir
 			grid[p].boost_dir = Vector2i(-bd.y, bd.x)
-		if grid[p].hazard == "wind":
-			var wd: Vector2i = grid[p].wind_dir
-			grid[p].wind_dir = Vector2i(-wd.y, wd.x)
 	# The FLOOD: every water card rises one step per tick, filling in
 	# four. A card already at the brim at the start of the tick POURS —
 	# and what it pours into BECOMES A WATER CARD itself, one step
@@ -2519,6 +2517,12 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 					wind_blown.append({"cell": q, "dir": w.wind_dir})
 				break  # whatever stands there stops the gust either way
 			q += w.wind_dir
+	# NOW the vanes swing a quarter for the next hand — the blow the
+	# player just watched used exactly the direction on display.
+	for p in grid:
+		if grid[p].hazard == "wind":
+			var wd: Vector2i = grid[p].wind_dir
+			grid[p].wind_dir = Vector2i(-wd.y, wd.x)
 	# Every hazard that sat this round out is seasoned for the next.
 	for p in grid:
 		grid[p].hazard_fresh = false

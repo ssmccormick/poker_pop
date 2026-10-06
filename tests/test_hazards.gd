@@ -117,13 +117,16 @@ func _init() -> void:
 	_free_board(b)
 
 	# --- wind blows the first card downwind every round ---------------------
+	# The blow uses the DISPLAYED direction; the vane turns after.
 	b = _board([[5, 0, 0, 0], [7, 1, 2, 0], [9, 2, 4, 0]])
 	b.grid[Vector2i(0, 0)].hazard = "wind"
-	b.grid[Vector2i(0, 0)].wind_dir = Vector2i.UP  # the tick turns it to RIGHT
+	b.grid[Vector2i(0, 0)].wind_dir = Vector2i.RIGHT
 	var bres: Dictionary = b._tick_fire_and_bombs()
 	failures += _check((bres.blown as Array).size() == 1
 			and bres.blown[0].cell == Vector2i(2, 0),
 			"the wind takes the first card downwind, blowing across the gap")
+	failures += _check(b.grid[Vector2i(0, 0)].wind_dir == Vector2i.DOWN,
+			"the vane swings a quarter AFTER the blow")
 	_free_board(b)
 	b = _board([[5, 0, 0, 0], [7, 1, 1, 0]])
 	b.grid[Vector2i(0, 0)].hazard = "wind"
