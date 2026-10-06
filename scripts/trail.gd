@@ -1559,8 +1559,10 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 					offer["collect_suit"] = randi_range(0, 3)
 					offer["collect_need"] = 12 + 3 * region
 				1:
-					offer.tarot = "WANTED"
-					offer.label = "Wanted"
+					# The rank drive is a ROUNDUP too — WANTED belongs
+					# to the bounty posters now.
+					offer.tarot = "THE ROUNDUP"
+					offer.label = "Roundup"
 					offer.odds = 2.0
 					offer["collect_rank"] = randi_range(2, 14)
 					offer["collect_need"] = 5 + region
@@ -1983,7 +1985,7 @@ func _collect_goal_text(o: Dictionary) -> String:
 		return "Clear %d %s" % [int(o.collect_need),
 				String(PlayingCard.SUIT_NAMES[int(o.collect_suit)]).to_upper()]
 	if o.has("collect_rank"):
-		return "WANTED: bring in %d %s" % [int(o.collect_need),
+		return "Bring in %d %s" % [int(o.collect_need),
 				_rank_plural(int(o.collect_rank))]
 	return "Clear cards of %d different ranks" % int(o.get("collect_need", 0))
 
@@ -2920,7 +2922,7 @@ func collect_status() -> String:
 			String(PlayingCard.SUIT_NAMES[int(o.collect_suit)]).to_upper(),
 			room_collect_done, room_collect_need]
 	if o.has("collect_rank"):
-		return "WANTED: %s  %d / %d" % [_rank_plural(int(o.collect_rank)),
+		return "BRING IN %s  %d / %d" % [_rank_plural(int(o.collect_rank)),
 				room_collect_done, room_collect_need]
 	# The census names its remaining heads: every rank not yet cleared
 	# stays on the list, and each catch strikes one off the banner.

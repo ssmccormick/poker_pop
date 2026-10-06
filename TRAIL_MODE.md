@@ -1,4 +1,4 @@
-# TRAIL MODE Ã¢â‚¬â€ Design Doc
+# TRAIL MODE — Design Doc
 
 Status: **v1 skeleton SHIPPED** (scripts/trail.gd): buy-in tables,
 tarot room draws with risk tiers (Sun/Wheel/Tower), forced stakes by
@@ -13,12 +13,12 @@ open threads at the bottom.
 ## Pitch
 
 A Slay the Spire / Balatro-style run mode built on **betting**. Buy in
-to a table, get a chip stack, and ride a trail of rooms Ã¢â‚¬â€ each a board
+to a table, get a chip stack, and ride a trail of rooms — each a board
 challenge revealed as a tarot card. Before every room you **wager
 chips on yourself**: clear the room and the bet pays out at odds; fail
 and the stake is gone. Chips are simultaneously your health, your
 wager, and your shop wallet. **Ride to the END of the trail** to bank chips
-as permanent cash Ã¢â‚¬â€ or push deeper for bigger blinds and bigger
+as permanent cash — or push deeper for bigger blinds and bigger
 payouts. Bankruptcy ends the run. Cash buys premium buy-ins and
 permanent upgrades between runs.
 
@@ -28,97 +28,97 @@ bosses, regions.
 
 ## The betting core (the heart of the mode)
 
-- **Buy-in tiers** Ã¢â‚¬â€ premium tables are **harder AND richer**
+- **Buy-in tiers** — premium tables are **harder AND richer**
   (Balatro-stakes style): bigger starting stack and better cash-out
   conversion, but difficulty modifiers stack on (steeper targets,
   faster blind escalation, meaner cursed-card injections, pricier
-  shops Ã¢â‚¬â€ exact modifier list TBD). Names/numbers draft:
+  shops — exact modifier list TBD). Names/numbers draft:
   | Table | Cost | Starting chips | Cash-out rate | Difficulty |
   | --- | --- | --- | --- | --- |
-  | Penny Ante | Free | 100 | Ãƒâ€”1 | baseline |
-  | Table Stakes | $250 cash | 250 | Ãƒâ€”1.5 | steeper targets/blinds, +hazards |
-  | High Roller | $1000 cash | 500 | Ãƒâ€”2.5 | steepest, most hazards, Dealer finale |
-  **Boss rooms are ALL-IN**: no bet choice Ã¢â‚¬â€ the whole stack rides at
+  | Penny Ante | Free | 100 | ×1 | baseline |
+  | Table Stakes | $250 cash | 250 | ×1.5 | steeper targets/blinds, +hazards |
+  | High Roller | $1000 cash | 500 | ×2.5 | steepest, most hazards, Dealer finale |
+  **Boss rooms are ALL-IN**: no bet choice — the whole stack rides at
   3:1. Shops never restock within a room, and the burn service costs
   more with every use (once per shop).
-- **Per-room wager Ã¢â‚¬â€ ante and bet at posted odds**: every room costs
+- **Per-room wager — ante and bet at posted odds**: every room costs
   its **ante** (25 chips at the first table, climbing with depth and
-  table stakes Ã¢â‚¬â€ the house keeps it, win or lose). Then you **bet
-  chips on yourself** at the table's posted odds (MIN / RAISE Ãƒâ€”2 /
+  table stakes — the house keeps it, win or lose). Then you **bet
+  chips on yourself** at the table's posted odds (MIN / RAISE ×2 /
   ALL IN). The hand budget (or minute budget on clock tables) is
-  FIXED by the table and tightens as the trail deepens Ã¢â‚¬â€ no haggling
-  over it. Clearing pays bet + bet Ãƒâ€” odds, PLUS a swiftness bonus:
+  FIXED by the table and tightens as the trail deepens — no haggling
+  over it. Clearing pays bet + bet × odds, PLUS a swiftness bonus:
   every spare hand (or every spare 10 seconds on a clock table) pays
-  blindÃƒÂ·5 chips. Failing loses ante and bet. Bosses are ALL IN at
+  blind÷5 chips. Failing loses ante and bet. Bosses are ALL IN at
   base odds, fixed hand budget.
-  *(The old promise dial Ã¢â‚¬â€ trading fewer hands/minutes for fatter
-  odds Ã¢â‚¬â€ was removed 2026-09-12; difficulty now comes purely from
+  *(The old promise dial — trading fewer hands/minutes for fatter
+  odds — was removed 2026-09-12; difficulty now comes purely from
   progression.)*
-- **Odds by room**: Steady 1:1 Ã‚Â· Risky/Treasure/soft-Purge 3:2 Ã‚Â·
-  Dangerous/Heist/hard-Purge/Called-Hands 2:1 Ã‚Â· Royal Hunt 5:1 Ã‚Â·
+- **Odds by room**: Steady 1:1 · Risky/Treasure/soft-Purge 3:2 ·
+  Dangerous/Heist/hard-Purge/Called-Hands 2:1 · Royal Hunt 5:1 ·
   Boss 3:1.
 - **The big league**: beyond the Jack (table 8 on), EVERY cost runs
-  10Ãƒâ€” Ã¢â‚¬â€ antes, bets, shop cards, relics, the forge, the Fool's
-  kicker Ã¢â‚¬â€ and beyond the Queen (table 15 on) it jumps 10Ãƒâ€” AGAIN
-  (100Ãƒâ€” frontier prices). An all-in rider clears each region with a
+  10× — antes, bets, shop cards, relics, the forge, the Fool's
+  kicker — and beyond the Queen (table 15 on) it jumps 10× AGAIN
+  (100× frontier prices). An all-in rider clears each region with a
   stack that keeps pace.
 - **Blinds escalate**: the blind rises each room (poker blinds
-  structure) Ã¢â‚¬â€ late trail, you can't limp. Can't cover a table's
+  structure) — late trail, you can't limp. Can't cover a table's
   **cheapest seat** (ante + minimum bet) = **BLINDED OUT**: the run is
-  over and the house keeps everything Ã¢â‚¬â€ chips only turn to cash at
+  over and the house keeps everything — chips only turn to cash at
   the end of the trail.
 - **No cashing out mid-ride**: chips become permanent $cash ONLY by
-  finishing all 21 tables (premium multiplier + completion purse) Ã¢â‚¬â€
+  finishing all 21 tables (premium multiplier + completion purse) —
   or $1 at a time by playing GOLD cards during the run (banked
   instantly, and kept even if the run later busts). All-or-nothing:
   the ride itself is the bet.
-- Shops charge the same chips you bet with Ã¢â‚¬â€ every purchase shrinks the
+- Shops charge the same chips you bet with — every purchase shrinks the
   stack that keeps you alive. That tension is the design.
 
 ## Run structure
 
 - A **trail** of rooms, escalating; the final room is the Dealer
   (see Bosses). Clearing it wins the run.
-- Draft shape: ~12Ã¢â‚¬â€œ15 rooms, 3 regions ("towns"?), each region capped
+- Draft shape: ~12–15 rooms, 3 regions ("towns"?), each region capped
   by a court-card boss, min bet rising per region.
 - Run length is variable BY DESIGN: cashing out early is a short run;
-  riding to the Dealer is the long one (~20Ã¢â‚¬â€œ60 min naturally).
+  riding to the Dealer is the long one (~20–60 min naturally).
 - Every room clear: **pick 1 of 3 cards** to add to the deck
   (skippable); removal exists in shops to manage bloat.
 
 ## The trail draw (room selection)
 
-At each junction, fate deals **three face-up room cards** Ã¢â‚¬â€ each is
+At each junction, fate deals **three face-up room cards** — each is
 the next room, showing its type, rules, odds, and ante. A fourth,
-face-down option: **LUCK OF THE DRAW** Ã¢â‚¬â€ a random different room,
+face-down option: **LUCK OF THE DRAW** — a random different room,
 sweetened with a small chip kicker for trusting the cards.
 
 Rooms are named for poker and the West (the tarot naming retired):
 | Card | Room |
 | --- | --- |
-| EASY MONEY | Normal, steady tier 1:1 (renamed from LIMIT TABLE Ã¢â‚¬â€ the betting-structure names meant nothing here) (shipped) |
+| EASY MONEY | Normal, steady tier 1:1 (renamed from LIMIT TABLE — the betting-structure names meant nothing here) (shipped) |
 | FAT POT | Normal, risky tier 3:2 (renamed from POT LIMIT) (shipped) |
 | HIGH STAKES | Normal, dangerous tier 2:1 (renamed from NO LIMIT) (shipped) |
-| TRAVELING MERCHANT | Shop Ã¢â‚¬â€ Peddler / Collector / Card Sharp, rolled per stop (shipped) |
+| TRAVELING MERCHANT | Shop — Peddler / Collector / Card Sharp, rolled per stop (shipped) |
 | POWDER KEG | Purge room: bombs (shipped) |
 | WILDFIRE | Purge room: fire (shipped) |
 | DUST STORM | Purge room: wind (shipped) |
 | FLASH FLOOD | Purge room: water (shipped) |
-| GOLD MINE | Board choked with stone; break N to clear, gold cards turn up in the rubble. Always ON THE CLOCK (5 min, no hand limit) Ã¢â‚¬â€ collapsing seams wait for no hand count (shipped) |
-| BANK JOB | Heist room (crack the safe Ã¢â‚¬â€ shipped) |
-| STAGECOACH HAUL | Treasure room: 3Ã¢â‚¬â€œ5 key+chest pairs ON THE CLOCK (unlimited hands, ~1 min per pair, fixed by the table) Ã¢â‚¬â€ the hardest job on the trail, but clearing it awards a RELIC (shipped) |
+| GOLD MINE | Board choked with stone; break N to clear, gold cards turn up in the rubble. Always ON THE CLOCK (5 min, no hand limit) — collapsing seams wait for no hand count (shipped) |
+| BANK JOB | Heist room (crack the safe — shipped) |
+| STAGECOACH HAUL | Treasure room: 3–5 key+chest pairs ON THE CLOCK (unlimited hands, ~1 min per pair, fixed by the table) — the hardest job on the trail, but clearing it awards a RELIC (shipped) |
 | DEALER'S CALL | Called Hands: play the demanded hands (shipped) |
 | ROYAL HUNT | Called-hands special (region 2+): land ONE Royal Flush at 5:1. Always ON THE CLOCK (4 min, unlimited hands) - stalking a royal on a hand budget was a coin flip (shipped) |
 | HIGH NOON | Timed table: score the target before the clock dies (shipped) |
 | TEXAS HOLD'EM | Variant: persistent 5-card community, pick 2 hole cards, best playable subset of the 7 scores; RE-DEAL card refreshes the community (shipped) |
 | CRAZY 8s | Variant: every 8 is WILD, but the board crawls with a mixed hazard storm (8 + region seeded, replenished each hand); score target (shipped) |
-| BLACKJACK | Variant: poker off Ã¢â‚¬â€ the table is dealt FACE-DOWN (corners up); chain blind hits, then the dealer flips his hole card and draws out his hand like a real dealer; 3+region wins to clear; hazard storm of 5 + region, replenished (shipped) |
-| BOUNTY | The wanted-gun duel (formerly SHOWDOWN): clear YOUR gold bullets to shoot (5+region HP a head). HIS red bullets are waiting slugs Ã¢â‚¬â€ no fuse, no countdown: clear a card carrying one and he SHOOTS you for it (Ã¢Ë†â€™1 grit each), so build hands AROUND them (at most two ride the board). Weak hands under the posted score give him free shots; 3 GRIT. Bounties ride in POSSES of 1 + rand(region) heads (max 3), fought one at a time Ã¢â‚¬â€ drop one and the next rides in at full HP; hands 10+3/(extra head), odds 2.5/3.0/3.5. Every outlaw is a character-kit face: preset leaders (The Outlaw, Calico Rose, One-Eye Silas, Dusty Vane, El Coyote, Widow Marsh...), seeded random gang members with generated names. The offer is a WANTED poster (leader portrait, name, gang line, reward = anteÃƒâ€”odds); a wanted banner drops when the table opens (shipped) |
+| BLACKJACK | Variant: poker off — the table is dealt FACE-DOWN (corners up); chain blind hits, then the dealer flips his hole card and draws out his hand like a real dealer; 3+region wins to clear; hazard storm of 5 + region, replenished (shipped) |
+| BOUNTY | The wanted-gun duel (formerly SHOWDOWN): clear YOUR gold bullets to shoot (5+region HP a head). HIS red bullets are waiting slugs — no fuse, no countdown: clear a card carrying one and he SHOOTS you for it (−1 grit each), so build hands AROUND them (at most two ride the board). Weak hands under the posted score give him free shots; 3 GRIT. Bounties ride in POSSES of 1 + rand(region) heads (max 3), fought one at a time — drop one and the next rides in at full HP; hands 10+3/(extra head), odds 2.5/3.0/3.5. Every outlaw is a character-kit face: preset leaders (The Outlaw, Calico Rose, One-Eye Silas, Dusty Vane, El Coyote, Widow Marsh...), seeded random gang members with generated names. The offer is a WANTED poster (leader portrait, name, gang line, reward = ante×odds); a wanted banner drops when the table opens (shipped) |
 
 **Goal vs limit**: every non-boss room now rolls its challenge type
-independently Ã¢â‚¬â€ 50% a HAND BUDGET, 50% ON THE CLOCK (plain score
+independently — 50% a HAND BUDGET, 50% ON THE CLOCK (plain score
 tables drawing the clock take the HIGH NOON name). Minutes default to
-~0.4 Ãƒâ€” the hand reference. The old dedicated timed room is folded in.
+~0.4 × the hand reference. The old dedicated timed room is folded in.
 Any directional card (wind, plus, minus, bumper) turns its arrow a
 quarter clockwise every hand.
 
@@ -127,15 +127,15 @@ quarter clockwise every hand.
 | Room | Rule | Notes |
 | --- | --- | --- |
 | Normal | Score target within the hands you bought | The baseline |
-| Purge | A QUOTA hunt: 4 of ONE hazard kind (bomb/fire/wind/water) seeded at the deal, clear 10 (+3 per region) total AND leave the table clean; up to 2 more trickle in per hand keeping Ã¢â€°Â¥4 on the table until the quota is spawned (no score target) | Shipped. Cleared = spawned Ã¢Ë†â€™ standing, so ANY exit counts: played, gusted off, shoved off, burned out, blown up. Fire spread adds to the spawned ledger, so WILDFIRE can overshoot its quota while flames still stand Ã¢â‚¬â€ the room isn't won until every last fire is out (and all-ablaze still loses the table). No ambient extras Ã¢â‚¬â€ the hazards ARE the room |
-| Gold Mine | Mine the seam DRY: 20 stones total Ã¢â‚¬â€ 12 seeded, the rest riding in on the deal (Ã¢â€°Â¤2/hand, keeping Ã¢â€°Â¥6 standing until all 20 have spawned); the table clears only when every stone is broken (chip by clearing cards beside them, 3 chips each); 12 hands | Shipped. NOT a solid board Ã¢â‚¬â€ the plain cards between stones pop and refill so the mine shifts every hand. Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash) |
-| THE ROUNDUP / WANTED / THE CENSUS | Roundup family (goal "collect"): clear 12+3Ã‚Â·region cards of one SUIT, or 5+region of one RANK (WANTED, 2:1), or cards of 11+region DIFFERENT ranks, capped at 13 (CENSUS Ã¢â‚¬â€ the banner lists every rank still uncleared and strikes them off as they fall) Ã¢â‚¬â€ only cards actually cleared in scoring hands count; 10+region hands to do it (shipped) |
+| Purge | A QUOTA hunt: 4 of ONE hazard kind (bomb/fire/wind/water) seeded at the deal, clear 10 (+3 per region) total AND leave the table clean; up to 2 more trickle in per hand keeping ≥4 on the table until the quota is spawned (no score target) | Shipped. Cleared = spawned − standing, so ANY exit counts: played, gusted off, shoved off, burned out, blown up. Fire spread adds to the spawned ledger, so WILDFIRE can overshoot its quota while flames still stand — the room isn't won until every last fire is out (and all-ablaze still loses the table). No ambient extras — the hazards ARE the room |
+| Gold Mine | Mine the seam DRY: 20 stones total — 12 seeded, the rest riding in on the deal (≤2/hand, keeping ≥6 standing until all 20 have spawned); the table clears only when every stone is broken (chip by clearing cards beside them, 3 chips each); 12 hands | Shipped. NOT a solid board — the plain cards between stones pop and refill so the mine shifts every hand. Each destroyed stone has a 35% chance to leave a GOLD card in the refill (plays for $1 real cash) |
+| THE ROUNDUP / THE CENSUS | Roundup family (goal "collect"): clear 12+3·region cards of one SUIT, or 5+region of one RANK (also THE ROUNDUP, 2:1 - WANTED now belongs to the bounty posters), or cards of 11+region DIFFERENT ranks, capped at 13 (CENSUS — the banner lists every rank still uncleared and strikes them off as they fall) — only cards actually cleared in scoring hands count; 10+region hands to do it (shipped) |
 | LAND RUSH | Claim every plot: clear a card from each of the 25 cells; claimed plots wear a gold ring under the card; 12 hands, 2:1 (shipped) |
-| Called Hands | Play the exact demanded hands (e.g. 2Ãƒâ€” Flush + 1Ãƒâ€” Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only Ã¢â‚¬â€ a Full House is not three Pairs |
+| Called Hands | Play the exact demanded hands (e.g. 2× Flush + 1× Pair; scales per region) | Shipped (JUDGEMENT). Exact composition only — a Full House is not three Pairs |
 | ROYAL HUNT | Called-hands special (region 2+): land ONE Royal Flush at 5:1. Always ON THE CLOCK (4 min, unlimited hands) - stalking a royal on a hand budget was a coin flip (shipped) | Shipped (THE WORLD): rare, region 2+, odds 5:1 |
-| Timed | Score target before the clock; hands unlimited | Shipped (THE HANGED MAN, 2:1 base). The minute budget is fixed by the table (4Ã¢â€ â€™2 by region). Hazards still tick per hand |
-| Tight Hands | Target with very few hands (4Ã¢â‚¬â€œ6) | Efficiency puzzle |
-| Suit Locked | Only 1Ã¢â‚¬â€œ2 suits score | e.g. "red room": hearts/diamonds only |
+| Timed | Score target before the clock; hands unlimited | Shipped (THE HANGED MAN, 2:1 base). The minute budget is fixed by the table (4→2 by region). Hazards still tick per hand |
+| Tight Hands | Target with very few hands (4–6) | Efficiency puzzle |
+| Suit Locked | Only 1–2 suits score | e.g. "red room": hearts/diamonds only |
 | Hand Locked | Only listed hand types score | e.g. "pairs are worthless tonight" |
 | Pressure | The arcade drain bar, one room's worth | Reuses meter machinery |
 | Shop | Spend chips: cards, modifiers, card **removal** | No challenge, no reward |
@@ -143,31 +143,31 @@ quarter clockwise every hand.
 | Event? | Mystery choice (risk/reward text event) | Post-v1 candidate |
 | Boss | Rule-warping challenge capping a region | See Bosses |
 
-## NEXT Ã¢â‚¬â€ Stage B: the poker economy (user-designed, queued)
+## NEXT — Stage B: the poker economy (user-designed, queued)
 
 - **Score rooms go on the clock**: plain EASY MONEY/FAT POT/HIGH
   STAKES tables become TIME-limited (unlimited hands), merging HIGH NOON into
   the standard tables. CONDITION rooms (purges, heist, treasure,
-  called hands, variants, Bounty) roll 50/50 Ã¢â‚¬â€ except BANK JOB,
+  called hands, variants, Bounty) roll 50/50 — except BANK JOB,
   STAGECOACH, GOLD MINE and ROYAL HUNT, which ALWAYS run on the clock.
 - **CALL / RAISE / ALL IN** replaces the free bet dial:
   each room has a SET bet amount. CALL = play the room as offered.
   RAISE = bigger bet AND the room gains an extra complication (a
-  second modifier Ã¢â‚¬â€ extra hazards, a mixed second mode, tighter
+  second modifier — extra hazards, a mixed second mode, tighter
   budget) for better odds. ALL IN = the raise, betting everything.
 - **Pickup cards**: "+30s EXTRA TIME" and "+1 EXTRA HAND" cards can
   be dealt ambiently (~6% per refill) in rooms of the matching limit
   type; clear them in any scoring hand to collect.
 
-## NEXT Ã¢â‚¬â€ Stage C: variant rooms (user-designed, queued)
+## NEXT — Stage C: variant rooms (user-designed, queued)
 
 - **TEXAS HOLD'EM**: 5 community cards displayed beside the board and
   PERSIST all room. Select exactly 2 adjacent board cards as hole
-  cards; the hand is the best 5 of the 7 (kickers allowed here Ã¢â‚¬â€ it's
+  cards; the hand is the best 5 of the 7 (kickers allowed here — it's
   hold'em). A RE-DEAL card has a chance to be dealt to the board;
   scoring it refreshes the community 5.
 - **CRAZY 8s**: every 8 on the board is WILD (counts as any rank and
-  suit) Ã¢â‚¬â€ and the house evens the odds with a TON of hazards: a mixed
+  suit) — and the house evens the odds with a TON of hazards: a mixed
   storm of 8 (+1 per region) seeded at the deal, and whenever clears
   drop the board below that level, a fresh hazard rolls in on the
   next hand. Exempt from the normal ambient hazard roll (the storm IS
@@ -177,8 +177,8 @@ quarter clockwise every hand.
   corner cards; refills arrive face-down; every submitted hand turns
   one more random card face-up. Chains must START from a face-up
   card. Each face-down card you select is a HIT: it flips ON THE SPOT
-  and its pips join your running sum. Hits are BINDING Ã¢â‚¬â€ no deselect,
-  no clear (the clear button/right-click are refused mid-chain) Ã¢â‚¬â€ and
+  and its pips join your running sum. Hits are BINDING — no deselect,
+  no clear (the clear button/right-click are refused mid-chain) — and
   if a flip carries the sum past 21 the round busts immediately, no
   submit needed. PLAY HAND (any 1+ cards) is standing: the dealer
   reveals his hole card (one is face-down in the panel, real
@@ -186,21 +186,21 @@ quarter clockwise every hand.
   busts over 21. His played-out hand lingers ~2s, then a fresh round
   is dealt. Beat the dealer N times (3 + region) to clear. Hazards
   burn through the card backs (a hazarded card is always face-up),
-  and the storm rules still apply Ã¢â‚¬â€ 5 + region, replenished, no
+  and the storm rules still apply — 5 + region, replenished, no
   ambient roll.
-- **BOUNTY Ã¢â‚¬â€ the wanted guns**: the current outlaw's composed
+- **BOUNTY — the wanted guns**: the current outlaw's composed
   character portrait stands in the RIGHT gutter (the deck pile holds
   the left corner now). YOUR bullet cards and HIS bullet cards spawn
   among the deals.
-  Clear YOUR bullets in scoring hands Ã¢â€ â€™ shots that damage him. Clear
-  HIS bullets Ã¢â€ â€™ he shoots YOU. He also shoots if your scored hand is
+  Clear YOUR bullets in scoring hands → shots that damage him. Clear
+  HIS bullets → he shoots YOU. He also shoots if your scored hand is
   below a posted threshold. Shots cost DUEL HP (separate, ~3 grit for
-  the room; 0 = room failed). Kill every head of the posse to clear Ã¢â‚¬â€
+  the room; 0 = room failed). Kill every head of the posse to clear —
   gang members ride in one at a time at full HP. His health lives in
   the banner as a RED SEGMENTED HEALTH BAR (one notch per life), the
   same bar the bosses wear; during the duel the whole banner strip is
-  the kit's slim WANTED plaque Ã¢â‚¬â€ mini portrait, name, DEAD OR ALIVE,
-  the score bar, and the reward on the dashed plate Ã¢â‚¬â€ with the HP bar
+  the kit's slim WANTED plaque — mini portrait, name, DEAD OR ALIVE,
+  the score bar, and the reward on the dashed plate — with the HP bar
   dropped just below it onto the table rim.
 
 Technical wrinkle flagged early: constraint rooms (Suit/Hand Locked)
@@ -219,26 +219,26 @@ detection/reshuffles will lie.
   for free: *Stacker* (duplicates), *Monochrome* (suit density),
   *Slim* (thin deck consistency).
 - Card choices after rooms: mix of plain cards (including exact
-  duplicates of cards you own Ã¢â‚¬â€ the Flushed Five enabler) and modified
+  duplicates of cards you own — the Flushed Five enabler) and modified
   cards (below). Skipping is always allowed.
-- Shops sell removal ("burn a card") Ã¢â‚¬â€ pricier than buying. Deck size
+- Shops sell removal ("burn a card") — pricier than buying. Deck size
   has no cap; bloat is self-punishing.
 
-## Hazard cards (SHIPPED Ã¢â‚¬â€ reworked after playtest round 1)
+## Hazard cards (SHIPPED — reworked after playtest round 1)
 
 Hazards are AMBIENT: the tarot decides only a room's GOAL (target /
 heist / treasure / boss), while hazards seed randomly into EVERY play
-room Ã¢â‚¬â€ bosses included Ã¢â‚¬â€ with no warning and no odds compensation.
+room — bosses included — with no warning and no odds compensation.
 Chance = 20% + 8%/room + 15%/buy-in tier (cap 95%); count = 1 + 1 per
 4 tables (High Roller adds another half the time, cap 6), with mixed
 hazard types coexisting. On top of the seed, THE DECK TURNS MEAN:
-every refilled card has a chance to arrive already hazarded Ã¢â‚¬â€ 3% +
-0.8%/room per card (cap 20%) Ã¢â‚¬â€ so deep tables never stay calm. Purge
+every refilled card has a chance to arrive already hazarded — 3% +
+0.8%/room per card (cap 20%) — so deep tables never stay calm. Purge
 rooms are exempt from both (their hazards ARE the room); storm tables
 (Crazy 8s / Blackjack) swap the seed roll for their guaranteed floor
 but keep the mean deck. EVERY mid-room hazard (storm replenish,
-purge trickle, mean-deck roll) arrives ON a freshly dealt card Ã¢â‚¬â€
-never stamped onto a card already sitting at the table Ã¢â‚¬â€ and lands
+purge trickle, mean-deck roll) arrives ON a freshly dealt card —
+never stamped onto a card already sitting at the table — and lands
 with a burst of its element (splash, embers, sparks, rubble, dust)
 so new trouble is unmistakable. The card fire or water will strike
 next ALWAYS wears a faint preview of the effect creeping in at its
@@ -247,22 +247,22 @@ after every tick, seed, and refill). The old hazard tarot cards
 (DEATH etc.) are retired. Hazards are states on normal rank/suit
 cards, one per card; ticks happen only on scoring hands, after the
 board settles. A hazard that arrives mid-room sits out the round it
-landed Ã¢â‚¬â€ no spread, soak, rank burn, or fuse tick until the next
+landed — no spread, soak, rank burn, or fuse tick until the next
 hand. Hazards on the table from the deal get no such mercy: they
 spread, soak, burn down, and count down from hand one.
 
 | Hazard | Tarot | Rule | Counterplay |
 | --- | --- | --- | --- |
-| Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward). Drawn as a BUNDLE OF DYNAMITE with a pulsing red alert ring around the whole card, and while any bomb sits on the board a loud fuse-sizzle loops constantly Ã¢â‚¬â€ you cannot not notice it | Include it in any scoring hand to defuse |
-| Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks Ã¢Ë†â€™1; below 2 it burns up (unscored). The FLAMES GROW as the rank falls Ã¢â‚¬â€ barely above the bottom edge on an Ace, all but consuming the card at rank 2. If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish Ã¢â‚¬â€ every hand you wait, the fire claims another card. The next card to catch wears small flames licking its bottom edge |
-| Wind | THE CHARIOT | Every scoring hand it BLOWS the first card in its facing direction clean off the board, unscored Ã¢â‚¬â€ the direction turns a quarter each hand and is HIDDEN by default (the Weathervane shows the arrow AND marks the next victim). Safes, bosses, and cobra coils are too heavy and block the gust; hazards, treasure, and bullets all fly (their respawn nets catch the objectives) | Play the wind card, at any time, to still the air Ã¢â‚¬â€ every hand you wait costs you a card |
-| Stone | STRENGTH | A BLOCKER: no rank, no suit, unplayable, and chains can't pass through it. Every card cleared orthogonally beside it chips it (3 chips = crumble); broken rock has a 35% chance of baring a GOLD card in the refill Ã¢â‚¬â€ everywhere, not just mines | Mine around it: build hands that clear its neighbors, and cash the gold it leaves behind |
-| Water | Ã¢â‚¬â€ | The FLOOD: a water card FILLS 1/4 per hand with SOLID water Ã¢â‚¬â€ the face sinks from view as it rises, rank corner last. At the brim it POURS Ã¢â‚¬â€ every plain orthogonal neighbor BECOMES A WATER CARD of its own (one step filled) that fills and pours in turn. ONE card type, making more of itself. At the brim the face is hidden EVERYWHERE Ã¢â‚¬â€ board, hover tooltip, and hand preview all go quiet | Play any water card, at any level, to clear it; a canteen bails one out. A card at the brim still plays blind Ã¢â‚¬â€ if you remember what it was |
+| Bomb | DEATH | Fuse (5) drops per scoring hand; 0 = room LOST (fail-forward). Drawn as a BUNDLE OF DYNAMITE with a pulsing red alert ring around the whole card, and while any bomb sits on the board a loud fuse-sizzle loops constantly — you cannot not notice it | Include it in any scoring hand to defuse |
+| Fire | WILDFIRE | Every hand it SPREADS to one adjacent card that isn't burning, and its rank ticks −1; below 2 it burns up (unscored). The FLAMES GROW as the rank falls — barely above the bottom edge on an Ace, all but consuming the card at rank 2. If EVERY card on the table catches fire, the table is LOST | Play it (scores at current rank) to extinguish — every hand you wait, the fire claims another card. The next card to catch wears small flames licking its bottom edge |
+| Wind | THE CHARIOT | Every scoring hand it BLOWS the first card in its facing direction clean off the board, unscored — the direction turns a quarter each hand and is HIDDEN by default (the Weathervane shows the arrow AND marks the next victim). Safes, bosses, and cobra coils are too heavy and block the gust; hazards, treasure, and bullets all fly (their respawn nets catch the objectives) | Play the wind card, at any time, to still the air — every hand you wait costs you a card |
+| Stone | STRENGTH | A BLOCKER: no rank, no suit, unplayable, and chains can't pass through it. Every card cleared orthogonally beside it chips it (3 chips = crumble); broken rock has a 35% chance of baring a GOLD card in the refill — everywhere, not just mines | Mine around it: build hands that clear its neighbors, and cash the gold it leaves behind |
+| Water | — | The FLOOD: a water card FILLS 1/4 per hand with SOLID water — the face sinks from view as it rises, rank corner last. At the brim it POURS — every plain orthogonal neighbor BECOMES A WATER CARD of its own (one step filled) that fills and pours in turn. ONE card type, making more of itself. At the brim the face is hidden EVERYWHERE — board, hover tooltip, and hand preview all go quiet | Play any water card, at any level, to clear it; a canteen bails one out. A card at the brim still plays blind — if you remember what it was |
 
-Design calls: fire spreads 4-way (8-way wipes 5Ãƒâ€”5 boards); spread skips
+Design calls: fire spreads 4-way (8-way wipes 5×5 boards); spread skips
 hazarded/cursed cards; hazards don't persist in the run save.
 Water calls: FILLED (washed) cards play normally (the evaluator knows
-the truth Ã¢â‚¬â€ the player doesn't); while one is selected the preview
+the truth — the player doesn't); while one is selected the preview
 shows "???" and the valid-hand green border is suppressed so you can't
 probe for free; water only pours into plain cards (never hazarded,
 cursed, objective, or already-damp ones); damp cards can't catch fire;
@@ -272,39 +272,39 @@ drain the whole spread); flooding is room-local.
 ## Objective cards (SHIPPED)
 
 **The Safe (heist).** A safe card sits on the board showing a 4-digit
-combination (ranks 2Ã¢â‚¬â€œ9, duplicates possible), e.g. **3Ã‚Â·9Ã‚Â·5Ã‚Â·2**. Crack
+combination (ranks 2–9, duplicates possible), e.g. **3·9·5·2**. Crack
 it by chaining the combo cards IN PRINTED ORDER (any suits, normal
-adjacency) and ending the chain on the safe itself Ã¢â‚¬â€ no poker hand
+adjacency) and ending the chain on the safe itself — no poker hand
 required. Cracking costs a hand like any play and scores no points.
-- **Heist room (THE MOON, odds 2.0)**: the safe IS the goal Ã¢â‚¬â€ crack it
+- **Heist room (THE MOON, odds 2.0)**: the safe IS the goal — crack it
   within the hand budget to clear the room. No score target.
-- **Ambient safes**: random chance in normal rooms Ã¢â‚¬â€ cracking pays
+- **Ambient safes**: random chance in normal rooms — cracking pays
   bonus chips. Optional loot; the score target still rules the room.
 - The safe acts as a wall for normal chains (like cursed); it only
   accepts selection as the final pick of a matching combo chain.
 
 **Key + Chest (treasure).** A key card and a chest card (both normal
 rank/suit cards with overlays) are on the board. Make a VALID poker
-hand containing BOTH Ã¢â‚¬â€ the hand scores normally and the chest opens.
+hand containing BOTH — the hand scores normally and the chest opens.
 Rewards: a new card for the deck, bonus chips, cash, or (later) a
 modified card.
-- Both objective jobs Ã¢â‚¬â€ the BANK JOB and the STAGECOACH Ã¢â‚¬â€ **always
+- Both objective jobs — the BANK JOB and the STAGECOACH — **always
   run on the clock**: they never deal as hand-budget tables.
 - **Treasure room (STAGECOACH HAUL, odds 2.0)**: the room demands
-  **3Ã¢â‚¬â€œ5 pairs by depth**, and it runs **on the clock** Ã¢â‚¬â€ unlimited
+  **3–5 pairs by depth**, and it runs **on the clock** — unlimited
   hands, reference ~1 minute per pair + 1, with minutes as the odds
   promise like HIGH NOON. Each opened chest pays its reward roll AND
   respawns a fresh key + chest until the count is met; clearing the
-  room awards a RELIC. A piece cleared WITHOUT its partner Ã¢â‚¬â€ or lost
-  off the board entirely (burned, gusted, bumped) Ã¢â‚¬â€ simply respawns
+  room awards a RELIC. A piece cleared WITHOUT its partner — or lost
+  off the board entirely (burned, gusted, bumped) — simply respawns
   on a fresh random card; the seconds spent finding it are the price.
   (The column-drop mechanic was tried and reverted.)
 - **Ambient chests**: random chance in normal rooms as optional loot.
   Opening one mid-room only CLAIMS it ("it cracks open after the
-  table") Ã¢â‚¬â€ the reward reveals with the winnings once the table is
+  table") — the reward reveals with the winnings once the table is
   cleared: coin joins THE TAKE ledger (30+15/region), a card owes an
   EXTRA 3-card pick round after the normal one (25% mod chance), and
-  a relic Ã¢â‚¬â€ always a COMMON Ã¢â‚¬â€ takes the strongbox reveal screen. A
+  a relic — always a COMMON — takes the strongbox reveal screen. A
   failed or abandoned table loses the unopened chest.
 - v1: objective spawns don't mix with hazard rooms.
 
@@ -319,37 +319,37 @@ overlay and a hover panel explaining the hovered card.
 | Modifier | Effect |
 | --- | --- |
 | Chip card | Pays bonus chips every time it's played in a scoring hand |
-| Mult card | Multiplies the score of any hand it's part of (Ãƒâ€”1.5; multiple mults stack multiplicatively) |
+| Mult card | Multiplies the score of any hand it's part of (×1.5; multiple mults stack multiplicatively) |
 | Gold card | Pays $1 of real, bankable cash every time it's played. Drawn SOLID GOLD, face and all |
-| Plus card | When cleared, the card its arrow points at gains +1 rank. Boosting an ACE wraps it into a LUCKY 2+ (green-framed deuce) that DOUBLES any hand it scores in (stacking). The arrow turns a quarter clockwise every hand Ã¢â‚¬â€ time the clear to aim it |
-| Minus card | Mirror of Plus: the aimed card drops Ã¢Ë†â€™1 rank Ã¢â‚¬â€ and a 2 ground lower is DESTROYED, removed from the table unscored. Sculpt a King down to match your Queens, or grind junk to nothing |
-| Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand) Ã¢â‚¬â€ the push lands FIRST, while the bumper still sits on the felt, then the scored cards pop and the board settles. A gap absorbs the push; safes and cobra coils block it; a card pushed past the edge is removed unscored. The Jack and Queen ride the shove like anyone else: off the edge costs the boss one life (a Queen stripe, or 1,000 of the Jack's score pool), and he storms back onto the vacated cell |
+| Plus card | When cleared, the card its arrow points at gains +1 rank. Boosting an ACE wraps it into a LUCKY 2+ (green-framed deuce) that DOUBLES any hand it scores in (stacking). The arrow turns a quarter clockwise every hand — time the clear to aim it |
+| Minus card | Mirror of Plus: the aimed card drops −1 rank — and a 2 ground lower is DESTROYED, removed from the table unscored. Sculpt a King down to match your Queens, or grind junk to nothing |
+| Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand) — the push lands FIRST, while the bumper still sits on the felt, then the scored cards pop and the board settles. A gap absorbs the push; safes and cobra coils block it; a card pushed past the edge is removed unscored. The Jack and Queen ride the shove like anyone else: off the edge costs the boss one life (a Queen stripe, or 1,000 of the Jack's score pool), and he storms back onto the vacated cell |
 | Wild card | Counts as ANY rank and suit; the evaluator takes the best assignment. The rarest roll (~3%) |
-| EXPLOSIVE (rider) | Not a mod Ã¢â‚¬â€ a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
+| EXPLOSIVE (rider) | Not a mod — a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
 
 Enhanced cards wear their power as their identity: a full-face color
 wash + frame in the mod's color, and the mod's emblem drawn LARGE in
 the center where the suit pip normally sits (suit stays readable in
 the corner). Gold cards are solid gold head to toe.
 
-Roll weights: Mult 26% Ã‚Â· Chip 26% Ã‚Â· Plus 14% Ã‚Â· Minus 10% Ã‚Â· Bumper 11%
-Ã‚Â· Gold 10% Ã‚Â· Wild 3%, with the Explosive rider rolled separately.
+Roll weights: Mult 26% · Chip 26% · Plus 14% · Minus 10% · Bumper 11%
+· Gold 10% · Wild 3%, with the Explosive rider rolled separately.
 
-## Relic system (SHIPPED Ã¢â‚¬â€ all 17 below are in)
+## Relic system (SHIPPED — all 17 below are in)
 
 Run-wide passive items, Balatro-joker/StS-relic style. Held for the
-run Ã¢â‚¬â€ NO carry limit; the price is the gate Ã¢â‚¬â€ shown as a (wrapping)
+run — NO carry limit; the price is the gate — shown as a (wrapping)
 line on the tarot screen, saved with the run, gone when it ends.
 Acquired from the shop's relic slot and chest rewards. Rarity sets
-price: Common 150 chips Ã‚Â· Rare 300 Ã‚Â· Legendary 600 (Ãƒâ€”league
-multiplier, Snake Oil Ã¢Ë†â€™25%).
+price: Common 150 chips · Rare 300 · Legendary 600 (×league
+multiplier, Snake Oil −25%).
 
 Starter catalog (names/numbers draft):
 | Relic | Rarity | Effect |
 | --- | --- | --- |
 | Horseshoe | C | +1 hand in every room's budget |
 | Card Sleeve | C | Card picks offer 4 choices |
-| Snake Oil | C | Shop prices Ã¢Ë†â€™25% |
+| Snake Oil | C | Shop prices −25% |
 | Tin Star | C | +10 chips every cleared room |
 | Rabbit's Foot | C | Ambient safes/chests twice as likely |
 | Bomb Squad Badge | C | Bombs start with +2 fuse |
@@ -358,24 +358,24 @@ Starter catalog (names/numbers draft):
 | Weathervane | R | Wind cards show their direction arrow (hidden otherwise) |
 | Magnifying Glass | R | Washed cards still show their suit |
 | Gold Tooth | R | Chip cards pay double |
-| Mirror Shades | R | Mult cards Ãƒâ€”2 instead of Ãƒâ€”1.5 |
+| Mirror Shades | R | Mult cards ×2 instead of ×1.5 |
 | Second Wind | R | First failed room each run adds no cursed card |
-| Bankroll Clip | R | Cash-out rate +0.25Ãƒâ€” |
-| Dowsing Rod | R | Safe combos use only ranks 2Ã¢â‚¬â€œ6 |
+| Bankroll Clip | R | Cash-out rate +0.25× |
+| Dowsing Rod | R | Safe combos use only ranks 2–6 |
 | Saddlebags | R | A 4th slot in the provision kit |
 | Lucky Chip | L | 10% chance a played hand costs no hand |
 
 ## Ace up the Sleeve (SHIPPED)
 
-Every trail run starts with a hidden card up the sleeve Ã¢â‚¬â€ the top row
+Every trail run starts with a hidden card up the sleeve — the top row
 of the KIT panel. ONCE PER TABLE you may click it and pick any plain
 card on the table: the two trade places in a blink (a free action, no
 hand spent), and the card you took rides up the sleeve to be played
 onto another table. Nothing cursed, hazarded, flooded, face-down,
 objective-bearing, or boss-sized fits up a sleeve; enhanced cards do,
-mods and all Ã¢â‚¬â€ palming a MULT or GOLD card for the right table is the
+mods and all — palming a MULT or GOLD card for the right table is the
 whole play. The sleeve starts each run as a **2 of a random suit**
-and is META-UPGRADED with $cash at THE OUTFITTER ($10Ãƒâ€”(rankÃ¢Ë†â€™1) per
+and is META-UPGRADED with $cash at THE OUTFITTER ($10×(rank−1) per
 step) all the way to an **Ace**. Saved with the run; the swap resets
 at every sit-down.
 
@@ -384,16 +384,16 @@ at every sit-down.
 The meta-progression shop, reached from the MAIN MENU (UPGRADES,
 beside THE TRAIL): every permanent upgrade $cash can buy, one shelf
 per upgrade, each showing its current level and next price. Current
-stock: **Ace up the Sleeve** (starting rank 2Ã¢â€ â€™A, $10Ãƒâ€”(rankÃ¢Ë†â€™1));
+stock: **Ace up the Sleeve** (starting rank 2→A, $10×(rank−1));
 **Bankroll** (+20 starting chips per level on every buy-in, 5 levels,
-$20Ãƒâ€”(level+1)); **Packed Kit** (a random provision already in the kit
-at run start, 2 levels, $35Ãƒâ€”(level+1)). All saved in trail_meta.cfg;
+$20×(level+1)); **Packed Kit** (a random provision already in the kit
+at run start, 2 levels, $35×(level+1)). All saved in trail_meta.cfg;
 new upgrades belong on this screen.
 
 ## Provisions (SHIPPED)
 
 One-shot consumables in a 3-slot KIT (right HUD column, trail rooms
-only; the Saddlebags relic opens a 4th slot). Using one is a FREE action Ã¢â‚¬â€ it never costs a hand; the
+only; the Saddlebags relic opens a 4th slot). Using one is a FREE action — it never costs a hand; the
 provision itself is the price. Two kinds: TARGETED (click the kit
 button, then a card on the table; right-click or press again to
 holster) and INSTANT (fires on the spot). Refusals explain themselves;
@@ -401,8 +401,8 @@ saved with the run.
 
 | Provision | Kind | Price | Effect |
 | --- | --- | --- | --- |
-| Canteen | Targeted | 45 | Douses one card Ã¢â‚¬â€ removes any hazard or soak (not stone) |
-| Dynamite Stick | Targeted | 60 | Destroys one card outright, unscored Ã¢â‚¬â€ stones and curses included (bosses, safes, and cobra coils are too big). Blasted mine stones still count toward the seam; a blasted treasure carrier respawns its piece |
+| Canteen | Targeted | 45 | Douses one card — removes any hazard or soak (not stone) |
+| Dynamite Stick | Targeted | 60 | Destroys one card outright, unscored — stones and curses included (bosses, safes, and cobra coils are too big). Blasted mine stones still count toward the seam; a blasted treasure carrier respawns its piece |
 | Branding Iron | Targeted | 70 | Brands a plain, dry card with a random enhancement |
 | Barber's Razor | Targeted | 50 | Re-rolls one card's rank and suit (mods survive the cut) |
 | Gold Pan | Targeted | 65 | Turns one plain card solid GOLD |
@@ -410,16 +410,16 @@ saved with the run.
 | Pocket Flask | Instant | 60 | +2 hands at this table (+20 seconds on a timed one) |
 | Rattlesnake Tonic | Instant | 70 | The next scored hand counts DOUBLE (the preview shows it) |
 
-Sources: merchants stock a crate (Peddler 2 Ã‚Â· Collector 2 Ã‚Â· Sharp 1,
-prices Ãƒâ€”league mult, Snake Oil applies), ambient safes add one to the
+Sources: merchants stock a crate (Peddler 2 · Collector 2 · Sharp 1,
+prices ×league mult, Snake Oil applies), ambient safes add one to the
 loot 35% of the time, and the chest reward table rolls one in its
-0.80Ã¢â‚¬â€œ0.88 band. Tutor popup fires on the first one found.
+0.80–0.88 band. Tutor popup fires on the first one found.
 
-## Shop v3 Ã¢â‚¬â€ traveling merchants (SHIPPED)
+## Shop v3 — traveling merchants (SHIPPED)
 
 Each shop stop is a different trader, rolled when the tarot offer is
-drawn Ã¢â‚¬â€ the selector card names the merchant and lists their wares
-before you commit (stock and merchant fixed per room Ã¢â‚¬â€ no re-rolling
+drawn — the selector card names the merchant and lists their wares
+before you commit (stock and merchant fixed per room — no re-rolling
 by leaving):
 
 | Merchant | Cards | Relics | Forge |
@@ -429,7 +429,7 @@ by leaving):
 | THE CARD SHARP | 10 | 0 | yes |
 
 Card prices: plain 40 chips, duplicates-of-owned 50, modified 80.
-Relic prices by rarity: C 150 / R 300 / L 600 (Snake Oil still Ã¢Ë†â€™25%).
+Relic prices by rarity: C 150 / R 300 / L 600 (Snake Oil still −25%).
 Prices are computed at display time, so buying Snake Oil re-prices
 the rest of that same shop on the spot. Every purchase re-renders
 the shelves, and a refused purchase says WHY, loud and in red: not
@@ -441,29 +441,29 @@ The screen is dressed as a roadside camp (ShopBackdrop): covered
 wagon, lantern rope, crates, packed dirt. Hover any shelf card for
 the standard stat tooltip.
 
-## Card modifiers (further drafts Ã¢â‚¬â€ need our own names/flavor)
+## Card modifiers (further drafts — need our own names/flavor)
 
 | Modifier | Effect (draft) | Notes |
 | --- | --- | --- |
 | Gilded | +N chips every time it's played | Economy engine |
 | Marked | +15 pips when scored | Simple power |
 | Wild | Counts as any suit | Revives the old blank-card idea; flush grease |
-| Glass | Ãƒâ€”2 hand score when included; 1-in-4 to shatter (removed) after scoring | Risk/reward |
+| Glass | ×2 hand score when included; 1-in-4 to shatter (removed) after scoring | Risk/reward |
 | Lucky | 20%: double chips from this hand | Gambler flavor |
-| Heavy | Counts as two cards of its rank for hand-making? | Spicy; maybe too warping Ã¢â‚¬â€ discuss |
+| Heavy | Counts as two cards of its rank for hand-making? | Spicy; maybe too warping — discuss |
 | Cursed | Dead weight: can't be selected at all | From events/bosses; removal fodder |
 
 Rendering note: modifiers need to read at a glance on the code-drawn
-cards Ã¢â‚¬â€ border tints / corner gems / face patterns per modifier (theme
+cards — border tints / corner gems / face patterns per modifier (theme
 system already supports per-card materials).
 
 ## Economy
 
 Two currencies, one flow:
-- **Chips** Ã¢â‚¬â€ the run: your buy-in stack, grown by winning bets, spent
+- **Chips** — the run: your buy-in stack, grown by winning bets, spent
   on shops and lost to failed rooms. Bankruptcy = run over (banked cash
   is safe; unconverted chips die with the run).
-- **Cash** Ã¢â‚¬â€ the meta: earned ONLY by finishing the trail with chips
+- **Cash** — the meta: earned ONLY by finishing the trail with chips
   or playing GOLD cards mid-run (or the
   completion purse), persists forever, spent on premium buy-ins and the
   between-runs **Outfitter** (permanent upgrades).
@@ -479,52 +479,52 @@ Draft permanent upgrades (Outfitter):
 - One free board reshuffle per room (button)
 - Slower drain in Pressure rooms / +15s in Timed rooms
 - Starting deck variants (unlocks): e.g. "Stacked Deck" (44 cards,
-  extra kings), "Flush Times" (suit-skewed) Ã¢â‚¬â€ big-ticket items
+  extra kings), "Flush Times" (suit-skewed) — big-ticket items
 
-## Bosses Ã¢â‚¬â€ the Court (SHIPPED Ã¢â‚¬â€ Dealer duel still to come)
+## Bosses — the Court (SHIPPED — Dealer duel still to come)
 
 **The trail is 21 rooms; every 7th room is a forced boss** (no tarot
-choice Ã¢â‚¬â€ fate deals a court card): room 7 = Jack, 14 = Queen Bee,
-21 = King Cobra. Boss rooms have no score target Ã¢â‚¬â€ defeat the boss
+choice — fate deals a court card): room 7 = Jack, 14 = Queen Bee,
+21 = King Cobra. Boss rooms have no score target — defeat the boss
 within the hand budget to clear, at 3:1 odds. Bosses are LIVING CARDS
-on the board, participating in hands with their current identity Ã¢â‚¬â€
+on the board, participating in hands with their current identity —
 which makes deck sculpting the boss prep (stock queens before room 14).
 
-- **JACK OF ALL TRADES** (room 7) Ã¢â‚¬â€ his life is a **2,500-point
-  SCORE POOL**, fought over **30 hands**. Every submitted hand Ã¢â‚¬â€
-  including ones that hit him Ã¢â‚¬â€ makes him teleport and re-roll his
+- **JACK OF ALL TRADES** (room 7) — his life is a **2,500-point
+  SCORE POOL**, fought over **30 hands**. Every submitted hand —
+  including ones that hit him — makes him teleport and re-roll his
   rank AND suit. Pin him into a scoring hand that **beats his bar**
   (starts 30, **+25 per hit**, shown in the banner) and the hand's
   WHOLE SCORE bleeds off him; weaker hands make him scoff and stay.
   The card badge shows thousands left ("7K"); the banner bar carries
   the exact count in ten notches. The per-round wind can't touch him
   (bosses are too heavy for it); a bumper shove off the edge drains
-  1,000 Ã¢â‚¬â€ and he storms back on.
-- **Boss feedback** Ã¢â‚¬â€ every wound lands as a visible SLUG: the scored
+  1,000 — and he storms back on.
+- **Boss feedback** — every wound lands as a visible SLUG: the scored
   hand's pieces gather into a gold bullet that zooms from the hand's
   center into the boss card (flinch + sparks + table shake). Boss
   health is a RED SEGMENTED BAR in the banner slot (jack 10 notches,
   queen 3 stripes, cobra tail+head), shared with the Outlaw duel.
-- **QUEEN BEE** (room 14) Ã¢â‚¬â€ **3 stripes** (HP); she and her honey can
-  only be caught in **2Ã¢â‚¬â€œ3 card hands** (the honey is sticky, and so is
-  she Ã¢â‚¬â€ she's a Queen, so catching her means pairing queens). Her
+- **QUEEN BEE** (room 14) — **3 stripes** (HP); she and her honey can
+  only be caught in **2–3 card hands** (the honey is sticky, and so is
+  she — she's a Queen, so catching her means pairing queens). Her
   rhythm alternates: one turn she MOVES (steps into an adjacent cell),
   the next she HONEYS a card adjacent to her. Honey keeps its
   rank/suit, falls normally, and STAYS honeyed until cleared. Each
   catch removes a stripe.
-- **KING COBRA** (room 21) Ã¢â‚¬â€ the boss card is his HEAD, spawning with
+- **KING COBRA** (room 21) — the boss card is his HEAD, spawning with
   a random identity and a **2-segment body**. Each hand he SLITHERS
   like a real snake: the head eats an adjacent card (taking its cell
   and full identity), the body follows the head's path, and the cell
   the tail tip vacates is refilled by a fresh deal. Body segments
   block the board like walls, and he prefers slithering toward open
-  space. Clear his head using its CURRENT identity Ã¢â€ â€™ he's **stunned**
+  space. Clear his head using its CURRENT identity → he's **stunned**
   for a hand, the tail tip crumbles, and his identity reverts to the
   previous meal. **Kill = clear the head with no body left.**
-- **THE DEALER** (bonus, room 22 Ã¢â‚¬â€ HIGH ROLLER RUNS ONLY) Ã¢â‚¬â€ the true
+- **THE DEALER** (bonus, room 22 — HIGH ROLLER RUNS ONLY) — the true
   finale exists only at the highest stakes: a **heads-up duel with
   mirror rules**. You and the Dealer alternate scoring hands on the
-  SAME board Ã¢â‚¬â€ beat his total; his table rules counter your build
+  SAME board — beat his total; his table rules counter your build
   (your most-scored hand type pays half, your most-common suit
   restricted). Beating him = premium cash-out + purse + (someday) the
   credits. The duel AI is the single largest build item in this mode.
@@ -533,36 +533,36 @@ Trail restructure that comes with this: ROOMS_TOTAL 21, regions of 7,
 shops offered at region positions 3 and 6, target/blind curves
 recalibrated across 21 rooms, boss tarot cards drawn as court cards.
 
-## Failure & stakes Ã¢â‚¬â€ the room bars the way
+## Failure & stakes — the room bars the way
 
 Failing a room does NOT clear it. It costs you three ways:
 1. Your **stake** is lost.
-2. A **Cursed card** is shuffled into your deck Ã¢â‚¬â€ dead weight that
+2. A **Cursed card** is shuffled into your deck — dead weight that
    blocks chains until you pay a shop to burn it.
-3. **You must play the same room again** Ã¢â‚¬â€ straight back to its bet
+3. **You must play the same room again** — straight back to its bet
    screen (no backing out, no cash-out) with a fresh board, re-staking
    from what's left. Beat it or bleed out.
 
 The run ends by **bankruptcy** (a failed room leaves you at zero),
-by being **blinded out** (any table Ã¢â‚¬â€ next room or retry Ã¢â‚¬â€ whose seat
+by being **blinded out** (any table — next room or retry — whose seat
 your chips can't cover; the house keeps what's left), or by
 **finishing the trail**. There is no early cash-out.
 Bosses are all-in, so a boss loss IS bankruptcy. Banked cash is always
 safe. Quitting mid-room is NOT a fail: the whole outlay is refunded,
 the room is saved with the run, and resuming sits you back down at its
-stakes screen like a fresh visit (fresh board Ã¢â‚¬â€ no scumming penalty,
+stakes screen like a fresh visit (fresh board — no scumming penalty,
 by design).
 
 ## Technical skeleton (build phases)
 
-- **T1 Ã¢â‚¬â€ Run skeleton**: linear trail, Normal rooms only, target+hands,
+- **T1 — Run skeleton**: linear trail, Normal rooms only, target+hands,
   fail = run over, 1-of-3 plain card picks, run-state save
   (user://run.cfg), trail progress UI. Proves the loop.
-- **T2 Ã¢â‚¬â€ Variety**: room modifier engine (timed / tight / suit / hand
+- **T2 — Variety**: room modifier engine (timed / tight / suit / hand
   locked / pressure), shop rooms + chips, constraint-aware
   has_playable_hand.
-- **T3 Ã¢â‚¬â€ Card modifiers** + Elite rooms + bosses.
-- **T4 Ã¢â‚¬â€ Meta**: cash, Outfitter screen, permanent upgrades, starting
+- **T3 — Card modifiers** + Elite rooms + bosses.
+- **T4 — Meta**: cash, Outfitter screen, permanent upgrades, starting
   deck unlocks, run stats screen.
 
 Existing machinery that carries over: mode system in main.gd (Trail is
@@ -571,55 +571,55 @@ meter (Pressure rooms), Time Trial clock (Timed rooms), theme/material
 system (modifier rendering), ConfigFile save pattern (run + meta
 saves).
 
-## Decided (brainstorm rounds 1Ã¢â‚¬â€œ2)
+## Decided (brainstorm rounds 1–2)
 
-- Fail state Ã¢â€ â€™ betting: stake lost + cursed-card scar, fate moves on;
+- Fail state → betting: stake lost + cursed-card scar, fate moves on;
   run ends only on bankruptcy or cash-out.
-- Trail shape Ã¢â€ â€™ tarot draws (3 face-up + "Let Fate Decide").
-- Run length Ã¢â€ â€™ 20Ã¢â‚¬â€œ60 min, player-controlled via cash-out.
-- Card picks Ã¢â€ â€™ after every room, skippable, removal in shops.
-- Premium buy-ins Ã¢â€ â€™ harder AND richer (stake-style modifiers).
-- Bet UX Ã¢â€ â€™ ante + free bet at posted odds: the ante is sunk, the bet
+- Trail shape → tarot draws (3 face-up + "Let Fate Decide").
+- Run length → 20–60 min, player-controlled via cash-out.
+- Card picks → after every room, skippable, removal in shops.
+- Premium buy-ins → harder AND richer (stake-style modifiers).
+- Bet UX → ante + free bet at posted odds: the ante is sunk, the bet
   is chosen, the table fixes the hand/minute budget. Replaced promised
-  hands (odds dial, removed 2026-09-12 Ã¢â‚¬â€ difficulty comes from
+  hands (odds dial, removed 2026-09-12 — difficulty comes from
   progression instead), which replaced bought-hands, which replaced
   forced stakes, which replaced the free slider; per-room min bets
   printed on the tarot cards.
-- Bosses Ã¢â€ â€™ court cards revived (JoAT/Queen Bee/King Cobra) + Dealer
+- Bosses → court cards revived (JoAT/Queen Bee/King Cobra) + Dealer
   finale as heads-up duel with mirror counter-rules.
 
 ## Open threads (next brainstorm sessions)
 
-1. **Odds table tuning** Ã¢â‚¬â€ per room type, and do odds scale with how
+1. **Odds table tuning** — per room type, and do odds scale with how
    much of the stack is wagered (all-in bonus?)?
-2. **Cash-out curve** Ã¢â‚¬â€ flat rate per buy-in, or a rate that grows the
+2. **Cash-out curve** — flat rate per buy-in, or a rate that grows the
    deeper you cash out (rewarding the ride itself)?
-3. **Blind schedule** Ã¢â‚¬â€ exact min-bet escalation per region/table.
-4. **Cursed card variety** Ã¢â‚¬â€ one flavor, or a family (unplayable /
+3. **Blind schedule** — exact min-bet escalation per region/table.
+4. **Cursed card variety** — one flavor, or a family (unplayable /
    drains chips when drawn onto the board / blocks its cell)?
-5. **Shop inventory design** Ã¢â‚¬â€ slots, pricing, reroll cost, does
+5. **Shop inventory design** — slots, pricing, reroll cost, does
    removal price scale with deck size?
-6. **Dealer duel AI** Ã¢â‚¬â€ how strong is his hand-finding, does he obey
+6. **Dealer duel AI** — how strong is his hand-finding, does he obey
    the same chain-adjacency rules, does he get better at higher tables?
-7. **Elite rooms** Ã¢â‚¬â€ guaranteed modified-card picks as their reward?
+7. **Elite rooms** — guaranteed modified-card picks as their reward?
 8. **Does Trail sit beside Arcade or become the flagship** (menu
    ordering, what a new player sees first)?
-9. **Seeded/daily runs** Ã¢â‚¬â€ same tarot sequence for everyone once
+9. **Seeded/daily runs** — same tarot sequence for everyone once
    leaderboards exist (ties into tabled Supabase plan).
-10. "Heavy" modifier (counts as two of its rank) Ã¢â‚¬â€ too rule-warping?
+10. "Heavy" modifier (counts as two of its rank) — too rule-warping?
 
-## Balance pass Ã¢â‚¬â€ easier overall (Oct 2026)
+## Balance pass — easier overall (Oct 2026)
 
 The ride to the Queen was starving riders out. One pass, many small
 levers, all pulled toward the player:
 
 - Targets: TARGET_STEP 200 -> 165; HIGH STAKES scale 1.5 -> 1.4.
 - Hand budgets: 10/8/7 -> 11/9/8, and depth now costs at most ONE
-  hand (was one per region) Ã¢â‚¬â€ the old curve had region-2 HIGH
+  hand (was one per region) — the old curve had region-2 HIGH
   STAKES demanding ~560/hand.
 - Economy: blinds climb 6/table (was 8); starting stacks 140/300/600
   (were 100/250/500); the post-boss price wall is 6x per boss (was
-  10x) Ã¢â‚¬â€ a won 3:1 boss all-in only quadruples the stack, so the old
+  10x) — a won 3:1 boss all-in only quadruples the stack, so the old
   wall cut real wealth more than half right before the Queen.
 - Hazards: room step .055 (was .08), seed count grows every 5 tables
   (was 4), refill chance climbs slower and caps at 16% (was 20%);
@@ -634,21 +634,21 @@ trail remembers the last saddle; saves carry the rider). Each has a
 SIGNATURE ability in the kit panel top row, once per table unless
 upgraded at the Outfitter:
 
-- THE GAMBLER Ã¢â‚¬â€ Ace up the Sleeve (the existing sleeve system, now
+- THE GAMBLER — Ace up the Sleeve (the existing sleeve system, now
   his alone). Upgrade: starting rank, 2 through Ace.
-- THE MACHINE Ã¢â‚¬â€ The Laser: burn one card clean off the felt,
+- THE MACHINE — The Laser: burn one card clean off the felt,
   unscored. Safes, bosses and coils deflect the beam; job pieces
   caught in it resurface, dynamite-style; lasered stones count
   toward the mine quota. Upgrades (4): each extends the beam one
-  more card Ã¢â‚¬â€ up, right, down, left Ã¢â‚¬â€ into a full cross.
-- THE DOCTOR Ã¢â‚¬â€ The Pocket Watch: the last hand un-happens. The board
+  more card — up, right, down, left — into a full cross.
+- THE DOCTOR — The Pocket Watch: the last hand un-happens. The board
   snapshots before every hand (cards, deck, hazards, fuses, bosses)
   and the room state rides along (score, grit, hands, chips, cash);
   restoring consumes the snapshot, the clock keeps its seconds, and
   blackjack never rewinds. Upgrades (2): extra turns per table.
 
 Kit art: assets/art/playable (select cards + HUD portraits).
-Mobile/tablet layout kit delivered alongside and TABLED for later Ã¢â‚¬â€
+Mobile/tablet layout kit delivered alongside and TABLED for later —
 lives in Downloads\PokerPop_Mobile_Layouts (spec JSON + mocks), not
 yet in the project.
 
