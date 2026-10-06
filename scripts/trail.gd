@@ -1837,6 +1837,7 @@ const POSTER_JOB_ALIASES := {
 	"easy_money": "limit_table",
 	"fat_pot": "pot_limit",
 	"high_stakes": "no_limit",
+	"dust_storm": "dust_devil",  # the kit painted the old purge name
 }
 
 

@@ -290,7 +290,7 @@ var boss_hp := 0:
 	set(value):
 		boss_hp = value
 		queue_redraw()
-var honey := false:  # Queen Bee's spread: only 2-3 card hands clear it
+var honey := false:  # Queen Bee's trail: one card may follow it in a chain
 	set(value):
 		honey = value
 		queue_redraw()
@@ -686,9 +686,12 @@ func _draw() -> void:
 					HORIZONTAL_ALIGNMENT_CENTER, 22, 12, Color.WHITE)
 		"queen":
 			_draw_pixel_map(CROWN_PX, Vector2(0, -H / 2.0 + 8), 3.0, GOLD)
-			for i in boss_hp:
-				draw_rect(Rect2(-21.0 + i * 15.0, H / 2.0 - 16.0, 12, 8),
-						Color(0.92, 0.68, 0.18))
+			# Her score pool, worn as an amber chip like the Jack's.
+			var qc := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
+			draw_circle(qc, 12, Color(0.92, 0.68, 0.18))
+			draw_string(font, qc + Vector2(-11, 5),
+					"%dK" % ceili(boss_hp / 1000.0),
+					HORIZONTAL_ALIGNMENT_CENTER, 22, 12, BLACK)
 		"cobra":
 			draw_rect(rect.grow(-2), SNAKE_GREEN, false, 5.0)
 			draw_colored_polygon(PackedVector2Array([
@@ -869,9 +872,11 @@ func _draw_art(rect: Rect2) -> void:
 						"%dK" % ceili(boss_hp / 1000.0),
 						HORIZONTAL_ALIGNMENT_CENTER, 22, 12, Color.WHITE)
 			"queen":
-				for i in boss_hp:
-					draw_rect(Rect2(-21.0 + i * 15.0, H / 2.0 - 16.0, 12, 8),
-							Color(0.92, 0.68, 0.18))
+				var qc := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
+				draw_circle(qc, 12, Color(0.92, 0.68, 0.18))
+				draw_string(font, qc + Vector2(-11, 5),
+						"%dK" % ceili(boss_hp / 1000.0),
+						HORIZONTAL_ALIGNMENT_CENTER, 22, 12, BLACK)
 			"cobra":
 				if stunned:
 					draw_string(font, Vector2(-W / 2.0, -H / 2.0 - 4), "zzz",

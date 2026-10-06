@@ -80,18 +80,24 @@ func _init() -> void:
 			"blown segment unhooked from the head, one identity lost")
 	_free_board(b)
 
-	# --- sticky hands: queen/honey only in 2-3 card hands -------------------
+	# --- honey slows the chain: one card may follow it ----------------------
 	b = _board([[8, 0, 0, 0], [8, 1, 1, 0], [8, 2, 2, 0], [8, 3, 3, 0]])
 	b.grid[Vector2i(0, 0)].honey = true
+	# Honey first, one follower: adding a THIRD card is blocked.
 	b.selected.assign([b.grid[Vector2i(0, 0)], b.grid[Vector2i(1, 0)]])
-	b._update_hand_validity()
-	failures += _check(b.grid[Vector2i(0, 0)].hand_valid,
-			"honey pair (2 cards) is valid")
+	failures += _check(b._honey_blocks_add(),
+			"honey + one follower blocks further adds")
+	# Honey last in a long chain: one more may still join.
+	b.selected.assign([b.grid[Vector2i(1, 0)], b.grid[Vector2i(2, 0)],
+			b.grid[Vector2i(0, 0)]])
+	failures += _check(not b._honey_blocks_add(),
+			"fresh honey at the chain's end still allows one more")
+	# ...and a 4-card hand WITH honey is a legal hand now.
 	b.selected.assign([b.grid[Vector2i(0, 0)], b.grid[Vector2i(1, 0)],
 			b.grid[Vector2i(2, 0)], b.grid[Vector2i(3, 0)]])
 	b._update_hand_validity()
-	failures += _check(not b.grid[Vector2i(0, 0)].hand_valid,
-			"honey in a 4-card hand is too sticky")
+	failures += _check(b.grid[Vector2i(0, 0)].hand_valid,
+			"honey in a 4-card hand is a legal hand (gating is at selection)")
 	b.selected.clear()
 	_free_board(b)
 

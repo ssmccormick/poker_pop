@@ -735,3 +735,18 @@ gold under the emblem once it has seasoned.
   left - no scar, no refund games. Only a mid-round blackjack,
   which paces itself, falls back to the old outlay-back fresh
   sit-down. The photograph clears the moment a table ends.
+
+## Queen Bee reworked (Oct 2026)
+
+- She is no longer sticky and never sits still: EVERY boss turn she
+  flits to an adjacent cell and leaves HONEY on the card that takes
+  her old perch (cornered, she coats a neighbor instead).
+- Her life is a SCORE pool like the Jack's: 3,000 HP, every hand
+  she is in deals its score as damage, no shrug bar - the honey and
+  the wandering are her defense. Shoved off the table costs her
+  1,000 like the Jack. She wears an amber NK chip on the card.
+- HONEY reworked: honeyed cards play in ANY size hand, but once a
+  honeyed card joins your chain only ONE more card may follow it.
+  The gate is at selection time; a legal chain always plays.
+- DUST STORM purge posters render again (the kit painted the emblem
+  under the old DUST DEVIL name - aliased).

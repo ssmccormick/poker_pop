@@ -509,6 +509,15 @@ static func _is_adjacent(a: Vector2i, b: Vector2i) -> bool:
 	return maxi(d.x, d.y) == 1
 
 
+## Honey slows the hand: once a honey card is in the chain, only ONE
+## more card may join after it.
+func _honey_blocks_add() -> bool:
+	for i in selected.size():
+		if selected[i].honey:
+			return selected.size() >= i + 2
+	return false
+
+
 func _toggle_select(card: PlayingCard) -> void:
 	if card.cursed or card.snake_tail or card.hazard == "stone":
 		_play_sound(SFX_FLIP, 0.7, -10.0)
@@ -540,6 +549,9 @@ func _toggle_select(card: PlayingCard) -> void:
 		_play_sound(SFX_FLIP, 0.85, -8.0)
 	else:
 		if selected.size() >= _select_cap():
+			return
+		if _honey_blocks_add():
+			_play_sound(SFX_FLIP, 0.7, -10.0)
 			return
 		if not selected.is_empty() and not _is_adjacent(card.grid_pos, selected.back().grid_pos):
 			return
@@ -648,12 +660,6 @@ func _update_hand_validity() -> void:
 			if card.washed:
 				valid = false
 				break
-		# Sticky rule: the Queen and her honey only fall to 2-3 card hands.
-		if valid and selected.size() > 3:
-			for card in selected:
-				if card.boss == "queen" or card.honey:
-					valid = false
-					break
 	for card in selected:
 		card.hand_valid = valid
 
@@ -684,11 +690,6 @@ func play_hand() -> void:
 	hand_committing.emit()
 	if undo_enabled:
 		snapshot_state()
-	if selected.size() > 3:
-		for card in selected:
-			if card.boss == "queen" or card.honey:
-				_reject_hand()  # too big a hand for something this sticky
-				return
 	var result: Dictionary
 	if blackjack_target > 0:
 		# BLACKJACK: your hits flip face-up, then the dealer turns his
@@ -771,7 +772,7 @@ func play_hand() -> void:
 				elif card.boss_hp <= result.score:
 					result["boss_defeated"] = true
 			"queen":
-				if card.boss_hp <= 1:
+				if card.boss_hp <= result.score:
 					result["boss_defeated"] = true
 			"cobra":
 				if card.cobra_body.is_empty():
@@ -805,8 +806,8 @@ func play_hand() -> void:
 			# reroll and teleport as usual.
 			continue
 		if card.boss == "jack" or card.boss == "queen":
-			# The Jack bleeds score; the Queen loses a stripe.
-			card.boss_hp -= result.score if card.boss == "jack" else 1
+			# Both royals bleed SCORE; only the Jack raises his bar.
+			card.boss_hp -= result.score
 			if card.boss == "jack":
 				jack_bar += JACK_BAR_STEP
 			boss_hits.append(card)  # the shot lands after the shoves
@@ -900,9 +901,9 @@ func play_hand() -> void:
 		for c in shoved_off:
 			c.queue_free()
 		if bounced_boss != null:
-			# Off the table costs him a life — a thousand points of the
-			# Jack's score pool, or one of the Queen's stripes.
-			bounced_boss.boss_hp -= 1000 if bounced_boss.boss == "jack" else 1
+			# Off the table costs royalty a thousand points of their
+			# score pool.
+			bounced_boss.boss_hp -= 1000
 			if bounced_boss.boss == "jack":
 				jack_bar += JACK_BAR_STEP
 			_play_sound(SFX_REVOLVERS.pick_random(), 1.0, -7.0)
@@ -1980,9 +1981,10 @@ static func migrate_mod(mod: String) -> String:
 # --- Trail boss engine ----------------------------------------------------
 
 # The Jack's life is a SCORE pool: qualifying hands deal their score
-# as damage, and 2,500 total puts him down.
+# as damage, and 2,500 total puts him down. The Queen carries a pool
+# too — her defense is the honey and the wandering, not a bar.
 const JACK_HP := 2500
-const QUEEN_STRIPES := 3
+const QUEEN_HP := 3000
 const COBRA_START_TAIL := 2
 # The Jack only respects strong hands: the hand that clears him must
 # beat this bar to wound him, and every wound raises it.
@@ -2010,7 +2012,7 @@ func spawn_boss(kind: String) -> void:
 			card.rank = randi_range(2, 14)
 			card.suit = randi_range(0, 3)
 		"queen":
-			card.boss_hp = QUEEN_STRIPES
+			card.boss_hp = QUEEN_HP
 			card.rank = 12  # she IS a queen — pair her to sting her
 			card.suit = randi_range(0, 3)
 		"cobra":
@@ -2221,13 +2223,36 @@ func tick_boss() -> void:
 			b.suit = randi_range(0, 3)
 			_play_sound(SFX_SHUFFLES.pick_random(), 1.4, -10.0)
 		"queen":
-			# Alternating rhythm: she MOVES one turn, then HONEYS a card
-			# adjacent to her the next. Honey is permanent until cleared.
-			b.stunned = not b.stunned  # reuse as the rhythm flip
-			if b.stunned:
-				# Honey turn: coat a random orthogonal neighbor.
-				var dirs := HAZARD_DIRS.duplicate()
-				dirs.shuffle()
+			# She never sits still: EVERY turn she flits to a new cell
+			# and leaves HONEY on the card that takes her old perch.
+			# Cornered with nowhere to fly, she coats a neighbor instead.
+			var dirs := HAZARD_DIRS.duplicate()
+			dirs.shuffle()
+			var flew := false
+			for d in dirs:
+				var q: Vector2i = b.grid_pos + d
+				if not grid.has(q):
+					continue
+				var other: PlayingCard = grid[q]
+				if other.boss != "" or other.is_safe or other.snake_tail:
+					continue
+				var b_cell := b.grid_pos
+				grid[q] = b
+				grid[b_cell] = other
+				b.grid_pos = q
+				other.grid_pos = b_cell
+				var tw := create_tween().set_parallel(true)
+				tw.tween_property(b, "position", cell_center(q), 0.3) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+				tw.tween_property(other, "position", cell_center(b_cell), 0.3) \
+						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+				await tw.finished
+				if other.hazard == "" and not other.cursed and not other.honey:
+					other.honey = true
+					_play_sound(SFX_FLIP, 0.8, -10.0)
+				flew = true
+				break
+			if not flew:
 				for d in dirs:
 					var q: Vector2i = b.grid_pos + d
 					if not grid.has(q):
@@ -2238,29 +2263,6 @@ func tick_boss() -> void:
 						card.honey = true
 						_play_sound(SFX_FLIP, 0.8, -10.0)
 						break
-			else:
-				# Move turn: the queen steps into an adjacent cell (swap).
-				var dirs := HAZARD_DIRS.duplicate()
-				dirs.shuffle()
-				for d in dirs:
-					var q: Vector2i = b.grid_pos + d
-					if not grid.has(q):
-						continue
-					var other: PlayingCard = grid[q]
-					if other.boss != "" or other.is_safe or other.snake_tail:
-						continue
-					var b_cell := b.grid_pos
-					grid[q] = b
-					grid[b_cell] = other
-					b.grid_pos = q
-					other.grid_pos = b_cell
-					var tw := create_tween().set_parallel(true)
-					tw.tween_property(b, "position", cell_center(q), 0.3) \
-							.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-					tw.tween_property(other, "position", cell_center(b_cell), 0.3) \
-							.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-					await tw.finished
-					break
 		"cobra":
 			if b.stunned:
 				b.stunned = false

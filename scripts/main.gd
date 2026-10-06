@@ -504,8 +504,8 @@ func _update_labels() -> void:
 						bname = "JACK OF ALL TRADES  ·  BEAT %d TO WOUND" % board.jack_bar
 					"queen":
 						bhp = bcard.boss_hp
-						bhp_max = Board.QUEEN_STRIPES
-						bname = "QUEEN BEE  ·  2-3 CARD HANDS ONLY"
+						bhp_max = Board.QUEEN_HP
+						bname = "QUEEN BEE  ·  SCORE HANDS WITH HER"
 					"cobra":
 						var tail := 0
 						for q in board.grid:
@@ -1482,11 +1482,11 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"jack":
 			lines.append("JACK OF ALL TRADES — %d score left to deal him. A hand beating %d with him in it bleeds its WHOLE SCORE off him; the bar rises per hit." % [card.boss_hp, board.jack_bar])
 		"queen":
-			lines.append("QUEEN BEE — %d stripes. Only 2-3 card hands can hold her." % card.boss_hp)
+			lines.append("QUEEN BEE — a %d score pool: every hand she's in deals its score. She flits to a new cell each turn and leaves honey where she walked." % card.boss_hp)
 		"cobra":
 			lines.append("KING COBRA — %d meals in the tail. Clear his current face." % card.cobra_body.size())
 	if card.honey:
-		lines.append("HONEYED — only plays in 2-3 card hands.")
+		lines.append("HONEYED — plays in any hand, but once it's in your chain you can add only ONE more card after it.")
 	if card.cursed:
 		lines.append("CURSED — unplayable, blocks chains. Burn it at a shop.")
 	match card.hazard:
@@ -1556,7 +1556,7 @@ const TUTOR := {
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
 	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE bleeds off him — the bar rises with every hit. Deal 2,500 total to put him away."],
-	"boss_queen": ["QUEEN BEE", "The Queen only fits in SMALL hands — 2 or 3 cards. She alternates: one hand she moves, the next she honeys a neighbor (honeyed cards also only play in small hands). Sting her three times."],
+	"boss_queen": ["QUEEN BEE", "The Queen carries a 3,000 SCORE pool — every hand she's in deals its score as damage. But she never sits still: each turn she flits to a new cell and leaves HONEY where she walked. Honey plays in any hand, but once a honeyed card joins your chain, only ONE more card can follow it — her hive slows your biggest hands."],
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
