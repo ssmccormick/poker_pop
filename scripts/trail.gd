@@ -252,7 +252,11 @@ var character := "the_gambler"   # the rider this run
 const MAX_HP := 10
 const CAMP_REST_HP := 5
 var hp := MAX_HP
-var laser_used := false          # one shot per table (the Machine)
+# The ride's tally for the end-of-trail ledger.
+var outlaws_caught := 0
+var best_hand_score := 0
+var best_hand_name := ""
+var laser_used := false         # one shot per table (the Machine)
 var _aiming_laser := false
 var watch_uses_left := 1         # turns left this table (the Doctor)
 var _watch_snapshot := {}        # trail-side state alongside board.undo_state
@@ -428,6 +432,9 @@ func _save_run() -> void:
 	cf.set_value("run", "sleeve", sleeve_card)
 	cf.set_value("run", "character", character)
 	cf.set_value("run", "hp", hp)
+	cf.set_value("run", "outlaws_caught", outlaws_caught)
+	cf.set_value("run", "best_hand_score", best_hand_score)
+	cf.set_value("run", "best_hand_name", best_hand_name)
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
@@ -493,6 +500,9 @@ func _load_run() -> bool:
 	if not CHARACTERS.has(character):
 		character = "the_gambler"
 	hp = clampi(int(cf.get_value("run", "hp", MAX_HP)), 1, MAX_HP)
+	outlaws_caught = int(cf.get_value("run", "outlaws_caught", 0))
+	best_hand_score = int(cf.get_value("run", "best_hand_score", 0))
+	best_hand_name = String(cf.get_value("run", "best_hand_name", ""))
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
@@ -742,6 +752,9 @@ func use_watch() -> void:
 	deck = _watch_snapshot.deck.duplicate(true)
 	chips = int(_watch_snapshot.chips)
 	cash = int(_watch_snapshot.cash)
+	outlaws_caught = int(_watch_snapshot.get("outlaws_caught", outlaws_caught))
+	best_hand_score = int(_watch_snapshot.get("best_hand_score", best_hand_score))
+	best_hand_name = String(_watch_snapshot.get("best_hand_name", best_hand_name))
 	_watch_snapshot = {}
 	watch_uses_left -= 1
 	main.stat_bump("hands_unwound")
@@ -769,6 +782,8 @@ func _on_hand_committing() -> void:
 		"room_require": room_require.duplicate(true),
 		"deck": deck.duplicate(true),
 		"chips": chips, "cash": cash,
+		"outlaws_caught": outlaws_caught,
+		"best_hand_score": best_hand_score, "best_hand_name": best_hand_name,
 	}
 
 
@@ -1298,6 +1313,9 @@ func _start_run(tier: int) -> void:
 	sleeve_used = false
 	_aiming_sleeve = false
 	hp = MAX_HP
+	outlaws_caught = 0
+	best_hand_score = 0
+	best_hand_name = ""
 	burns_used = 0
 	_second_wind_used = false
 	_fire_tick_flip = false
@@ -2399,6 +2417,9 @@ func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
 	chips += result.get("bonus_chips", 0)
 	room_score += result.score
+	if int(result.score) > best_hand_score:
+		best_hand_score = int(result.score)
+		best_hand_name = String(result.get("name", ""))
 	# Chip cards SEASON with use: each scoring permanently bumps that
 	# deck card's payout a full base step for the rest of the run.
 	for cc in result.get("cleared_cards", []):
@@ -2789,6 +2810,7 @@ func _fire_bullet(from: Vector2, delay: float, hp_after: int, kills: bool) -> vo
 			main.board.fx.burst(main.board.fx.to_local(to), "sparks")
 		if kills:
 			main.outlaw.die()
+			outlaws_caught += 1
 			_outlaw_dead_pending = false
 			if room_outlaw_idx < room_outlaws.size() - 1:
 				_next_outlaw()
@@ -4035,7 +4057,10 @@ func _end_run(title: String, body: String, _payout: int) -> void:
 	main._stats_save()
 	if title == "BUSTED OUT":
 		_clear_run_save()
-	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nCash: $%d" % [title, body, main.score, cash]
+	var best := "—" if best_hand_score <= 0 \
+			else "%s  (%d)" % [best_hand_name.to_upper(), best_hand_score]
+	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nBest hand: %s\nOutlaws caught: %d\nCash: $%d" \
+			% [title, body, main.score, best, outlaws_caught, cash]
 	end_layer.visible = true
 
 
@@ -4380,7 +4405,7 @@ func build_ui() -> void:
 	_end_label = Label.new()
 	_end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_end_label.add_theme_font_size_override("font_size", 40)
+	_end_label.add_theme_font_size_override("font_size", 34)
 	_end_label.add_theme_color_override("font_color", main.OFFWHITE)
 	_end_label.size = main.VIEW
 	end_layer.add_child(_end_label)

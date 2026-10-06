@@ -252,6 +252,14 @@ func _ready() -> void:
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail._choose_offer({"kind": "shop", "tarot": "GENERAL STORE"}, false)
+			"trailover":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail.outlaws_caught = 3
+				trail.best_hand_score = 840
+				trail.best_hand_name = "Full House"
+				score = 4210
+				trail.take_damage(99, "Shot by Black Jack Calloway.")
 			"trailtarot":
 				menu_layer.visible = false
 				trail._start_run(0)

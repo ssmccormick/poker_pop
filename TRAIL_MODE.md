@@ -669,6 +669,12 @@ Zero HP = LAID LOW: the run ends on the spot, save cleared, the
 house keeps the chips. The Doctor's pocket watch snapshots HP with
 the hand, so a rewound hand gives the blood back.
 
+THE RIDE'S TALLY: every ending (LAID LOW, BUSTED OUT, BLINDED OUT,
+TRAIL COMPLETE) reads the run score, the best single hand (name and
+points), outlaws caught, and banked cash. The tally saves with the
+run and rides in the pocket watch snapshot, so a rewound hand can't
+keep a best hand or a kill it took back.
+
 THE CAMPFIRE: a rest stop once per region (room 4, between the two
 shops), offered on the tarot wall as a poster with a code-drawn
 fire. One comfort per stop: REST (+5 HP), TEND A CARD (a plain deck
