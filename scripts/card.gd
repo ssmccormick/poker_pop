@@ -906,44 +906,44 @@ func _draw_art(rect: Rect2) -> void:
 		return
 	var mod_key := mod
 	# THE JOKER wears the lucky wash and frame as his own suit, with
-	# whatever enhancement he's holding THIS hand as the center emblem.
+	# whatever enhancement he's holding THIS hand as his badge.
 	var skin := "lucky" if joker else mod_key
-	# Faces and Aces keep their big letter even when a mod rides the
-	# card: the wash and frame still dress it, but the emblem drops to
-	# the free bottom-left corner instead of covering the letter.
-	var lettered := rank >= 11
 	if skin != "":
 		_art(rect, "mod_wash", skin)
 		_art(rect, "mod_frame", skin)
-	if mod_key == "" or lettered:
-		if rank == 14:
-			_draw_art_ace(rect)
-		elif rank >= 11:
-			_art(rect, "center", "face_%s_%s" % [CardArt.rank_name(rank),
-					CardArt.suit_name(suit)])
-		else:
-			_art(rect, "center", "pip_" + CardArt.suit_name(suit))
+	# The card's own face ALWAYS shows — pip or letter — so the suit
+	# reads clearly even enhanced; the emblem rides the free
+	# bottom-left corner as a badge on every card.
+	if rank == 14:
+		_draw_art_ace(rect)
+	elif rank >= 11:
+		_art(rect, "center", "face_%s_%s" % [CardArt.rank_name(rank),
+				CardArt.suit_name(suit)])
+	else:
+		_art(rect, "center", "pip_" + CardArt.suit_name(suit))
 	if mod_key != "":
-		var emb_anchor := Vector2(0.24, 0.78) if lettered else Vector2(0.5, 0.5)
-		var emb_scale := 0.52 if lettered else 1.0
+		var emb_anchor := Vector2(0.24, 0.78)
 		if mod_key in ["plus", "minus", "bumper"]:
 			_art_badge(rect, "mod_emblem", mod_key + "_arrow_up", emb_anchor,
-					emb_scale, Color.WHITE, CardArt.arrow_rotation(boost_dir))
+					0.52, Color.WHITE, CardArt.arrow_rotation(boost_dir))
 		else:
-			_art_badge(rect, "mod_emblem", mod_key, emb_anchor, emb_scale)
+			_art_badge(rect, "mod_emblem", mod_key, emb_anchor, 0.52)
 	if joker:
-		# A small nameplate so the shifting power reads as one card.
+		# A small nameplate, kept right of the corner badge.
 		var jfont: Font = FontLib.numbers if FontLib.numbers != null \
 				else ThemeDB.fallback_font
-		draw_string(jfont, Vector2(rect.position.x, rect.end.y - 14.0), "JOKER",
-				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, Color("2a4a2a"))
+		draw_string(jfont, Vector2(rect.position.x + rect.size.x * 0.36,
+				rect.end.y - 14.0), "JOKER",
+				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 11,
+				Color("2a4a2a"))
 	elif mod == "chip" and chip_level > 0:
-		# A seasoned chip wears its grown payout over the baked +8.
+		# A seasoned chip wears its grown payout beside its badge.
 		var cfont: Font = FontLib.numbers if FontLib.numbers != null \
 				else ThemeDB.fallback_font
-		draw_string(cfont, Vector2(rect.position.x, rect.end.y - 14.0),
+		draw_string(cfont, Vector2(rect.position.x + rect.size.x * 0.36,
+				rect.end.y - 14.0),
 				"+%d" % (chip_pay_base * (1 + chip_level)),
-				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 12, GOLD)
+				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 12, GOLD)
 	_draw_art_rank_suit(rect)
 
 	# Hazards ride over the face; the code's motion rides over the art.
@@ -955,9 +955,8 @@ func _draw_art(rect: Rect2) -> void:
 		"water":
 			_art(rect, "hazard", "water_%d" % clampi(water_level, 1, 4))
 		"wind":
-			# No arrow: the swirl's own particles already blow the
-			# right way.
-			_art(rect, "hazard", "wind")
+			# No medallion, no arrow: the living swirl and its
+			# particles ARE the wind.
 			_draw_wind_swirl()
 		"bomb":
 			# The dynamite rides the free top-right corner â€” center
