@@ -707,3 +707,19 @@ doubled throughout by Gold Tooth). The level lives on the deck
 entry, rides the deal, the sleeve and the save, survives the pocket
 watch (the rewind un-scores it), and the card wears its grown +N in
 gold under the emblem once it has seasoned.
+
+## Polish pass (Oct 2026)
+
+- Bomb cards: the fuse-count badge tucks against the medallion's
+  lower-left rim, and the fuse-spark particles sit on the corner
+  medallion's baked fuse ball (they floated at the old centered-
+  bomb spot).
+- Wind cards drop the direction arrow: the swirl's particles already
+  blow the right way; the tooltip now says to watch the dust.
+- Magnifying Glass is now SWIMMING GOGGLES (same power: filled
+  cards still show their suit). Old saves migrate the id.
+- DEALER'S CALL demands more: ~8-9 called hands on a flat 10-hand
+  budget at every region (was ~6-7 on 9, shrinking with depth).
+- The generic THE OUTLAW name is gone: that preset face rides on
+  under a generated name, every bounty poster letters its name from
+  the template, and the baked THE OUTLAW card retires.

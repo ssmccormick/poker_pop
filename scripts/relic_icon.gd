@@ -85,9 +85,16 @@ func _draw() -> void:
 			draw_colored_polygon(PackedVector2Array([
 				Vector2(16, -6), Vector2(8, -11), Vector2(8, -1)]), GOLD)
 			draw_rect(Rect2(-16, -10, 4, 8), GOLD)
-		"magnifying_glass":
-			draw_arc(Vector2(-4, -6), 11, 0, TAU, 24, GOLD, 3.5)
-			draw_line(Vector2(4, 2), Vector2(14, 14), WOOD, 5.0)
+		"swimming_goggles":
+			# Two glass lenses on a strap — for reading drowned cards.
+			draw_line(Vector2(-18, -2), Vector2(18, -2), WOOD, 3.0)
+			draw_circle(Vector2(-8, 0), 8, Color(0.55, 0.75, 0.8, 0.85))
+			draw_circle(Vector2(8, 0), 8, Color(0.55, 0.75, 0.8, 0.85))
+			draw_arc(Vector2(-8, 0), 8, 0, TAU, 20, GOLD, 2.5)
+			draw_arc(Vector2(8, 0), 8, 0, TAU, 20, GOLD, 2.5)
+			draw_line(Vector2(-1, 0), Vector2(1, 0), GOLD, 3.0)
+			draw_circle(Vector2(-10, -3), 2.0, Color(0.9, 0.97, 1.0, 0.8))
+			draw_circle(Vector2(6, -3), 2.0, Color(0.9, 0.97, 1.0, 0.8))
 		"gold_tooth":
 			draw_circle(Vector2(-5, -6), 6, GOLD)
 			draw_circle(Vector2(5, -6), 6, GOLD)

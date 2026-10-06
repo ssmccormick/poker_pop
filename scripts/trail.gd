@@ -97,16 +97,16 @@ const GOLD_MINE_TRICKLE := 2       # at most this many ride in per hand
 # only (this game scores exact compositions, so a Full House is NOT
 # three Pairs).
 const REQUIRE_POOLS := [
-	[[["Pair", 5], ["Two Pair", 1]], [["Pair", 4], ["Three of a Kind", 2]],
-			[["Pair", 6]]],
-	[[["Two Pair", 2], ["Pair", 3], ["Three of a Kind", 1]],
-			[["Three of a Kind", 3], ["Pair", 3]],
-			[["Straight", 1], ["Pair", 4], ["Two Pair", 1]],
-			[["Flush", 1], ["Pair", 4], ["Two Pair", 1]]],
-	[[["Flush", 2], ["Pair", 3], ["Two Pair", 2]],
-			[["Full House", 1], ["Three of a Kind", 2], ["Pair", 3]],
-			[["Straight", 2], ["Two Pair", 3], ["Pair", 2]],
-			[["Four of a Kind", 1], ["Pair", 4], ["Two Pair", 1]]],
+	[[["Pair", 6], ["Two Pair", 2]], [["Pair", 5], ["Three of a Kind", 3]],
+			[["Pair", 8]]],
+	[[["Two Pair", 3], ["Pair", 4], ["Three of a Kind", 2]],
+			[["Three of a Kind", 4], ["Pair", 4]],
+			[["Straight", 1], ["Pair", 5], ["Two Pair", 2]],
+			[["Flush", 1], ["Pair", 5], ["Two Pair", 2]]],
+	[[["Flush", 2], ["Pair", 4], ["Two Pair", 3]],
+			[["Full House", 1], ["Three of a Kind", 3], ["Pair", 4]],
+			[["Straight", 2], ["Two Pair", 4], ["Pair", 3]],
+			[["Four of a Kind", 1], ["Pair", 5], ["Two Pair", 2]]],
 ]
 
 const BASE_TARGET := 1000         # table 1 target before scaling
@@ -177,7 +177,7 @@ const RELICS := {
 	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
 	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
 	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
-	"magnifying_glass": {"name": "Magnifying Glass", "rarity": 1, "desc": "Filled cards still show their suit"},
+	"swimming_goggles": {"name": "Swimming Goggles", "rarity": 1, "desc": "Filled cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
 	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "First failed room adds no cursed card"},
@@ -464,9 +464,13 @@ func _load_run() -> bool:
 				"chip_lv": chip_lvs[i] if i < chip_lvs.size() else 0})
 	relics.clear()
 	for id in cf.get_value("run", "relics", PackedStringArray()):
-		# Retired relics (the Weathervane) fall off resumed runs.
-		if RELICS.has(String(id)):
-			relics.append(String(id))
+		# Renamed relics carry over; retired ones (the Weathervane)
+		# fall off resumed runs.
+		var rid := String(id)
+		if rid == "magnifying_glass":
+			rid = "swimming_goggles"
+		if RELICS.has(rid):
+			relics.append(rid)
 	provisions.clear()
 	for id in cf.get_value("run", "provisions", PackedStringArray()):
 		if PROVISIONS.has(String(id)):
@@ -517,7 +521,7 @@ func _apply_relic_effects() -> void:
 	main.board.chip_bonus = Board.CHIP_BONUS * (2 if has_relic("gold_tooth") else 1)
 	PlayingCard.chip_pay_base = main.board.chip_bonus
 	main.board.mult_factor = 2.0 if has_relic("mirror_shades") else Board.MULT_FACTOR
-	PlayingCard.washed_show_suit = has_relic("magnifying_glass")
+	PlayingCard.washed_show_suit = has_relic("swimming_goggles")
 
 
 func _gain_relic(id: String) -> void:
@@ -1460,9 +1464,9 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer.odds = 1.5 if region == 0 else 2.0
 				var pool: Array = REQUIRE_POOLS[mini(region, REQUIRE_POOLS.size() - 1)]
 				offer["require"] = (pool.pick_random() as Array).duplicate(true)
-			# ~6-7 called hands on a 9-hand reference: barely any
-			# hands to waste — every play works toward a demand.
-			offer.hands = 9
+			# ~8-9 called hands on a 10-hand reference: one, maybe two
+			# hands to waste — every other play works toward a demand.
+			offer.hands = 10
 			offer.target = 0
 		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
 				+ HOLDEM_CHANCE:
@@ -1655,8 +1659,8 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 						gang.size(), offer.outlaw_hp]
 			else:
 				goal_line = "Gun down %s (%d HP)" % [
-						String(gang[0].name) if not gang.is_empty() else "the Outlaw",
-						offer.outlaw_hp]
+						String(gang[0].name) if not gang.is_empty()
+						else "the wanted man", offer.outlaw_hp]
 		elif offer.get("goal", "") == "collect":
 			goal_line = _collect_goal_text(offer)
 		elif offer.get("goal", "") == "landrush":
@@ -1752,19 +1756,13 @@ func _apply_wanted_poster(b: Button, offer: Dictionary) -> bool:
 		b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	b.size = Vector2(300, 420)
 	b.pivot_offset = b.size / 2.0
-	# THE OUTLAW riding alone gets his hand-finished poster; everyone
-	# else is set from the template at 0.6 scale (500x700 -> 300x420).
-	var baked: Texture2D = null
-	if outlaws.size() == 1 and String(leader.get("id", "")) == "the_outlaw" \
-			and ResourceLoader.exists("res://assets/art/wanted/card/wanted_outlaw.png"):
-		baked = load("res://assets/art/wanted/card/wanted_outlaw.png")
-	var tpl := baked
-	if tpl == null:
-		# The plain template bakes DEAD OR ALIVE; we letter our own red
-		# line (gang size, HP), so take the blank-subtitle version.
-		var info := CharacterKit.poster_info("card_template")
-		tpl = CharacterKit.tex(String(info.get("no_subtitle",
-				info.get("file", ""))))
+	# Every head gets a lettered poster from the template (the baked
+	# THE OUTLAW card retired with the generic name). The plain
+	# template bakes DEAD OR ALIVE; we letter our own red line (gang
+	# size, HP), so take the blank-subtitle version.
+	var info := CharacterKit.poster_info("card_template")
+	var tpl: Texture2D = CharacterKit.tex(String(info.get("no_subtitle",
+			info.get("file", ""))))
 	if tpl == null:
 		return false
 	var paper := TextureRect.new()
@@ -1775,21 +1773,20 @@ func _apply_wanted_poster(b: Button, offer: Dictionary) -> bool:
 	paper.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(paper)
-	if baked == null:
-		CharacterKit.add_portrait(b, leader, Rect2(66, 125, 168, 168))
-		var sub_text := "GANG OF %d · %d HP EACH · ANTE %d" % [outlaws.size(),
-				int(offer.outlaw_hp), int(offer.min_bet)] if outlaws.size() > 1 \
-				else "DEAD OR ALIVE · %d HP · ANTE %d" % [int(offer.outlaw_hp),
-				int(offer.min_bet)]
-		var subtitle := _face_label(b, sub_text, 92.0, 20.0, 13, Color("8a3a30"))
-		subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		var who := String(leader.get("name", "THE OUTLAW"))
-		var name_size := 28 if who.length() <= 12 else 20
-		var name_l := _face_label(b, who, 322.0 - name_size - 6, name_size + 12.0,
-				name_size, UiKit.POSTER_INK)
-		name_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		if FontLib.display != null:
-			name_l.add_theme_font_override("font", FontLib.display)
+	CharacterKit.add_portrait(b, leader, Rect2(66, 125, 168, 168))
+	var sub_text := "GANG OF %d · %d HP EACH · ANTE %d" % [outlaws.size(),
+			int(offer.outlaw_hp), int(offer.min_bet)] if outlaws.size() > 1 \
+			else "DEAD OR ALIVE · %d HP · ANTE %d" % [int(offer.outlaw_hp),
+			int(offer.min_bet)]
+	var subtitle := _face_label(b, sub_text, 92.0, 20.0, 13, Color("8a3a30"))
+	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var who := String(leader.get("name", "THE WANTED MAN"))
+	var name_size := 28 if who.length() <= 12 else 20
+	var name_l := _face_label(b, who, 322.0 - name_size - 6, name_size + 12.0,
+			name_size, UiKit.POSTER_INK)
+	name_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if FontLib.display != null:
+		name_l.add_theme_font_override("font", FontLib.display)
 	var reward_l := _face_label(b, "$%d" % reward, 359.0, 34.0, 26, Color("8a3a30"))
 	reward_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	if FontLib.display != null:
@@ -2055,7 +2052,7 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Beat the dealer %d times — a face-down table, blind hits, and a real dealer playing out his hand" % o.wins
 		"outlaw":
 			var gang: Array = o.get("outlaws", [])
-			var who := String(gang[0].name) if not gang.is_empty() else "the Outlaw"
+			var who := String(gang[0].name) if not gang.is_empty() else "the wanted man"
 			if gang.size() > 1:
 				return "Bounty: gun down %s and the gang riding behind — %d heads at %d HP each, one at a time" \
 						% [who, gang.size(), o.outlaw_hp]
@@ -2782,6 +2779,11 @@ func _roll_posse(n: int) -> Array:
 		leader = CharacterKit.preset(leader_ids.pick_random())
 	if leader.is_empty():
 		leader = CharacterKit.random_spec(randi())
+	if String(leader.get("name", "")) == "THE OUTLAW":
+		# No generic names on the wanted wall: the old face rides on
+		# under a name of his own.
+		leader["name"] = "%s %s" % [CharacterKit.FIRST.pick_random(),
+				CharacterKit.LAST.pick_random()]
 	out.append(leader)
 	for i in n - 1:
 		var member: Dictionary = CharacterKit.random_spec(randi(),
@@ -2803,7 +2805,7 @@ func current_outlaw_spec() -> Dictionary:
 
 
 func current_outlaw_name() -> String:
-	return String(current_outlaw_spec().get("name", "THE OUTLAW"))
+	return String(current_outlaw_spec().get("name", "THE WANTED MAN"))
 
 
 ## The red line on the wanted paper.

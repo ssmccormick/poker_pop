@@ -655,7 +655,7 @@ func _open_cardgrid() -> void:
 		["Water 1/4", func(c: PlayingCard) -> void: c.hazard = "water"; c.water_level = 1],
 		["Water 3/4", func(c: PlayingCard) -> void: c.hazard = "water"; c.water_level = 3],
 		["FILLED", func(c: PlayingCard) -> void: c.hazard = "water"; c.water_level = 4; c.washed = true],
-		["Wind (vane) ↑", func(c: PlayingCard) -> void: c.hazard = "wind"; c.wind_dir = Vector2i.UP],
+		["Wind", func(c: PlayingCard) -> void: c.hazard = "wind"; c.wind_dir = Vector2i.UP],
 		["Bomb, fuse 5", func(c: PlayingCard) -> void: c.hazard = "bomb"; c.fuse = 5],
 		["Bomb, fuse 1", func(c: PlayingCard) -> void: c.hazard = "bomb"; c.fuse = 1],
 		["Stone, fresh", func(c: PlayingCard) -> void: c.hazard = "stone"; c.stone_hits = 3],
@@ -1495,7 +1495,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"fire":
 			lines.append("FIRE — spreads every hand and burns its rank down. Play it to douse it.")
 		"wind":
-			lines.append("WIND — every hand it BLOWS the first card in its facing direction clean off the board, unscored. The direction turns each hand — hidden without the Weathervane, which also marks the next victim. Play it to still the air.")
+			lines.append("WIND — every hand it BLOWS the first card in its facing direction clean off the board, unscored. The direction turns each hand — watch which way the dust streams. Play it to still the air.")
 		"stone":
 			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
 					"" if card.stone_hits == 1 else "s"])

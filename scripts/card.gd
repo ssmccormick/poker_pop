@@ -97,13 +97,13 @@ const CLUB_PX := [
 ]
 const SUIT_PIXELS := [SPADE_PX, HEART_PX, DIAMOND_PX, CLUB_PX]
 
-# Magnifying Glass relic: soaked cards still reveal their suit.
+# Swimming Goggles relic: soaked cards still reveal their suit.
 static var washed_show_suit := false
 # Weathervane relic: hazards telegraph the card they strike next.
 # Always on since the Weathervane relic retired: wind arrows and
 # next-victim telegraphs are free information now.
 static var show_hazard_intent := true
-# What one chip level pays — mirrors board.chip_bonus (Gold Tooth
+# What one chip level pays â€” mirrors board.chip_bonus (Gold Tooth
 # doubles it), pushed by trail's relic effects.
 static var chip_pay_base := 8
 # CRAZY 8s room: every 8 on the board is wild (drawn with a W badge).
@@ -125,7 +125,7 @@ var rank := 2:
 			joker = false
 		queue_redraw()
 # THE JOKER: a PLUS boost past Ace wraps the card into the deck's
-# trickster — it holds ONE enhancement at a time and swaps to a
+# trickster â€” it holds ONE enhancement at a time and swaps to a
 # different one every hand (the board rerolls `mod` on its tick).
 var joker := false:
 	set(value):
@@ -166,7 +166,7 @@ var cursed := false:  # trail-mode dead weight: unselectable, blocks chains
 	set(value):
 		cursed = value
 		queue_redraw()
-# Blackjack tables: the card sits face-down until revealed — chaining
+# Blackjack tables: the card sits face-down until revealed â€” chaining
 # it is a blind hit. Hazards always burn through the card back.
 var face_down := false:
 	set(value):
@@ -218,7 +218,7 @@ var next_dir := Vector2i.RIGHT:
 		next_dir = value
 		queue_redraw()
 # Weathervane: the hazard about to strike THIS card ("", fire, water)
-# — drawn as a faint preview of the effect creeping in at the bottom.
+# â€” drawn as a faint preview of the effect creeping in at the bottom.
 var incoming := "":
 	set(value):
 		incoming = value
@@ -333,7 +333,7 @@ func _update_processing() -> void:
 
 
 ## Fire, bombs, water and wind smoulder, spark, drip, or swirl
-## constantly. Stone sits solid and silent — it only sheds dust when
+## constantly. Stone sits solid and silent â€” it only sheds dust when
 ## touched (see _stone_dust / _crumble_burst).
 func _update_ambient() -> void:
 	_update_processing()
@@ -482,7 +482,7 @@ func _draw() -> void:
 			_face_box.draw(get_canvas_item(), rect)
 			_draw_card_back(rect)
 			return
-	# Shadows stay on the felt while the face lifts — wider when the
+	# Shadows stay on the felt while the face lifts â€” wider when the
 	# card is raised, so selection reads as real height.
 	var far_off := Vector2(5, 10) if selected else Vector2(3, 6)
 	var near_off := Vector2(4, 7) if selected else Vector2(2, 4)
@@ -559,17 +559,17 @@ func _draw() -> void:
 		if selected:
 			pass  # border/badge drawn below as usual
 	elif washed:
-		# Drowned: water to the brim — whatever this card was is down
+		# Drowned: water to the brim â€” whatever this card was is down
 		# there somewhere, and the face is unreadable.
 		_draw_flood(rect, 1.0)
 		draw_circle(Vector2(-8, 6), 9.0, Color(0.19, 0.33, 0.46))
 		draw_circle(Vector2(10, -14), 6.0, Color(0.19, 0.33, 0.46))
 		draw_circle(Vector2(6, 26), 7.0, Color(0.19, 0.33, 0.46))
-		if washed_show_suit:  # Magnifying Glass
+		if washed_show_suit:  # Swimming Goggles
 			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	else:
 		if hazard == "stone":
-			# A slab of rock: no rank, no suit — just a blocker. Clear
+			# A slab of rock: no rank, no suit â€” just a blocker. Clear
 			# cards beside it to chip it away.
 			_draw_rock(rect)
 			for i in stone_hits:
@@ -589,7 +589,7 @@ func _draw() -> void:
 			# Enhanced cards wear their power as the center art.
 			_draw_mod_art(font)
 			if eights_wild and rank == 8:
-				# Still an 8 under the mod's face — still WILD.
+				# Still an 8 under the mod's face â€” still WILD.
 				draw_string(font, Vector2(W / 2.0 - 44, -H / 2.0 + 32), "W",
 						HORIZONTAL_ALIGNMENT_CENTER, 36, 28, WILD_PURPLE)
 		elif eights_wild and rank == 8:
@@ -640,11 +640,8 @@ func _draw() -> void:
 		"fire":
 			_draw_fire(rect)
 		"wind":
+			# The swirl's particles carry the direction; no arrow.
 			_draw_wind_swirl()
-			# Which way it blows is a secret — unless you carry the
-			# Weathervane.
-			if show_hazard_intent:
-				_draw_intent_arrow(wind_dir, WIND_BLUE)
 		"water":
 			if not washed:
 				# The washed branch already drew the full tank.
@@ -669,7 +666,7 @@ func _draw() -> void:
 		"bullet":
 			_draw_bullet(GOLD)
 		"hisbullet":
-			# A waiting slug — no fuse, no countdown. Clear the card
+			# A waiting slug â€” no fuse, no countdown. Clear the card
 			# it rides and he shoots you for it. Step around it.
 			_draw_bullet(ERROR_RED)
 
@@ -680,7 +677,7 @@ func _draw() -> void:
 	match boss:
 		"jack":
 			_draw_pixel_map(CROWN_PX, Vector2(0, -H / 2.0 + 8), 3.0, GOLD)
-			# Score left to deal him, in thousands — the badge can't fit
+			# Score left to deal him, in thousands â€” the badge can't fit
 			# five digits, and the banner bar carries the exact count.
 			var bc := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
 			draw_circle(bc, 12, ERROR_RED)
@@ -814,7 +811,7 @@ func _draw_art_rank_suit(rect: Rect2) -> void:
 	_art(rect, "suit_corner", CardArt.suit_name(suit))
 
 
-## The Ace wears a big letter like the Jack, Queen and King — the
+## The Ace wears a big letter like the Jack, Queen and King â€” the
 ## kit's own ornate corner letter (ink, halo and all), cropped out of
 ## the rank layer and scaled up to center stage, so the style matches
 ## the painted faces exactly.
@@ -897,7 +894,7 @@ func _draw_art(rect: Rect2) -> void:
 	if washed:
 		# FILLED: water to the brim hides everything.
 		_art(rect, "hazard", "water_4")
-		if washed_show_suit:  # Magnifying Glass
+		if washed_show_suit:  # Swimming Goggles
 			_art(rect, "suit_corner", CardArt.suit_name(suit))
 		_draw_art_chain_badge(font)
 		_draw_art_rings(rect)
@@ -947,34 +944,35 @@ func _draw_art(rect: Rect2) -> void:
 	# Hazards ride over the face; the code's motion rides over the art.
 	match hazard:
 		"fire":
-			# No still art here — the painted flames fought the live
+			# No still art here â€” the painted flames fought the live
 			# ones; the fire is all motion now.
 			_draw_fire(rect)
 		"water":
 			_art(rect, "hazard", "water_%d" % clampi(water_level, 1, 4))
 		"wind":
+			# No arrow: the swirl's own particles already blow the
+			# right way.
 			_art(rect, "hazard", "wind")
 			_draw_wind_swirl()
-			if show_hazard_intent:
-				_art(rect, "hazard", "wind_arrow_up", Color.WHITE,
-						CardArt.arrow_rotation(wind_dir))
 		"bomb":
-			# The dynamite rides the free top-right corner — center
+			# The dynamite rides the free top-right corner â€” center
 			# stage belongs to the card's own face.
 			var alert := 0.55 + 0.45 * sin(_t * 6.0 + _phase)
 			var bomb_at := Vector2(0.76, 0.21)
 			_art_badge(rect, "hazard", "bomb", bomb_at, 0.55)
-			# The alert ring stays card-sized — a whole-card pulse
+			# The alert ring stays card-sized â€” a whole-card pulse
 			# reads from across the board.
 			_art(rect, "hazard", "bomb_alert_ring", Color(1, 1, 1, alert))
+			# The fuse counter tucks against the medallion's lower-left
+			# rim, clear of the card edge.
 			_art_badge(rect, "hazard", "bomb_fuse_badge_%d" % fuse
 					if fuse >= 1 and fuse <= 5 else "bomb_fuse_badge_blank",
-					bomb_at, 0.55)
+					Vector2(0.60, 0.115), 0.55)
 
 	# The in-the-path tells for the NEXT victim.
 	match incoming:
 		"fire":
-			# Small live flames licking the bottom edge — the still
+			# Small live flames licking the bottom edge â€” the still
 			# spark art never read as motion.
 			_draw_flame_layer(rect, 11.0, 5, 6.0, Color(0.9, 0.46, 0.16, 0.6))
 			_draw_flame_layer(rect, 6.5, 6, 7.6, Color(1.0, 0.85, 0.5, 0.65))
@@ -1071,7 +1069,7 @@ func _draw_mod_art(font: Font) -> void:
 			draw_circle(c, 14, Color("a8842c"))
 			draw_circle(c, 6, GOLD)
 		"mult":
-			draw_string(font, c + Vector2(-24, 18), "×",
+			draw_string(font, c + Vector2(-24, 18), "Ã—",
 					HORIZONTAL_ALIGNMENT_CENTER, 48, 54, ERROR_RED)
 		"gold":
 			# A hefty nugget with a glint on the gold face.
@@ -1141,7 +1139,7 @@ func _draw_suit_vector(c: Vector2, px: float) -> void:
 	var col := suit_color()
 	var r := 3.6 * px
 	match suit:
-		0:  # spades — one tall sharp point over small low lobes
+		0:  # spades â€” one tall sharp point over small low lobes
 			draw_colored_polygon(PackedVector2Array([
 				c + Vector2(0, -r * 1.05), c + Vector2(r * 0.8, r * 0.38),
 				c + Vector2(-r * 0.8, r * 0.38)]), col)
@@ -1160,7 +1158,7 @@ func _draw_suit_vector(c: Vector2, px: float) -> void:
 			draw_colored_polygon(PackedVector2Array([
 				c + Vector2(0, -r), c + Vector2(r * 0.72, 0),
 				c + Vector2(0, r), c + Vector2(-r * 0.72, 0)]), col)
-		3:  # clubs — a clearly separated trefoil and a stem
+		3:  # clubs â€” a clearly separated trefoil and a stem
 			draw_circle(c + Vector2(0, -r * 0.55), r * 0.4, col)
 			draw_circle(c + Vector2(-r * 0.52, r * 0.22), r * 0.4, col)
 			draw_circle(c + Vector2(r * 0.52, r * 0.22), r * 0.4, col)
@@ -1193,7 +1191,7 @@ func _draw_fire(rect: Rect2) -> void:
 	draw_rect(Rect2(glow.position + Vector2(0, glow.size.y * 0.58),
 			Vector2(glow.size.x, glow.size.y * 0.42)),
 			Color(1.0, 0.55, 0.15, 0.08 + 0.12 * burn + flicker))
-	# Four bodies back-to-front, each breathing on its own clock —
+	# Four bodies back-to-front, each breathing on its own clock â€”
 	# alpha and height swell and fade out of step, so the colors mix
 	# and swirl through each other instead of sitting in fixed bands.
 	var bodies := [
@@ -1227,7 +1225,7 @@ func _draw_flame_body(rect: Rect2, max_h: float, seed_off: float,
 	var floor_y := rect.end.y - 2.0
 	var pts := PackedVector2Array()
 	pts.append(Vector2(left, floor_y))
-	# Dense sampling keeps the tongue tips ROUNDED — the sine fields
+	# Dense sampling keeps the tongue tips ROUNDED â€” the sine fields
 	# are smooth, so more points means soft licks, not spikes.
 	var n := 36
 	for i in n + 1:
@@ -1281,7 +1279,7 @@ func _draw_flame_layer(rect: Rect2, max_h: float, tongues: int, speed: float,
 	draw_colored_polygon(pts, col)
 
 
-## The leaky SOURCE card: solid water at its current level — as it
+## The leaky SOURCE card: solid water at its current level â€” as it
 ## rises, the face slips out of sight rank-corner last.
 func _draw_water(rect: Rect2) -> void:
 	_draw_flood(rect, lerpf(0.16, 0.94,
@@ -1332,7 +1330,7 @@ func _draw_rock(rect: Rect2) -> void:
 	var total := maxi(_stone_max, 1)
 	var dmg := 1.0 - float(stone_hits) / total
 	var inner := rect.grow(-3)
-	# Solid base — there's no card face under the rock any more.
+	# Solid base â€” there's no card face under the rock any more.
 	draw_rect(inner, Color(0.30, 0.30, 0.34))
 	var cols := 3
 	var rows := 4
@@ -1377,12 +1375,12 @@ func _draw_rock(rect: Rect2) -> void:
 
 
 ## The Weathervane tell on the TARGET: a whisper of the hazard that
-## strikes here next — flames barely licking the bottom edge, or a
+## strikes here next â€” flames barely licking the bottom edge, or a
 ## thin line of water seeping in.
 func _draw_incoming(rect: Rect2) -> void:
 	match incoming:
 		"fire":
-			# Small flames barely licking the bottom edge — the fire
+			# Small flames barely licking the bottom edge â€” the fire
 			# hasn't caught yet, but it's about to.
 			_draw_flame_layer(rect, 11.0, 5, 6.0, Color(0.9, 0.46, 0.16, 0.6))
 			_draw_flame_layer(rect, 6.5, 6, 7.6, Color(1.0, 0.85, 0.5, 0.65))
@@ -1408,18 +1406,12 @@ func _draw_incoming(rect: Rect2) -> void:
 						Color(WIND_BLUE.r, WIND_BLUE.g, WIND_BLUE.b, 0.7), 2.0)
 
 
-## The Weathervane tell on the wind card itself: its blow direction.
-func _draw_intent_arrow(dir: Vector2i, col: Color) -> void:
-	var base := Vector2(W / 2.0 - 18, H / 2.0 - 17)
-	var v := Vector2(dir) * 11.0
-	var perp := Vector2(-v.y, v.x).normalized() * 6.0
-	draw_line(base - v, base + v, col, 4.0)
-	draw_colored_polygon(PackedVector2Array([
-		base + v * 1.5, base + v * 0.5 + perp, base + v * 0.5 - perp]), col)
-
-
 ## Where the burning end of the fuse currently sits.
 func _fuse_tip() -> Vector2:
+	if CardArt.available():
+		# The fuse ball baked into the corner medallion (anchored at
+		# 0.76 / 0.21, drawn at 0.55 scale) â€” the spark sits on it.
+		return Vector2(23.7, -39.9)
 	return _fuse_point(float(fuse) / maxi(_fuse_max, 1))
 
 
