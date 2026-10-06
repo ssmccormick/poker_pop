@@ -894,7 +894,10 @@ func show_wanted_banner(spec: Dictionary, subtitle: String, reward: int) -> void
 	if spec.is_empty() or OS.get_environment("POKERPOP_SHOT") != "":
 		return
 	var info: Dictionary = CharacterKit.poster_info("banner_template")
-	var tpl: Texture2D = CharacterKit.tex(String(info.get("file", "")))
+	# The plain template bakes DEAD OR ALIVE into the red line; we
+	# letter our own subtitle, so take the blank-line version.
+	var tpl: Texture2D = CharacterKit.tex(String(info.get("no_subtitle",
+			info.get("file", ""))))
 	if tpl == null:
 		return
 	var holder := Control.new()
