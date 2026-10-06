@@ -401,17 +401,20 @@ func _save_run() -> void:
 	var curses := PackedInt32Array()
 	var mods := PackedStringArray()
 	var booms := PackedInt32Array()
+	var chip_lvs := PackedInt32Array()
 	for c in deck:
 		ranks.append(c.rank)
 		suits.append(c.suit)
 		curses.append(1 if c.get("cursed", false) else 0)
 		mods.append(c.get("mod", ""))
 		booms.append(1 if c.get("boom", false) else 0)
+		chip_lvs.append(int(c.get("chip_lv", 0)))
 	cf.set_value("run", "ranks", ranks)
 	cf.set_value("run", "suits", suits)
 	cf.set_value("run", "curses", curses)
 	cf.set_value("run", "mods", mods)
 	cf.set_value("run", "booms", booms)
+	cf.set_value("run", "chip_lvs", chip_lvs)
 	var relic_arr := PackedStringArray()
 	for id in relics:
 		relic_arr.append(id)
@@ -449,6 +452,7 @@ func _load_run() -> bool:
 	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
 	var mods: PackedStringArray = cf.get_value("run", "mods", PackedStringArray())
 	var booms: PackedInt32Array = cf.get_value("run", "booms", PackedInt32Array())
+	var chip_lvs: PackedInt32Array = cf.get_value("run", "chip_lvs", PackedInt32Array())
 	deck.clear()
 	for i in ranks.size():
 		var raw_mod: String = mods[i] if i < mods.size() else ""
@@ -456,7 +460,8 @@ func _load_run() -> bool:
 				"cursed": curses[i] == 1,
 				"mod": Board.migrate_mod(raw_mod),
 				"boom": (i < booms.size() and booms[i] == 1)
-						or raw_mod == "chipsplode"})
+						or raw_mod == "chipsplode",
+				"chip_lv": chip_lvs[i] if i < chip_lvs.size() else 0})
 	relics.clear()
 	for id in cf.get_value("run", "relics", PackedStringArray()):
 		# Retired relics (the Weathervane) fall off resumed runs.
@@ -510,6 +515,7 @@ func _price(base: int) -> int:
 ## start, on load, and whenever a relic is gained.
 func _apply_relic_effects() -> void:
 	main.board.chip_bonus = Board.CHIP_BONUS * (2 if has_relic("gold_tooth") else 1)
+	PlayingCard.chip_pay_base = main.board.chip_bonus
 	main.board.mult_factor = 2.0 if has_relic("mirror_shades") else Board.MULT_FACTOR
 	PlayingCard.washed_show_suit = has_relic("magnifying_glass")
 
@@ -593,12 +599,14 @@ func _sleeve_refusal(card: PlayingCard) -> String:
 ## place. What you took rides along to the next table.
 func _do_sleeve_swap(card: PlayingCard) -> void:
 	var taken := {"rank": card.rank, "suit": card.suit, "mod": card.mod,
-			"boom": card.boom, "joker": card.joker}
+			"boom": card.boom, "joker": card.joker,
+			"chip_lv": card.chip_level}
 	card.rank = int(sleeve_card.rank)
 	card.suit = int(sleeve_card.suit)
 	card.mod = String(sleeve_card.get("mod", ""))
 	card.boom = bool(sleeve_card.get("boom", false))
 	card.joker = bool(sleeve_card.get("joker", sleeve_card.get("two_plus", false)))
+	card.chip_level = int(sleeve_card.get("chip_lv", 0))
 	if card.mod in ["plus", "minus", "bumper"]:
 		card.boost_dir = Board.HAZARD_DIRS.pick_random()
 	card.queue_redraw()
@@ -712,6 +720,7 @@ func use_watch() -> void:
 	room_collect_done = int(_watch_snapshot.room_collect_done)
 	room_collect_kinds = _watch_snapshot.room_collect_kinds.duplicate()
 	room_require = _watch_snapshot.room_require.duplicate(true)
+	deck = _watch_snapshot.deck.duplicate(true)
 	chips = int(_watch_snapshot.chips)
 	cash = int(_watch_snapshot.cash)
 	_watch_snapshot = {}
@@ -739,6 +748,7 @@ func _on_hand_committing() -> void:
 		"room_collect_done": room_collect_done,
 		"room_collect_kinds": room_collect_kinds.duplicate(),
 		"room_require": room_require.duplicate(true),
+		"deck": deck.duplicate(true),
 		"chips": chips, "cash": cash,
 	}
 
@@ -2355,6 +2365,17 @@ func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
 	chips += result.get("bonus_chips", 0)
 	room_score += result.score
+	# Chip cards SEASON with use: each scoring permanently bumps that
+	# deck card's payout a full base step for the rest of the run.
+	for cc in result.get("cleared_cards", []):
+		if String(cc.get("mod", "")) != "chip" or bool(cc.get("joker", false)):
+			continue
+		for d in deck:
+			if String(d.get("mod", "")) == "chip" and int(d.rank) == int(cc.rank) \
+					and int(d.suit) == int(cc.suit) \
+					and int(d.get("chip_lv", 0)) == int(cc.get("chip_lv", 0)):
+				d["chip_lv"] = int(d.get("chip_lv", 0)) + 1
+				break
 	var earned := int(result.get("cash_earned", 0))
 	if earned > 0:
 		# Cash cards pay real money, banked on the spot.
@@ -3751,6 +3772,7 @@ func _populate_deck_view() -> void:
 		pc.cursed = card_data.get("cursed", false)
 		pc.mod = card_data.get("mod", "")
 		pc.boom = card_data.get("boom", false)
+		pc.chip_level = int(card_data.get("chip_lv", 0))
 		pc.material = Themes.current_material()
 		pc.position = Vector2(50, 70)
 		holder.add_child(pc)
@@ -3803,7 +3825,11 @@ func _deck_stat_text(d: Dictionary) -> String:
 		return text + "CURSED\nDead weight: it can't be played and it blocks chains. Burn it at a shop."
 	match String(d.get("mod", "")):
 		"chip":
-			text += "CHIP\nPays +%d bonus chips every time it's played." % main.board.chip_bonus
+			var lv := int(d.get("chip_lv", 0))
+			text += "CHIP\nPays +%d bonus chips when played — and it SEASONS: every score grows the payout +%d for the rest of the run.%s" % [
+					main.board.chip_bonus * (1 + lv), main.board.chip_bonus,
+					"" if lv == 0 else "\nScored %d time%s so far." % [lv,
+					"" if lv == 1 else "s"]]
 		"mult":
 			text += "MULT\nMultiplies the whole hand's score ×%.1f. Stacks with other mult cards." % main.board.mult_factor
 		"gold":

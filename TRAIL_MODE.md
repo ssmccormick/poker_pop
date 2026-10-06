@@ -698,3 +698,12 @@ card, free). Then the trail calls.
 - CHUCK WAGON (relic, EPIC - the new fourth rarity, $1000 base): a
   random provision rolls into the kit at every table's start (when
   there is room). RELIC_PRICES grows to [150, 300, 600, 1000].
+
+## Chip cards season (Oct 2026)
+
+A chip card now GROWS: every time that deck card scores, its payout
+climbs a full base step for the rest of the run (8 -> 16 -> 24...,
+doubled throughout by Gold Tooth). The level lives on the deck
+entry, rides the deal, the sleeve and the save, survives the pocket
+watch (the rewind un-scores it), and the card wears its grown +N in
+gold under the emblem once it has seasoned.

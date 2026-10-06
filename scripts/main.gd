@@ -1503,7 +1503,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 			lines.append("WATER — fills 1/4 per hand (%d/4 now). Full to the brim it POURS, turning all four neighbors into water cards. Play it at any level to clear it." % card.water_level)
 	match card.mod:
 		"chip":
-			lines.append("CHIP — pays +%d chips when played." % board.chip_bonus)
+			lines.append("CHIP — pays +%d chips when played, and SEASONS: every score grows it +%d for the rest of the run." % [
+					board.chip_bonus * (1 + card.chip_level), board.chip_bonus])
 		"mult":
 			lines.append("MULT — hand score ×%.1f. Stacks with other mults." % board.mult_factor)
 		"gold":

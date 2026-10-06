@@ -103,6 +103,9 @@ static var washed_show_suit := false
 # Always on since the Weathervane relic retired: wind arrows and
 # next-victim telegraphs are free information now.
 static var show_hazard_intent := true
+# What one chip level pays — mirrors board.chip_bonus (Gold Tooth
+# doubles it), pushed by trail's relic effects.
+static var chip_pay_base := 8
 # CRAZY 8s room: every 8 on the board is wild (drawn with a W badge).
 static var eights_wild := false
 
@@ -247,6 +250,12 @@ var mod := "":
 var boom := false:
 	set(value):
 		boom = value
+		queue_redraw()
+# Chip cards SEASON with use: +1 every time this deck card scores,
+# and the payout grows a full base step per level.
+var chip_level := 0:
+	set(value):
+		chip_level = value
 		queue_redraw()
 var boost_dir := Vector2i.RIGHT:  # plus/minus: the arrow, turning each hand
 	set(value):
@@ -926,6 +935,13 @@ func _draw_art(rect: Rect2) -> void:
 				else ThemeDB.fallback_font
 		draw_string(jfont, Vector2(rect.position.x, rect.end.y - 14.0), "JOKER",
 				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, Color("2a4a2a"))
+	elif mod == "chip" and chip_level > 0:
+		# A seasoned chip wears its grown payout over the baked +8.
+		var cfont: Font = FontLib.numbers if FontLib.numbers != null \
+				else ThemeDB.fallback_font
+		draw_string(cfont, Vector2(rect.position.x, rect.end.y - 14.0),
+				"+%d" % (chip_pay_base * (1 + chip_level)),
+				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 12, GOLD)
 	_draw_art_rank_suit(rect)
 
 	# Hazards ride over the face; the code's motion rides over the art.

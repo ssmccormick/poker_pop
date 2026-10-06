@@ -836,7 +836,9 @@ func play_hand() -> void:
 	var cleared_cards: Array = []
 	var cleared_cells: Array = []
 	for card in poppers:
-		cleared_cards.append({"rank": card.rank, "suit": card.suit})
+		cleared_cards.append({"rank": card.rank, "suit": card.suit,
+				"mod": card.mod, "chip_lv": card.chip_level,
+				"joker": card.joker})
 		cleared_cells.append(card.grid_pos)
 	result["cleared_cards"] = cleared_cards
 	result["cleared_cells"] = cleared_cells
@@ -1325,6 +1327,7 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.suit = data.suit
 			card.cursed = data.get("cursed", false)
 			card.mod = migrate_mod(data.get("mod", ""))
+			card.chip_level = int(data.get("chip_lv", 0))
 			card.boom = data.get("boom", false) or data.get("mod", "") == "chipsplode"
 			if card.mod in ["plus", "minus", "bumper"]:
 				card.boost_dir = HAZARD_DIRS.pick_random()
@@ -1666,19 +1669,20 @@ func shuffle_board() -> void:
 ## bonus_chips. Pure on the result dict — headless-testable.
 func _apply_card_mods(result: Dictionary) -> void:
 	var mults := 0
-	var chip_cards := 0
+	var chip_pay := 0
 	var gold_cards := 0
 	for card in selected:
 		if card.mod == "mult":
 			mults += 1
 		elif card.mod == "chip":
-			chip_cards += 1
+			# Seasoned chips pay a full base step more per level.
+			chip_pay += chip_bonus * (1 + card.chip_level)
 		elif card.mod == "gold":
 			gold_cards += 1
 	if mults > 0:
 		result.score = int(result.score * pow(mult_factor, mults))
-	if chip_cards > 0:
-		result["bonus_chips"] = chip_cards * chip_bonus
+	if chip_pay > 0:
+		result["bonus_chips"] = chip_pay
 	if gold_cards > 0:
 		# Real money, straight to the pocket: $1 per gold card.
 		result["cash_earned"] = gold_cards
@@ -1708,7 +1712,7 @@ func provision_clean(card: PlayingCard) -> void:
 
 ## Every card property the watch must carry back. `hazard` sits
 ## before `fuse` so the fuse setter can place its ambient spark.
-const UNDO_CARD_PROPS := ["rank", "suit", "mod", "boom", "joker",
+const UNDO_CARD_PROPS := ["rank", "suit", "mod", "boom", "joker", "chip_level",
 		"cursed", "washed", "hazard", "hazard_fresh", "fuse", "stone_hits",
 		"water_level", "wind_dir", "next_dir", "boost_dir", "objective",
 		"bullet_timer", "is_safe", "combo_progress", "boss", "boss_hp",
