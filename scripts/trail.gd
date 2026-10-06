@@ -1530,7 +1530,9 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				+ OUTLAW_CHANCE:
 			# The bounty: a wanted gun — or a whole posse, hunted down
 			# one head at a time. Clear YOUR bullets to shoot, dodge HIS.
-			var posse := 1 + randi() % mini(region, 3)
+			# region is 0-based: lone guns in region one, pairs from
+			# region two, full gangs of three in region three.
+			var posse := 1 + randi() % mini(region + 1, 3)
 			offer.tarot = "BOUNTY"
 			offer.label = "Bounty"
 			offer.odds = 2.0 + 0.5 * posse
@@ -1615,6 +1617,8 @@ func _render_tarot() -> void:
 	var start_x := (1920.0 - total_w) / 2.0
 	for i in _offers.size():
 		var offer: Dictionary = _offers[i]
+		if offer.is_empty() or not offer.has("kind"):
+			continue  # one bad roll must never blank the whole wall
 		var b := _tarot_card_button(offer, start_x + i * 330)
 		var picked := offer
 		b.pressed.connect(func() -> void:

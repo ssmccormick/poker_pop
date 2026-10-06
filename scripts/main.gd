@@ -255,6 +255,14 @@ func _ready() -> void:
 			"trailtarot":
 				menu_layer.visible = false
 				trail._start_run(0)
+				# POKERPOP_ROOM teleports the probe deeper down the
+				# trail, where the special job types start rolling.
+				var shot_room := OS.get_environment("POKERPOP_ROOM")
+				if shot_room != "":
+					trail.room_index = clampi(int(shot_room), 0,
+							TrailMode.ROOMS_TOTAL - 1)
+					trail.chips = 5000
+					trail._show_tarot()
 				# Showcase the wanted poster: force a bounty into the rack.
 				for offer in trail._offers:
 					if offer.kind == "play":
