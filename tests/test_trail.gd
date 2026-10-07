@@ -134,6 +134,8 @@ func _run() -> void:
 				"the metal card stays in its cell after scoring")
 		failures += _check(main.board.grid.get(mate_pos) != mate,
 				"its plain partner cleared as usual")
+		failures += _check(steel.metal_wear == 1 and steel.metal_plays_left() == 4,
+				"one play spends one of its five")
 
 	# --- A Prism finish rides through the run save ---------------------
 	trail.deck[0]["mod"] = "chip"

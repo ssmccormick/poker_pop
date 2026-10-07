@@ -854,7 +854,7 @@ func play_hand() -> void:
 					"mod": card.mod})
 		elif card.mod == "bumper":
 			bumps.append({"cell": card.grid_pos, "dir": card.boost_dir})
-		if card.finish == "metal":
+		if card.finish == "metal" and card.wear_metal():
 			stays.append(card)  # scored, but steel stays on the felt
 			continue
 		poppers.append(card)
@@ -1751,7 +1751,7 @@ func provision_clean(card: PlayingCard) -> void:
 
 ## Every card property the watch must carry back. `hazard` sits
 ## before `fuse` so the fuse setter can place its ambient spark.
-const UNDO_CARD_PROPS := ["rank", "suit", "mod", "finish", "joker", "chip_level",
+const UNDO_CARD_PROPS := ["rank", "suit", "mod", "finish", "metal_wear", "joker", "chip_level",
 		"cursed", "washed", "hazard", "hazard_fresh", "fuse", "stone_hits",
 		"water_level", "wind_dir", "next_dir", "boost_dir", "objective",
 		"bullet_timer", "is_safe", "combo_progress", "boss", "boss_hp",

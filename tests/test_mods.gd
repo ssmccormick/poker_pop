@@ -197,6 +197,18 @@ func _init() -> void:
 			"a Prism card keeps animating its shimmer")
 	shiny.free()
 
+	# --- METAL wears through on its fifth scoring play -----------------
+	var steel := PlayingCard.new()
+	steel.finish = "metal"
+	var stays := 0
+	for i in PlayingCard.METAL_PLAYS:
+		if steel.wear_metal():
+			stays += 1
+	failures += _check(stays == PlayingCard.METAL_PLAYS - 1
+			and steel.metal_plays_left() == 0,
+			"metal stays for four plays and clears on the fifth")
+	steel.free()
+
 	# Old save ids map onto the current mod family.
 	failures += _check(Board.migrate_mod("cash") == "gold"
 			and Board.migrate_mod("boost") == "plus"

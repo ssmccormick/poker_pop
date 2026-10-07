@@ -711,7 +711,7 @@ func _open_cardgrid() -> void:
 		["Wild", func(c: PlayingCard) -> void: c.mod = "wild"],
 		["The Joker", func(c: PlayingCard) -> void: c.rank = 14; c.joker = true; c.mod = "wild"],
 		["Prism mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.finish = "prism"],
-		["Metal chip", func(c: PlayingCard) -> void: c.mod = "chip"; c.finish = "metal"],
+		["Metal chip, 3 plays left", func(c: PlayingCard) -> void: c.mod = "chip"; c.finish = "metal"; c.metal_wear = 2],
 		["Crazy 8 (wild)", func(c: PlayingCard) -> void: c.rank = 8],
 		["Fire on an Ace", func(c: PlayingCard) -> void: c.rank = 14; c.hazard = "fire"],
 		["Fire on a 2", func(c: PlayingCard) -> void: c.rank = 2; c.hazard = "fire"],
@@ -1615,6 +1615,9 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.finish != "":
 		var fin: Dictionary = PlayingCard.FINISHES[card.finish]
 		lines.append("%s — %s" % [fin.name, fin.desc])
+		if card.finish == "metal":
+			lines.append("%d of %d plays left at this table." % [card.metal_plays_left(),
+					PlayingCard.METAL_PLAYS])
 	if card.objective == "key":
 		lines.append("THE KEY — get it and the chest into one scoring hand.")
 	elif card.objective == "chest":

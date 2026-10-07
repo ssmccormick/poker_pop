@@ -252,12 +252,20 @@ const FINISHES := {
 	"prism": {"name": "PRISM",
 			"desc": "Clearing it spreads its enhancement to every neighbor."},
 	"metal": {"name": "METAL",
-			"desc": "Stays on the table when scored, and no hazard can touch it."},
+			"desc": "Stays on the table when scored, for 5 plays, and no hazard can touch it."},
 }
+## Scoring plays a METAL card survives at one table; the last one
+## clears it like any card.
+const METAL_PLAYS := 5
 var finish := "":
 	set(value):
 		finish = value if FINISHES.has(value) else ""
 		_update_processing()
+		queue_redraw()
+# Scoring plays a METAL card has taken at this table.
+var metal_wear := 0:
+	set(value):
+		metal_wear = value
 		queue_redraw()
 # Chip cards SEASON with use: +1 every time this deck card scores,
 # and the payout grows a full base step per level.
@@ -473,6 +481,18 @@ func hazard_proof() -> bool:
 	return finish == "metal"
 
 
+## Scoring plays left before a METAL card wears through.
+func metal_plays_left() -> int:
+	return maxi(METAL_PLAYS - metal_wear, 0)
+
+
+## Counts one scoring play on a METAL card. True while it still stays
+## on the table; false on the play that wears it through.
+func wear_metal() -> bool:
+	metal_wear += 1
+	return metal_wear < METAL_PLAYS
+
+
 ## The finish layer over the whole face. One branch per finish.
 func _draw_finish(rect: Rect2) -> void:
 	match finish:
@@ -508,6 +528,15 @@ func _draw_metal(rect: Rect2) -> void:
 	draw_line(b.position, Vector2(b.position.x, b.end.y), lit, 2.0)
 	draw_line(Vector2(b.position.x, b.end.y), b.end, shade, 2.0)
 	draw_line(Vector2(b.end.x, b.position.y), b.end, shade, 2.0)
+	# Wear notches along the top edge: bright for plays left, dark for
+	# plays spent.
+	var notch_y := r.position.y + 5.0
+	var span := (METAL_PLAYS - 1) * 7.0
+	for i in METAL_PLAYS:
+		var at := Vector2(r.get_center().x - span / 2.0 + i * 7.0, notch_y)
+		var left := i < metal_plays_left()
+		draw_circle(at, 2.2, Color(0.95, 0.97, 1.0, 0.9) if left
+				else Color(0.12, 0.14, 0.17, 0.75))
 	# The glint: travels for 40% of a slow cycle, then rests.
 	var cycle := fposmod(_t / 3.6 + _phase / TAU, 1.0)
 	if cycle < 0.4:
