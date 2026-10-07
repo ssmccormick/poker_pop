@@ -273,7 +273,7 @@ const METAL_PLAYS := 5
 ## and with the last one the cover comes off. The order they go in,
 ## as card corners (0 = left/top, 1 = right/bottom).
 const METAL_PINS := 4
-const PIN_ORDER := [Vector2(1, 0), Vector2(0, 1), Vector2(0, 0), Vector2(1, 1)]
+const PIN_ORDER := [Vector2(0, 1), Vector2(1, 1), Vector2(0, 0), Vector2(1, 0)]
 var finish := "":
 	set(value):
 		finish = value if FINISHES.has(value) else ""
@@ -743,10 +743,15 @@ func _draw_prism_art(rect: Rect2) -> void:
 	draw_set_transform_matrix(_face_xform())
 
 
-## METAL from the kit: the windowed steel plate, a pin or an empty
-## socket at each corner, and the glint band sliding slowly across.
+## The kit's steel plate is on this card (drawn with the face, under
+## the rank, suit and badge).
+func _steel_plate() -> bool:
+	return metal_covered() and CardArt.tex("finish", "metal_plate") != null
+
+
+## METAL from the kit, over the rank and suit: a pin or an empty socket
+## at each corner, and the glint band sliding slowly across.
 func _draw_metal_art(rect: Rect2) -> void:
-	_art(rect, "finish", "metal_plate")
 	var pin := CardArt.tex("finish", "metal_pin")
 	var hole := CardArt.tex("finish", "metal_pin_hole")
 	var pin_size := Vector2.ONE * (48.0 / 500.0) * rect.size.x
@@ -1337,6 +1342,8 @@ func _draw_art(rect: Rect2) -> void:
 		_art(rect, "mod_wash", "joker")
 		_art(rect, "center", "face_joker")
 		_art(rect, "mod_frame", "joker")
+		if _steel_plate():
+			_art(rect, "finish", "metal_plate")
 		_art(rect, "rank", "JKR")
 		_draw_finish(rect)
 		_art(rect, "rider", "joker_x2")
@@ -1361,14 +1368,13 @@ func _draw_art(rect: Rect2) -> void:
 					CardArt.suit_name(suit)])
 		else:
 			_art(rect, "center", "pip_" + CardArt.suit_name(suit))
+		if _steel_plate():
+			# The steel goes on over the face; the badge, rank and suit sit
+			# on top of it as part of the metal card.
+			_art(rect, "finish", "metal_plate")
 		if mod_key != "" and not joker:
 			var emb_anchor := Vector2(0.24, 0.78)
 			var emb_scale := 0.52
-			if metal_covered() and CardArt.tex("finish", "metal_plate") != null:
-				# Under the steel plate the badge sits in the plate's round
-				# window (centre 92,612, radius 38 on the 500×700 canvas).
-				emb_anchor = Vector2(92.0 / 500.0, 612.0 / 700.0)
-				emb_scale = 0.4
 			if mod_key in ["plus", "minus", "bumper"]:
 				_art_badge(rect, "mod_emblem", mod_key + "_arrow_up", emb_anchor,
 						emb_scale, Color.WHITE, CardArt.arrow_rotation(boost_dir))
