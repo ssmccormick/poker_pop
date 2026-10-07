@@ -277,6 +277,21 @@ static func style_button(b: Button, primary := false) -> void:
 	b.add_theme_color_override("font_disabled_color", DIM)
 
 
+## Shrinks a button's label until it fits its slot (less `inset`, the
+## room kept clear at the edges). Buttons otherwise grow to fit their
+## text and spill over their neighbours.
+static func fit_button_text(b: Button, max_size: int, min_size := 13,
+		inset := 48.0) -> void:
+	b.clip_text = true
+	var font: Font = b.get_theme_font("font")
+	var room := b.size.x - inset
+	var fs := max_size
+	while fs > min_size and font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT,
+			-1, fs).x > room:
+		fs -= 1
+	b.add_theme_font_size_override("font_size", fs)
+
+
 ## Shelf-slot chrome for shop and pick holders: item well on top,
 ## price row in the bottom 48px. Leaves the flat button chrome alone
 ## when the kit is absent.

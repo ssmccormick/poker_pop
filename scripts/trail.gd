@@ -3650,7 +3650,7 @@ func _show_shop() -> void:
 	if _shop_burned_here:
 		_shop_burn_btn.text = "THE FORGE IS COLD"
 		_shop_burn_btn.tooltip_text = "One burn per shop — the next merchant's forge is hot."
-	_fit_button_text(_shop_burn_btn, 20)
+	UiKit.fit_button_text(_shop_burn_btn, 20)
 	_render_shop_relics()
 	_render_shop_provisions()
 	for child in _shop_box.get_children():
@@ -4504,19 +4504,6 @@ func build_ui() -> void:
 	end_layer.add_child(_gameover_scene)
 	_gameover_scene.ride_again.connect(open_select)
 	_gameover_scene.to_menu.connect(back_to_menu)
-
-
-## Shrinks a button's label until it fits its slot. Buttons otherwise
-## grow to fit their text and spill over their neighbours.
-func _fit_button_text(b: Button, max_size: int, min_size := 13) -> void:
-	b.clip_text = true
-	var font: Font = b.get_theme_font("font")
-	var room := b.size.x - 48.0
-	var fs := max_size
-	while fs > min_size and font.get_string_size(b.text, HORIZONTAL_ALIGNMENT_LEFT,
-			-1, fs).x > room:
-		fs -= 1
-	b.add_theme_font_size_override("font_size", fs)
 
 
 func _layer() -> ColorRect:

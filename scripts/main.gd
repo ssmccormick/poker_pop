@@ -323,6 +323,9 @@ func _ready() -> void:
 				trail._render_tarot()
 			"trailbet", "trailroom", "trailhazard":
 				menu_layer.visible = false
+				# POKERPOP_RIDER: the_gambler / the_machine / the_doctor.
+				if TrailMode.CHARACTERS.has(OS.get_environment("POKERPOP_RIDER")):
+					trail.character = OS.get_environment("POKERPOP_RIDER")
 				trail._start_run(0)
 				for offer in trail._offers:
 					if offer.kind == "play":
@@ -858,6 +861,7 @@ func _update_kit() -> void:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "SLEEVE  %s" % trail.sleeve_label()
 				_sleeve_btn.tooltip_text = "ACE UP THE SLEEVE — once per table, trade this card for any plain card on the table; what you take rides up the sleeve to another table. Upgrade its starting rank at the trail buy-in."
+	UiKit.fit_button_text(_sleeve_btn, 19)
 	for i in _kit_btns.size():
 		var btn: Button = _kit_btns[i]
 		btn.position = Vector2(PANEL_R, 574 + (i + 1) * spacing)
@@ -883,6 +887,8 @@ func _update_kit() -> void:
 			btn.disabled = true
 			btn.text = "—"
 			btn.tooltip_text = "An empty kit slot. Provisions turn up in shops, safes, and chests."
+		# Centered text keeps clear of the icon on the left edge.
+		UiKit.fit_button_text(btn, 19, 13, 2.0 * (icon.position.x + icon.size.x + 6.0))
 
 
 ## Restyles the banner bar as a red segmented HEALTH bar (bosses and
@@ -2205,11 +2211,13 @@ func _build_ui() -> void:
 	_kit_plate = UiKit.plate(hud_root, Rect2(PANEL_R - 18, 524, 336, 312))
 	_kit_title = _label(hud_root, "KIT", Vector2(PANEL_R, 536), 22, DIM)
 	_sleeve_btn = _button(hud_root, "—", Vector2(PANEL_R, 574), Vector2(300, 56))
+	_sleeve_btn.clip_text = true
 	_sleeve_btn.add_theme_font_size_override("font_size", 19)
 	_sleeve_btn.pressed.connect(func() -> void:
 		trail.use_signature())
 	for i in 4:
 		var kb := _button(hud_root, "—", Vector2(PANEL_R, 574 + (i + 1) * 64), Vector2(300, 56))
+		kb.clip_text = true
 		kb.add_theme_font_size_override("font_size", 19)
 		var slot := i
 		kb.pressed.connect(func() -> void:
