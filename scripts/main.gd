@@ -251,7 +251,15 @@ func _ready() -> void:
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
-				trail._choose_offer({"kind": "shop", "tarot": "GENERAL STORE"}, false)
+				# POKERPOP_MERCHANT picks the trader (0 peddler, 1 collector,
+				# 2 card sharp); POKERPOP_BURNED shows the forge spent.
+				var shop_offer := {"kind": "shop", "tarot": "GENERAL STORE"}
+				if OS.get_environment("POKERPOP_MERCHANT") != "":
+					shop_offer["merchant"] = int(OS.get_environment("POKERPOP_MERCHANT"))
+				trail._choose_offer(shop_offer, false)
+				if OS.get_environment("POKERPOP_BURNED") != "":
+					trail._shop_burned_here = true
+					trail._show_shop()
 			"trailover":
 				# POKERPOP_ENDING: laid_low (default), busted_out,
 				# blinded_out or trail_complete.
