@@ -172,7 +172,7 @@ const RELICS := {
 	"horseshoe": {"name": "Horseshoe", "rarity": 0, "desc": "+1 hand in every room"},
 	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks offer 4 choices"},
 	"snake_oil": {"name": "Snake Oil", "rarity": 0, "desc": "Shop prices -25%"},
-	"tin_star": {"name": "Tin Star", "rarity": 0, "desc": "+10 chips each cleared room"},
+	"tin_star": {"name": "Tin Star", "rarity": 0, "desc": "Every cleared table pays an extra blind"},
 	"rabbits_foot": {"name": "Rabbit's Foot", "rarity": 0, "desc": "Surprise safes and chests turn up twice as often on plain tables"},
 	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
 	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
@@ -180,7 +180,7 @@ const RELICS := {
 	"swimming_goggles": {"name": "Swimming Goggles", "rarity": 1, "desc": "Filled cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
-	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "First failed room adds no cursed card"},
+	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "One free life: when the trail would end you, rise with 5 HP and chips for the table. Then it's spent"},
 	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Trail completion pays +0.25x"},
 	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combos use only ranks 2-6"},
 	"saddlebags": {"name": "Saddlebags", "rarity": 1, "desc": "A 4th slot in your provision kit"},
@@ -244,8 +244,18 @@ const CHARACTERS := {
 	"the_doctor": {"name": "The Doctor", "ability": "THE POCKET WATCH",
 			"line": "Turn the last hand back as if it never happened. Upgrades wind in extra uses."},
 }
+## The Gambler picks one signature when he saddles up.
+const GAMBLER_ABILITIES := {
+	"sleeve": {"ability": "ACE UP THE SLEEVE", "short": "SLEEVE",
+			"line": "Once per table, trade the card up his sleeve for any plain card on the felt."},
+	"sleight": {"ability": "SLEIGHT OF HAND", "short": "SLEIGHT",
+			"line": "Once per table, swap two cards that sit side by side. Nobody saw a thing."},
+}
 const LASER_DIRS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 var character := "the_gambler"   # the rider this run
+var gambler_ability := "sleeve"  # the Gambler's chosen signature (remembered)
+var sleight_used := false        # one swap per table (Sleight of Hand)
+var _aiming_sleight := false
 # The rider's HITPOINTS, run-wide: burnt-out flames, dynamite, outlaw
 # lead and lost tables all take their pound of flesh; campfires give
 # some back. Zero and the trail claims the rider.
@@ -344,6 +354,9 @@ var _remove_info: Label
 var _deck_tip: PanelContainer
 var _deck_tip_label: Label
 var _end_label: Label
+var _gambler_ab_label: Label
+var _gambler_line_label: Label
+var _gambler_ability_btns := {}
 var _end_leave_btn: Button
 var _gameover_scene: GameOverScene
 var _shop_title: Label
@@ -383,6 +396,9 @@ func _load_meta() -> void:
 	character = String(cf.get_value("meta", "character", "the_gambler"))
 	if not CHARACTERS.has(character):
 		character = "the_gambler"
+	gambler_ability = String(cf.get_value("meta", "gambler_ability", "sleeve"))
+	if not GAMBLER_ABILITIES.has(gambler_ability):
+		gambler_ability = "sleeve"
 
 
 func _save_meta() -> void:
@@ -396,6 +412,7 @@ func _save_meta() -> void:
 	cf.set_value("meta", "laser", laser_level)
 	cf.set_value("meta", "watch", watch_level)
 	cf.set_value("meta", "character", character)
+	cf.set_value("meta", "gambler_ability", gambler_ability)
 	cf.save(main.profile_path("trail_meta.cfg"))
 
 
@@ -436,6 +453,7 @@ func _save_run() -> void:
 	cf.set_value("run", "provisions", prov_arr)
 	cf.set_value("run", "sleeve", sleeve_card)
 	cf.set_value("run", "character", character)
+	cf.set_value("run", "gambler_ability", gambler_ability)
 	cf.set_value("run", "hp", hp)
 	cf.set_value("run", "outlaws_caught", outlaws_caught)
 	cf.set_value("run", "best_hand_score", best_hand_score)
@@ -459,6 +477,8 @@ func _save_run() -> void:
 
 func _clear_run_save() -> void:
 	run_active = false
+	if OS.get_environment("POKERPOP_SHOT") != "":
+		return  # screenshot runs must not touch real saves
 	var cf := ConfigFile.new()
 	cf.set_value("run", "active", false)
 	cf.save(main.profile_path("trail_run.cfg"))
@@ -505,6 +525,9 @@ func _load_run() -> bool:
 	character = String(cf.get_value("run", "character", "the_gambler"))
 	if not CHARACTERS.has(character):
 		character = "the_gambler"
+	gambler_ability = String(cf.get_value("run", "gambler_ability", "sleeve"))
+	if not GAMBLER_ABILITIES.has(gambler_ability):
+		gambler_ability = "sleeve"
 	hp = clampi(int(cf.get_value("run", "hp", MAX_HP)), 1, MAX_HP)
 	outlaws_caught = int(cf.get_value("run", "outlaws_caught", 0))
 	best_hand_score = int(cf.get_value("run", "best_hand_score", 0))
@@ -666,7 +689,62 @@ func use_signature() -> void:
 		"the_doctor":
 			use_watch()
 		_:
-			use_sleeve()
+			if gambler_ability == "sleight":
+				use_sleight()
+			else:
+				use_sleeve()
+
+
+## THE GAMBLER's Sleight of Hand: arms a two-pick neighbor swap (or
+## pockets it again). Once per table.
+func use_sleight() -> void:
+	if _aiming_sleight:
+		main.board.pending_provision = ""
+		_aiming_sleight = false
+		_swap_first = null
+		main._announce("POCKETED", main.DIM)
+		return
+	if not in_room or not main.game_started or main.board.busy \
+			or main.board.locked or main.board.blackjack_presenting:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	if sleight_used:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce("THE TRICK IS PLAYED — one swap per table", main.RED)
+		return
+	_aiming_slot = -1  # only one thing aims at a time
+	_aiming_sleeve = false
+	_aiming_laser = false
+	_aiming_sleight = true
+	_swap_first = null
+	main.board.pending_provision = "sleight"
+	main._announce("PICK A CARD, THEN ITS NEIGHBOR — right-click to pocket", main.GOLD)
+
+
+## Two picks for a side-by-side swap: returns the first card once
+## `card` completes a neighboring pair, null while still choosing.
+func _swap_pair_pick(card: PlayingCard) -> PlayingCard:
+	if _swap_first == null or not is_instance_valid(_swap_first) \
+			or not main.board.grid.has(_swap_first.grid_pos) \
+			or main.board.grid[_swap_first.grid_pos] != _swap_first:
+		_swap_first = card
+		main.board._play_sound(Board.SFX_FLIP, 1.3, -10.0)
+		main.board._fx(card.position, "pop", main.GOLD)
+		main._announce("NOW PICK THE CARD BESIDE IT — right-click to holster",
+				main.GOLD)
+		return null
+	if card == _swap_first:
+		_swap_first = null
+		main._announce("UNPICKED — choose the first card again", main.DIM)
+		return null
+	var dp: Vector2i = card.grid_pos - _swap_first.grid_pos
+	if absi(dp.x) + absi(dp.y) != 1:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce("THEY MUST SIT SIDE BY SIDE", main.RED)
+		return null
+	var first := _swap_first
+	_swap_first = null
+	return first
 
 
 ## THE MACHINE's laser: arms the beam (or powers it down again).
@@ -686,6 +764,7 @@ func use_laser() -> void:
 		return
 	_aiming_slot = -1  # only one thing aims at a time
 	_aiming_sleeve = false
+	_aiming_sleight = false
 	_aiming_laser = true
 	main.board.pending_provision = "laser"
 	main._announce("TARGET A CARD — right-click to power down", main.GOLD)
@@ -794,6 +873,30 @@ func _on_hand_committing() -> void:
 	}
 
 
+## Second Wind still has its one free life in it.
+func second_wind_ready() -> bool:
+	return has_relic("second_wind") and not _second_wind_used
+
+
+## The free life: back up with at least 5 HP and enough chips to sit
+## the table at hand (`seat`, or this table's cheapest seat). The relic
+## stays in the satchel, spent, so no merchant sells a second one.
+func _second_wind_revive(seat := -1) -> void:
+	_second_wind_used = true
+	hp = maxi(hp, CAMP_REST_HP)
+	chips = maxi(chips, seat if seat >= 0 else _cheapest_seat(room_index))
+	main.stat_bump("second_winds")
+	main.board._play_sound(Board.SFX_STING_WIN, 0.9, -6.0)
+	main.board._play_sound(Board.SFX_WINDS.pick_random(), 1.0, -8.0)
+	_save_run()
+	# Let the blow (or the lost table's verdict) land first.
+	var text := "SECOND WIND — BACK ON YOUR FEET  ·  HP %d  ·  %d CHIPS" % [hp, chips]
+	while main.board.busy:
+		await get_tree().process_frame
+	await get_tree().create_timer(1.0).timeout
+	main._announce(text, main.GOLD)
+
+
 func character_name() -> String:
 	return String(CHARACTERS.get(character, {}).get("name", "The Gambler"))
 
@@ -811,6 +914,9 @@ func take_damage(amount: int, why := "", cause := "") -> bool:
 		if why != "":
 			main._announce("%s — HP %d" % [why, hp], main.RED)
 		_save_run()
+		return true
+	if second_wind_ready():
+		_second_wind_revive()
 		return true
 	# The trail claims the rider.
 	in_room = false
@@ -865,6 +971,7 @@ func use_provision(slot: int) -> void:
 		_apply_instant_provision(id)
 		return
 	_aiming_sleeve = false  # only one thing aims at a time
+	_aiming_sleight = false
 	_aiming_slot = slot
 	_swap_first = null
 	main.board.pending_provision = id
@@ -928,6 +1035,28 @@ func _on_provision_target(card) -> void:
 		main.board.pending_provision = ""
 		_do_sleeve_swap(card)
 		return
+	if _aiming_sleight:
+		if card == null:
+			_aiming_sleight = false
+			_swap_first = null
+			main._announce("POCKETED", main.DIM)
+			return
+		var trick_why := _provision_refusal("shell_game", card)
+		if trick_why != "":
+			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+			main._announce(trick_why, main.RED)
+			return  # still aiming
+		var first := _swap_pair_pick(card)
+		if first == null:
+			return  # still aiming
+		_aiming_sleight = false
+		main.board.pending_provision = ""
+		sleight_used = true
+		main.stat_bump("sleights")
+		main._announce("SLEIGHT OF HAND — NOBODY SAW A THING")
+		await main.board.provision_swap(first, card)
+		_save_run()
+		return
 	if _aiming_slot < 0 or _aiming_slot >= provisions.size():
 		_aiming_slot = -1
 		_swap_first = null
@@ -945,26 +1074,9 @@ func _on_provision_target(card) -> void:
 		return  # still aiming — pick another card or holster
 	if id == "shell_game":
 		# Two picks: the first card waits while you choose its neighbor.
-		if _swap_first == null or not is_instance_valid(_swap_first) \
-				or not main.board.grid.has(_swap_first.grid_pos) \
-				or main.board.grid[_swap_first.grid_pos] != _swap_first:
-			_swap_first = card
-			main.board._play_sound(Board.SFX_FLIP, 1.3, -10.0)
-			main.board._fx(card.position, "pop", main.GOLD)
-			main._announce("NOW PICK THE CARD BESIDE IT — right-click to holster",
-					main.GOLD)
+		var first := _swap_pair_pick(card)
+		if first == null:
 			return  # still aiming
-		if card == _swap_first:
-			_swap_first = null
-			main._announce("UNPICKED — choose the first card again", main.DIM)
-			return
-		var dp: Vector2i = card.grid_pos - _swap_first.grid_pos
-		if absi(dp.x) + absi(dp.y) != 1:
-			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-			main._announce("THEY MUST SIT SIDE BY SIDE", main.RED)
-			return  # still aiming
-		var first := _swap_first
-		_swap_first = null
 		_spend_provision(_aiming_slot)
 		main._announce("THE SHELL GAME — WATCH THE CARDS")
 		await main.board.provision_swap(first, card)
@@ -1063,6 +1175,9 @@ func _cheapest_seat(room: int) -> int:
 func _short_stacked(cost: int) -> bool:
 	if chips >= cost:
 		return false
+	if second_wind_ready():
+		_second_wind_revive(cost)
+		return false
 	if chips <= 0:
 		_clear_run_save()
 		_end_run("BUSTED OUT",
@@ -1160,6 +1275,26 @@ func _refresh_select() -> void:
 		var p := "res://assets/art/playable/full/%s%s.png" % [id, suffix]
 		if ResourceLoader.exists(p):
 			tr.texture = load(p)
+	var pick: Dictionary = GAMBLER_ABILITIES[gambler_ability]
+	if _gambler_ab_label != null:
+		_gambler_ab_label.text = String(pick.ability)
+		_gambler_line_label.text = String(pick.line)
+	for key in _gambler_ability_btns:
+		# The chosen trick wears the oxblood call-to-action chrome.
+		UiKit.style_button(_gambler_ability_btns[key], key == gambler_ability)
+
+
+## The Gambler's trick for this ride; choosing one also saddles him.
+func _pick_gambler_ability(key: String) -> void:
+	if not GAMBLER_ABILITIES.has(key):
+		return
+	var changed := gambler_ability != key or character != "the_gambler"
+	gambler_ability = key
+	character = "the_gambler"
+	if changed:
+		main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+		_save_meta()
+	_refresh_select()
 
 
 func _pick_character(id: String) -> void:
@@ -1321,6 +1456,7 @@ func _start_run(tier: int) -> void:
 	sleeve_card = _fresh_sleeve()
 	sleeve_used = false
 	_aiming_sleeve = false
+	_aiming_sleight = false
 	hp = MAX_HP
 	outlaws_caught = 0
 	best_hand_score = 0
@@ -1640,7 +1776,10 @@ func _render_tarot() -> void:
 	else:
 		var names := PackedStringArray()
 		for id in relics:
-			names.append(RELICS[id].name)
+			var relic_name := String(RELICS[id].name)
+			if id == "second_wind" and _second_wind_used:
+				relic_name += " (spent)"
+			names.append(relic_name)
 		_tarot_relics.text = "RELICS:  " + "  ·  ".join(names)
 	var slot_count := _offers.size() + (0 if is_boss else 1)
 	var total_w := slot_count * 330 - 30
@@ -2186,6 +2325,9 @@ func _start_room() -> void:
 	main.stat_max("deepest_table", room_index + 1)
 	sleeve_used = false  # one signature use per table, fresh each sit-down
 	_aiming_sleeve = false
+	_aiming_sleight = false
+	sleight_used = false
+	_aiming_sleight = false
 	laser_used = false
 	_aiming_laser = false
 	_swap_first = null
@@ -2208,7 +2350,7 @@ func _start_room() -> void:
 		"the_doctor":
 			main.tutor_show("watch")
 		_:
-			main.tutor_show("sleeve")
+			main.tutor_show("sleight" if gambler_ability == "sleight" else "sleeve")
 	room_score = 0
 	room_target = current_offer.target
 	room_goal = current_offer.get("goal", "")
@@ -3099,6 +3241,7 @@ func _room_cleared() -> void:
 	_room_save = {}  # the photograph is stale the moment the table ends
 	_aiming_slot = -1
 	_aiming_sleeve = false
+	_aiming_sleight = false
 	main.board.pending_provision = ""
 	pending_retry = {}
 	main.stat_bump("tables_cleared")
@@ -3118,8 +3261,10 @@ func _room_cleared() -> void:
 	_win_rows = [["THE POT — %d staked at %s : 1" % [stake,
 			String.num(stake_odds, 1)], pot]]
 	if has_relic("tin_star"):
-		winnings += 10
-		_win_rows.append(["TIN STAR", 10])
+		# The badge pays a blind, so it keeps pace with the trail.
+		var star := _blind_for(room_index)
+		winnings += star
+		_win_rows.append(["TIN STAR", star])
 	# Swift work pays: every spare hand (or every spare 10 seconds on
 	# a clock table) converts to chips, scaled to the table's blind.
 	var spare := int(room_time_left / 10.0) if room_on_clock() \
@@ -3204,18 +3349,13 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	_chest_rewards.clear()  # the chest went down with the table
 	_chest_won_cards.clear()
 	main.board.locked = true
-	# The stake is gone and a curse joins the deck (unless Second Wind
-	# spares the first stumble) — and the room does NOT clear: the same
-	# table must be beaten before the trail continues.
-	if has_relic("second_wind") and not _second_wind_used:
-		_second_wind_used = true
-		reason = "BUSTED — SECOND WIND, NO SCAR"
-	else:
-		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
-		main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
-		# Losing a table leaves a mark on the rider too.
-		if not take_damage(2, "", "One lost table too many."):
-			return
+	# The stake is gone and a curse joins the deck — and the room does
+	# NOT clear: the same table must be beaten before the trail continues.
+	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+	main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
+	# Losing a table leaves a mark on the rider too.
+	if not take_damage(2, "", "One lost table too many."):
+		return
 	main._announce(reason, main.RED)
 	_after_board_settles(_retry_room)
 
@@ -3261,6 +3401,7 @@ func _capture_room_state() -> Dictionary:
 		"room_require": room_require.duplicate(true),
 		"room_combo": room_combo.duplicate(),
 		"sleeve_used": sleeve_used, "laser_used": laser_used,
+		"sleight_used": sleight_used,
 		"watch_uses_left": watch_uses_left,
 	}
 
@@ -3304,11 +3445,13 @@ func _restore_room_state() -> void:
 	room_combo = rs.room_combo.duplicate()
 	sleeve_used = bool(rs.sleeve_used)
 	laser_used = bool(rs.laser_used)
+	sleight_used = bool(rs.get("sleight_used", false))
 	watch_uses_left = int(rs.watch_uses_left)
 	_outlaw_dead_pending = false
 	_watch_snapshot = {}
 	_aiming_slot = -1
 	_aiming_sleeve = false
+	_aiming_sleight = false
 	_aiming_laser = false
 	_swap_first = null
 	in_room = true
@@ -3356,6 +3499,7 @@ func on_abandon_room() -> void:
 	in_room = false
 	_aiming_slot = -1
 	_aiming_sleeve = false
+	_aiming_sleight = false
 	_aiming_laser = false
 	_swap_first = null
 	main.board.pending_provision = ""
@@ -4187,6 +4331,21 @@ func build_ui() -> void:
 		var line := _wrap_label(select_layer, String(ch.line),
 				Rect2(x - 10, 698, 320, 70), 15, main.DIM)
 		line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if id == "the_gambler":
+			# The Gambler picks his trick: two toggles under his card.
+			_gambler_ab_label = ab
+			_gambler_line_label = line
+			var keys := GAMBLER_ABILITIES.keys()
+			for k in keys.size():
+				var key: String = keys[k]
+				var tb: Button = main._button(select_layer,
+						String(GAMBLER_ABILITIES[key].short),
+						Vector2(x + 4 + k * 150, 774), Vector2(142, 44))
+				tb.add_theme_font_size_override("font_size", 17)
+				tb.tooltip_text = String(GAMBLER_ABILITIES[key].ability)
+				tb.pressed.connect(func() -> void:
+					_pick_gambler_ability(key))
+				_gambler_ability_btns[key] = tb
 	var ride: Button = main._button(select_layer, "RIDE ON",
 			Vector2(810, 860), Vector2(300, 64), true)
 	ride.add_theme_font_size_override("font_size", 24)

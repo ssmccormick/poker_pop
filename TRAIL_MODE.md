@@ -350,7 +350,7 @@ Starter catalog (names/numbers draft):
 | Horseshoe | C | +1 hand in every room's budget |
 | Card Sleeve | C | Card picks offer 4 choices |
 | Snake Oil | C | Shop prices −25% |
-| Tin Star | C | +10 chips every cleared room |
+| Tin Star | C | Every cleared table pays an extra blind (25 at the first table; it grows with the trail and the boss multipliers) |
 | Rabbit's Foot | C | Ambient safes/chests twice as likely |
 | Bomb Squad Badge | C | Bombs start with +2 fuse |
 | Chisel | C | Stones need one fewer use |
@@ -359,7 +359,7 @@ Starter catalog (names/numbers draft):
 | Magnifying Glass | R | Washed cards still show their suit |
 | Gold Tooth | R | Chip cards pay double |
 | Mirror Shades | R | Mult cards ×2 instead of ×1.5 |
-| Second Wind | R | First failed room each run adds no cursed card |
+| Second Wind | R | One free life: when HP, a bust or a blind would end the ride, rise with at least 5 HP and enough chips to sit the table. Then it's spent (it stays in the satchel, so no shop sells another) |
 | Bankroll Clip | R | Cash-out rate +0.25× |
 | Dowsing Rod | R | Safe combos use only ranks 2–6 |
 | Saddlebags | R | A 4th slot in the provision kit |
@@ -674,6 +674,13 @@ TRAIL COMPLETE) reads the run score, the best single hand (name and
 points), outlaws caught, and banked cash. The tally saves with the
 run and rides in the pocket watch snapshot, so a rewound hand can't
 keep a best hand or a kill it took back.
+
+THE GAMBLER'S CHOICE: on CHOOSE YOUR RIDER the Gambler offers two
+signatures, picked with the SLEEVE / SLEIGHT toggles under his card
+(remembered per profile and saved with the run). ACE UP THE SLEEVE is
+the sleeve trade; SLEIGHT OF HAND swaps two side-by-side cards once
+per table, exactly like the Shell Game provision (bosses, safes and
+snake tails are too heavy).
 
 THE LAST PAGE (GameOverScene, art in assets/art/gameover/, laid out by
 gameover_manifest.json): four painted endings sharing one layout.

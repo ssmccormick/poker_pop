@@ -274,6 +274,7 @@ func _ready() -> void:
 				score = 41300
 				trail.relics.assign(["horseshoe", "rabbits_foot", "second_wind",
 						"snake_oil", "chuck_wagon"])
+				trail._second_wind_used = true  # or the free life would save the ride
 				var log_kinds := ["table", "table", "outlaw", "camp", "table", "shop",
 						"boss", "table", "outlaw", "table", "camp", "shop", "table",
 						"boss", "table", "outlaw", "table", "camp", "table", "shop", "boss"]
@@ -326,6 +327,9 @@ func _ready() -> void:
 				# POKERPOP_RIDER: the_gambler / the_machine / the_doctor.
 				if TrailMode.CHARACTERS.has(OS.get_environment("POKERPOP_RIDER")):
 					trail.character = OS.get_environment("POKERPOP_RIDER")
+				# POKERPOP_TRICK: the Gambler's signature (sleeve / sleight).
+				if TrailMode.GAMBLER_ABILITIES.has(OS.get_environment("POKERPOP_TRICK")):
+					trail.gambler_ability = OS.get_environment("POKERPOP_TRICK")
 				trail._start_run(0)
 				for offer in trail._offers:
 					if offer.kind == "play":
@@ -807,7 +811,8 @@ func _update_kit() -> void:
 	var sig := str(trail.provisions) + str(trail._aiming_slot) + str(trail.kit_size()) \
 			+ str(trail.sleeve_card) + str(trail.sleeve_used) + str(trail._aiming_sleeve) \
 			+ trail.character + str(trail.laser_used) + str(trail._aiming_laser) \
-			+ str(trail.laser_level) + str(trail.watch_uses_left) + str(board.has_undo())
+			+ str(trail.laser_level) + str(trail.watch_uses_left) + str(board.has_undo()) \
+			+ trail.gambler_ability + str(trail.sleight_used) + str(trail._aiming_sleight)
 	if sig == _kit_sig:
 		return
 	_kit_sig = sig
@@ -848,6 +853,19 @@ func _update_kit() -> void:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "POCKET WATCH  ×%d" % trail.watch_uses_left
 				_sleeve_btn.tooltip_text = "THE POCKET WATCH — press to turn the last hand back: cards, score, the spent hand, all of it. Wind in extra turns at the Outfitter."
+		_ when trail.gambler_ability == "sleight":
+			if trail._aiming_sleight:
+				_sleeve_btn.disabled = false
+				_sleeve_btn.text = "AIMING…"
+				_sleeve_btn.tooltip_text = "Pick a card, then the card beside it — right-click or press again to pocket the trick."
+			elif trail.sleight_used:
+				_sleeve_btn.disabled = true
+				_sleeve_btn.text = "SLEIGHT — PLAYED"
+				_sleeve_btn.tooltip_text = "One swap per table. The trick's ready again at the next sit-down."
+			else:
+				_sleeve_btn.disabled = false
+				_sleeve_btn.text = "SLEIGHT OF HAND"
+				_sleeve_btn.tooltip_text = "SLEIGHT OF HAND — once per table, swap two cards that sit side by side. Free action."
 		_:
 			if trail._aiming_sleeve:
 				_sleeve_btn.disabled = false
@@ -1636,8 +1654,9 @@ const TUTOR := {
 	"relics": ["RELICS", "Run-wide charms — carry as many as you can afford. Each one quietly bends the rules in your favor for the rest of the ride."],
 	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots (good SADDLEBAGS add a fourth). Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
 	"sleeve": ["ACE UP THE SLEEVE", "You ride with a hidden card — the SLEEVE row atop your kit. Once per table, click it and pick a plain card on the table: they trade places, and the card you take waits up your sleeve for another table. Raise its starting rank with $cash at the trail buy-in."],
+	"sleight": ["SLEIGHT OF HAND", "The Gambler palms a trick — the SLEIGHT row atop your kit. Once per table, click it, pick a card, then pick the card right beside it: the two trade places. A free action, no hand spent. Bosses and safes are too heavy to shuffle."],
 	"laser": ["THE LASER", "The Machine carries a beam — the LASER row atop your kit. Once per table, click it and pick a card: the beam burns it clean off the felt, unscored. Safes, bosses and coils deflect it. Each Outfitter upgrade extends the beam one more card into a cross."],
-	"watch": ["THE POCKET WATCH", "The Doctor carries his watch — the row atop your kit. After any hand, press it and the hand UN-HAPPENS: the cards return, the score and the spent hand come back, grit and bosses rewind. The clock, if one runs, keeps ticking. More turns per table await at the Outfitter."],
+	"watch": ["THE POCKET WATCH", "The Doctor carries his watch — the row atop your kit. After any hand, press it and the hand UN-HAPPENS: the cards return, the score and the spent hand come back, your HP and the bosses rewind. The clock, if one runs, keeps ticking. More turns per table await at the Outfitter."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
 # tooltip with its full story instead.)
