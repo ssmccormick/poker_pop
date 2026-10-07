@@ -153,7 +153,13 @@ var _sel_tween: Tween
 var hovered := false:
 	set(value):
 		hovered = value
+		_update_processing()
 		queue_redraw()
+# The hover TILT: the card leans toward the cursor. Only the drawing
+# tilts (never the node), so board tweens and hit areas are untouched.
+const TILT_MAX := 0.3          # radians at the card's edge
+var _tilt := Vector2.ZERO      # -1..1 toward the cursor, eased
+var _hover_amt := 0.0          # 0..1, eased hover lift
 var chain_index := 0:
 	set(value):
 		chain_index = value
@@ -339,18 +345,75 @@ var _phase := randf() * TAU
 
 
 func _process(delta: float) -> void:
-	if hazard == "" and incoming == "" and finish == "":
+	var tilting := _ease_tilt(delta)
+	if hazard == "" and incoming == "" and finish == "" and not tilting:
 		set_process(false)
 		return
 	_t += delta
 	queue_redraw()
 
 
+## Eases the tilt toward the cursor while hovered, and back to flat
+## after. True while there is still tilt to show.
+func _ease_tilt(delta: float) -> bool:
+	var target := Vector2.ZERO
+	if hovered and is_inside_tree() and deal_flip >= 1.0:
+		var m := get_local_mouse_position()
+		target = Vector2(clampf(m.x / (W / 2.0), -1.0, 1.0),
+				clampf(m.y / (H / 2.0), -1.0, 1.0))
+	var k := 1.0 - exp(-delta * 14.0)
+	_tilt = _tilt.lerp(target, k)
+	_hover_amt = lerpf(_hover_amt, 1.0 if hovered else 0.0, k)
+	if not hovered and _tilt.length() < 0.01 and _hover_amt < 0.01:
+		_tilt = Vector2.ZERO
+		_hover_amt = 0.0
+		return false
+	return true
+
+
+## Where the face is drawn: the selection lift, plus the hover lean as
+## an orthographic turn toward the cursor (narrowing with a diagonal
+## shear), a slight swell and a small twist.
+func _face_xform() -> Transform2D:
+	var lift := Vector2(0, -8) if selected else Vector2.ZERO
+	if _tilt == Vector2.ZERO and _hover_amt == 0.0:
+		return Transform2D(0.0, lift)
+	var ty := _tilt.x * TILT_MAX
+	var tx := _tilt.y * TILT_MAX
+	var swell := 1.0 + 0.03 * _hover_amt
+	var lean := Transform2D(Vector2(cos(ty), sin(ty) * sin(tx)) * swell,
+			Vector2(0.0, cos(tx)) * swell, Vector2.ZERO)
+	return Transform2D(-_tilt.x * 0.035, lift) * lean
+
+
+## A soft light band across the face that slides with the cursor, so
+## the lean reads as a real surface catching the light.
+func _draw_tilt_sheen(rect: Rect2) -> void:
+	if _hover_amt <= 0.01:
+		return
+	var r := rect.grow(-2.0)
+	var card_poly := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y),
+			r.end, Vector2(r.position.x, r.end.y)])
+	var cx := r.get_center().x + _tilt.x * r.size.x * 0.45
+	var lean := r.size.y * 0.3
+	var widths := [26.0, 14.0, 6.0]
+	var alphas := [0.05, 0.06, 0.07]
+	for i in widths.size():
+		var w: float = widths[i]
+		var band := PackedVector2Array([Vector2(cx - w + lean / 2.0, r.position.y),
+				Vector2(cx + w + lean / 2.0, r.position.y),
+				Vector2(cx + w - lean / 2.0, r.end.y), Vector2(cx - w - lean / 2.0, r.end.y)])
+		var col := Color(1, 1, 1, float(alphas[i]) * _hover_amt)
+		for piece in Geometry2D.intersect_polygons(band, card_poly):
+			draw_colored_polygon(piece, col)
+
+
 ## Animate only while something on this card moves: a live hazard
 ## (stone sits still) or an incoming-strike preview.
 func _update_processing() -> void:
 	set_process((hazard != "" and hazard != "stone") or incoming != ""
-			or water_level > 0 or washed or finish != "")
+			or water_level > 0 or washed or finish != ""
+			or hovered or _tilt != Vector2.ZERO or _hover_amt > 0.0)
 
 
 ## Fire, bombs, water and wind smoulder, spark, drip, or swirl
@@ -700,17 +763,19 @@ func _draw() -> void:
 	# card is raised, so selection reads as real height.
 	var far_off := Vector2(5, 10) if selected else Vector2(3, 6)
 	var near_off := Vector2(4, 7) if selected else Vector2(2, 4)
+	far_off -= _tilt * Vector2(4, 3)
+	near_off -= _tilt * Vector2(2, 1.5)
 	_shadow_far.draw(get_canvas_item(),
 			Rect2(rect.position + far_off, rect.size).grow(2))
 	_shadow_near.draw(get_canvas_item(),
 			Rect2(rect.position + near_off, rect.size))
-	if selected:
-		# Lift the whole face slightly while selected.
-		draw_set_transform(Vector2(0, -8))
+	# The face rides the selection lift and the hover lean.
+	draw_set_transform_matrix(_face_xform())
 	if CardArt.available():
 		# The layered art kit draws the whole face; interaction rings
 		# and badges ride on top. Game logic untouched.
 		_draw_art(rect)
+		_draw_tilt_sheen(rect)
 		return
 	if selected:
 		var box := _selected_box
@@ -955,10 +1020,9 @@ func _art(rect: Rect2, group: String, name: String, tint := Color.WHITE,
 	if t == null:
 		return
 	if rot != 0.0:
-		var lift := Vector2(0, -8) if selected else Vector2.ZERO
-		draw_set_transform(lift, rot, Vector2.ONE)
+		draw_set_transform_matrix(_face_xform() * Transform2D(rot, Vector2.ZERO))
 		draw_texture_rect(t, rect, false, tint)
-		draw_set_transform(lift, 0.0, Vector2.ONE)
+		draw_set_transform_matrix(_face_xform())
 	else:
 		draw_texture_rect(t, rect, false, tint)
 
@@ -976,10 +1040,9 @@ func _art_badge(rect: Rect2, group: String, name: String, anchor: Vector2,
 	var sub_size := rect.size * scale_f
 	var center := rect.position + rect.size * anchor
 	if rot != 0.0:
-		var lift := Vector2(0, -8) if selected else Vector2.ZERO
-		draw_set_transform(center + lift, rot, Vector2.ONE)
+		draw_set_transform_matrix(_face_xform() * Transform2D(rot, center))
 		draw_texture_rect(t, Rect2(-sub_size / 2.0, sub_size), false, tint)
-		draw_set_transform(lift, 0.0, Vector2.ONE)
+		draw_set_transform_matrix(_face_xform())
 	else:
 		draw_texture_rect(t, Rect2(center - sub_size / 2.0, sub_size),
 				false, tint)
