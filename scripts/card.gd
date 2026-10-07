@@ -252,11 +252,16 @@ const FINISHES := {
 	"prism": {"name": "PRISM",
 			"desc": "Clearing it spreads its enhancement to every neighbor."},
 	"metal": {"name": "METAL",
-			"desc": "Stays on the table when scored, for 5 plays, and no hazard can touch it."},
+			"desc": "Pinned under steel: it stays on the table when scored and no hazard can touch it. Each play pops a pin; with the last one the cover comes off and it plays as a normal card."},
 }
 ## Scoring plays a METAL card survives at one table; the last one
 ## clears it like any card.
 const METAL_PLAYS := 5
+## Corner pins holding the steel cover on: one pops per scoring play,
+## and with the last one the cover comes off. The order they go in,
+## as card corners (0 = left/top, 1 = right/bottom).
+const METAL_PINS := 4
+const PIN_ORDER := [Vector2(1, 0), Vector2(0, 1), Vector2(0, 0), Vector2(1, 1)]
 var finish := "":
 	set(value):
 		finish = value if FINISHES.has(value) else ""
@@ -478,7 +483,12 @@ static func finish_of(d: Dictionary) -> String:
 ## METAL shrugs off every hazard: no fire, flood, wind, bomb or stone
 ## can land on it, and no job piece rides it.
 func hazard_proof() -> bool:
-	return finish == "metal"
+	return metal_covered()
+
+
+## The steel cover is still pinned on (it comes off with the last pin).
+func metal_covered() -> bool:
+	return finish == "metal" and metal_wear < METAL_PINS
 
 
 ## Scoring plays left before a METAL card wears through.
@@ -490,7 +500,61 @@ func metal_plays_left() -> int:
 ## on the table; false on the play that wears it through.
 func wear_metal() -> bool:
 	metal_wear += 1
+	if is_inside_tree():
+		if metal_wear <= METAL_PINS:
+			_pop_pin(metal_wear - 1)
+		if metal_wear == METAL_PINS:
+			_pop_cover()
 	return metal_wear < METAL_PLAYS
+
+
+func _pin_pos(corner: Vector2) -> Vector2:
+	var r := Rect2(-W / 2.0, -H / 2.0, W, H).grow(-9.0)
+	return r.position + r.size * corner
+
+
+## One pin springs out of its corner, spinning off and fading.
+func _pop_pin(i: int) -> void:
+	var corner: Vector2 = PIN_ORDER[i % PIN_ORDER.size()]
+	var at := _pin_pos(corner)
+	var pin := Polygon2D.new()
+	var pts := PackedVector2Array()
+	for k in 10:
+		pts.append(Vector2.RIGHT.rotated(TAU * k / 10.0) * 3.6)
+	pin.polygon = pts
+	pin.color = Color(0.88, 0.91, 0.95)
+	pin.position = at
+	pin.z_index = 5
+	add_child(pin)
+	var out := Vector2(-1.0 if corner.x < 0.5 else 1.0, -1.0 if corner.y < 0.5 else 1.0)
+	var tw := pin.create_tween().set_parallel(true)
+	tw.tween_property(pin, "position", at + out * Vector2(28, 16) + Vector2(0, 10), 0.45) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(pin, "rotation", out.x * randf_range(5.0, 8.0), 0.45)
+	tw.tween_property(pin, "modulate:a", 0.0, 0.3).set_delay(0.15)
+	tw.chain().tween_callback(pin.queue_free)
+
+
+## The last pin is out: the steel plate lifts off and tumbles away,
+## leaving the plain card underneath.
+func _pop_cover() -> void:
+	var r := Rect2(-W / 2.0, -H / 2.0, W, H).grow(-3.0)
+	var cover := Polygon2D.new()
+	cover.polygon = PackedVector2Array([r.position, Vector2(r.end.x, r.position.y),
+			r.end, Vector2(r.position.x, r.end.y)])
+	var top := Color(0.86, 0.9, 0.95, 0.8)
+	var foot := Color(0.42, 0.47, 0.54, 0.8)
+	cover.vertex_colors = PackedColorArray([top, top, foot, foot])
+	cover.z_index = 6
+	add_child(cover)
+	var lean := -1.0 if randf() < 0.5 else 1.0
+	var tw := cover.create_tween().set_parallel(true)
+	tw.tween_property(cover, "position", Vector2(lean * 14.0, -50.0), 0.5) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(cover, "rotation", lean * 0.4, 0.5)
+	tw.tween_property(cover, "scale", Vector2.ONE * 1.08, 0.5)
+	tw.tween_property(cover, "modulate:a", 0.0, 0.5)
+	tw.chain().tween_callback(cover.queue_free)
 
 
 ## The finish layer over the whole face. One branch per finish.
@@ -499,7 +563,8 @@ func _draw_finish(rect: Rect2) -> void:
 		"prism":
 			_draw_prism(rect)
 		"metal":
-			_draw_metal(rect)
+			if metal_covered():
+				_draw_metal(rect)
 
 
 ## METAL: brushed steel. A cool steel tint darkening toward the foot,
@@ -528,15 +593,13 @@ func _draw_metal(rect: Rect2) -> void:
 	draw_line(b.position, Vector2(b.position.x, b.end.y), lit, 2.0)
 	draw_line(Vector2(b.position.x, b.end.y), b.end, shade, 2.0)
 	draw_line(Vector2(b.end.x, b.position.y), b.end, shade, 2.0)
-	# Wear notches along the top edge: bright for plays left, dark for
-	# plays spent.
-	var notch_y := r.position.y + 5.0
-	var span := (METAL_PLAYS - 1) * 7.0
-	for i in METAL_PLAYS:
-		var at := Vector2(r.get_center().x - span / 2.0 + i * 7.0, notch_y)
-		var left := i < metal_plays_left()
-		draw_circle(at, 2.2, Color(0.95, 0.97, 1.0, 0.9) if left
-				else Color(0.12, 0.14, 0.17, 0.75))
+	# The corner pins still holding the cover on: domed steel rivets.
+	for i in range(metal_wear, METAL_PINS):
+		var at := _pin_pos(PIN_ORDER[i])
+		draw_circle(at + Vector2(0.6, 0.9), 3.8, Color(0.08, 0.09, 0.11, 0.6))
+		draw_circle(at, 3.6, Color(0.62, 0.67, 0.74))
+		draw_circle(at, 2.6, Color(0.86, 0.9, 0.95))
+		draw_circle(at - Vector2(1.0, 1.0), 1.0, Color(1, 1, 1, 0.95))
 	# The glint: travels for 40% of a slow cycle, then rests.
 	var cycle := fposmod(_t / 3.6 + _phase / TAU, 1.0)
 	if cycle < 0.4:

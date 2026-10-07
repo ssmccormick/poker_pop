@@ -202,6 +202,12 @@ func _init() -> void:
 	steel.finish = "metal"
 	var stays := 0
 	for i in PlayingCard.METAL_PLAYS:
+		if i == PlayingCard.METAL_PINS:
+			failures += _check(not steel.metal_covered() and not steel.hazard_proof(),
+					"after the last pin the cover is off and hazards can reach it")
+		elif i < PlayingCard.METAL_PINS:
+			failures += _check(steel.metal_covered() and steel.hazard_proof(),
+					"pinned steel keeps its cover and its immunity")
 		if steel.wear_metal():
 			stays += 1
 	failures += _check(stays == PlayingCard.METAL_PLAYS - 1

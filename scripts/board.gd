@@ -882,8 +882,13 @@ func play_hand() -> void:
 		card.scale = Vector2.ONE * 1.12
 		ring.tween_property(card, "scale", Vector2.ONE, 0.25) \
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	if not stays.is_empty():
-		_play_sound(SFX_BELL, 1.8, -12.0)
+	for card in stays:
+		if card.metal_wear == PlayingCard.METAL_PINS:
+			# The cover comes off: a heavier clank and a spray of sparks.
+			_play_sound(SFX_BELL, 1.1, -8.0)
+			_fx(card.position, "sparks", Color(0.86, 0.9, 0.95))
+		else:
+			_play_sound(SFX_CLICK, 2.0, -9.0)  # a pin pings out
 
 	# Stones are blockers now: every cleared card chips each stone
 	# beside it, and a stone out of chips crumbles with the pops.
