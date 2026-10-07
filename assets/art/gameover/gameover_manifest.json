@@ -1,0 +1,618 @@
+{
+ "canvas": [
+  1920,
+  1080
+ ],
+ "safe_area": [
+  160,
+  40,
+  1600,
+  1000
+ ],
+ "endings": {
+  "laid_low": {
+   "mood": "cold dusk",
+   "portrait_frame": "fallen",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "laid_low/sky.png",
+     "z": 0,
+     "parallax_drift_px": 0
+    },
+    {
+     "id": "far",
+     "file": "laid_low/far.png",
+     "z": 1,
+     "parallax_drift_px": 4
+    },
+    {
+     "id": "mid",
+     "file": "laid_low/mid.png",
+     "z": 2,
+     "parallax_drift_px": 10
+    },
+    {
+     "id": "fg",
+     "file": "laid_low/fg.png",
+     "z": 3,
+     "parallax_drift_px": 18
+    }
+   ],
+   "fx": {
+    "vultures": {
+     "frames": [
+      "laid_low/fx_vulture_0.png",
+      "laid_low/fx_vulture_1.png",
+      "laid_low/fx_vulture_2.png"
+     ],
+     "fps": 5,
+     "count": 3,
+     "orbit": {
+      "center": [
+       1320,
+       300
+      ],
+      "radius": [
+       220,
+       70
+      ],
+      "period_s": [
+       14,
+       17,
+       21
+      ],
+      "scale": [
+       1.0,
+       0.7,
+       0.5
+      ],
+      "alpha": [
+       0.9,
+       0.7,
+       0.55
+      ]
+     },
+     "z_after": "far"
+    },
+    "dust": {
+     "file": "laid_low/fx_dust_2400.png",
+     "scroll_px_s": -40,
+     "tile_x": 2400,
+     "alpha": 0.55,
+     "z_after": "mid"
+    },
+    "tumbleweed": {
+     "file": "laid_low/fx_tumbleweed.png",
+     "path_y": 770,
+     "speed_px_s": 260,
+     "spin_deg_s": 280,
+     "bounce_px": 18,
+     "respawn_s": [
+      6,
+      11
+     ],
+     "z_after": "mid"
+    }
+   },
+   "composite_reference": "laid_low/_composite.png"
+  },
+  "busted_out": {
+   "mood": "empty saloon",
+   "portrait_frame": "fallen",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "busted_out/sky.png",
+     "z": 0,
+     "parallax_drift_px": 0
+    },
+    {
+     "id": "far",
+     "file": "busted_out/far.png",
+     "z": 1,
+     "parallax_drift_px": 4
+    },
+    {
+     "id": "mid",
+     "file": "busted_out/mid.png",
+     "z": 2,
+     "parallax_drift_px": 10
+    },
+    {
+     "id": "fg",
+     "file": "busted_out/fg.png",
+     "z": 3,
+     "parallax_drift_px": 18
+    }
+   ],
+   "fx": {
+    "lantern": {
+     "glow": "busted_out/fx_lantern_glow.png",
+     "flame_frames": [
+      "busted_out/fx_lantern_flame_0.png",
+      "busted_out/fx_lantern_flame_1.png",
+      "busted_out/fx_lantern_flame_2.png"
+     ],
+     "flicker": {
+      "alpha": [
+       0.82,
+       1.0
+      ],
+      "noise_hz": 7,
+      "flame_fps": 10
+     },
+     "z_after": "mid"
+    },
+    "dust_motes": {
+     "note": "spawn 20-30 small #E8C890 dots (r 1-2.5px) inside the lantern glow; drift up 6-14 px/s, fade over 4-7 s"
+    }
+   },
+   "composite_reference": "busted_out/_composite.png"
+  },
+  "blinded_out": {
+   "mood": "so close",
+   "portrait_frame": "fallen",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "blinded_out/sky.png",
+     "z": 0,
+     "parallax_drift_px": 0
+    },
+    {
+     "id": "far",
+     "file": "blinded_out/far.png",
+     "z": 1,
+     "parallax_drift_px": 4
+    },
+    {
+     "id": "mid",
+     "file": "blinded_out/mid.png",
+     "z": 2,
+     "parallax_drift_px": 10
+    },
+    {
+     "id": "fg",
+     "file": "blinded_out/fg.png",
+     "z": 3,
+     "parallax_drift_px": 18
+    }
+   ],
+   "fx": {
+    "lantern": {
+     "glow": "blinded_out/fx_lantern_glow.png",
+     "flame_frames": [
+      "blinded_out/fx_lantern_flame_0.png",
+      "blinded_out/fx_lantern_flame_1.png",
+      "blinded_out/fx_lantern_flame_2.png"
+     ],
+     "flicker": {
+      "alpha": [
+       0.82,
+       1.0
+      ],
+      "noise_hz": 7,
+      "flame_fps": 10
+     },
+     "z_after": "mid"
+    },
+    "dust_motes": {
+     "note": "spawn 20-30 small #E8C890 dots (r 1-2.5px) inside the lantern glow; drift up 6-14 px/s, fade over 4-7 s"
+    },
+    "dealer_hand": {
+     "file": "blinded_out/fx_dealer_hand.png",
+     "pos_end": [
+      1290,
+      586
+     ],
+     "anim": "slide from x+420 to pos_end over 1.6 s ease-in-out, starting 0.8 s after the title lands; chips ride with the hand",
+     "z_after": "mid"
+    }
+   },
+   "composite_reference": "blinded_out/_composite.png"
+  },
+  "trail_complete": {
+   "mood": "golden victory",
+   "portrait_frame": "gilded",
+   "layers": [
+    {
+     "id": "sky",
+     "file": "trail_complete/sky.png",
+     "z": 0,
+     "parallax_drift_px": 0
+    },
+    {
+     "id": "far",
+     "file": "trail_complete/far.png",
+     "z": 1,
+     "parallax_drift_px": 4
+    },
+    {
+     "id": "mid",
+     "file": "trail_complete/mid.png",
+     "z": 2,
+     "parallax_drift_px": 10
+    },
+    {
+     "id": "fg",
+     "file": "trail_complete/fg.png",
+     "z": 3,
+     "parallax_drift_px": 18
+    }
+   ],
+   "fx": {
+    "coin_glints": {
+     "file": "trail_complete/fx_glint.png",
+     "spawn_area": [
+      1240,
+      700,
+      300,
+      140
+     ],
+     "every_s": 0.35,
+     "life_s": 0.6,
+     "scale": [
+      0.4,
+      1.0
+     ],
+     "rotate_deg": 45
+    },
+    "sun_shimmer": {
+     "file": "trail_complete/fx_sun_glow.png",
+     "pulse": {
+      "scale": [
+       0.96,
+       1.06
+      ],
+      "alpha": [
+       0.75,
+       1
+      ],
+      "period_s": 3.2
+     },
+     "z_after": "sky"
+    }
+   },
+   "composite_reference": "trail_complete/_composite.png"
+  }
+ },
+ "ui": {
+  "title_plate": {
+   "file": "ui/title_plate.png",
+   "margins": [
+    70,
+    40,
+    70,
+    40
+   ]
+  },
+  "title_plate_gilded": {
+   "file": "ui/title_plate_gilded.png",
+   "margins": [
+    70,
+    40,
+    70,
+    40
+   ]
+  },
+  "portrait_frame_normal": {
+   "file": "ui/portrait_frame_normal.png",
+   "size": [
+    340,
+    490
+   ],
+   "window": [
+    20,
+    20,
+    300,
+    450
+   ],
+   "draw": "rider art (300x450) at window, then this frame on top"
+  },
+  "portrait_frame_fallen": {
+   "file": "ui/portrait_frame_fallen.png",
+   "size": [
+    340,
+    490
+   ],
+   "window": [
+    20,
+    20,
+    300,
+    450
+   ],
+   "draw": "rider art (300x450) at window, then this frame on top"
+  },
+  "portrait_frame_gilded": {
+   "file": "ui/portrait_frame_gilded.png",
+   "size": [
+    340,
+    490
+   ],
+   "window": [
+    20,
+    20,
+    300,
+    450
+   ],
+   "draw": "rider art (300x450) at window, then this frame on top"
+  },
+  "ledger_panel": {
+   "file": "ui/ledger_panel.png",
+   "margins": [
+    76,
+    40,
+    30,
+    40
+   ],
+   "note": "9-slice paper with red margin line and punch holes; draw ledger_rule under each line"
+  },
+  "ledger_rule": {
+   "file": "ui/ledger_rule.png",
+   "tile_x": true
+  },
+  "ledger_leader_dots": {
+   "file": "ui/ledger_leader.png",
+   "tile_x": true,
+   "note": "dot leader between label and value"
+  },
+  "tally": {
+   "tally_1": "ui/tally_1.png",
+   "tally_2": "ui/tally_2.png",
+   "tally_3": "ui/tally_3.png",
+   "tally_4": "ui/tally_4.png",
+   "tally_5": "ui/tally_5.png",
+   "note": "Groups of five: draw tally_1..4 progressively; the 5th outlaw swaps to tally_5 (red slash). Each new mark punches in (scale 1.4 -> 1.0, 120 ms)."
+  },
+  "outlaw_caught_stamp": "ui/outlaw_caught_stamp.png",
+  "relic_slot": {
+   "file": "ui/relic_slot.png",
+   "empty": "ui/relic_slot_empty.png",
+   "icon_box": [
+    10,
+    10,
+    52,
+    52
+   ]
+  },
+  "strip": {
+   "rail": "ui/strip_rail.png",
+   "rail_lit": "ui/strip_rail_lit.png",
+   "rail_margins": [
+    10,
+    0,
+    10,
+    0
+   ],
+   "table_ahead": "ui/marker_table_ahead.png",
+   "table_passed": "ui/marker_table_passed.png",
+   "table_current": "ui/marker_table_current.png",
+   "campfire": "ui/marker_campfire.png",
+   "campfire_ahead": "ui/marker_campfire_ahead.png",
+   "outlaw": "ui/marker_outlaw.png",
+   "outlaw_ahead": "ui/marker_outlaw_ahead.png",
+   "boss_jack": "ui/marker_boss_jack.png",
+   "boss_jack_ahead": "ui/marker_boss_jack_ahead.png",
+   "boss_queen": "ui/marker_boss_queen.png",
+   "boss_queen_ahead": "ui/marker_boss_queen_ahead.png",
+   "boss_cobra": "ui/marker_boss_cobra.png",
+   "boss_cobra_ahead": "ui/marker_boss_cobra_ahead.png",
+   "ended_here": "ui/marker_ended.png",
+   "victory": "ui/marker_victory.png",
+   "region_divider": "ui/region_divider.png"
+  }
+ },
+ "riders": {
+  "the_gambler": {
+   "art": "riders/the_gambler_300x450.png",
+   "fallen": "riders/the_gambler_300x450_fallen.png"
+  },
+  "the_machine": {
+   "art": "riders/the_machine_300x450.png",
+   "fallen": "riders/the_machine_300x450_fallen.png"
+  },
+  "the_doctor": {
+   "art": "riders/the_doctor_300x450.png",
+   "fallen": "riders/the_doctor_300x450_fallen.png"
+  }
+ },
+ "layout": {
+  "title_plate": [
+   120,
+   40,
+   980,
+   150
+  ],
+  "title_text_box": [
+   150,
+   58,
+   920,
+   112
+  ],
+  "epitaph": [
+   130,
+   198,
+   960,
+   40
+  ],
+  "portrait_frame": [
+   120,
+   250,
+   340,
+   490
+  ],
+  "ledger": [
+   500,
+   250,
+   600,
+   490
+  ],
+  "ledger_lines_start": [
+   580,
+   312
+  ],
+  "ledger_line_h": 62,
+  "relics_label": [
+   120,
+   776
+  ],
+  "relics_row": [
+   500,
+   748,
+   8,
+   72,
+   10
+  ],
+  "strip": [
+   180,
+   860,
+   1560,
+   100
+  ],
+  "strip_node_x0": 210,
+  "strip_node_dx": 75,
+  "strip_rail_y": 900,
+  "buttons": {
+   "back_to_menu": [
+    1110,
+    978,
+    310,
+    72
+   ],
+   "ride_again": [
+    1440,
+    978,
+    360,
+    72
+   ]
+  },
+  "scrim_left": "Gradient ColorRect behind the UI: #0c0806 alpha .78 at x=0 -> .55 at x=1000 -> 0 at x=1250 (keeps the set piece clear)",
+  "safe_area": [
+   160,
+   40,
+   1600,
+   1000
+  ]
+ },
+ "trail_map": {
+  "tables": 21,
+  "regions": [
+   [
+    1,
+    7
+   ],
+   [
+    8,
+    14
+   ],
+   [
+    15,
+    21
+   ]
+  ],
+  "bosses": {
+   "7": "Jack of All Trades",
+   "14": "Queen Bee",
+   "21": "King Cobra"
+  },
+  "example_outlaw_tables": [
+   3,
+   10,
+   17
+  ],
+  "example_campfire_tables": [
+   5,
+   12,
+   19
+  ],
+  "note": "Outlaw/campfire positions are examples for the mock; feed the run's real map. Node x = strip_node_x0 + (table-1) * strip_node_dx."
+ },
+ "intro_anim": [
+  {
+   "t_ms": 0,
+   "what": "scene layers fade in from black",
+   "dur_ms": 500
+  },
+  {
+   "t_ms": 300,
+   "what": "title slams: scale 1.6 -> 1.0, alpha 0 -> 1, ease-out-back, then 6 px camera shake 2 cycles",
+   "dur_ms": 180
+  },
+  {
+   "t_ms": 520,
+   "what": "epitaph types/fades in",
+   "dur_ms": 400
+  },
+  {
+   "t_ms": 600,
+   "what": "portrait frame settles: drop 30 px + rotate -4 deg -> 0, ease-out-bounce; fallen frames finish at -2 deg (crooked)",
+   "dur_ms": 400
+  },
+  {
+   "t_ms": 900,
+   "what": "ledger slides up 40 px + fades; then each line ticks in, 250 ms stagger; numbers count up over 400 ms",
+   "dur_ms": 1700
+  },
+  {
+   "t_ms": 1400,
+   "what": "outlaws line: one tally mark (or caught stamp) punches per outlaw, scale 1.4 -> 1.0, 120 ms each, with a thunk SFX"
+  },
+  {
+   "t_ms": 2400,
+   "what": "relic slots pop in left->right, 60 ms stagger"
+  },
+  {
+   "t_ms": 2700,
+   "what": "progress strip lights node by node up to the ended table (40 ms per node); ended_here flag drops in (or victory star bursts on table 21)"
+  },
+  {
+   "t_ms": 3600,
+   "what": "buttons fade in; RIDE AGAIN gets focus"
+  },
+  {
+   "what": "loop FX start with the scene fade and run forever (see endings.*.fx)"
+  }
+ ],
+ "mockups": {
+  "laid_low": "mockups/laid_low_mockup.png",
+  "busted_out": "mockups/busted_out_mockup.png",
+  "blinded_out": "mockups/blinded_out_mockup.png",
+  "trail_complete": "mockups/trail_complete_mockup.png"
+ },
+ "cause_examples": {
+  "laid_low": [
+   "Shot by Black Jack Calloway.",
+   "Burned at the table.",
+   "Caught in the blast."
+  ],
+  "busted_out": [
+   "Lost every chip at Table 12."
+  ],
+  "blinded_out": [
+   "Couldn't cover the blind."
+  ]
+ },
+ "sample_copy": {
+  "laid_low": {
+   "title": "LAID LOW",
+   "epitaph": "The Trail took the last of him at Table 9.",
+   "cause": "Shot by Black Jack Calloway."
+  },
+  "busted_out": {
+   "title": "BUSTED OUT",
+   "epitaph": "Empty pockets. Empty chair.",
+   "cause": "Lost every chip at Table 12."
+  },
+  "blinded_out": {
+   "title": "BLINDED OUT",
+   "epitaph": "So close. The next seat cost more than you had.",
+   "cause": "Couldn't cover the blind."
+  },
+  "trail_complete": {
+   "title": "TRAIL COMPLETE",
+   "epitaph": "King Cobra folds. The Dealer's table is yours \u2014 for now.",
+   "cause": null
+  }
+ }
+}

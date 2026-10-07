@@ -256,7 +256,10 @@ var hp := MAX_HP
 var outlaws_caught := 0
 var best_hand_score := 0
 var best_hand_name := ""
-var laser_used := false         # one shot per table (the Machine)
+# What each stop on the ride was, by room index: "table", "outlaw",
+# "boss", "shop" or "camp" — the end-of-trail map lights these.
+var trail_log: Array = []
+var laser_used := false        # one shot per table (the Machine)
 var _aiming_laser := false
 var watch_uses_left := 1         # turns left this table (the Doctor)
 var _watch_snapshot := {}        # trail-side state alongside board.undo_state
@@ -341,6 +344,8 @@ var _remove_info: Label
 var _deck_tip: PanelContainer
 var _deck_tip_label: Label
 var _end_label: Label
+var _end_leave_btn: Button
+var _gameover_scene: GameOverScene
 var _shop_title: Label
 var _shop_flavor: Label
 var _shop_relic_box: Control
@@ -435,6 +440,7 @@ func _save_run() -> void:
 	cf.set_value("run", "outlaws_caught", outlaws_caught)
 	cf.set_value("run", "best_hand_score", best_hand_score)
 	cf.set_value("run", "best_hand_name", best_hand_name)
+	cf.set_value("run", "trail_log", PackedStringArray(trail_log))
 	cf.set_value("run", "second_wind_used", _second_wind_used)
 	cf.set_value("run", "burns_used", burns_used)
 	cf.set_value("run", "pending", pending_retry)
@@ -503,6 +509,7 @@ func _load_run() -> bool:
 	outlaws_caught = int(cf.get_value("run", "outlaws_caught", 0))
 	best_hand_score = int(cf.get_value("run", "best_hand_score", 0))
 	best_hand_name = String(cf.get_value("run", "best_hand_name", ""))
+	trail_log = Array(cf.get_value("run", "trail_log", PackedStringArray()))
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
 	pending_retry = cf.get_value("run", "pending", {})
@@ -794,7 +801,7 @@ func character_name() -> String:
 ## The trail hurts: burnt-out flames, dynamite, outlaw lead, lost
 ## tables. Returns false when the damage ends the run — callers must
 ## stop what they were doing.
-func take_damage(amount: int, why := "") -> bool:
+func take_damage(amount: int, why := "", cause := "") -> bool:
 	if amount <= 0 or not run_active:
 		return true
 	hp = maxi(0, hp - amount)
@@ -812,7 +819,8 @@ func take_damage(amount: int, why := "") -> bool:
 	_clear_run_save()
 	_end_run("LAID LOW",
 			"%s\nThe trail took its last pound of flesh.\n%s won't finish this ride." \
-			% [why if why != "" else "The last blow landed.", character_name()], 0)
+			% [why if why != "" else "The last blow landed.", character_name()], 0,
+			cause if cause != "" else "The last blow landed.")
 	return false
 
 
@@ -1058,12 +1066,13 @@ func _short_stacked(cost: int) -> bool:
 	if chips <= 0:
 		_clear_run_save()
 		_end_run("BUSTED OUT",
-				"That table took your last chip.\nThe trail ends here.", 0)
+				"That table took your last chip.\nThe trail ends here.", 0,
+				"Lost every chip at Table %d." % mini(room_index + 1, ROOMS_TOTAL))
 		return true
 	_clear_run_save()
 	_end_run("BLINDED OUT",
 			"A seat at this table costs at least %d chips — you're down to %d.\nOnly riders who reach the end cash out. The house keeps the rest." % [cost, chips],
-			0)
+			0, "Needed %d chips, held %d." % [cost, chips])
 	return true
 
 
@@ -1316,6 +1325,7 @@ func _start_run(tier: int) -> void:
 	outlaws_caught = 0
 	best_hand_score = 0
 	best_hand_name = ""
+	trail_log = []
 	burns_used = 0
 	_second_wind_used = false
 	_fire_tick_flip = false
@@ -2030,11 +2040,27 @@ func _choose_offer(offer: Dictionary, from_fate: bool) -> void:
 		_choose_offer_now(offer, from_fate))
 
 
+func _log_stop(offer: Dictionary) -> void:
+	var kind := "table"
+	if offer.kind == "shop":
+		kind = "shop"
+	elif offer.kind == "camp":
+		kind = "camp"
+	elif offer.has("boss"):
+		kind = "boss"
+	elif String(offer.get("goal", "")) == "outlaw":
+		kind = "outlaw"
+	while trail_log.size() <= room_index:
+		trail_log.append("")
+	trail_log[room_index] = kind
+
+
 func _choose_offer_now(offer: Dictionary, from_fate: bool) -> void:
 	if from_fate:
 		chips += FATE_KICKER * _cost_mult(room_index)
 	current_offer = offer
 	tarot_layer.visible = false
+	_log_stop(offer)
 	if offer.kind == "shop":
 		_show_shop()
 	elif offer.kind == "camp":
@@ -2502,7 +2528,8 @@ func on_hand_played(result: Dictionary) -> void:
 			main.board._play_sound(Board.SFX_REVOLVERS.pick_random(), 0.8, -5.0)
 			if not take_damage(caught,
 					"YOU CAUGHT HIS BULLET" if int(result.get("bullets_his", 0)) > 0
-					else "%s FIRES" % current_outlaw_name()):
+					else "%s FIRES" % current_outlaw_name(),
+					"Shot by %s." % _title_case(current_outlaw_name())):
 				return
 		_replenish_bullets()
 	if room_goal == "purge":
@@ -3046,9 +3073,11 @@ func _tick_room_hazards() -> void:
 	var blasts: int = main.board.last_tick_detonated
 	if burns > 0 and not take_damage(burns,
 			"THE FIRE BURNS DOWN TO YOU" if burns == 1
-			else "%d FIRES BURN DOWN TO YOU" % burns):
+			else "%d FIRES BURN DOWN TO YOU" % burns,
+			"Burned at the table."):
 		return
-	if blasts > 0 and not take_damage(2 * blasts, "CAUGHT IN THE BLAST"):
+	if blasts > 0 and not take_damage(2 * blasts, "CAUGHT IN THE BLAST",
+			"Caught in the blast."):
 		return
 	if in_room and main.board.board_ablaze():
 		# Every card burning: nothing left to save.
@@ -3185,7 +3214,7 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 		main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
 		# Losing a table leaves a mark on the rider too.
-		if not take_damage(2):
+		if not take_damage(2, "", "One lost table too many."):
 			return
 	main._announce(reason, main.RED)
 	_after_board_settles(_retry_room)
@@ -4042,13 +4071,14 @@ func _deck_stat_text(d: Dictionary) -> String:
 
 # --- Flow: run end --------------------------------------------------------
 
-func _end_run(title: String, body: String, _payout: int) -> void:
+func _end_run(title: String, body: String, payout: int, cause := "") -> void:
 	_hide_all()
 	run_active = false
 	_room_save = {}
 	main.game_started = false
 	if title in ["BUSTED OUT", "BLINDED OUT"]:
 		main.stat_bump("trail_busts")
+	if title != "TRAIL COMPLETE":
 		main.play_music("lost")
 		# A lone howl over the sad harmonica.
 		main.board._play_sound(Board.SFX_LOSS_HOWLS.pick_random(), 1.0, -8.0, 0.8)
@@ -4061,7 +4091,60 @@ func _end_run(title: String, body: String, _payout: int) -> void:
 			else "%s  (%d)" % [best_hand_name.to_upper(), best_hand_score]
 	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nBest hand: %s\nOutlaws caught: %d\nCash: $%d" \
 			% [title, body, main.score, best, outlaws_caught, cash]
+	# The painted last page when the art is installed; the plain
+	# text page otherwise.
+	var painted: bool = _gameover_scene.show_ending(_ending_data(title, payout, cause))
+	_end_label.visible = not painted
+	_end_leave_btn.visible = not painted
 	end_layer.visible = true
+
+
+## Everything the last page shows, gathered while the run still exists.
+func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
+	var kind := String({"LAID LOW": "laid_low", "BUSTED OUT": "busted_out",
+			"BLINDED OUT": "blinded_out"}.get(title, "trail_complete"))
+	var reached := ROOMS_TOTAL if kind == "trail_complete" \
+			else mini(room_index + 1, ROOMS_TOTAL)
+	var rider := character_name()
+	if rider.begins_with("The "):
+		rider = "the " + rider.substr(4)
+	var epitaph := ""
+	match kind:
+		"laid_low":
+			epitaph = "The trail took the last of %s at Table %d." % [rider, reached]
+		"busted_out":
+			epitaph = "Empty pockets. Empty chair."
+		"blinded_out":
+			epitaph = "So close. The next seat cost more than you had."
+		_:
+			epitaph = "King Cobra folds. The Dealer's table is yours — for now." \
+					if table_tier == 2 \
+					else "King Cobra folds. The trail pays $%d in tribute." % payout
+	var stops: Array = []
+	for i in ROOMS_TOTAL:
+		stops.append(String(trail_log[i]) if i < trail_log.size() else "")
+	return {
+		"kind": kind, "title": title, "epitaph": epitaph, "cause": cause,
+		"rider": character, "score": main.score,
+		"best_name": best_hand_name, "best_score": best_hand_score,
+		"outlaws": outlaws_caught, "reached": reached, "total": ROOMS_TOTAL,
+		"cash": cash, "stake": _title_case(String(TABLES[table_tier].name)),
+		"relics": relics.duplicate(), "stops": stops,
+		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": 3,
+	}
+
+
+## "BLACK JACK MCGREW" -> "Black Jack McGrew".
+static func _title_case(s: String) -> String:
+	var words: Array = []
+	for w in s.to_lower().split(" ", false):
+		var word := String(w)
+		if word.begins_with("mc") and word.length() > 2:
+			word = "Mc" + word.substr(2, 1).to_upper() + word.substr(3)
+		else:
+			word = word.substr(0, 1).to_upper() + word.substr(1)
+		words.append(word)
+	return " ".join(words)
 
 
 # --- UI construction ------------------------------------------------------
@@ -4409,9 +4492,14 @@ func build_ui() -> void:
 	_end_label.add_theme_color_override("font_color", main.OFFWHITE)
 	_end_label.size = main.VIEW
 	end_layer.add_child(_end_label)
-	var out: Button = main._button(end_layer, "LEAVE THE TABLE", Vector2(760, 860), Vector2(400, 64))
-	out.add_theme_font_size_override("font_size", 24)
-	out.pressed.connect(back_to_menu)
+	_end_leave_btn = main._button(end_layer, "LEAVE THE TABLE", Vector2(760, 860), Vector2(400, 64))
+	_end_leave_btn.add_theme_font_size_override("font_size", 24)
+	_end_leave_btn.pressed.connect(back_to_menu)
+	_gameover_scene = GameOverScene.new()
+	_gameover_scene.host = main
+	end_layer.add_child(_gameover_scene)
+	_gameover_scene.ride_again.connect(open_select)
+	_gameover_scene.to_menu.connect(back_to_menu)
 
 
 func _layer() -> ColorRect:

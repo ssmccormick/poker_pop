@@ -675,6 +675,25 @@ points), outlaws caught, and banked cash. The tally saves with the
 run and rides in the pocket watch snapshot, so a rewound hand can't
 keep a best hand or a kill it took back.
 
+THE LAST PAGE (GameOverScene, art in assets/art/gameover/, laid out by
+gameover_manifest.json): four painted endings sharing one layout.
+LAID LOW is cold dusk with vultures and a tumbleweed; BUSTED OUT the
+empty saloon under a flickering lantern; BLINDED OUT the same saloon
+while the dealer's hand slides the pot away; TRAIL COMPLETE the golden
+ridge with a glinting strongbox. Each shows the rider's portrait
+(sepia and cracked, hung crooked, for the fallen; gilded for the
+win), a sentence-case cause in red (Shot by Black Jack McGrew.,
+Burned at the table., Caught in the blast., One lost table too many.,
+Lost every chip at Table N., Needed X chips, held Y.), the Trail Ledger
+(score, best hand, outlaws as tally gates of five, tables reached,
+cash, stake), up to eight relics, and the map of the ride. The map
+reads trail_log, a per-room record of what each stop was (table,
+outlaw, camp, shop, boss), saved with the run; stops ahead show the
+bosses and the campfire slots dimmed. The intro is one clock: title
+slam, frame drop, ledger tally, relics, the map lighting node by node,
+then RIDE AGAIN (rider select) and BACK TO MENU. A click jumps it to
+the last frame.
+
 THE CAMPFIRE: a rest stop once per region (room 4, between the two
 shops), offered on the tarot wall as a poster with a code-drawn
 fire. One comfort per stop: REST (+5 HP), TEND A CARD (a plain deck

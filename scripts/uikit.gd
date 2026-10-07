@@ -247,6 +247,7 @@ static func style_button(b: Button, primary := false) -> void:
 			sb.content_margin_bottom = 0.0
 			b.add_theme_stylebox_override(state, sb)
 		b.add_theme_color_override("font_color", Color("e6d5b0"))
+		b.add_theme_color_override("font_focus_color", Color("e6d5b0"))
 		b.add_theme_color_override("font_hover_color", BRASS_HI)
 		b.add_theme_color_override("font_pressed_color", BRASS_HI)
 		b.add_theme_color_override("font_disabled_color", DISABLED_TEXT)
@@ -270,6 +271,7 @@ static func style_button(b: Button, primary := false) -> void:
 	disabled.shadow_size = 0
 	b.add_theme_stylebox_override("disabled", disabled)
 	b.add_theme_color_override("font_color", Color("e6d5b0"))
+	b.add_theme_color_override("font_focus_color", Color("e6d5b0"))
 	b.add_theme_color_override("font_hover_color", Color("e8c547"))
 	b.add_theme_color_override("font_pressed_color", Color("e8c547"))
 	b.add_theme_color_override("font_disabled_color", DIM)

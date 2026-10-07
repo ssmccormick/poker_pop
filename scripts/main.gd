@@ -253,13 +253,42 @@ func _ready() -> void:
 				trail._start_run(0)
 				trail._choose_offer({"kind": "shop", "tarot": "GENERAL STORE"}, false)
 			"trailover":
+				# POKERPOP_ENDING: laid_low (default), busted_out,
+				# blinded_out or trail_complete.
 				menu_layer.visible = false
-				trail._start_run(0)
-				trail.outlaws_caught = 3
+				var ending := OS.get_environment("POKERPOP_ENDING")
+				if ending == "trail_complete":
+					trail.cash = maxi(trail.cash, 1200)  # the High Roller seat
+				trail._start_run(2 if ending == "trail_complete" else 0)
+				trail.outlaws_caught = 7 if ending == "trail_complete" else 3
 				trail.best_hand_score = 840
 				trail.best_hand_name = "Full House"
-				score = 4210
-				trail.take_damage(99, "Shot by Black Jack Calloway.")
+				score = 41300
+				trail.relics.assign(["horseshoe", "rabbits_foot", "second_wind",
+						"snake_oil", "chuck_wagon"])
+				var log_kinds := ["table", "table", "outlaw", "camp", "table", "shop",
+						"boss", "table", "outlaw", "table", "camp", "shop", "table",
+						"boss", "table", "outlaw", "table", "camp", "table", "shop", "boss"]
+				trail.room_index = 20 if ending == "trail_complete" else 9
+				for i in trail.room_index + 1:
+					trail.room_index = i
+					trail._log_stop({"kind": "camp"} if log_kinds[i] == "camp"
+							else {"kind": "shop"} if log_kinds[i] == "shop"
+							else {"kind": "play", "boss": "x"} if log_kinds[i] == "boss"
+							else {"kind": "play", "goal": log_kinds[i]})
+				match ending:
+					"busted_out":
+						trail.chips = 0
+						trail._short_stacked(1)
+					"blinded_out":
+						trail.chips = 40
+						trail._short_stacked(120)
+					"trail_complete":
+						trail.room_index = TrailMode.ROOMS_TOTAL
+						trail._trail_complete()
+					_:
+						trail.take_damage(99, "", "Shot by %s."
+								% TrailMode._title_case("BLACK JACK MCGREW"))
 			"trailtarot":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -2613,7 +2642,7 @@ func _build_profiles_and_tutor() -> void:
 	hud_root.add_child(_tooltip)
 
 	# A soft radial vignette framing play — above the HUD, below every
-	# full-screen layer (menus/trail screens are built after this).
+	# full-screen layer.
 	# The round-2 kit paints one; the gradient is the fallback.
 	var vin_tex: Texture2D = UiKit.tex("vignette")
 	if vin_tex == null:
@@ -2635,6 +2664,8 @@ func _build_profiles_and_tutor() -> void:
 	vignette.size = VIEW
 	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(vignette)
+	# Built after the trail screens and menus, so pin it back down.
+	ui_root.move_child(vignette, hud_root.get_index() + 1)
 
 	# Dust motes drifting over the table while a game is on.
 	_dust = CPUParticles2D.new()
@@ -2926,7 +2957,7 @@ func _debug_seed_hazards() -> void:
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid":
+		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover":
 			await get_tree().create_timer(4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
