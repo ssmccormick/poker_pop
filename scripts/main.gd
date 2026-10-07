@@ -709,7 +709,7 @@ func _open_cardgrid() -> void:
 		["Bumper ↓", func(c: PlayingCard) -> void: c.mod = "bumper"; c.boost_dir = Vector2i.DOWN],
 		["Gold", func(c: PlayingCard) -> void: c.mod = "gold"],
 		["Wild", func(c: PlayingCard) -> void: c.mod = "wild"],
-		["The Joker (MULT now)", func(c: PlayingCard) -> void: c.rank = 2; c.joker = true; c.mod = "mult"],
+		["The Joker", func(c: PlayingCard) -> void: c.rank = 14; c.joker = true; c.mod = "wild"],
 		["Explosive mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.boom = true],
 		["Crazy 8 (wild)", func(c: PlayingCard) -> void: c.rank = 8],
 		["Fire on an Ace", func(c: PlayingCard) -> void: c.rank = 14; c.hazard = "fire"],
@@ -1560,8 +1560,11 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.washed:
 		lines.append("FILLED — water to the brim: the card is under there somewhere, and it POURS into its neighbors every hand. It still is what it was — play it blind if you remember, or bail it out with a canteen.")
 	else:
-		lines.append("%s of %s  ·  pips %d" % [rank_names.get(card.rank, str(card.rank)),
-				PlayingCard.SUIT_NAMES[card.suit], card.rank])
+		if card.joker:
+			lines.append("The Joker")
+		else:
+			lines.append("%s of %s  ·  pips %d" % [rank_names.get(card.rank, str(card.rank)),
+					PlayingCard.SUIT_NAMES[card.suit], card.rank])
 	match card.boss:
 		"jack":
 			lines.append("JACK OF ALL TRADES — %d score left to deal him. A hand beating %d with him in it bleeds its WHOLE SCORE off him; the bar rises per hit." % [card.boss_hp, board.jack_bar])
@@ -1594,17 +1597,18 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"gold":
 			lines.append("GOLD — pays $1 of permanent cash when played.")
 		"plus":
-			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand. Boosting an ACE wraps it into THE JOKER.")
+			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand. Boosting an ACE lifts it into THE JOKER.")
 		"minus":
 			lines.append("MINUS — clearing it drops the aimed card one rank; a 2 ground lower is DESTROYED (unscored). The arrow turns each hand.")
 		"bumper":
 			lines.append("BUMPER — clearing it shoves the line beside it one step along the arrow; past the edge is gone. The arrow turns each hand.")
 		"wild":
-			lines.append("WILD — counts as ANY rank and suit.")
+			if not card.joker:  # the Joker's own line says it
+				lines.append("WILD — counts as ANY rank and suit.")
 	if PlayingCard.eights_wild and card.rank == 8 and not card.washed:
 		lines.append("CRAZY 8s — this 8 counts as WILD: any rank, any suit.")
 	if card.joker:
-		lines.append("THE JOKER — a wrapped Ace turned trickster: he holds ONE enhancement at a time and swaps to a different one every hand. Right now he rides as %s." % (card.mod.to_upper() if card.mod != "" else "NOTHING"))
+		lines.append("THE JOKER — one step above the Ace. Always WILD (any rank, any suit) and he DOUBLES every hand he scores in. A MINUS knocks him back down to a plain Ace.")
 	if card.incoming != "":
 		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
 	if card.boom:

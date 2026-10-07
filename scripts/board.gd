@@ -98,8 +98,6 @@ func queue_refill_hazards(kind: String, count: int) -> void:
 	for i in count:
 		_pending_refill_hazards.append(kind)
 const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
-# Everything THE JOKER can hold — he draws a different one each hand.
-const JOKER_MODS := ["chip", "mult", "gold", "wild", "plus", "minus", "bumper"]
 # Ledger of every hazard ever put on this board, by kind. Purge rooms
 # read cleared = spawned − still standing, which is exact no matter
 # HOW a hazard left (played, burned out, gusted, shoved, blown up).
@@ -664,6 +662,31 @@ func _update_hand_validity() -> void:
 		card.hand_valid = valid
 
 
+## One Plus or Minus arrow landing on a card. Returns "none", "raised",
+## "lowered", "joker" (an Ace lifted into THE JOKER) or "destroy" (a 2
+## ground below the deuce; the caller removes it).
+func boost_card(c: PlayingCard, arrow: String) -> String:
+	if arrow == "plus":
+		if c.joker:
+			return "none"  # nothing ranks above the Joker
+		if c.rank >= 14:
+			# One step past the Ace: wild for good, ×2 on every hand.
+			c.joker = true
+			c.mod = "wild"
+			return "joker"
+		c.rank += 1
+		return "raised"
+	if c.joker:
+		# One step down from the Joker is a plain Ace.
+		c.joker = false
+		c.mod = ""
+		return "lowered"
+	if c.rank <= 2:
+		return "destroy"
+	c.rank -= 1
+	return "lowered"
+
+
 func get_selected_data() -> Array:
 	var out := []
 	for card in selected:
@@ -989,18 +1012,12 @@ func play_hand() -> void:
 			var c: PlayingCard = grid[q]
 			if not c.is_safe and c.boss == "" and not c.snake_tail \
 					and not c.cursed and c.hazard != "stone":
-				if adata.mod == "plus" and c.rank >= 14:
-					# Nowhere up from an Ace: it wraps into THE JOKER —
-					# a trickster deuce holding one enhancement at a
-					# time, swapping to another every hand.
-					c.rank = 2
-					c.joker = true
-					c.mod = JOKER_MODS.pick_random()
-					c.boost_dir = HAZARD_DIRS.pick_random()
+				var outcome := boost_card(c, String(adata.mod))
+				if outcome == "none":
+					continue
+				if outcome == "joker":
 					_spawn_float_text("THE JOKER!", c.position)
-				elif adata.mod == "plus":
-					c.rank += 1
-				elif c.rank <= 2:
+				elif outcome == "destroy":
 					# Ground below the deuce: the card wears away to
 					# nothing and leaves the table, unscored.
 					grid.erase(q)
@@ -1011,8 +1028,6 @@ func play_hand() -> void:
 							.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 					vtw.tween_callback(c.queue_free)
 					continue
-				else:
-					c.rank -= 1
 				_play_sound(SFX_FLIP, 1.4 if adata.mod == "plus" else 0.7, -8.0)
 				_fx(cell_center(q), "sparks")
 	# A transition (room clear / level clear) suppresses the refill.
@@ -1672,8 +1687,11 @@ func _apply_card_mods(result: Dictionary) -> void:
 	var mults := 0
 	var chip_pay := 0
 	var gold_cards := 0
+	var jokers := 0
 	for card in selected:
-		if card.mod == "mult":
+		if card.joker:
+			jokers += 1  # wild, and his own ×2 on top
+		elif card.mod == "mult":
 			mults += 1
 		elif card.mod == "chip":
 			# Seasoned chips pay a full base step more per level.
@@ -1682,6 +1700,8 @@ func _apply_card_mods(result: Dictionary) -> void:
 			gold_cards += 1
 	if mults > 0:
 		result.score = int(result.score * pow(mult_factor, mults))
+	if jokers > 0:
+		result.score = int(result.score * pow(2.0, jokers))
 	if chip_pay > 0:
 		result["bonus_chips"] = chip_pay
 	if gold_cards > 0:
@@ -1792,6 +1812,11 @@ func restore_state() -> bool:
 		var card := PlayingCard.new()
 		for key in UNDO_CARD_PROPS:
 			card.set(key, props[key])
+		if card.joker:
+			# Saves from before the Joker moved above the Ace.
+			card.rank = 14
+			card.joker = true
+			card.mod = "wild"
 		card.combo = props["combo"].duplicate()
 		card.grid_pos = p
 		card.position = cell_center(p)
@@ -2421,15 +2446,9 @@ func _tick_fire_and_bombs(tick_fire := true) -> Dictionary:
 	# EVERY directional card swings its arrow a quarter turn (clockwise)
 	# each hand — plus/minus/bumper mods turn here; WIND turns at the
 	# END of the tick, after it blows, so the direction the dust was
-	# streaming is the direction the gust actually takes. THE JOKER
-	# swaps to a different enhancement entirely.
+	# streaming is the direction the gust actually takes.
 	for p in grid:
-		if grid[p].joker:
-			var pool := JOKER_MODS.duplicate()
-			pool.erase(grid[p].mod)
-			grid[p].mod = pool.pick_random()
-			grid[p].boost_dir = HAZARD_DIRS.pick_random()
-		elif grid[p].mod in ["plus", "minus", "bumper"]:
+		if grid[p].mod in ["plus", "minus", "bumper"]:
 			var bd: Vector2i = grid[p].boost_dir
 			grid[p].boost_dir = Vector2i(-bd.y, bd.x)
 	# The FLOOD: every water card rises one step per tick, filling in

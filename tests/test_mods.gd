@@ -138,6 +138,50 @@ func _init() -> void:
 	cobra.free()
 	b.free()
 
+	# --- THE JOKER: one step above the Ace, wild for good, x2 ----------
+	b = Board.new()
+	var ace := PlayingCard.new()
+	ace.rank = 14
+	failures += _check(b.boost_card(ace, "plus") == "joker"
+			and ace.joker and ace.rank == 14 and ace.mod == "wild",
+			"a Plus on an Ace lifts it into a wild Joker")
+	failures += _check(ace.rank_text() == "JKR", "the Joker reads JKR")
+	failures += _check(b.boost_card(ace, "plus") == "none" and ace.joker,
+			"nothing ranks above the Joker")
+	var other := PlayingCard.new()
+	other.rank = 9
+	b.selected.assign([ace, other])
+	res = {"score": 100}
+	b._apply_card_mods(res)
+	failures += _check(res.score == 200, "the Joker doubles the hand")
+	var mult := PlayingCard.new()
+	mult.mod = "mult"
+	b.selected.assign([ace, mult])
+	res = {"score": 100}
+	b._apply_card_mods(res)
+	failures += _check(res.score == 300, "Joker x2 stacks with a mult's x1.5")
+	failures += _check(b.get_selected_data()[0].get("wild", false),
+			"the Joker plays wild")
+	b.selected.clear()
+	b.grid[Vector2i(0, 0)] = ace
+	b._tick_fire_and_bombs()
+	failures += _check(ace.joker and ace.mod == "wild",
+			"the Joker holds wild through the hand tick")
+	b.grid.clear()
+	failures += _check(b.boost_card(ace, "minus") == "lowered"
+			and not ace.joker and ace.mod == "" and ace.rank == 14,
+			"a Minus knocks the Joker down to a plain Ace")
+	ace.joker = true
+	ace.rank = 7
+	failures += _check(not ace.joker, "leaving the Ace's rank drops the Joker")
+	var deuce := PlayingCard.new()
+	deuce.rank = 2
+	failures += _check(b.boost_card(deuce, "minus") == "destroy",
+			"a Minus on a 2 still destroys it")
+	for c in [ace, other, mult, deuce]:
+		c.free()
+	b.free()
+
 	# Old save ids map onto the current mod family.
 	failures += _check(Board.migrate_mod("cash") == "gold"
 			and Board.migrate_mod("boost") == "plus"

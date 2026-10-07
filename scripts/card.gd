@@ -121,12 +121,12 @@ static var _hover_glow: StyleBoxFlat
 var rank := 2:
 	set(value):
 		rank = value
-		if rank != 2:
+		if rank != 14:
 			joker = false
 		queue_redraw()
-# THE JOKER: a PLUS boost past Ace wraps the card into the deck's
-# trickster â€” it holds ONE enhancement at a time and swaps to a
-# different one every hand (the board rerolls `mod` on its tick).
+# THE JOKER: a PLUS boost past the Ace. He sits one step above the
+# Ace (stored on the Ace's rank), always plays WILD and doubles any
+# hand he scores in.
 var joker := false:
 	set(value):
 		joker = value
@@ -584,7 +584,8 @@ func _draw() -> void:
 		var col := suit_color()
 		draw_string(font, Vector2(-W / 2.0 + 8, -H / 2.0 + 27), rank_text(),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 24, col)
-		_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
+		if not joker:
+			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 		if mod != "":
 			# Enhanced cards wear their power as the center art.
 			_draw_mod_art(font)
@@ -811,6 +812,13 @@ func _draw_art_chain_badge(font: Font) -> void:
 
 
 func _draw_art_rank_suit(rect: Rect2) -> void:
+	if joker:
+		# Wild has no suit: just the JKR mark in the rank corner.
+		var jf: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
+		draw_string(jf, Vector2(rect.position.x + rect.size.x * 0.09,
+				rect.position.y + rect.size.y * 0.18), "JKR",
+				HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.5, 15, Color("2a4a2a"))
+		return
 	var ink := "red" if suit == 1 or suit == 2 else "black"
 	_art(rect, "rank", "%s_%s" % [CardArt.rank_name(rank), ink])
 	_art(rect, "suit_corner", CardArt.suit_name(suit))
@@ -916,14 +924,17 @@ func _draw_art(rect: Rect2) -> void:
 	# The card's own face ALWAYS shows — pip or letter — so the suit
 	# reads clearly even enhanced; the emblem rides the free
 	# bottom-left corner as a badge on every card.
-	if rank == 14:
+	if joker:
+		# No suit and no letter: the Wild emblem holds center stage.
+		_art_badge(rect, "mod_emblem", "wild", Vector2(0.5, 0.47), 1.0)
+	elif rank == 14:
 		_draw_art_ace(rect)
 	elif rank >= 11:
 		_art(rect, "center", "face_%s_%s" % [CardArt.rank_name(rank),
 				CardArt.suit_name(suit)])
 	else:
 		_art(rect, "center", "pip_" + CardArt.suit_name(suit))
-	if mod_key != "":
+	if mod_key != "" and not joker:
 		var emb_anchor := Vector2(0.24, 0.78)
 		if mod_key in ["plus", "minus", "bumper"]:
 			_art_badge(rect, "mod_emblem", mod_key + "_arrow_up", emb_anchor,
@@ -935,7 +946,7 @@ func _draw_art(rect: Rect2) -> void:
 		var jfont: Font = FontLib.numbers if FontLib.numbers != null \
 				else ThemeDB.fallback_font
 		draw_string(jfont, Vector2(rect.position.x + rect.size.x * 0.36,
-				rect.end.y - 14.0), "JOKER",
+				rect.end.y - 14.0), "JOKER  ×2",
 				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 11,
 				Color("2a4a2a"))
 	elif mod == "chip" and chip_level > 0:

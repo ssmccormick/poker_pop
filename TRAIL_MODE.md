@@ -341,8 +341,8 @@ Run-wide passive items, Balatro-joker/StS-relic style. Held for the
 run — NO carry limit; the price is the gate — shown as a (wrapping)
 line on the tarot screen, saved with the run, gone when it ends.
 Acquired from the shop's relic slot and chest rewards. Rarity sets
-price: Common 150 chips · Rare 300 · Legendary 600 (×league
-multiplier, Snake Oil −25%).
+price: Common 150 chips · Rare 300 · Epic 600 · Legendary 1000
+(×league multiplier, Snake Oil −25%).
 
 Starter catalog (names/numbers draft):
 | Relic | Rarity | Effect |
@@ -710,11 +710,13 @@ card, free). Then the trail calls.
 ## The Joker, honest stakes, and a retired relic (Oct 2026)
 
 - Lucky 2+ is gone. A PLUS boost past an Ace now wraps the card into
-  THE JOKER: a trickster deuce in the lucky green suit that holds
-  ONE enhancement at a time (chip, mult, gold, wild, plus, minus or
-  bumper) and swaps to a DIFFERENT one every hand on the board tick.
-  Whatever he holds when scored is what he does. The sleeve carries
-  him between tables; old 2+ saves load as Jokers.
+  THE JOKER, one step above the Ace in the lucky green suit. He is
+  always WILD and doubles (×2) every hand he scores in, stacking with
+  mult cards. A Plus does nothing more to him; a Minus knocks him back
+  to a plain Ace. He is stored on the Ace's rank (wild picks his rank
+  in every hand anyway), reads JKR, and shows the Wild emblem with a
+  JOKER ×2 nameplate. The sleeve carries him between tables; old 2+
+  and old rank-2 Jokers load as the new Joker.
 - THE STAKES screen re-spaced: the info block (five lines on a
   retry) now clears the BET row entirely.
 - The Weathervane relic is retired - the wind particles already blow
@@ -727,9 +729,10 @@ card, free). Then the trail calls.
   neighboring cards. Pick one, then the card beside it - they cross
   in the air with everything riding along (hazards, fuses, job
   pieces). Safes, bosses and coils are too heavy to shuffle.
-- CHUCK WAGON (relic, EPIC - the new fourth rarity, $1000 base): a
-  random provision rolls into the kit at every table's start (when
-  there is room). RELIC_PRICES grows to [150, 300, 600, 1000].
+- CHUCK WAGON (relic, EPIC, 600 base): a random provision rolls into
+  the kit at every table's start (when there is room). Rarities run
+  Common, Rare, Epic, Legendary; RELIC_PRICES is [150, 300, 600, 1000],
+  so Lucky Chip (Legendary) sits at the top at 1000.
 
 ## Chip cards season (Oct 2026)
 

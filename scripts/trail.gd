@@ -128,7 +128,7 @@ const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
 
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
 const MAX_RELICS := 999  # no satchel limit — the price is the gate
-const RELIC_PRICES := [150, 300, 600, 1000]  # by rarity C/R/L/EPIC — carry is unlimited, so they cost dear
+const RELIC_PRICES := [150, 300, 600, 1000]  # by rarity C/R/EPIC/L — carry is unlimited, so they cost dear
 
 # Traveling merchants: each shop stop is a different trader, rolled
 # per room, with their own stock — some deal only in relics.
@@ -184,8 +184,8 @@ const RELICS := {
 	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Trail completion pays +0.25x"},
 	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combos use only ranks 2-6"},
 	"saddlebags": {"name": "Saddlebags", "rarity": 1, "desc": "A 4th slot in your provision kit"},
-	"lucky_chip": {"name": "Lucky Chip", "rarity": 2, "desc": "10% chance a hand costs no hand"},
-	"chuck_wagon": {"name": "Chuck Wagon", "rarity": 3, "desc": "A random provision at every table's start"},
+	"lucky_chip": {"name": "Lucky Chip", "rarity": 3, "desc": "10% chance a hand costs no hand"},
+	"chuck_wagon": {"name": "Chuck Wagon", "rarity": 2, "desc": "A random provision at every table's start"},
 }
 
 var main: Node2D  # set by main.gd before build()
@@ -522,6 +522,11 @@ func _load_run() -> bool:
 	sleeve_card = cf.get_value("run", "sleeve", {})
 	if sleeve_card.is_empty():
 		sleeve_card = _fresh_sleeve()  # runs saved before the sleeve existed
+	if bool(sleeve_card.get("joker", sleeve_card.get("two_plus", false))):
+		# A Joker saved from before he moved above the Ace.
+		sleeve_card["rank"] = 14
+		sleeve_card["mod"] = "wild"
+		sleeve_card["joker"] = true
 	character = String(cf.get_value("run", "character", "the_gambler"))
 	if not CHARACTERS.has(character):
 		character = "the_gambler"
@@ -4202,7 +4207,7 @@ func _deck_stat_text(d: Dictionary) -> String:
 		"gold":
 			text += "GOLD\nPays $1 of real, bankable cash when played."
 		"plus":
-			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it. Boosting an ACE wraps it into THE JOKER — a trickster holding one enhancement at a time, swapping every hand."
+			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it. Boosting an ACE lifts it into THE JOKER — wild for good, doubling every hand he scores in."
 		"minus":
 			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank — and a 2 ground lower is DESTROYED, unscored. The arrow turns a quarter every hand — time it."
 		"bumper":
