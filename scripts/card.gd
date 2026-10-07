@@ -155,11 +155,17 @@ var hovered := false:
 		hovered = value
 		_update_processing()
 		queue_redraw()
-# The hover TILT: the card leans toward the cursor. Only the drawing
-# tilts (never the node), so board tweens and hit areas are untouched.
-const TILT_MAX := 0.3          # radians at the card's edge
+# The hover TILT: the card turns in 3D toward the cursor, projected
+# with real perspective by the card shader. Only the drawing tilts
+# (never the node), so board tweens and hit areas are untouched.
+const TILT_MAX := 0.35         # radians at the card's edge
 var _tilt := Vector2.ZERO      # -1..1 toward the cursor, eased
 var _hover_amt := 0.0          # 0..1, eased hover lift
+# While tilting, the card wears its own copy of the theme material
+# (the tilt is per card); flat, it hands the shared one back.
+static var _card_shader: Shader
+var _tilt_mat: ShaderMaterial
+var _theme_mat: Material
 var chain_index := 0:
 	set(value):
 		chain_index = value
@@ -367,23 +373,42 @@ func _ease_tilt(delta: float) -> bool:
 	if not hovered and _tilt.length() < 0.01 and _hover_amt < 0.01:
 		_tilt = Vector2.ZERO
 		_hover_amt = 0.0
+		_release_tilt_material()
 		return false
+	_hold_tilt_material()
+	_tilt_mat.set_shader_parameter("tilt", _tilt * TILT_MAX)
 	return true
 
 
-## Where the face is drawn: the selection lift, plus the hover lean as
-## an orthographic turn toward the cursor (narrowing with a diagonal
-## shear), a slight swell and a small twist.
+## Puts this card in its own copy of the theme material. Re-adopts the
+## theme if someone (a theme switch) swapped the material meanwhile.
+func _hold_tilt_material() -> void:
+	if _tilt_mat != null and material == _tilt_mat:
+		return
+	_theme_mat = material
+	if _theme_mat is ShaderMaterial:
+		_tilt_mat = (_theme_mat as ShaderMaterial).duplicate()
+	else:
+		if _card_shader == null:
+			_card_shader = load("res://shaders/card_pattern.gdshader")
+		_tilt_mat = ShaderMaterial.new()
+		_tilt_mat.shader = _card_shader
+		_tilt_mat.set_shader_parameter("pattern_strength", 0.0)
+	material = _tilt_mat
+
+
+func _release_tilt_material() -> void:
+	if _tilt_mat != null and material == _tilt_mat:
+		material = _theme_mat
+	_tilt_mat = null
+
+
+## Where the face is drawn: the selection lift and a slight hover swell
+## (the 3D turn itself happens in the card shader).
 func _face_xform() -> Transform2D:
 	var lift := Vector2(0, -8) if selected else Vector2.ZERO
-	if _tilt == Vector2.ZERO and _hover_amt == 0.0:
-		return Transform2D(0.0, lift)
-	var ty := _tilt.x * TILT_MAX
-	var tx := _tilt.y * TILT_MAX
 	var swell := 1.0 + 0.03 * _hover_amt
-	var lean := Transform2D(Vector2(cos(ty), sin(ty) * sin(tx)) * swell,
-			Vector2(0.0, cos(tx)) * swell, Vector2.ZERO)
-	return Transform2D(-_tilt.x * 0.035, lift) * lean
+	return Transform2D(Vector2(swell, 0.0), Vector2(0.0, swell), lift)
 
 
 ## A soft light band across the face that slides with the cursor, so
