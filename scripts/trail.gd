@@ -1235,8 +1235,13 @@ func _random_mod() -> String:
 	return "wild"
 
 
-## The PRISM finish: a rare extra on any enhanced card.
-const PRISM_CHANCE := 0.15
+## FINISHES ride along as a rare extra on any enhanced card, one of
+## them (Prism or Metal) at random.
+const FINISH_CHANCE := 0.2
+
+
+func _roll_finish() -> String:
+	return PlayingCard.FINISHES.keys().pick_random() if randf() < FINISH_CHANCE else ""
 
 
 func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
@@ -1244,7 +1249,7 @@ func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 	var finish := ""
 	if randf() < mod_chance:
 		mod = _random_mod()
-		finish = "prism" if randf() < PRISM_CHANCE else ""
+		finish = _roll_finish()
 	# Half the time, offer an exact duplicate of a card already owned
 	# (the Five of a Kind / Flushed Five enabler).
 	if randf() < 0.5 and not deck.is_empty():
@@ -2893,7 +2898,7 @@ func _open_chest() -> void:
 	else:
 		var enhanced := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": _random_mod(),
-				"finish": "prism" if randf() < PRISM_CHANCE else ""}
+				"finish": _roll_finish()}
 		deck.append(enhanced)
 		_chest_won_cards.append(enhanced)
 		main.board._play_sound(Board.SFX_FLIP, 1.3, -8.0)
@@ -3706,7 +3711,7 @@ func _shop_card_offer() -> Dictionary:
 	if randf() < SHOP_MOD_CHANCE:
 		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": _random_mod(),
-				"finish": "prism" if randf() < PRISM_CHANCE else ""},
+				"finish": _roll_finish()},
 				"base": SHOP_MOD_PRICE}
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()

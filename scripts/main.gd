@@ -711,6 +711,7 @@ func _open_cardgrid() -> void:
 		["Wild", func(c: PlayingCard) -> void: c.mod = "wild"],
 		["The Joker", func(c: PlayingCard) -> void: c.rank = 14; c.joker = true; c.mod = "wild"],
 		["Prism mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.finish = "prism"],
+		["Metal chip", func(c: PlayingCard) -> void: c.mod = "chip"; c.finish = "metal"],
 		["Crazy 8 (wild)", func(c: PlayingCard) -> void: c.rank = 8],
 		["Fire on an Ace", func(c: PlayingCard) -> void: c.rank = 14; c.hazard = "fire"],
 		["Fire on a 2", func(c: PlayingCard) -> void: c.rank = 2; c.hazard = "fire"],

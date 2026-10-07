@@ -820,6 +820,7 @@ func play_hand() -> void:
 	var bumps: Array = []     # {"cell", "dir"} — bumper shoves
 	var defeated_boss := false
 	var boss_hits: Array = []  # wounded bosses catch a slug after the shoves
+	var stays: Array = []     # METAL cards: they score but never clear
 	for card in played:
 		card.selected = false
 		card.chain_index = 0
@@ -853,19 +854,36 @@ func play_hand() -> void:
 					"mod": card.mod})
 		elif card.mod == "bumper":
 			bumps.append({"cell": card.grid_pos, "dir": card.boost_dir})
+		if card.finish == "metal":
+			stays.append(card)  # scored, but steel stays on the felt
+			continue
 		poppers.append(card)
 
 	# The new goals watch what actually cleared: identities for the
 	# roundups, cells for the land rush.
 	var cleared_cards: Array = []
 	var cleared_cells: Array = []
-	for card in poppers:
+	for card in poppers + stays:
+		# Metal counts as scored for roundups and chip seasoning, but
+		# claims no plot: it never left its cell.
 		cleared_cards.append({"rank": card.rank, "suit": card.suit,
 				"mod": card.mod, "chip_lv": card.chip_level,
 				"joker": card.joker})
-		cleared_cells.append(card.grid_pos)
+		if card.finish != "metal":
+			cleared_cells.append(card.grid_pos)
 	result["cleared_cards"] = cleared_cards
 	result["cleared_cells"] = cleared_cells
+	for card in stays:
+		# A staying chip card seasons in place, so its deck twin and the
+		# table copy stay in step.
+		if card.mod == "chip" and not card.joker:
+			card.chip_level += 1
+		var ring := create_tween()
+		card.scale = Vector2.ONE * 1.12
+		ring.tween_property(card, "scale", Vector2.ONE, 0.25) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if not stays.is_empty():
+		_play_sound(SFX_BELL, 1.8, -12.0)
 
 	# Stones are blockers now: every cleared card chips each stone
 	# beside it, and a stone out of chips crumbles with the pops.
@@ -1102,7 +1120,7 @@ func spawn_safe(combo: Array) -> void:
 	for p in grid:
 		var card: PlayingCard = grid[p]
 		if card.hazard == "" and not card.cursed and not card.washed \
-				and card.mod == "" and card.objective == "" and not card.is_safe:
+				and card.mod == "" and card.objective == "" and not card.is_safe and not card.hazard_proof():
 			candidates.append(p)
 	if candidates.is_empty():
 		return
@@ -1165,7 +1183,7 @@ func spawn_key_and_chest() -> void:
 	for p in grid:
 		var card: PlayingCard = grid[p]
 		if card.hazard == "" and not card.cursed and not card.washed \
-				and card.objective == "" and not card.is_safe:
+				and card.objective == "" and not card.is_safe and not card.hazard_proof():
 			candidates.append(card)
 	if candidates.size() < 2:
 		return
@@ -1180,7 +1198,7 @@ func spawn_objective(kind: String) -> void:
 	for p in grid:
 		var card: PlayingCard = grid[p]
 		if card.hazard == "" and not card.cursed and not card.washed \
-				and card.objective == "" and not card.is_safe \
+				and card.objective == "" and not card.is_safe and not card.hazard_proof() \
 				and card.boss == "" and not card.snake_tail:
 			candidates.append(card)
 	if not candidates.is_empty():
@@ -1349,10 +1367,10 @@ func _fall_and_fill(initial_deal: bool) -> void:
 				card.boost_dir = HAZARD_DIRS.pick_random()
 			# Danger off the deck: queued room hazards ride the deal
 			# first, then the ambient per-card roll.
-			if not initial_deal and not card.cursed \
+			if not initial_deal and not card.cursed and not card.hazard_proof() \
 					and not _pending_refill_hazards.is_empty():
 				_init_hazard(card, _pending_refill_hazards.pop_front())
-			elif not initial_deal and not card.cursed \
+			elif not initial_deal and not card.cursed and not card.hazard_proof() \
 					and randf() < refill_hazard_chance:
 				_init_hazard(card, HAZARD_KINDS.pick_random())
 			# Blackjack tables deal their refills face-down.
@@ -2026,7 +2044,7 @@ func spawn_boss(kind: String) -> void:
 	for p in grid:
 		var card: PlayingCard = grid[p]
 		if card.hazard == "" and not card.cursed and not card.washed \
-				and card.objective == "" and not card.is_safe and card.boss == "":
+				and card.objective == "" and not card.is_safe and not card.hazard_proof() and card.boss == "":
 			candidates.append(p)
 	if candidates.is_empty():
 		return
@@ -2366,7 +2384,8 @@ func apply_room_hazards(kind: String, count: int) -> void:
 		# be cleared the normal way, so a bomb there is a rigged loss.
 		if card.hazard == "" and not card.cursed and not card.washed \
 				and card.boss == "" and not card.is_safe \
-				and not card.snake_tail and card.objective == "":
+				and not card.snake_tail and card.objective == "" \
+				and not card.hazard_proof():
 			candidates.append(card)
 	candidates.shuffle()
 	for i in mini(count, candidates.size()):
@@ -2433,8 +2452,8 @@ func wind_line_cells(from: Vector2i, dir: Vector2i) -> Array:
 	var out: Array = []
 	var p := from + dir
 	while p.x >= 0 and p.x < cols and p.y >= 0 and p.y < rows:
-		# Safes are too heavy for the wind — the gust blows around them.
-		if grid.has(p) and not grid[p].is_safe:
+		# Safes and metal are too heavy for the wind: it blows around them.
+		if grid.has(p) and not grid[p].is_safe and not grid[p].hazard_proof():
 			out.append(p)
 		p += dir
 	return out
@@ -2571,7 +2590,8 @@ func _victim_ok(q: Vector2i) -> bool:
 	# A damp card won't catch fire, and pours don't restart it either.
 	return c.hazard == "" and not c.cursed and not c.washed \
 			and c.boss == "" and not c.is_safe and not c.snake_tail \
-			and c.objective == "" and c.water_level == 0
+			and c.objective == "" and c.water_level == 0 \
+			and not c.hazard_proof()
 
 
 ## Points every fire/water card's next strike at a neighbor it can

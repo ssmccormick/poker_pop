@@ -108,6 +108,33 @@ func _run() -> void:
 	failures += _check(trail.gambler_ability == "sleeve",
 			"the run save carries the Gambler's trick")
 
+	# --- METAL scores but stays on the table -----------------------------
+	await _enter_room("the_machine")
+	var pair2 := _plain_neighbors()
+	if pair2.is_empty():
+		failures += _check(false, "found two plain neighbors for the metal test")
+	else:
+		var steel: PlayingCard = pair2[0]
+		var mate: PlayingCard = pair2[1]
+		mate.rank = steel.rank
+		mate.mod = ""
+		steel.mod = ""
+		steel.finish = "metal"
+		var steel_pos: Vector2i = steel.grid_pos
+		var mate_pos: Vector2i = mate.grid_pos
+		var score_before: int = main.score
+		main.board.selected.assign([steel, mate])
+		steel.selected = true
+		mate.selected = true
+		main.board._update_hand_validity()
+		await main.board.play_hand()
+		await _settle()
+		failures += _check(main.score > score_before, "the pair with a metal card scored")
+		failures += _check(main.board.grid.get(steel_pos) == steel and is_instance_valid(steel),
+				"the metal card stays in its cell after scoring")
+		failures += _check(main.board.grid.get(mate_pos) != mate,
+				"its plain partner cleared as usual")
+
 	# --- A Prism finish rides through the run save ---------------------
 	trail.deck[0]["mod"] = "chip"
 	trail.deck[0]["finish"] = "prism"

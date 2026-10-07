@@ -137,6 +137,39 @@ func _init() -> void:
 			"a wind that just landed holds its breath for a round")
 	_free_board(b)
 
+	# --- METAL shrugs off every hazard ------------------------------------
+	b = _board([[5, 0, 0, 0], [6, 1, 1, 0], [7, 2, 2, 0]])
+	b.grid[Vector2i(0, 0)].finish = "metal"
+	b.grid[Vector2i(1, 0)].finish = "metal"
+	b.apply_room_hazards("bomb", 3)
+	failures += _check(b.grid[Vector2i(0, 0)].hazard == ""
+			and b.grid[Vector2i(1, 0)].hazard == ""
+			and b.grid[Vector2i(2, 0)].hazard == "bomb",
+			"seeded hazards never land on metal")
+	_free_board(b)
+	b = _board([[5, 0, 0, 0], [6, 1, 1, 0]])
+	b.grid[Vector2i(0, 0)].hazard = "fire"
+	b.grid[Vector2i(1, 0)].finish = "metal"
+	b._tick_fire_and_bombs()
+	failures += _check(b.grid[Vector2i(1, 0)].hazard == "",
+			"fire can't spread onto metal")
+	_free_board(b)
+	b = _board([[5, 0, 0, 0], [6, 1, 1, 0]])
+	b.grid[Vector2i(0, 0)].hazard = "water"
+	b.grid[Vector2i(0, 0)].water_level = 4
+	b.grid[Vector2i(0, 0)].washed = true
+	b.grid[Vector2i(1, 0)].finish = "metal"
+	b._tick_fire_and_bombs()
+	failures += _check(b.grid[Vector2i(1, 0)].hazard == ""
+			and b.grid[Vector2i(1, 0)].water_level == 0,
+			"a pour can't flood metal")
+	_free_board(b)
+	b = _board([[5, 0, 0, 0], [7, 1, 1, 0], [9, 2, 2, 0]])
+	b.grid[Vector2i(1, 0)].finish = "metal"
+	line = b.wind_line_cells(Vector2i(0, 0), Vector2i.RIGHT)
+	failures += _check(line == [Vector2i(2, 0)], "the wind blows around metal")
+	_free_board(b)
+
 	# --- bomb fuse ---------------------------------------------------------
 	b = _board([[5, 0, 0, 0], [6, 1, 1, 0]])
 	b.grid[Vector2i(0, 0)].hazard = "bomb"

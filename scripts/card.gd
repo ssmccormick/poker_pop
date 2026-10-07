@@ -251,6 +251,8 @@ var mod := "":
 const FINISHES := {
 	"prism": {"name": "PRISM",
 			"desc": "Clearing it spreads its enhancement to every neighbor."},
+	"metal": {"name": "METAL",
+			"desc": "Stays on the table when scored, and no hazard can touch it."},
 }
 var finish := "":
 	set(value):
@@ -465,11 +467,63 @@ static func finish_of(d: Dictionary) -> String:
 	return ""
 
 
+## METAL shrugs off every hazard: no fire, flood, wind, bomb or stone
+## can land on it, and no job piece rides it.
+func hazard_proof() -> bool:
+	return finish == "metal"
+
+
 ## The finish layer over the whole face. One branch per finish.
 func _draw_finish(rect: Rect2) -> void:
 	match finish:
 		"prism":
 			_draw_prism(rect)
+		"metal":
+			_draw_metal(rect)
+
+
+## METAL: brushed steel. A cool steel tint darkening toward the foot,
+## fine brushed grain, a beveled plate edge, and a slow white glint
+## that slides across now and then.
+func _draw_metal(rect: Rect2) -> void:
+	var r := rect.grow(-3.0)
+	var card_poly := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y),
+			r.end, Vector2(r.position.x, r.end.y)])
+	var top := Color(0.86, 0.9, 0.95, 0.34)
+	var foot := Color(0.42, 0.47, 0.54, 0.34)
+	draw_polygon(card_poly, PackedColorArray([top, top, foot, foot]))
+	# Brushed grain: hairlines, alternately light and dark.
+	var y := r.position.y + 2.0
+	var k := 0
+	while y < r.end.y:
+		var grain := Color(1, 1, 1, 0.07) if k % 2 == 0 else Color(0, 0, 0, 0.05)
+		draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), grain, 1.0)
+		y += 3.0
+		k += 1
+	# Beveled plate: lit top-left edge, shadowed bottom-right edge.
+	var b := r.grow(-1.0)
+	var lit := Color(1, 1, 1, 0.45)
+	var shade := Color(0.1, 0.12, 0.15, 0.45)
+	draw_line(b.position, Vector2(b.end.x, b.position.y), lit, 2.0)
+	draw_line(b.position, Vector2(b.position.x, b.end.y), lit, 2.0)
+	draw_line(Vector2(b.position.x, b.end.y), b.end, shade, 2.0)
+	draw_line(Vector2(b.end.x, b.position.y), b.end, shade, 2.0)
+	# The glint: travels for 40% of a slow cycle, then rests.
+	var cycle := fposmod(_t / 3.6 + _phase / TAU, 1.0)
+	if cycle < 0.4:
+		var travel := cycle / 0.4
+		var lean := r.size.y * 0.35
+		var stripes := 5
+		var sw := 3.0
+		var x0 := lerpf(r.position.x - stripes * sw, r.end.x + lean, travel)
+		for i in stripes:
+			var x := x0 + i * sw
+			var band := PackedVector2Array([Vector2(x, r.position.y),
+					Vector2(x + sw, r.position.y), Vector2(x + sw - lean, r.end.y),
+					Vector2(x - lean, r.end.y)])
+			var shine := Color(1, 1, 1, 0.5 * sin(travel * PI) * sin(PI * (i + 0.5) / stripes))
+			for piece in Geometry2D.intersect_polygons(band, card_poly):
+				draw_colored_polygon(piece, shine)
 
 
 ## PRISM: a foil sheen. A faint iridescent wash whose hues drift
