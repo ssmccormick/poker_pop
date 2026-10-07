@@ -325,7 +325,7 @@ overlay and a hover panel explaining the hovered card.
 | Minus card | Mirror of Plus: the aimed card drops −1 rank — and a 2 ground lower is DESTROYED, removed from the table unscored. Sculpt a King down to match your Queens, or grind junk to nothing |
 | Bumper card | When cleared, shoves the contiguous line of cards beside it one step along its arrow (turns each hand) — the push lands FIRST, while the bumper still sits on the felt, then the scored cards pop and the board settles. A gap absorbs the push; safes and cobra coils block it; a card pushed past the edge is removed unscored. The Jack and Queen ride the shove like anyone else: off the edge costs the boss one life (a Queen stripe, or 1,000 of the Jack's score pool), and he storms back onto the vacated cell |
 | Wild card | Counts as ANY rank and suit; the evaluator takes the best assignment. The rarest roll (~3%) |
-| EXPLOSIVE (rider) | Not a mod — a rare extra (~15%) on ANY enhanced card. When cleared, the card spreads its own mod to every adjacent (8-way) unmodified card. Old "Chip Explosion" = Chip + Explosive |
+| PRISM (finish) | Not a mod: the first FINISH, a rare extra (~15%) on ANY enhanced card. Finishes are their own layer (card.finish, PlayingCard.FINISHES), drawn as a shimmer over the whole face like a foil edition: an iridescent wash with a rainbow sheen sweeping across. When cleared, a Prism card spreads its own mod to every adjacent (8-way) unmodified card. It replaced the Explosive rider; old saves (boom flag, "chipsplode") load as Prism |
 
 Enhanced cards wear their power as their identity: a full-face color
 wash + frame in the mod's color, and the mod's emblem drawn LARGE in
@@ -333,7 +333,7 @@ the center where the suit pip normally sits (suit stays readable in
 the corner). Gold cards are solid gold head to toe.
 
 Roll weights: Mult 26% · Chip 26% · Plus 14% · Minus 10% · Bumper 11%
-· Gold 10% · Wild 3%, with the Explosive rider rolled separately.
+· Gold 10% · Wild 3%, with the Prism finish rolled separately.
 
 ## Relic system (SHIPPED — all 17 below are in)
 

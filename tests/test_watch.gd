@@ -27,7 +27,7 @@ func _init() -> void:
 	var bomb: PlayingCard = board.grid[Vector2i(1, 1)]
 	bomb.hazard = "bomb"
 	bomb.fuse = 3
-	board.deck = [{"rank": 5, "suit": 2, "cursed": false, "mod": "", "boom": false}]
+	board.deck = [{"rank": 5, "suit": 2, "cursed": false, "mod": "", "finish": ""}]
 	board.jack_bar = 123
 	board.undo_enabled = true
 	board.snapshot_state()

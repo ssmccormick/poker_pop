@@ -233,7 +233,7 @@ var provisions: Array = []       # provision ids in the kit (max 3, dupes fine)
 var _aiming_slot := -1           # kit slot waiting on a target, -1 = none
 # ACE UP THE SLEEVE: the hidden card you can trade onto the table once
 # per room — the card you take waits up the sleeve for another table.
-var sleeve_card := {}            # {rank, suit, mod, boom, joker}
+var sleeve_card := {}            # {rank, suit, mod, finish, joker}
 var sleeve_used := false         # one swap per table (the Gambler)
 # --- Playable characters: three riders, one signature ability each.
 const CHARACTERS := {
@@ -428,20 +428,20 @@ func _save_run() -> void:
 	var suits := PackedInt32Array()
 	var curses := PackedInt32Array()
 	var mods := PackedStringArray()
-	var booms := PackedInt32Array()
+	var finishes := PackedStringArray()
 	var chip_lvs := PackedInt32Array()
 	for c in deck:
 		ranks.append(c.rank)
 		suits.append(c.suit)
 		curses.append(1 if c.get("cursed", false) else 0)
 		mods.append(c.get("mod", ""))
-		booms.append(1 if c.get("boom", false) else 0)
+		finishes.append(PlayingCard.finish_of(c))
 		chip_lvs.append(int(c.get("chip_lv", 0)))
 	cf.set_value("run", "ranks", ranks)
 	cf.set_value("run", "suits", suits)
 	cf.set_value("run", "curses", curses)
 	cf.set_value("run", "mods", mods)
-	cf.set_value("run", "booms", booms)
+	cf.set_value("run", "finishes", finishes)
 	cf.set_value("run", "chip_lvs", chip_lvs)
 	var relic_arr := PackedStringArray()
 	for id in relics:
@@ -495,7 +495,8 @@ func _load_run() -> bool:
 	var suits: PackedInt32Array = cf.get_value("run", "suits", PackedInt32Array())
 	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
 	var mods: PackedStringArray = cf.get_value("run", "mods", PackedStringArray())
-	var booms: PackedInt32Array = cf.get_value("run", "booms", PackedInt32Array())
+	var booms: PackedInt32Array = cf.get_value("run", "booms", PackedInt32Array())  # pre-Prism saves
+	var finishes: PackedStringArray = cf.get_value("run", "finishes", PackedStringArray())
 	var chip_lvs: PackedInt32Array = cf.get_value("run", "chip_lvs", PackedInt32Array())
 	deck.clear()
 	for i in ranks.size():
@@ -503,8 +504,9 @@ func _load_run() -> bool:
 		deck.append({"rank": ranks[i], "suit": suits[i],
 				"cursed": curses[i] == 1,
 				"mod": Board.migrate_mod(raw_mod),
-				"boom": (i < booms.size() and booms[i] == 1)
-						or raw_mod == "chipsplode",
+				"finish": finishes[i] if i < finishes.size()
+						else ("prism" if (i < booms.size() and booms[i] == 1)
+						or raw_mod == "chipsplode" else ""),
 				"chip_lv": chip_lvs[i] if i < chip_lvs.size() else 0})
 	relics.clear()
 	for id in cf.get_value("run", "relics", PackedStringArray()):
@@ -603,7 +605,7 @@ const SUIT_CHARS := ["♠", "♥", "♦", "♣"]
 ## A new run's sleeve: the meta-upgraded rank, in a random suit.
 func _fresh_sleeve() -> Dictionary:
 	return {"rank": sleeve_rank, "suit": randi_range(0, 3),
-			"mod": "", "boom": false, "joker": false}
+			"mod": "", "finish": "", "joker": false}
 
 
 ## "A♥"-style label for whatever is up the sleeve right now.
@@ -663,12 +665,12 @@ func _sleeve_refusal(card: PlayingCard) -> String:
 ## place. What you took rides along to the next table.
 func _do_sleeve_swap(card: PlayingCard) -> void:
 	var taken := {"rank": card.rank, "suit": card.suit, "mod": card.mod,
-			"boom": card.boom, "joker": card.joker,
+			"finish": card.finish, "joker": card.joker,
 			"chip_lv": card.chip_level}
 	card.rank = int(sleeve_card.rank)
 	card.suit = int(sleeve_card.suit)
 	card.mod = String(sleeve_card.get("mod", ""))
-	card.boom = bool(sleeve_card.get("boom", false))
+	card.finish = PlayingCard.finish_of(sleeve_card)
 	card.joker = bool(sleeve_card.get("joker", sleeve_card.get("two_plus", false)))
 	card.chip_level = int(sleeve_card.get("chip_lv", 0))
 	if card.mod in ["plus", "minus", "bumper"]:
@@ -1233,25 +1235,25 @@ func _random_mod() -> String:
 	return "wild"
 
 
-## The EXPLOSION rider: a rare extra on any enhanced card.
-const BOOM_CHANCE := 0.15
+## The PRISM finish: a rare extra on any enhanced card.
+const PRISM_CHANCE := 0.15
 
 
 func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 	var mod := ""
-	var boom := false
+	var finish := ""
 	if randf() < mod_chance:
 		mod = _random_mod()
-		boom = randf() < BOOM_CHANCE
+		finish = "prism" if randf() < PRISM_CHANCE else ""
 	# Half the time, offer an exact duplicate of a card already owned
 	# (the Five of a Kind / Flushed Five enabler).
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
 		if not src.get("cursed", false):
 			return {"rank": src.rank, "suit": src.suit, "cursed": false,
-					"mod": mod, "boom": boom}
+					"mod": mod, "finish": finish}
 	return {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-			"cursed": false, "mod": mod, "boom": boom}
+			"cursed": false, "mod": mod, "finish": finish}
 
 
 # --- Flow: entry ----------------------------------------------------------
@@ -2876,7 +2878,7 @@ func _open_chest() -> void:
 	elif roll < 0.80:
 		# No loose cash on the trail — the chest holds a GOLD card.
 		var gold := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
-				"cursed": false, "mod": "gold", "boom": false}
+				"cursed": false, "mod": "gold", "finish": ""}
 		deck.append(gold)
 		_chest_won_cards.append(gold)
 		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.2, -8.0)
@@ -2891,7 +2893,7 @@ func _open_chest() -> void:
 	else:
 		var enhanced := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": _random_mod(),
-				"boom": randf() < BOOM_CHANCE}
+				"finish": "prism" if randf() < PRISM_CHANCE else ""}
 		deck.append(enhanced)
 		_chest_won_cards.append(enhanced)
 		main.board._play_sound(Board.SFX_FLIP, 1.3, -8.0)
@@ -3585,7 +3587,7 @@ func _show_pick_now() -> void:
 		pc.rank = card_data.rank
 		pc.suit = card_data.suit
 		pc.mod = card_data.get("mod", "")
-		pc.boom = card_data.get("boom", false)
+		pc.finish = PlayingCard.finish_of(card_data)
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.6, 1.6)
 		pc.position = Vector2(85, 120)
@@ -3688,7 +3690,7 @@ func _render_win_ledger() -> void:
 			pc.rank = int(d.rank)
 			pc.suit = int(d.suit)
 			pc.mod = Board.migrate_mod(String(d.get("mod", "")))
-			pc.boom = bool(d.get("boom", false))
+			pc.finish = PlayingCard.finish_of(d)
 			pc.material = Themes.current_material()
 			pc.scale = Vector2(0.95, 0.95)
 			pc.position = Vector2(62 + i * 100, plate_h + 116)
@@ -3704,7 +3706,7 @@ func _shop_card_offer() -> Dictionary:
 	if randf() < SHOP_MOD_CHANCE:
 		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
 				"cursed": false, "mod": _random_mod(),
-				"boom": randf() < BOOM_CHANCE},
+				"finish": "prism" if randf() < PRISM_CHANCE else ""},
 				"base": SHOP_MOD_PRICE}
 	if randf() < 0.5 and not deck.is_empty():
 		var src: Dictionary = deck.pick_random()
@@ -3815,7 +3817,7 @@ func _show_shop() -> void:
 		pc.rank = offer.data.rank
 		pc.suit = offer.data.suit
 		pc.mod = offer.data.mod
-		pc.boom = offer.data.get("boom", false)
+		pc.finish = PlayingCard.finish_of(offer.data)
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(1.3, 1.3)
 		pc.position = Vector2(85, 95)
@@ -4089,7 +4091,7 @@ func _camp_pick(idx: int) -> void:
 			_remove_info.text = "THE FIRE WON'T TAKE A CURSE — cast it off instead."
 			_remove_info.add_theme_color_override("font_color", main.RED)
 			return
-		if String(d.get("mod", "")) != "" or d.get("boom", false):
+		if String(d.get("mod", "")) != "" or PlayingCard.finish_of(d) != "":
 			_remove_info.text = "ALREADY ENHANCED — pick an honest card."
 			_remove_info.add_theme_color_override("font_color", main.RED)
 			return
@@ -4143,7 +4145,7 @@ func _populate_deck_view() -> void:
 		pc.suit = card_data.suit
 		pc.cursed = card_data.get("cursed", false)
 		pc.mod = card_data.get("mod", "")
-		pc.boom = card_data.get("boom", false)
+		pc.finish = PlayingCard.finish_of(card_data)
 		pc.chip_level = int(card_data.get("chip_lv", 0))
 		pc.material = Themes.current_material()
 		pc.position = Vector2(50, 70)
@@ -4216,8 +4218,9 @@ func _deck_stat_text(d: Dictionary) -> String:
 			text += "WILD\nCounts as ANY rank and suit — the best possible hand wins. The rarest card on the trail."
 		_:
 			text += "No enhancement.\nHonest cardboard."
-	if d.get("boom", false):
-		text += "\n\nEXPLOSIVE\nWhen cleared, it spreads its enhancement to every adjacent card."
+	var fin := PlayingCard.finish_of(d)
+	if fin != "":
+		text += "\n\n%s\n%s" % [PlayingCard.FINISHES[fin].name, PlayingCard.FINISHES[fin].desc]
 	return text
 
 

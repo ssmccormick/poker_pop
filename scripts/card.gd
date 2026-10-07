@@ -245,11 +245,17 @@ var mod := "":
 	set(value):
 		mod = value
 		queue_redraw()
-# The EXPLOSION rider: clearing this card spreads its mod to every
-# adjacent card. Rides on top of any mod (chip, gold, plus...).
-var boom := false:
+# FINISHES ride over a card's whole face, like Balatro's editions:
+# a shimmer you can read at a glance, separate from the enhancement.
+# "" is none. Each finish also changes how the card plays.
+const FINISHES := {
+	"prism": {"name": "PRISM",
+			"desc": "Clearing it spreads its enhancement to every neighbor."},
+}
+var finish := "":
 	set(value):
-		boom = value
+		finish = value if FINISHES.has(value) else ""
+		_update_processing()
 		queue_redraw()
 # Chip cards SEASON with use: +1 every time this deck card scores,
 # and the payout grows a full base step per level.
@@ -318,7 +324,7 @@ var _phase := randf() * TAU
 
 
 func _process(delta: float) -> void:
-	if hazard == "" and incoming == "":
+	if hazard == "" and incoming == "" and finish == "":
 		set_process(false)
 		return
 	_t += delta
@@ -329,7 +335,7 @@ func _process(delta: float) -> void:
 ## (stone sits still) or an incoming-strike preview.
 func _update_processing() -> void:
 	set_process((hazard != "" and hazard != "stone") or incoming != ""
-			or water_level > 0 or washed)
+			or water_level > 0 or washed or finish != "")
 
 
 ## Fire, bombs, water and wind smoulder, spark, drip, or swirl
@@ -446,6 +452,68 @@ static func _make_boxes() -> void:
 	_hover_glow.border_color = Color(GOLD.r, GOLD.g, GOLD.b, 0.35)
 	_hover_glow.set_border_width_all(4)
 	_hover_glow.set_corner_radius_all(9)
+
+
+## A deck entry's finish, reading saves from before finishes existed
+## (the old Explosive flag and its even older "chipsplode" mod).
+static func finish_of(d: Dictionary) -> String:
+	var f := String(d.get("finish", ""))
+	if FINISHES.has(f):
+		return f
+	if bool(d.get("boom", false)) or String(d.get("mod", "")) == "chipsplode":
+		return "prism"
+	return ""
+
+
+## The finish layer over the whole face. One branch per finish.
+func _draw_finish(rect: Rect2) -> void:
+	match finish:
+		"prism":
+			_draw_prism(rect)
+
+
+## PRISM: a foil sheen. A faint iridescent wash whose hues drift
+## across the card, a rainbow band that sweeps corner to corner and
+## rests, and two glints that twinkle in turn.
+func _draw_prism(rect: Rect2) -> void:
+	var r := rect.grow(-3.0)
+	var card_poly := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y),
+			r.end, Vector2(r.position.x, r.end.y)])
+	var hue := fposmod(_t * 0.12 + _phase / TAU, 1.0)
+	var wash := PackedColorArray()
+	for k in 4:
+		wash.append(Color.from_hsv(fposmod(hue + k * 0.22, 1.0), 0.6, 1.0, 0.2))
+	draw_polygon(card_poly, wash)
+	# The sweep travels for the first 75% of its cycle, then rests.
+	var cycle := fposmod(_t / 2.4 + _phase / TAU, 1.0)
+	if cycle < 0.75:
+		var travel := cycle / 0.75
+		var lean := r.size.y * 0.5
+		var stripes := 9
+		var sw := 3.5
+		var start := r.position.x - stripes * sw
+		var x0 := lerpf(start, r.end.x + lean, travel)
+		var fade := sin(travel * PI)
+		for k in stripes:
+			var x := x0 + k * sw
+			var band := PackedVector2Array([Vector2(x, r.position.y),
+					Vector2(x + sw, r.position.y), Vector2(x + sw - lean, r.end.y),
+					Vector2(x - lean, r.end.y)])
+			# Soft edges: the middle of the band shines brightest.
+			var edge := sin(PI * (k + 0.5) / stripes)
+			var col := Color.from_hsv(fposmod(float(k) / stripes + hue, 1.0),
+					0.5, 1.0, 0.42 * fade * edge)
+			for piece in Geometry2D.intersect_polygons(band, card_poly):
+				draw_colored_polygon(piece, col)
+	for k in 2:
+		var tw := sin(fposmod(_t * 0.7 + _phase + k * 0.5, 1.0) * PI)
+		if tw <= 0.05:
+			continue
+		var at := r.position + r.size * (Vector2(0.78, 0.2) if k == 0 else Vector2(0.22, 0.62))
+		var arm := 5.0 * tw
+		var glint := Color(1, 1, 1, 0.85 * tw)
+		draw_line(at - Vector2(arm, 0), at + Vector2(arm, 0), glint, 1.5)
+		draw_line(at - Vector2(0, arm * 1.4), at + Vector2(0, arm * 1.4), glint, 1.5)
 
 
 func rank_text() -> String:
@@ -598,6 +666,7 @@ func _draw() -> void:
 					HORIZONTAL_ALIGNMENT_CENTER, 48, 46, WILD_PURPLE)
 		else:
 			_draw_suit(Vector2(0, 6), 5.0)
+		_draw_finish(rect)
 
 	match hazard:
 		"bomb":
@@ -958,6 +1027,7 @@ func _draw_art(rect: Rect2) -> void:
 				"+%d" % (chip_pay_base * (1 + chip_level)),
 				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 12, GOLD)
 	_draw_art_rank_suit(rect)
+	_draw_finish(rect)
 
 	# Hazards ride over the face; the code's motion rides over the art.
 	match hazard:
@@ -1023,8 +1093,6 @@ func _draw_art(rect: Rect2) -> void:
 				WIND_BLUE)
 	if honey:
 		_art(rect, "special", "honey")
-	if boom and mod != "":
-		_art(rect, "rider", "explosive")
 	if eights_wild and rank == 8:
 		_art(rect, "rider", "wild8_badge")
 	if cursed:
@@ -1128,11 +1196,6 @@ func _draw_mod_art(font: Font) -> void:
 			draw_colored_polygon(PackedVector2Array([
 				btip + bv * 0.35, btip - bv * 0.2 + bperp * 8.0,
 				btip - bv * 0.2 - bperp * 8.0]), WIND_BLUE)
-	if boom:
-		# Explosion rider: rays around the emblem.
-		for k in 8:
-			var ray := Vector2.RIGHT.rotated(k * PI / 4.0 + PI / 8.0)
-			draw_line(c + ray * 28.0, c + ray * 35.0, FIRE_ORANGE, 3.0)
 
 
 ## Draws the suit pixel map centered on `center`, one pixel = `px`.

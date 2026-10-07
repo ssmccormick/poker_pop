@@ -108,6 +108,17 @@ func _run() -> void:
 	failures += _check(trail.gambler_ability == "sleeve",
 			"the run save carries the Gambler's trick")
 
+	# --- A Prism finish rides through the run save ---------------------
+	trail.deck[0]["mod"] = "chip"
+	trail.deck[0]["finish"] = "prism"
+	trail.deck[1]["finish"] = ""
+	trail._save_run()
+	trail.deck[0]["finish"] = ""
+	trail._load_run()
+	failures += _check(String(trail.deck[0].get("finish", "")) == "prism"
+			and String(trail.deck[1].get("finish", "")) == "",
+			"a Prism deck card keeps its finish across a save")
+
 	_cleanup()
 	if failures == 0:
 		print("ALL TRAIL TESTS PASSED")

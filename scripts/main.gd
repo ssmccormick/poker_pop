@@ -360,8 +360,8 @@ func _ready() -> void:
 				trail._win_rows = [["THE POT — 50 staked at 1.5 : 1", 125],
 						["TIN STAR", 10], ["3 HANDS TO SPARE", 36]]
 				trail._chest_won_cards = [
-					{"rank": 13, "suit": 1, "cursed": false, "mod": "gold", "boom": false},
-					{"rank": 7, "suit": 0, "cursed": false, "mod": "", "boom": false}]
+					{"rank": 13, "suit": 1, "cursed": false, "mod": "gold", "finish": ""},
+					{"rank": 7, "suit": 0, "cursed": false, "mod": "", "finish": ""}]
 				trail._show_pick()
 			"trailrelic":
 				menu_layer.visible = false
@@ -710,7 +710,7 @@ func _open_cardgrid() -> void:
 		["Gold", func(c: PlayingCard) -> void: c.mod = "gold"],
 		["Wild", func(c: PlayingCard) -> void: c.mod = "wild"],
 		["The Joker", func(c: PlayingCard) -> void: c.rank = 14; c.joker = true; c.mod = "wild"],
-		["Explosive mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.boom = true],
+		["Prism mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.finish = "prism"],
 		["Crazy 8 (wild)", func(c: PlayingCard) -> void: c.rank = 8],
 		["Fire on an Ace", func(c: PlayingCard) -> void: c.rank = 14; c.hazard = "fire"],
 		["Fire on a 2", func(c: PlayingCard) -> void: c.rank = 2; c.hazard = "fire"],
@@ -782,7 +782,7 @@ func _open_deck_peek() -> void:
 		pc.rank = int(d.rank)
 		pc.suit = int(d.suit)
 		pc.mod = Board.migrate_mod(String(d.get("mod", "")))
-		pc.boom = bool(d.get("boom", false))
+		pc.finish = PlayingCard.finish_of(d)
 		pc.cursed = bool(d.get("cursed", false))
 		pc.material = Themes.current_material()
 		pc.scale = Vector2(0.9, 0.9)
@@ -1611,8 +1611,9 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		lines.append("THE JOKER — one step above the Ace. Always WILD (any rank, any suit) and he DOUBLES every hand he scores in. A MINUS knocks him back down to a plain Ace.")
 	if card.incoming != "":
 		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
-	if card.boom:
-		lines.append("EXPLOSIVE — clearing it spreads its enhancement to every neighbor.")
+	if card.finish != "":
+		var fin: Dictionary = PlayingCard.FINISHES[card.finish]
+		lines.append("%s — %s" % [fin.name, fin.desc])
 	if card.objective == "key":
 		lines.append("THE KEY — get it and the chest into one scoring hand.")
 	elif card.objective == "chest":

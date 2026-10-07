@@ -182,6 +182,21 @@ func _init() -> void:
 		c.free()
 	b.free()
 
+	# --- Finishes: the Prism, and saves from the Explosive days -------
+	failures += _check(PlayingCard.finish_of({"finish": "prism"}) == "prism"
+			and PlayingCard.finish_of({"boom": true}) == "prism"
+			and PlayingCard.finish_of({"mod": "chipsplode"}) == "prism"
+			and PlayingCard.finish_of({"mod": "chip"}) == ""
+			and PlayingCard.finish_of({"finish": "nonsense"}) == "",
+			"old Explosive saves load as Prism; unknown finishes drop")
+	var shiny := PlayingCard.new()
+	shiny.finish = "foil?"
+	failures += _check(shiny.finish == "", "a card refuses an unknown finish")
+	shiny.finish = "prism"
+	failures += _check(shiny.finish == "prism" and shiny.is_processing(),
+			"a Prism card keeps animating its shimmer")
+	shiny.free()
+
 	# Old save ids map onto the current mod family.
 	failures += _check(Board.migrate_mod("cash") == "gold"
 			and Board.migrate_mod("boost") == "plus"

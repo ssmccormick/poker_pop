@@ -815,7 +815,7 @@ func play_hand() -> void:
 
 	# Partition: payload effects are snapshotted before cells change.
 	var poppers: Array = []
-	var boomers: Array = []   # {"cell", "mod"} — exploding mods spread
+	var prisms: Array = []    # {"cell", "mod"} — Prism finishes spread their mod
 	var arrows: Array = []    # {"cell", "dir", "mod"} — plus/minus aims
 	var bumps: Array = []     # {"cell", "dir"} — bumper shoves
 	var defeated_boss := false
@@ -846,8 +846,8 @@ func play_hand() -> void:
 			else:
 				_cobra_revert(card)
 			continue
-		if card.boom and card.mod != "":
-			boomers.append({"cell": card.grid_pos, "mod": card.mod})
+		if card.finish == "prism" and card.mod != "":
+			prisms.append({"cell": card.grid_pos, "mod": card.mod})
 		if card.mod in ["plus", "minus"]:
 			arrows.append({"cell": card.grid_pos, "dir": card.boost_dir,
 					"mod": card.mod})
@@ -988,7 +988,7 @@ func play_hand() -> void:
 	# Mod payloads land on whatever survived the pops. Explosions spread
 	# their mod through the neighborhood; plus/minus feed the card the
 	# arrow pointed at.
-	for bdata in boomers:
+	for bdata in prisms:
 		var spread := false
 		for dx in [-1, 0, 1]:
 			for dy in [-1, 0, 1]:
@@ -1344,7 +1344,7 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.cursed = data.get("cursed", false)
 			card.mod = migrate_mod(data.get("mod", ""))
 			card.chip_level = int(data.get("chip_lv", 0))
-			card.boom = data.get("boom", false) or data.get("mod", "") == "chipsplode"
+			card.finish = PlayingCard.finish_of(data)
 			if card.mod in ["plus", "minus", "bumper"]:
 				card.boost_dir = HAZARD_DIRS.pick_random()
 			# Danger off the deck: queued room hazards ride the deal
@@ -1733,7 +1733,7 @@ func provision_clean(card: PlayingCard) -> void:
 
 ## Every card property the watch must carry back. `hazard` sits
 ## before `fuse` so the fuse setter can place its ambient spark.
-const UNDO_CARD_PROPS := ["rank", "suit", "mod", "boom", "joker", "chip_level",
+const UNDO_CARD_PROPS := ["rank", "suit", "mod", "finish", "joker", "chip_level",
 		"cursed", "washed", "hazard", "hazard_fresh", "fuse", "stone_hits",
 		"water_level", "wind_dir", "next_dir", "boost_dir", "objective",
 		"bullet_timer", "is_safe", "combo_progress", "boss", "boss_hp",
@@ -1811,7 +1811,10 @@ func restore_state() -> bool:
 		var props: Dictionary = cards[p]
 		var card := PlayingCard.new()
 		for key in UNDO_CARD_PROPS:
-			card.set(key, props[key])
+			if props.has(key):
+				card.set(key, props[key])
+		if bool(props.get("boom", false)):
+			card.finish = "prism"  # snapshots from before the Prism
 		if card.joker:
 			# Saves from before the Joker moved above the Ace.
 			card.rank = 14
@@ -1999,7 +2002,7 @@ static func migrate_mod(mod: String) -> String:
 		"boost":
 			return "plus"
 		"chipsplode":
-			return "chip"  # the explosion itself lives on `boom` now
+			return "chip"  # the spread itself lives on the Prism finish now
 	return mod
 
 
