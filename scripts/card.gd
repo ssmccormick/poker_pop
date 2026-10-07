@@ -416,6 +416,11 @@ func _face_xform() -> Transform2D:
 func _draw_tilt_sheen(rect: Rect2) -> void:
 	if _hover_amt <= 0.01:
 		return
+	var glare := CardArt.tex("fx", "card_glare")
+	if glare != null:
+		# The kit's soft highlight rides with the cursor.
+		_draw_clipped(glare, rect, _tilt * rect.size * 0.5, Color(1, 1, 1, 0.5 * _hover_amt))
+		return
 	var r := rect.grow(-2.0)
 	var card_poly := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y),
 			r.end, Vector2(r.position.x, r.end.y)])
@@ -596,8 +601,12 @@ func wear_metal() -> bool:
 	return metal_wear < METAL_PLAYS
 
 
+## A pin's centre: the kit puts them 38 px in from each corner of the
+## 500×700 canvas.
 func _pin_pos(corner: Vector2) -> Vector2:
-	var r := Rect2(-W / 2.0, -H / 2.0, W, H).grow(-9.0)
+	var inset := Vector2(38.0 / 500.0 * W, 38.0 / 700.0 * H)
+	var r := Rect2(-W / 2.0, -H / 2.0, W, H).grow_individual(-inset.x, -inset.y,
+			-inset.x, -inset.y)
 	return r.position + r.size * corner
 
 
@@ -605,12 +614,21 @@ func _pin_pos(corner: Vector2) -> Vector2:
 func _pop_pin(i: int) -> void:
 	var corner: Vector2 = PIN_ORDER[i % PIN_ORDER.size()]
 	var at := _pin_pos(corner)
-	var pin := Polygon2D.new()
-	var pts := PackedVector2Array()
-	for k in 10:
-		pts.append(Vector2.RIGHT.rotated(TAU * k / 10.0) * 3.6)
-	pin.polygon = pts
-	pin.color = Color(0.88, 0.91, 0.95)
+	var pin: Node2D
+	var pin_tex := CardArt.tex("finish", "metal_pin")
+	if pin_tex != null:
+		var spr := Sprite2D.new()
+		spr.texture = pin_tex
+		spr.scale = Vector2.ONE * (W / 500.0)
+		pin = spr
+	else:
+		var poly := Polygon2D.new()
+		var pts := PackedVector2Array()
+		for k in 10:
+			pts.append(Vector2.RIGHT.rotated(TAU * k / 10.0) * 3.6)
+		poly.polygon = pts
+		poly.color = Color(0.88, 0.91, 0.95)
+		pin = poly
 	pin.position = at
 	pin.z_index = 5
 	add_child(pin)
@@ -626,6 +644,29 @@ func _pop_pin(i: int) -> void:
 ## The last pin is out: the steel plate lifts off and tumbles away,
 ## leaving the plain card underneath.
 func _pop_cover() -> void:
+	var lift_1 := CardArt.tex("finish", "metal_lift_1")
+	if lift_1 != null:
+		# The kit's three lift frames (700×900, card centred), 60 ms
+		# apiece, then the plate drops away.
+		var spr := Sprite2D.new()
+		spr.texture = lift_1
+		spr.scale = Vector2.ONE * (W / 500.0)
+		spr.z_index = 6
+		add_child(spr)
+		var tw := spr.create_tween()
+		for f in [2, 3]:
+			tw.tween_interval(0.06)
+			var frame := CardArt.tex("finish", "metal_lift_%d" % f)
+			tw.tween_callback(func() -> void:
+				if frame != null:
+					spr.texture = frame)
+		tw.tween_interval(0.06)
+		tw.set_parallel(true)
+		tw.tween_property(spr, "position", Vector2(0, -24), 0.18) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(spr, "modulate:a", 0.0, 0.18)
+		tw.chain().tween_callback(spr.queue_free)
+		return
 	var r := Rect2(-W / 2.0, -H / 2.0, W, H).grow(-3.0)
 	var cover := Polygon2D.new()
 	cover.polygon = PackedVector2Array([r.position, Vector2(r.end.x, r.position.y),
@@ -649,10 +690,76 @@ func _pop_cover() -> void:
 func _draw_finish(rect: Rect2) -> void:
 	match finish:
 		"prism":
-			_draw_prism(rect)
+			if CardArt.tex("finish", "prism_foil") != null:
+				_draw_prism_art(rect)
+			else:
+				_draw_prism(rect)
 		"metal":
-			if metal_covered():
+			if not metal_covered():
+				return
+			if CardArt.tex("finish", "metal_plate") != null:
+				_draw_metal_art(rect)
+			else:
 				_draw_metal(rect)
+
+
+## Draws `t` as if laid over the card at `off` (card units), clipped
+## to the card rect: the kit's sliding bands stay on the card.
+func _draw_clipped(t: Texture2D, rect: Rect2, off: Vector2, tint: Color) -> void:
+	var placed := Rect2(rect.position + off, rect.size)
+	var inter := placed.intersection(rect)
+	if inter.size.x <= 0.5 or inter.size.y <= 0.5:
+		return
+	var px := Vector2(t.get_size()) / rect.size
+	draw_texture_rect_region(t, inter,
+			Rect2((inter.position - placed.position) * px, inter.size * px), tint)
+
+
+## PRISM from the kit: the static foil, the rainbow sheen sliding down
+## the diagonal (1.8 s, then a 1.2 s rest), and two star glints that
+## pop up at fresh spots, swell and fade over 0.6 s.
+func _draw_prism_art(rect: Rect2) -> void:
+	_art(rect, "finish", "prism_foil")
+	var sheen := CardArt.tex("finish", "prism_sheen")
+	var cycle := fposmod(_t + _phase, 3.0)
+	if sheen != null and cycle < 1.8:
+		var f := cycle / 1.8
+		_draw_clipped(sheen, rect, Vector2(lerpf(-1.0, 1.0, f), lerpf(-1.0, 1.0, f)) * rect.size,
+				Color(1, 1, 1, 0.6))
+	var glint := CardArt.tex("finish", "prism_glint")
+	if glint == null:
+		return
+	for k in 2:
+		var span := fposmod(_t * 0.8 + _phase + k * 0.5, 1.0) * 1.25
+		if span > 0.6:
+			continue  # resting between twinkles
+		var n := floorf(_t * 0.8 + _phase + k * 0.5) * 2.0 + k
+		var spot := Vector2(fposmod(sin(n * 12.9898) * 43758.5453, 1.0),
+				fposmod(sin(n * 78.233) * 12543.1, 1.0))
+		var at := rect.position + rect.size * (Vector2(0.18, 0.15) + spot * Vector2(0.64, 0.7))
+		var size := (64.0 / 500.0) * rect.size.x * sin(span / 0.6 * PI)
+		draw_set_transform_matrix(_face_xform() * Transform2D(PI / 4.0, at))
+		draw_texture_rect(glint, Rect2(-Vector2.ONE * size / 2.0, Vector2.ONE * size), false)
+	draw_set_transform_matrix(_face_xform())
+
+
+## METAL from the kit: the windowed steel plate, a pin or an empty
+## socket at each corner, and the glint band sliding slowly across.
+func _draw_metal_art(rect: Rect2) -> void:
+	_art(rect, "finish", "metal_plate")
+	var pin := CardArt.tex("finish", "metal_pin")
+	var hole := CardArt.tex("finish", "metal_pin_hole")
+	var pin_size := Vector2.ONE * (48.0 / 500.0) * rect.size.x
+	for i in METAL_PINS:
+		var t: Texture2D = pin if i >= metal_wear else hole
+		if t != null:
+			draw_texture_rect(t, Rect2(_pin_pos(PIN_ORDER[i]) - pin_size / 2.0, pin_size), false)
+	var glint := CardArt.tex("finish", "metal_glint")
+	var cycle := fposmod(_t / 3.6 + _phase / TAU, 1.0)
+	if glint != null and cycle < 0.4:
+		var f := cycle / 0.4
+		_draw_clipped(glint, rect, Vector2(lerpf(-1.0, 1.0, f) * rect.size.x, 0.0),
+				Color(1, 1, 1, sin(f * PI)))
 
 
 ## METAL: brushed steel. A cool steel tint darkening toward the foot,
@@ -790,10 +897,17 @@ func _draw() -> void:
 	var near_off := Vector2(4, 7) if selected else Vector2(2, 4)
 	far_off -= _tilt * Vector2(4, 3)
 	near_off -= _tilt * Vector2(2, 1.5)
-	_shadow_far.draw(get_canvas_item(),
-			Rect2(rect.position + far_off, rect.size).grow(2))
-	_shadow_near.draw(get_canvas_item(),
-			Rect2(rect.position + near_off, rect.size))
+	var soft := CardArt.tex("fx", "card_shadow_soft")
+	if soft != null:
+		# The kit's soft shadow: 600×800 with the card at (50, 50).
+		var k := rect.size.x / 500.0
+		draw_texture_rect(soft, Rect2(rect.position - Vector2(50, 50) * k + far_off,
+				Vector2(600, 800) * k), false)
+	else:
+		_shadow_far.draw(get_canvas_item(),
+				Rect2(rect.position + far_off, rect.size).grow(2))
+		_shadow_near.draw(get_canvas_item(),
+				Rect2(rect.position + near_off, rect.size))
 	# The face rides the selection lift and the hover lean.
 	draw_set_transform_matrix(_face_xform())
 	if CardArt.available():
@@ -1217,51 +1331,67 @@ func _draw_art(rect: Rect2) -> void:
 		_draw_art_chain_badge(font)
 		_draw_art_rings(rect)
 		return
-	var mod_key := mod
-	# THE JOKER wears the lucky wash and frame as his own suit, with
-	# whatever enhancement he's holding THIS hand as his badge.
-	var skin := "lucky" if joker else mod_key
-	if skin != "":
-		_art(rect, "mod_wash", skin)
-		_art(rect, "mod_frame", skin)
-	# The card's own face ALWAYS shows — pip or letter — so the suit
-	# reads clearly even enhanced; the emblem rides the free
-	# bottom-left corner as a badge on every card.
-	if joker:
-		# No suit and no letter: the Wild emblem holds center stage.
-		_art_badge(rect, "mod_emblem", "wild", Vector2(0.5, 0.47), 1.0)
-	elif rank == 14:
-		_draw_art_ace(rect)
-	elif rank >= 11:
-		_art(rect, "center", "face_%s_%s" % [CardArt.rank_name(rank),
-				CardArt.suit_name(suit)])
+	if joker and CardArt.tex("center", "face_joker") != null:
+		# THE JOKER's own stack: harlequin skin, the jester, his JKR
+		# index (no suit), any finish, then the ×2 badge on top.
+		_art(rect, "mod_wash", "joker")
+		_art(rect, "center", "face_joker")
+		_art(rect, "mod_frame", "joker")
+		_art(rect, "rank", "JKR")
+		_draw_finish(rect)
+		_art(rect, "rider", "joker_x2")
 	else:
-		_art(rect, "center", "pip_" + CardArt.suit_name(suit))
-	if mod_key != "" and not joker:
-		var emb_anchor := Vector2(0.24, 0.78)
-		if mod_key in ["plus", "minus", "bumper"]:
-			_art_badge(rect, "mod_emblem", mod_key + "_arrow_up", emb_anchor,
-					0.52, Color.WHITE, CardArt.arrow_rotation(boost_dir))
+		var mod_key := mod
+		# THE JOKER wears the lucky wash and frame as his own suit, with
+		# whatever enhancement he's holding THIS hand as his badge.
+		var skin := "lucky" if joker else mod_key
+		if skin != "":
+			_art(rect, "mod_wash", skin)
+			_art(rect, "mod_frame", skin)
+		# The card's own face ALWAYS shows — pip or letter — so the suit
+		# reads clearly even enhanced; the emblem rides the free
+		# bottom-left corner as a badge on every card.
+		if joker:
+			# No suit and no letter: the Wild emblem holds center stage.
+			_art_badge(rect, "mod_emblem", "wild", Vector2(0.5, 0.47), 1.0)
+		elif rank == 14:
+			_draw_art_ace(rect)
+		elif rank >= 11:
+			_art(rect, "center", "face_%s_%s" % [CardArt.rank_name(rank),
+					CardArt.suit_name(suit)])
 		else:
-			_art_badge(rect, "mod_emblem", mod_key, emb_anchor, 0.52)
-	if joker:
-		# A small nameplate, kept right of the corner badge.
-		var jfont: Font = FontLib.numbers if FontLib.numbers != null \
-				else ThemeDB.fallback_font
-		draw_string(jfont, Vector2(rect.position.x + rect.size.x * 0.36,
-				rect.end.y - 14.0), "JOKER  ×2",
-				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 11,
-				Color("2a4a2a"))
-	elif mod == "chip" and chip_level > 0:
-		# A seasoned chip wears its grown payout beside its badge.
-		var cfont: Font = FontLib.numbers if FontLib.numbers != null \
-				else ThemeDB.fallback_font
-		draw_string(cfont, Vector2(rect.position.x + rect.size.x * 0.36,
-				rect.end.y - 14.0),
-				"+%d" % (chip_pay_base * (1 + chip_level)),
-				HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 12, GOLD)
-	_draw_art_rank_suit(rect)
-	_draw_finish(rect)
+			_art(rect, "center", "pip_" + CardArt.suit_name(suit))
+		if mod_key != "" and not joker:
+			var emb_anchor := Vector2(0.24, 0.78)
+			var emb_scale := 0.52
+			if metal_covered() and CardArt.tex("finish", "metal_plate") != null:
+				# Under the steel plate the badge sits in the plate's round
+				# window (centre 92,612, radius 38 on the 500×700 canvas).
+				emb_anchor = Vector2(92.0 / 500.0, 612.0 / 700.0)
+				emb_scale = 0.4
+			if mod_key in ["plus", "minus", "bumper"]:
+				_art_badge(rect, "mod_emblem", mod_key + "_arrow_up", emb_anchor,
+						emb_scale, Color.WHITE, CardArt.arrow_rotation(boost_dir))
+			else:
+				_art_badge(rect, "mod_emblem", mod_key, emb_anchor, emb_scale)
+		if joker:
+			# A small nameplate, kept right of the corner badge.
+			var jfont: Font = FontLib.numbers if FontLib.numbers != null \
+					else ThemeDB.fallback_font
+			draw_string(jfont, Vector2(rect.position.x + rect.size.x * 0.36,
+					rect.end.y - 14.0), "JOKER  ×2",
+					HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 11,
+					Color("2a4a2a"))
+		elif mod == "chip" and chip_level > 0:
+			# A seasoned chip wears its grown payout beside its badge.
+			var cfont: Font = FontLib.numbers if FontLib.numbers != null \
+					else ThemeDB.fallback_font
+			draw_string(cfont, Vector2(rect.position.x + rect.size.x * 0.36,
+					rect.end.y - 14.0),
+					"+%d" % (chip_pay_base * (1 + chip_level)),
+					HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 12, GOLD)
+		_draw_art_rank_suit(rect)
+		_draw_finish(rect)
 
 	# Hazards ride over the face; the code's motion rides over the art.
 	match hazard:

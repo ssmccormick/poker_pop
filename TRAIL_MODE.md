@@ -683,6 +683,19 @@ the sleeve trade; SLEIGHT OF HAND swaps two side-by-side cards once
 per table, exactly like the Shell Game provision (bosses, safes and
 snake tails are too heavy).
 
+CARD KIT r3 (assets/art/cards, from Claude Design): the Joker's own
+stack (harlequin wash and frame, the jester face, a JKR index with no
+suit, a x2 rider); Prism (foil, a sheen sliding down the diagonal for
+1.8 s then resting 1.2 s, star glints) and Metal (a windowed steel
+plate, pin and empty-socket art at the corners, a glint band, and three
+cover-lift frames at 60 ms) finishes; the hover glare and soft shadow;
+the Epic relic frame; Chuck Wagon and Swimming Goggles art; Second
+Wind's spent art on the last page; Shell Game art; the Gambler's
+signature toggles; and signature icons on the kit's top row. The kit's
+retired still-fire entries stay out of the index, and the Weathervane
+and Magnifying Glass art is gone. Every piece falls back to the code
+drawing when its art is missing.
+
 THE LAST PAGE (GameOverScene, art in assets/art/gameover/, laid out by
 gameover_manifest.json): four painted endings sharing one layout.
 LAID LOW is cold dusk with vultures and a tumbleweed; BUSTED OUT the

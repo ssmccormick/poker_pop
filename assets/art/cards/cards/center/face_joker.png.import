@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1kwjh22yo68q"
-path="res://.godot/imported/magnifying_glass.png-81d8ff5b518b18a94ecc446bbcc524bc.ctex"
+uid="uid://dhdg3xx6egcaj"
+path="res://.godot/imported/face_joker.png-4da1fdf462741be8b381420bb8a37e27.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/cards/relics/framed/magnifying_glass.png"
-dest_files=["res://.godot/imported/magnifying_glass.png-81d8ff5b518b18a94ecc446bbcc524bc.ctex"]
+source_file="res://assets/art/cards/cards/center/face_joker.png"
+dest_files=["res://.godot/imported/face_joker.png-4da1fdf462741be8b381420bb8a37e27.ctex"]
 
 [params]
 

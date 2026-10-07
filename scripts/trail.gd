@@ -1292,8 +1292,40 @@ func _refresh_select() -> void:
 		_gambler_ab_label.text = String(pick.ability)
 		_gambler_line_label.text = String(pick.line)
 	for key in _gambler_ability_btns:
-		# The chosen trick wears the oxblood call-to-action chrome.
-		UiKit.style_button(_gambler_ability_btns[key], key == gambler_ability)
+		_style_signature_toggle(_gambler_ability_btns[key], key == gambler_ability)
+
+
+## The Gambler's two-way selector: the kit's oxblood "selected" face
+## with a hot-brass rim, or the quieter unselected one (hover lifts
+## it). Falls back to the button kit's primary/plain chrome.
+func _style_signature_toggle(b: Button, chosen: bool) -> void:
+	var pieces := {"normal": "signature_toggle_unselected",
+			"hover": "signature_toggle_unselected_hover",
+			"pressed": "signature_toggle_selected"}
+	if chosen:
+		pieces = {"normal": "signature_toggle_selected",
+				"hover": "signature_toggle_selected",
+				"pressed": "signature_toggle_selected"}
+	if CardArt.tex("ui", "signature_toggle_selected") == null:
+		UiKit.style_button(b, chosen)
+		return
+	for state in pieces:
+		var sb := StyleBoxTexture.new()
+		sb.texture = CardArt.tex("ui", String(pieces[state]))
+		sb.texture_margin_left = 18
+		sb.texture_margin_right = 18
+		sb.texture_margin_top = 14
+		sb.texture_margin_bottom = 14
+		sb.content_margin_left = 22
+		sb.content_margin_right = 22
+		sb.content_margin_top = 6
+		sb.content_margin_bottom = 6
+		b.add_theme_stylebox_override(state, sb)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var ink := Color("e6d5b0") if chosen else Color("b8a888")
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(c, ink)
+	b.add_theme_font_size_override("font_size", 18)
 
 
 ## The Gambler's trick for this ride; choosing one also saddles him.
@@ -4290,6 +4322,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"outlaws": outlaws_caught, "reached": reached, "total": ROOMS_TOTAL,
 		"cash": cash, "stake": _title_case(String(TABLES[table_tier].name)),
 		"relics": relics.duplicate(), "stops": stops,
+		"spent": ["second_wind"] if _second_wind_used else [],
 		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": 3,
 	}
 

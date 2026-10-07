@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b6i17ftnvglee"
-path="res://.godot/imported/weathervane.png-a4b091f10a7578aca3f8e5bf3b14b9aa.ctex"
+uid="uid://cc14trsfmk1i1"
+path="res://.godot/imported/signature_toggle_unselected_hover@2x.png-65c44ed3372e97dd996f580a9b043cff.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/cards/relics/framed/weathervane.png"
-dest_files=["res://.godot/imported/weathervane.png-a4b091f10a7578aca3f8e5bf3b14b9aa.ctex"]
+source_file="res://assets/art/cards/ui/signature_toggle_unselected_hover@2x.png"
+dest_files=["res://.godot/imported/signature_toggle_unselected_hover@2x.png-65c44ed3372e97dd996f580a9b043cff.ctex"]
 
 [params]
 

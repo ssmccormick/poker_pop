@@ -21,11 +21,21 @@ var relic_id := "":
 	set(value):
 		relic_id = value
 		queue_redraw()
+# A used-up relic (Second Wind after its free life) wears its spent art.
+var spent := false:
+	set(value):
+		spent = value
+		queue_redraw()
 
 
 func _draw() -> void:
 	# The kit's framed icon when it exists; the vector emblem otherwise.
-	var t := CardArt.tex("relic_framed", ART_NAMES.get(relic_id, relic_id))
+	var art_name: String = ART_NAMES.get(relic_id, relic_id)
+	var t: Texture2D = null
+	if spent:
+		t = CardArt.tex("relic_framed", art_name + "_spent")
+	if t == null:
+		t = CardArt.tex("relic_framed", art_name)
 	if t != null:
 		draw_texture_rect(t, Rect2(-36, -36, 72, 72), false)
 		return

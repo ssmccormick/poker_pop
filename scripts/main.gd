@@ -68,7 +68,8 @@ var _kit_plate: Panel
 var _kit_title: Label
 var _kit_btns: Array = []  # provision slot buttons
 var _kit_icons: Array = [] # framed provision icons on those buttons
-var _sleeve_btn: Button    # Ace up the Sleeve, top row of the kit
+var _sleeve_btn: Button    # the rider's signature, top row of the kit
+var _sleeve_icon: TextureRect
 var _kit_sig := ""         # last-rendered kit state, to skip rebuilds
 const DECK_STACK_MAX := 60  # backs to pool for the literal stack
 const DECK_PILE_FACTOR := 1.35  # the pile's size relative to felt cards
@@ -880,7 +881,16 @@ func _update_kit() -> void:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "SLEEVE  %s" % trail.sleeve_label()
 				_sleeve_btn.tooltip_text = "ACE UP THE SLEEVE — once per table, trade this card for any plain card on the table; what you take rides up the sleeve to another table. Upgrade its starting rank at the trail buy-in."
-	UiKit.fit_button_text(_sleeve_btn, 19)
+	var sig_icon := "laser" if trail.character == "the_machine" \
+			else "watch" if trail.character == "the_doctor" \
+			else trail.gambler_ability
+	_sleeve_icon.texture = CardArt.tex("icon", sig_icon)
+	_sleeve_icon.position = Vector2(8, 6)
+	_sleeve_icon.size = Vector2(bh - 12, bh - 12)
+	if _sleeve_icon.texture != null:
+		UiKit.fit_button_text(_sleeve_btn, 19, 13, 2.0 * (_sleeve_icon.size.x + 14.0))
+	else:
+		UiKit.fit_button_text(_sleeve_btn, 19)
 	for i in _kit_btns.size():
 		var btn: Button = _kit_btns[i]
 		btn.position = Vector2(PANEL_R, 574 + (i + 1) * spacing)
@@ -2243,6 +2253,12 @@ func _build_ui() -> void:
 	_sleeve_btn = _button(hud_root, "—", Vector2(PANEL_R, 574), Vector2(300, 56))
 	_sleeve_btn.clip_text = true
 	_sleeve_btn.add_theme_font_size_override("font_size", 19)
+	# The rider's signature icon rides the left edge, like a provision.
+	_sleeve_icon = TextureRect.new()
+	_sleeve_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_sleeve_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_sleeve_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sleeve_btn.add_child(_sleeve_icon)
 	_sleeve_btn.pressed.connect(func() -> void:
 		trail.use_signature())
 	for i in 4:

@@ -621,7 +621,13 @@ func _build_relics() -> void:
 		holder.add_child(bg)
 		if has:
 			var id := String(relics[j])
-			var glyph := CardArt.tex("relic_glyph", String(RelicIcon.ART_NAMES.get(id, id)))
+			var art_id := String(RelicIcon.ART_NAMES.get(id, id))
+			var glyph := CardArt.tex("relic_glyph", art_id)
+			if id in _data.get("spent", []):
+				# A used-up relic shows its spent art (the framed version).
+				var worn := CardArt.tex("relic_framed", art_id + "_spent")
+				if worn != null:
+					glyph = worn
 			if glyph != null:
 				var g := TextureRect.new()
 				g.texture = glyph
