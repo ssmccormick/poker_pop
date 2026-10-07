@@ -323,7 +323,9 @@ func _ready() -> void:
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail._hide_all()
-				trail._pending_relic_reward = "horseshoe"
+				# POKERPOP_RELIC shows any relic on the strongbox screen.
+				var rid := OS.get_environment("POKERPOP_RELIC")
+				trail._pending_relic_reward = rid if rid != "" else "horseshoe"
 				trail._show_relic_reward_now()
 			"trailbj":
 				menu_layer.visible = false

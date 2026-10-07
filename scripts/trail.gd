@@ -173,7 +173,7 @@ const RELICS := {
 	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks offer 4 choices"},
 	"snake_oil": {"name": "Snake Oil", "rarity": 0, "desc": "Shop prices -25%"},
 	"tin_star": {"name": "Tin Star", "rarity": 0, "desc": "+10 chips each cleared room"},
-	"rabbits_foot": {"name": "Rabbit's Foot", "rarity": 0, "desc": "Ambient loot twice as likely"},
+	"rabbits_foot": {"name": "Rabbit's Foot", "rarity": 0, "desc": "Surprise safes and chests turn up twice as often on plain tables"},
 	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
 	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
 	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
