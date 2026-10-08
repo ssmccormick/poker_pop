@@ -682,6 +682,14 @@ signatures, picked with the SLEEVE / SLEIGHT toggles under his card
 the sleeve trade; SLEIGHT OF HAND swaps two side-by-side cards once
 per table, exactly like the Shell Game provision (bosses, safes and
 snake tails are too heavy).
+Sleight of Hand upgrades at the Outfitter (sleight_level 0-2, $40 x
+level): each level palms one more trick per table, so up to three
+(sleight_uses_left resets to 1 + level at every sit-down).
+
+RESUME FIRST: with a ride saved, THE TRAIL on the menu skips rider
+select and opens the buy-in with RESUME YOUR RIDE on top in oxblood,
+"or start a new ride" above the stakes, and a NEW RIDER button for
+saddling someone else on a fresh ride.
 
 CARD KIT r3 (assets/art/cards, from Claude Design): the Joker's own
 stack (harlequin wash and frame, the jester face, a JKR index with no

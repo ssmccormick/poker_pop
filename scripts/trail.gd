@@ -249,12 +249,13 @@ const GAMBLER_ABILITIES := {
 	"sleeve": {"ability": "ACE UP THE SLEEVE", "short": "SLEEVE",
 			"line": "Once per table, trade the card up his sleeve for any plain card on the felt."},
 	"sleight": {"ability": "SLEIGHT OF HAND", "short": "SLEIGHT",
-			"line": "Once per table, swap two cards that sit side by side. Nobody saw a thing."},
+			"line": "Swap two cards that sit side by side, once per table. Upgrades palm in more tricks."},
 }
 const LASER_DIRS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 var character := "the_gambler"   # the rider this run
 var gambler_ability := "sleeve"  # the Gambler's chosen signature (remembered)
-var sleight_used := false        # one swap per table (Sleight of Hand)
+var sleight_uses_left := 1       # Sleight of Hand tricks left this table
+var sleight_level := 0           # meta: extra tricks per table (0..2)
 var _aiming_sleight := false
 # The rider's HITPOINTS, run-wide: burnt-out flames, dynamite, outlaw
 # lead and lost tables all take their pound of flesh; campfires give
@@ -310,6 +311,9 @@ var _relic_desc: Label
 var _pending_relic_reward := ""
 var _buyin_cash_label: Label
 var _buyin_resume_btn: Button
+var _buyin_rider_btn: Button
+var _buyin_new_label: Label
+var preview_riding := false  # screenshot mode: show the buy-in as if a ride were saved
 var _buyin_tier_btns: Array = []
 var upgrades_layer: ColorRect    # the OUTFITTER: meta upgrades for $cash
 var select_layer: ColorRect      # pick your rider before the buy-in
@@ -393,6 +397,7 @@ func _load_meta() -> void:
 	meta_provisions = clampi(int(cf.get_value("meta", "provisions", 0)), 0, 2)
 	laser_level = clampi(int(cf.get_value("meta", "laser", 0)), 0, 4)
 	watch_level = clampi(int(cf.get_value("meta", "watch", 0)), 0, 2)
+	sleight_level = clampi(int(cf.get_value("meta", "sleight", 0)), 0, 2)
 	character = String(cf.get_value("meta", "character", "the_gambler"))
 	if not CHARACTERS.has(character):
 		character = "the_gambler"
@@ -411,6 +416,7 @@ func _save_meta() -> void:
 	cf.set_value("meta", "provisions", meta_provisions)
 	cf.set_value("meta", "laser", laser_level)
 	cf.set_value("meta", "watch", watch_level)
+	cf.set_value("meta", "sleight", sleight_level)
 	cf.set_value("meta", "character", character)
 	cf.set_value("meta", "gambler_ability", gambler_ability)
 	cf.save(main.profile_path("trail_meta.cfg"))
@@ -715,9 +721,9 @@ func use_sleight() -> void:
 			or main.board.locked or main.board.blackjack_presenting:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
 		return
-	if sleight_used:
+	if sleight_uses_left <= 0:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-		main._announce("THE TRICK IS PLAYED — one swap per table", main.RED)
+		main._announce("NO TRICKS LEFT AT THIS TABLE", main.RED)
 		return
 	_aiming_slot = -1  # only one thing aims at a time
 	_aiming_sleeve = false
@@ -1058,7 +1064,7 @@ func _on_provision_target(card) -> void:
 			return  # still aiming
 		_aiming_sleight = false
 		main.board.pending_provision = ""
-		sleight_used = true
+		sleight_uses_left -= 1
 		main.stat_bump("sleights")
 		main._announce("SLEIGHT OF HAND — NOBODY SAW A THING")
 		await main.board.provision_swap(first, card)
@@ -1265,6 +1271,15 @@ func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 
 ## THE TRAIL's first stop: pick your rider. Falls straight through
 ## to the buy-in when the character art isn't installed.
+## THE TRAIL from the menu: a ride in progress comes first, straight to
+## the buy-in with RESUME on top; otherwise saddle a rider.
+func open_trail() -> void:
+	if _has_saved_run():
+		open_buyin()
+	else:
+		open_select()
+
+
 func open_select() -> void:
 	if _select_cards.is_empty():
 		open_buyin()
@@ -1365,8 +1380,10 @@ func _open_buyin_now() -> void:
 	_hide_all()
 	_buyin_cash_label.text = "CASH  $%d" % cash
 	# A ride in progress takes top billing; fresh saddles move down.
-	var riding := _has_saved_run()
+	var riding := _has_saved_run() or preview_riding
 	_buyin_resume_btn.visible = riding
+	_buyin_rider_btn.visible = riding and not _select_cards.is_empty()
+	_buyin_new_label.visible = riding
 	if riding:
 		_buyin_resume_btn.position = Vector2(660, 320)
 		for i in _buyin_tier_btns.size():
@@ -1400,6 +1417,8 @@ func upgrade_cost(id: String) -> int:
 			return 0 if laser_level >= 4 else 30 * (laser_level + 1)
 		"watch":
 			return 0 if watch_level >= 2 else 50 * (watch_level + 1)
+		"sleight":
+			return 0 if sleight_level >= 2 else 40 * (sleight_level + 1)
 		"bankroll":
 			return 0 if meta_bankroll >= 5 else 20 * (meta_bankroll + 1)
 		"provisions":
@@ -1420,6 +1439,8 @@ func _buy_upgrade(id: String) -> void:
 			laser_level += 1
 		"watch":
 			watch_level += 1
+		"sleight":
+			sleight_level += 1
 		"bankroll":
 			meta_bankroll += 1
 		"provisions":
@@ -1458,6 +1479,12 @@ func _refresh_upgrades() -> void:
 						"" if watch_level == 0 else "s"]
 				btn.text = "WIND ANOTHER TURN — $%d" % cost if cost > 0 \
 						else "WOUND TO THE LIMIT"
+			"sleight":
+				status.text = "Level %d / 2  ·  %d trick%s per table" \
+						% [sleight_level, 1 + sleight_level,
+						"" if sleight_level == 0 else "s"]
+				btn.text = "PALM ANOTHER TRICK — $%d" % cost if cost > 0 \
+						else "QUICKEST HANDS ON THE TRAIL"
 			"bankroll":
 				status.text = "Level %d / 5  ·  +%d chips at every buy-in" \
 						% [meta_bankroll, 20 * meta_bankroll]
@@ -2370,7 +2397,7 @@ func _start_room() -> void:
 	sleeve_used = false  # one signature use per table, fresh each sit-down
 	_aiming_sleeve = false
 	_aiming_sleight = false
-	sleight_used = false
+	sleight_uses_left = 1 + sleight_level
 	_aiming_sleight = false
 	laser_used = false
 	_aiming_laser = false
@@ -3445,7 +3472,7 @@ func _capture_room_state() -> Dictionary:
 		"room_require": room_require.duplicate(true),
 		"room_combo": room_combo.duplicate(),
 		"sleeve_used": sleeve_used, "laser_used": laser_used,
-		"sleight_used": sleight_used,
+		"sleight_uses_left": sleight_uses_left,
 		"watch_uses_left": watch_uses_left,
 	}
 
@@ -3489,7 +3516,8 @@ func _restore_room_state() -> void:
 	room_combo = rs.room_combo.duplicate()
 	sleeve_used = bool(rs.sleeve_used)
 	laser_used = bool(rs.laser_used)
-	sleight_used = bool(rs.get("sleight_used", false))
+	sleight_uses_left = int(rs.get("sleight_uses_left",
+			0 if bool(rs.get("sleight_used", false)) else 1 + sleight_level))
 	watch_uses_left = int(rs.watch_uses_left)
 	_outlaw_dead_pending = false
 	_watch_snapshot = {}
@@ -4414,19 +4442,27 @@ func build_ui() -> void:
 		var tier := i
 		b.pressed.connect(func() -> void:
 			_start_run(tier))
-	_buyin_resume_btn = main._button(buyin_layer, "RESUME YOUR RIDE", Vector2(660, 740), Vector2(600, 70))
+	_buyin_resume_btn = main._button(buyin_layer, "RESUME YOUR RIDE", Vector2(660, 740), Vector2(600, 70), true)
+	_buyin_new_label = _center(buyin_layer, "or start a new ride", 418, 20, main.DIM)
 	_buyin_resume_btn.add_theme_font_size_override("font_size", 24)
 	_buyin_resume_btn.pressed.connect(_resume_run)
+	# With a ride saved, THE TRAIL lands here; a fresh ride can still
+	# saddle someone new.
+	_buyin_rider_btn = main._button(buyin_layer, "NEW RIDER", Vector2(810, 852), Vector2(300, 56))
+	_buyin_rider_btn.add_theme_font_size_override("font_size", 20)
+	_buyin_rider_btn.pressed.connect(open_select)
 	_back_button(buyin_layer, back_to_menu)
 
 	# THE OUTFITTER — every meta upgrade $cash can buy, one shelf each.
 	upgrades_layer = _layer()
 	_screen_title(upgrades_layer, "THE OUTFITTER")
 	_center(upgrades_layer, "Permanent gear, paid in $cash banked from finished rides.", 200, 22, main.DIM)
-	_up_cash = _center(upgrades_layer, "", 246, 30, main.GOLD)
+	_up_cash = _center(upgrades_layer, "", 238, 30, main.GOLD)
 	var updefs := [
 		["sleeve", "ACE UP THE SLEEVE — THE GAMBLER",
 			"His hidden swap card — once per table, trade it for any plain card on the felt. Raising it raises its starting rank, all the way to an Ace."],
+		["sleight", "SLEIGHT OF HAND — THE GAMBLER",
+			"His other trick: swap two cards that sit side by side. Each upgrade palms another trick per table."],
 		["laser", "THE LASER — THE MACHINE",
 			"One shot per table burns a card clean off the felt. Each upgrade extends the beam one more card — up, right, down, left — into a full cross."],
 		["watch", "THE POCKET WATCH — THE DOCTOR",
@@ -4438,17 +4474,17 @@ func build_ui() -> void:
 	]
 	for i in updefs.size():
 		var def: Array = updefs[i]
-		var top := 292.0 + i * 140.0
-		UiKit.plate(upgrades_layer, Rect2(440, top, 1040, 128))
+		var top := 282.0 + i * 118.0
+		UiKit.plate(upgrades_layer, Rect2(440, top, 1040, 108))
 		var name_l: Label = main._label(upgrades_layer, String(def[1]),
-				Vector2(560, top + 12), 24, main.GOLD)
-		name_l.size = Vector2(580, 32)
+				Vector2(560, top + 10), 22, main.GOLD)
+		name_l.size = Vector2(580, 30)
 		_wrap_label(upgrades_layer, String(def[2]),
-				Rect2(560, top + 48, 570, 72), 15, main.OFFWHITE)
+				Rect2(560, top + 42, 570, 58), 15, main.OFFWHITE)
 		var status := _wrap_label(upgrades_layer, "",
-				Rect2(1170, top + 12, 290, 54), 16, main.DIM)
+				Rect2(1170, top + 10, 290, 46), 16, main.DIM)
 		var buy: Button = main._button(upgrades_layer, "",
-				Vector2(1170, top + 70), Vector2(290, 46))
+				Vector2(1170, top + 60), Vector2(290, 40))
 		buy.add_theme_font_size_override("font_size", 15)
 		var uid := String(def[0])
 		buy.pressed.connect(func() -> void:
@@ -4456,8 +4492,8 @@ func build_ui() -> void:
 		_up_rows.append({"id": uid, "status": status, "btn": buy})
 	_sleeve_pc = PlayingCard.new()
 	_sleeve_pc.material = Themes.current_material()
-	_sleeve_pc.position = Vector2(502, 356)
-	_sleeve_pc.scale = Vector2(0.9, 0.9)
+	_sleeve_pc.position = Vector2(502, 336)
+	_sleeve_pc.scale = Vector2(0.84, 0.84)
 	upgrades_layer.add_child(_sleeve_pc)
 	_back_button(upgrades_layer, back_to_menu, "MENU")
 

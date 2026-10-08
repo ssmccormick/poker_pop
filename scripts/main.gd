@@ -249,6 +249,11 @@ func _ready() -> void:
 				trail._start_run(0)
 				trail.hp = 6
 				trail._choose_offer({"kind": "camp", "tarot": "THE CAMPFIRE"}, false)
+			"trailbuyin":
+				# POKERPOP_RIDING shows the screen as it is with a ride saved.
+				menu_layer.visible = false
+				trail.preview_riding = OS.get_environment("POKERPOP_RIDING") != ""
+				trail._open_buyin_now()
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -814,7 +819,7 @@ func _update_kit() -> void:
 			+ str(trail.sleeve_card) + str(trail.sleeve_used) + str(trail._aiming_sleeve) \
 			+ trail.character + str(trail.laser_used) + str(trail._aiming_laser) \
 			+ str(trail.laser_level) + str(trail.watch_uses_left) + str(board.has_undo()) \
-			+ trail.gambler_ability + str(trail.sleight_used) + str(trail._aiming_sleight)
+			+ trail.gambler_ability + str(trail.sleight_uses_left) + str(trail._aiming_sleight)
 	if sig == _kit_sig:
 		return
 	_kit_sig = sig
@@ -860,14 +865,16 @@ func _update_kit() -> void:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "AIMING…"
 				_sleeve_btn.tooltip_text = "Pick a card, then the card beside it — right-click or press again to pocket the trick."
-			elif trail.sleight_used:
+			elif trail.sleight_uses_left <= 0:
 				_sleeve_btn.disabled = true
 				_sleeve_btn.text = "SLEIGHT — PLAYED"
-				_sleeve_btn.tooltip_text = "One swap per table. The trick's ready again at the next sit-down."
+				_sleeve_btn.tooltip_text = "No tricks left at this table. They're ready again at the next sit-down."
 			else:
 				_sleeve_btn.disabled = false
-				_sleeve_btn.text = "SLEIGHT OF HAND"
-				_sleeve_btn.tooltip_text = "SLEIGHT OF HAND — once per table, swap two cards that sit side by side. Free action."
+				_sleeve_btn.text = "SLEIGHT OF HAND" if trail.sleight_level == 0 \
+						else "SLEIGHT  ×%d" % trail.sleight_uses_left
+				_sleeve_btn.tooltip_text = "SLEIGHT OF HAND — swap two cards that sit side by side. %d trick%s left at this table; palm in more at the Outfitter. Free action." \
+						% [trail.sleight_uses_left, "" if trail.sleight_uses_left == 1 else "s"]
 		_:
 			if trail._aiming_sleeve:
 				_sleeve_btn.disabled = false
@@ -1675,7 +1682,7 @@ const TUTOR := {
 	"relics": ["RELICS", "Run-wide charms — carry as many as you can afford. Each one quietly bends the rules in your favor for the rest of the ride."],
 	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots (good SADDLEBAGS add a fourth). Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
 	"sleeve": ["ACE UP THE SLEEVE", "You ride with a hidden card — the SLEEVE row atop your kit. Once per table, click it and pick a plain card on the table: they trade places, and the card you take waits up your sleeve for another table. Raise its starting rank with $cash at the Outfitter (UPGRADES on the main menu)."],
-	"sleight": ["SLEIGHT OF HAND", "The Gambler palms a trick — the SLEIGHT row atop your kit. Once per table, click it, pick a card, then pick the card right beside it: the two trade places. A free action, no hand spent. Bosses and safes are too heavy to shuffle."],
+	"sleight": ["SLEIGHT OF HAND", "The Gambler palms a trick — the SLEIGHT row atop your kit. Once per table (the Outfitter palms in more), click it, pick a card, then pick the card right beside it: the two trade places. A free action, no hand spent. Bosses and safes are too heavy to shuffle."],
 	"laser": ["THE LASER", "The Machine carries a beam — the LASER row atop your kit. Once per table, click it and pick a card: the beam burns it clean off the felt, unscored. Safes, bosses and coils deflect it. Each Outfitter upgrade extends the beam one more card into a cross."],
 	"watch": ["THE POCKET WATCH", "The Doctor carries his watch — the row atop your kit. After any hand, press it and the hand UN-HAPPENS: the cards return, the score and the spent hand come back, your HP and the bosses rewind. The clock, if one runs, keeps ticking. More turns per table await at the Outfitter."],
 }
@@ -2513,7 +2520,7 @@ func _build_menu() -> void:
 	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66), true)
 	trail_btn.add_theme_font_size_override("font_size", 26)
 	trail_btn.pressed.connect(func() -> void:
-		trail.open_select())
+		trail.open_trail())
 	# The Outfitter: every $cash meta upgrade, right beside the ride.
 	var upgrades_btn := _button(menu_layer, "UPGRADES", Vector2(1250, 336), Vector2(210, 66))
 	upgrades_btn.add_theme_font_size_override("font_size", 20)

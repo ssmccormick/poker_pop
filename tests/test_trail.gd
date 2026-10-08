@@ -86,11 +86,11 @@ func _run() -> void:
 				and main.board.pending_provision == "sleight",
 				"pressing the ability arms the trick")
 		trail._on_provision_target(a)
-		failures += _check(trail._aiming_sleight and not trail.sleight_used,
+		failures += _check(trail._aiming_sleight and trail.sleight_uses_left == 1,
 				"the first pick waits for its neighbor")
 		await trail._on_provision_target(b)
 		await _settle()
-		failures += _check(trail.sleight_used and not trail._aiming_sleight,
+		failures += _check(trail.sleight_uses_left == 0 and not trail._aiming_sleight,
 				"the second pick plays the trick")
 		failures += _check(main.board.grid.get(a_pos) == b and main.board.grid.get(b_pos) == a,
 				"the two cards traded places")
@@ -101,12 +101,28 @@ func _run() -> void:
 		trail.use_signature()
 		failures += _check(not trail._aiming_sleight, "a second trick at the same table is refused")
 	trail.gambler_ability = "sleeve"
-	trail.sleight_used = false
 	trail._save_run()
 	trail.gambler_ability = "sleight"
 	trail._load_run()
 	failures += _check(trail.gambler_ability == "sleeve",
 			"the run save carries the Gambler's trick")
+
+	# --- An upgraded Sleight of Hand palms two tricks per table ----------
+	trail.sleight_level = 1
+	await _enter_room("the_gambler", "sleight")
+	failures += _check(trail.sleight_uses_left == 2,
+			"one Outfitter level gives two tricks per table")
+	var pair3 := _plain_neighbors()
+	if not pair3.is_empty():
+		trail.use_signature()
+		trail._on_provision_target(pair3[0])
+		await trail._on_provision_target(pair3[1])
+		await _settle()
+		trail.use_signature()
+		failures += _check(trail.sleight_uses_left == 1 and trail._aiming_sleight,
+				"after one trick the second is still ready to arm")
+		trail.use_signature()  # pocket it again
+	trail.sleight_level = 0
 
 	# --- METAL scores but stays on the table -----------------------------
 	await _enter_room("the_machine")
@@ -147,6 +163,19 @@ func _run() -> void:
 	failures += _check(String(trail.deck[0].get("finish", "")) == "prism"
 			and String(trail.deck[1].get("finish", "")) == "",
 			"a Prism deck card keeps its finish across a save")
+
+	# --- With a ride saved, THE TRAIL puts RESUME first ------------------
+	trail._save_run()
+	main.tutor_seen["core"] = true
+	trail._hide_all()
+	trail.open_trail()
+	await _wait(0.5)
+	var resume: Button = trail._buyin_resume_btn
+	var first_tier: Button = trail._buyin_tier_btns[0]
+	failures += _check(trail.buyin_layer.visible and not trail.select_layer.visible,
+			"THE TRAIL skips rider select when a ride is saved")
+	failures += _check(resume.visible and resume.position.y < first_tier.position.y,
+			"RESUME YOUR RIDE is the first choice")
 
 	_cleanup()
 	if failures == 0:
