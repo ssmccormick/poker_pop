@@ -40,6 +40,8 @@ const T_STRIP := 2.70
 const NODE_STEP := 0.04
 const T_BUTTONS := 3.60
 const T_HAND := T_TITLE + TITLE_DUR + 0.8
+const EXP_DUR := 1.4      # the EXP bar's fill, after the trail map lights
+const BANNER_DUR := 0.35
 
 const ROMAN := ["I", "II", "III", "IV", "V"]
 
@@ -79,6 +81,15 @@ var _flag_y := 0.0
 var _star: Control
 var _buttons: Array = []
 var _ride_btn: Button
+# EXP payoff: the bar that fills, and the level-up banner.
+var _exp_box: Control
+var _exp_fill: Control
+var _exp_level: Label
+var _exp_gain: Label
+var _exp_track_w := 0.0
+var _t_exp := 99.0
+var _banner: Control
+var _contracts_l: Label
 
 var _layers: Array = []
 var _vultures: Array = []
@@ -162,6 +173,10 @@ func _reset() -> void:
 	_flag = null
 	_star = null
 	_rail_lit = null
+	_exp_box = null
+	_banner = null
+	_contracts_l = null
+	_t_exp = 99.0
 
 
 # --- Painted scene ---------------------------------------------------------
@@ -352,6 +367,11 @@ func _build_ui() -> void:
 	var strip_done := T_STRIP + _end_node * NODE_STEP + 0.4
 	_intro_end = maxf(T_BUTTONS + 0.35, maxf(strip_done,
 			_tally_start + _outlaws * MARK_STEP + 0.2))
+	if _data.has("exp_gain"):
+		_t_exp = strip_done
+		_build_exp()
+		_build_banner()
+		_intro_end = maxf(_intro_end, _t_exp + EXP_DUR + BANNER_DUR + 0.3)
 
 
 func _build_title(complete: bool) -> void:
@@ -644,7 +664,8 @@ func _build_relics() -> void:
 				icon.scale = Vector2.ONE * (box.size.x / 72.0)
 				holder.add_child(icon)
 			var tip: Dictionary = TrailMode.RELICS.get(id, {})
-			holder.tooltip_text = "%s — %s" % [tip.get("name", id), tip.get("desc", "")]
+			var tip_desc := String(_data.get("relic_descs", {}).get(id, tip.get("desc", "")))
+			holder.tooltip_text = "%s — %s" % [tip.get("name", id), tip_desc]
 			holder.mouse_filter = Control.MOUSE_FILTER_PASS
 		_relic_slots.append(holder)
 
@@ -756,6 +777,119 @@ func _build_strip(complete: bool) -> void:
 		_ui.add_child(flag)
 
 
+## The ride's EXP: the rider's level, a bar that fills from where it
+## stood to where the ride leaves it (rolling over at each level), and
+## the EXP earned. Hover for the breakdown.
+func _build_exp() -> void:
+	var r := Rect2(120, 984, 960, 60)
+	_exp_box = Control.new()
+	_exp_box.position = r.position
+	_exp_box.size = r.size
+	_exp_box.mouse_filter = Control.MOUSE_FILTER_PASS
+	_ui.add_child(_exp_box)
+	var rows := PackedStringArray()
+	for row in _data.get("exp_rows", []):
+		rows.append("%s  +%s" % [String(row[0]), _commas(int(row[1]))])
+	_exp_box.tooltip_text = "\n".join(rows)
+	var display: Font = _font(FontLib.display)
+	_exp_level = _label(_exp_box, "", display, 30, GOLD, Rect2(0, 8, 190, 44),
+			HORIZONTAL_ALIGNMENT_LEFT)
+	_exp_level.add_theme_color_override("font_outline_color", Color("2a1a0e"))
+	_exp_level.add_theme_constant_override("outline_size", 5)
+	var track := Panel.new()
+	track.position = Vector2(200, 22)
+	track.size = Vector2(560, 18)
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.add_theme_stylebox_override("panel", UiKit.bar_box("track"))
+	_exp_box.add_child(track)
+	_exp_track_w = track.size.x
+	var fill := Panel.new()
+	fill.position = track.position
+	fill.size = Vector2(0, 18)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fill.add_theme_stylebox_override("panel", UiKit.bar_box("gold"))
+	_exp_box.add_child(fill)
+	_exp_fill = fill
+	_exp_gain = _label(_exp_box, "", _font(FontLib.label), 24, BONE,
+			Rect2(776, 12, 184, 36), HORIZONTAL_ALIGNMENT_LEFT)
+
+
+## LEVEL UP: the new level, what it opened on the trail and the purse,
+## over the set piece. Contracts finished on the ride ride beneath it.
+func _build_banner() -> void:
+	var lv0 := int(_data.get("level_before", 1))
+	var lv1 := int(_data.get("level_after", lv0))
+	var names: Array = _data.get("contracts", [])
+	if names.size() > 0:
+		var shown := names.slice(0, 2)
+		var text := "CONTRACT%s DONE: %s%s — claim from the menu" % [
+				"S" if names.size() > 1 else "", ", ".join(shown),
+				" +%d more" % (names.size() - 2) if names.size() > 2 else ""]
+		_contracts_l = _label(_ui, text, _font(FontLib.label), 20, GOLD,
+				Rect2(1180, 556 if lv1 > lv0 else 300, 620, 30), HORIZONTAL_ALIGNMENT_CENTER)
+		_contracts_l.add_theme_color_override("font_outline_color", Color("1a1008"))
+		_contracts_l.add_theme_constant_override("outline_size", 5)
+	if lv1 <= lv0:
+		return
+	var r := Rect2(1180, 300, 620, 240)
+	_banner = Control.new()
+	_banner.position = r.position
+	_banner.size = r.size
+	_banner.pivot_offset = r.size / 2.0
+	_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui.add_child(_banner)
+	var plate := _nine("title_plate_gilded")
+	plate.size = r.size
+	_banner.add_child(plate)
+	var display: Font = _font(FontLib.display)
+	var head := _label(_banner, "LEVEL UP!  ·  LEVEL %d" % lv1, display, 42, GOLD,
+			Rect2(30, 26, 560, 60), HORIZONTAL_ALIGNMENT_CENTER)
+	head.add_theme_color_override("font_outline_color", Color("2a1a0e"))
+	head.add_theme_constant_override("outline_size", 6)
+	var unlocks: Array = _data.get("unlocks", [])
+	var lines := PackedStringArray()
+	for i in mini(3, unlocks.size()):
+		lines.append(String(unlocks[i].get("name", "")))
+	var body := "Unlocked: " + "  ·  ".join(lines) if not lines.is_empty() else ""
+	if unlocks.size() > 3:
+		body += "  +%d more" % (unlocks.size() - 3)
+	var serif: Font = _font(FontLib.card)
+	var fs := 24
+	while fs > 16 and serif.get_string_size(body, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > 540:
+		fs -= 1
+	_label(_banner, body, serif, fs, BONE, Rect2(40, 98, 540, 40), HORIZONTAL_ALIGNMENT_CENTER)
+	var purse := int(_data.get("purse", 0))
+	_label(_banner, "Level purse  +$%s  ·  see the Outfitter" % _commas(purse), serif, 22,
+			GOLD, Rect2(40, 150, 540, 40), HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _apply_exp(it: float) -> void:
+	if _exp_box == null:
+		return
+	_exp_box.modulate.a = _c01((it - (_t_exp - 0.3)) / 0.3)
+	var q := _ease_in_out(_c01((it - _t_exp) / EXP_DUR))
+	var e0 := float(_data.get("exp_before", 0))
+	var e1 := float(_data.get("exp_after", e0))
+	var e := int(round(lerpf(e0, e1, q)))
+	var lv := Progression.level_for_exp(e)
+	var into := e - Progression.exp_at_level(lv)
+	_exp_level.text = "LEVEL %d" % lv
+	_exp_fill.size.x = _exp_track_w * clampf(float(into) / Progression.exp_to_next(lv), 0.0, 1.0)
+	_exp_gain.text = "+%s EXP" % _commas(int(round(float(_data.get("exp_gain", 0)) * q)))
+	if lv > int(_data.get("level_before", lv)):
+		_once("level_%d" % lv, func() -> void:
+			_sfx(Board.SFX_BELL, 1.0 + 0.05 * (lv % 4), -8.0))
+	if _banner != null:
+		var b := _c01((it - _t_exp - EXP_DUR) / BANNER_DUR)
+		_banner.modulate.a = _c01(b * 3.0)
+		_banner.scale = Vector2.ONE * maxf(0.001, _ease_out_back(b))
+		if b > 0.0:
+			_once("banner", func() -> void:
+				_sfx(Board.SFX_STING_WIN, 1.0, -8.0))
+	if _contracts_l != null:
+		_contracts_l.modulate.a = _c01((it - _t_exp - EXP_DUR - BANNER_DUR) / 0.3)
+
+
 func _place_node(n: Dictionary) -> void:
 	var tr: TextureRect = n.rect
 	var t: Texture2D = tr.texture
@@ -823,6 +957,7 @@ func _apply_intro() -> void:
 		slot.scale = Vector2.ONE * maxf(0.001, _ease_out_back(q))
 		slot.modulate.a = _c01(q * 3.0)
 	_apply_strip(it)
+	_apply_exp(it)
 	if _hand != null:
 		var hp := _ease_in_out(_c01((it - T_HAND) / 1.6))
 		_hand.position = _hand_end + Vector2(420.0 * (1.0 - hp), 0)

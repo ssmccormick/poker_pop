@@ -292,6 +292,13 @@ func _ready() -> void:
 				trail.best_hand_score = 840
 				trail.best_hand_name = "Full House"
 				score = 41300
+				if OS.get_environment("POKERPOP_LEVELUP") != "":
+					# Just shy of level 10, so the ride climbs two levels,
+					# and one contract finishes on the way.
+					trail.progress.exp_total = Progression.exp_at_level(10) - 60
+					trail.progress.contracts_seen.erase("road_worn")
+					trail.progress.contracts_claimed.erase("road_worn")
+					stats["tables_cleared"] = maxi(int(stats.get("tables_cleared", 0)), 100)
 				trail.relics.assign(["horseshoe", "rabbits_foot", "second_wind",
 						"snake_oil", "chuck_wagon"])
 				trail._second_wind_used = true  # or the free life would save the ride
@@ -1413,6 +1420,9 @@ func _load_settings() -> void:
 	var cf := ConfigFile.new()
 	cf.load("user://settings.cfg")  # missing file is fine, defaults apply
 	profile = clampi(int(cf.get_value("profile", "current", 1)), 1, 3)
+	# Test runs boot straight onto a throwaway profile (never saved).
+	if OS.get_environment("POKERPOP_PROFILE") != "":
+		profile = int(OS.get_environment("POKERPOP_PROFILE"))
 	_migrate_legacy_saves()
 	_tutor_load()
 	_stats_load()
@@ -1669,6 +1679,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 # --- First-time tutorials (per profile) ------------------------------------
 
 const TUTOR := {
+	"levels": ["LEVELS & UNLOCKS", "Every ride's score turns into EXP, win or bust, and every level unlocks ONE new thing for the trail: a table, a relic, a provision, a card, a rider, a merchant or a stake. Tables and merchants go straight onto the trail; relics, provisions, cards and riders must be BOUGHT at the Outfitter (UPGRADES) before they turn up. Owned items can be upgraded too: FIND makes them turn up more often, POWER makes them hit harder. Each level-up also pays a little purse — and CONTRACTS on the menu pay cash for goals met."],
 	"mode_time": ["TIME TRIAL", "Score as much as you can before the clock runs out. Hands are unlimited and the deck reshuffles forever — speed is everything."],
 	"mode_single": ["SINGLE DECK", "One 52-card deck, no timer. When the deck runs dry the run is over — squeeze every point from every card."],
 	"mode_arcade": ["ARCADE", "The bar at the top is always draining. Scoring refills it; hit the level target to move up. When the bar empties, the run ends."],
@@ -1851,6 +1862,8 @@ func _end_tutorial() -> void:
 
 
 func _save_settings() -> void:
+	if OS.get_environment("POKERPOP_PROFILE") != "":
+		return  # a test's throwaway profile must never become the saved one
 	var cf := ConfigFile.new()
 	cf.set_value("profile", "current", profile)
 	cf.set_value("video", "fullscreen", fullscreen_on)
@@ -1926,6 +1939,9 @@ func _open_menu_now() -> void:
 	board.locked = true
 	menu_layer.visible = true
 	_refresh_level_plate()
+	# The first level-up earns the explainer, back at the menu.
+	if trail.progress.level() > 1:
+		tutor_show("levels")
 
 
 ## The rider's level under STATS: the number, a sliver of EXP bar, and
@@ -3250,7 +3266,8 @@ func _debug_seed_hazards() -> void:
 func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
 		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover":
-			await get_tree().create_timer(4.2).timeout
+			# The last page's EXP bar and level-up banner come in last.
+			await get_tree().create_timer(6.2 if OS.get_environment("POKERPOP_MODE") == "trailover" else 4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
 			return

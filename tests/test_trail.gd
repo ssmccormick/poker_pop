@@ -19,6 +19,10 @@ func _initialize() -> void:
 
 func _run() -> void:
 	await process_frame
+	# Boot straight onto the throwaway profile so the real one is never
+	# loaded (or saved) by the test.
+	OS.set_environment("POKERPOP_PROFILE", str(TEST_PROFILE))
+	_cleanup()
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	for i in 5:
@@ -29,6 +33,10 @@ func _run() -> void:
 	_cleanup()
 	main._stats_load()
 	trail._load_meta()
+	# No first-time popups over the tables under test.
+	for k in main.TUTOR:
+		main.tutor_seen[k] = true
+	main.tutor_seen["core"] = true
 	main._dismiss_splash()
 	failures += _check(trail.progress.level() == 1 and not trail.progress.grandfathered,
 			"a fresh profile starts at level 1")
@@ -387,6 +395,7 @@ func _run() -> void:
 	failures += _check(trail._ride_contracts.count("Road Worn") == 1, "and only once")
 
 	_cleanup()
+	OS.unset_environment("POKERPOP_PROFILE")
 	if failures == 0:
 		print("ALL TRAIL TESTS PASSED")
 	else:

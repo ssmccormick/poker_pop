@@ -101,6 +101,46 @@ func _run() -> void:
 		scene.free()
 	failures += _check(_rode == 4 and _menued == 4,
 			"RIDE AGAIN and BACK TO MENU each answer once per page")
+
+	# --- A ride that climbs levels: the EXP bar fills, the banner lands --
+	var lv_scene := GameOverScene.new()
+	lv_scene.host = host
+	root.add_child(lv_scene)
+	var e0 := Progression.exp_at_level(10) - 60
+	var gain := 513
+	var lv_shown := lv_scene.show_ending({
+		"kind": "laid_low", "title": "LAID LOW", "epitaph": "Epitaph.", "cause": "",
+		"rider": "the_gambler", "score": 41300, "best_name": "Full House",
+		"best_score": 840, "outlaws": 3, "reached": 10, "total": 21,
+		"cash": 88, "stake": "Penny Ante", "relics": [], "stops": stops,
+		"bosses": TrailMode.BOSS_ROOMS, "region_size": 7, "camp_slot": 3,
+		"exp_gain": gain, "exp_rows": [["SCORE", 413], ["TABLES REACHED", 100]],
+		"exp_before": e0, "exp_after": e0 + gain,
+		"level_before": Progression.level_for_exp(e0),
+		"level_after": Progression.level_for_exp(e0 + gain),
+		"unlocks": Progression.unlocks_between(9, 11), "purse": 105,
+		"contracts": ["Road Worn"]})
+	failures += _check(lv_shown and lv_scene._exp_box != null and lv_scene._banner != null,
+			"a level-up page builds its EXP bar and banner")
+	if lv_shown:
+		failures += _check(lv_scene._banner.modulate.a < 0.01
+				and lv_scene._exp_gain.text == "+0 EXP", "both wait for the map to light")
+		var click2 := InputEventMouseButton.new()
+		click2.button_index = MOUSE_BUTTON_LEFT
+		click2.pressed = true
+		lv_scene._gui_input(click2)
+		var lv_end := Progression.level_for_exp(e0 + gain)
+		failures += _check(lv_scene._exp_level.text == "LEVEL %d" % lv_end
+				and lv_scene._exp_gain.text == "+513 EXP",
+				"skipped to the end, the bar shows the new level and the EXP earned")
+		var into := e0 + gain - Progression.exp_at_level(lv_end)
+		failures += _check(is_equal_approx(lv_scene._exp_fill.size.x,
+				lv_scene._exp_track_w * float(into) / Progression.exp_to_next(lv_end)),
+				"the bar ends where the EXP leaves it")
+		failures += _check(lv_scene._banner.modulate.a > 0.99
+				and lv_scene._contracts_l != null and lv_scene._contracts_l.modulate.a > 0.99,
+				"the level-up banner and the contracts line are up")
+	lv_scene.free()
 	host.free()
 
 	if failures == 0:

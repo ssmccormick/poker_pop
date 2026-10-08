@@ -496,7 +496,16 @@ func _load_meta() -> void:
 	var legacy := {"character": character, "laser": laser_level,
 			"watch": watch_level, "sleight": sleight_level,
 			"gambler_ability": gambler_ability, "provisions": meta_provisions}
-	if progress.read(cf, main.stats, legacy):
+	var built := progress.read(cf, main.stats, legacy)
+	if not progress.contracts_init:
+		# Contracts already met before they existed are claimable on the
+		# page, but not news at the next table or the next last page.
+		for c in Contracts.LIST:
+			if Contracts.is_complete(c, main.stats, main.stats_hands):
+				progress.contracts_seen[String(c.id)] = true
+		progress.contracts_init = true
+		built = true
+	if built:
 		_save_meta()  # an old profile, seated at the level its stats earned
 	if OS.get_environment("POKERPOP_SHOT") != "":
 		# Screenshots show everything on the trail — or, with
@@ -5039,10 +5048,18 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"outlaws": outlaws_caught, "reached": reached, "total": ROOMS_TOTAL,
 		"cash": cash, "stake": _title_case(String(TABLES[table_tier].name)),
 		"relics": relics.duplicate(), "stops": stops,
+		"relic_descs": _relic_descs(),
 		"spent": ["second_wind"] if _second_wind_used else [],
 		"contracts": _ride_contracts.duplicate(),
 		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": 3,
 	}.merged(_last_grant)
+
+
+func _relic_descs() -> Dictionary:
+	var d := {}
+	for id in relics:
+		d[id] = relic_desc(String(id))
+	return d
 
 
 ## "BLACK JACK MCGREW" -> "Black Jack McGrew".

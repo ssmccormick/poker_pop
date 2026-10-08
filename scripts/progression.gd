@@ -195,6 +195,7 @@ var last_run_uid := ""    # the last ride already paid out (no double grants)
 var grandfathered := false
 var contracts_claimed := {}  # contract id -> true
 var contracts_seen := {}     # contract id -> true (completion announced)
+var contracts_init := false  # contracts met before they existed are marked seen
 var unlock_all := false      # screenshots / tests: everything on the trail
 
 static var _index := {}
@@ -453,6 +454,7 @@ func write(cf: ConfigFile) -> void:
 	cf.set_value("progress", "grandfathered", grandfathered)
 	cf.set_value("progress", "contracts_claimed", PackedStringArray(contracts_claimed.keys()))
 	cf.set_value("progress", "contracts_seen", PackedStringArray(contracts_seen.keys()))
+	cf.set_value("progress", "contracts_init", contracts_init)
 
 
 ## Loads from cf. A profile without a [progress] section that has
@@ -478,6 +480,7 @@ func read(cf: ConfigFile, stats: Dictionary, legacy: Dictionary = {}) -> bool:
 			contracts_claimed[String(k)] = true
 		for k in cf.get_value("progress", "contracts_seen", PackedStringArray()):
 			contracts_seen[String(k)] = true
+		contracts_init = bool(cf.get_value("progress", "contracts_init", false))
 		return false
 	if int(stats.get("trail_runs", 0)) <= 0:
 		return false  # a fresh saddle: level 1, the starter set
@@ -524,3 +527,4 @@ func _reset() -> void:
 	grandfathered = false
 	contracts_claimed = {}
 	contracts_seen = {}
+	contracts_init = false
