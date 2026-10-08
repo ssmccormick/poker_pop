@@ -92,6 +92,9 @@ const CATALOG := [
 	{"kind": "room", "id": "royal", "name": "Royal Hunt", "level": 43, "price": 0},
 	{"kind": "relic", "id": "lucky_chip", "name": "Lucky Chip", "level": 44, "price": 500},
 	{"kind": "room", "id": "dealer", "name": "The Dealer's Table", "level": RESERVED_LEVEL, "price": 0, "reserved": true},
+	# --- Past the Dealer: the CardFX finishes ------------------------------
+	{"kind": "finish", "id": "holo", "name": "Holo", "level": 46, "price": 200},
+	{"kind": "finish", "id": "negative", "name": "Negative", "level": 47, "price": 250},
 ]
 
 ## POWER levels, hand-designed: each value has one entry per level, and
@@ -175,6 +178,13 @@ const POWER := {
 		"pdesc": ["Re-deal every plain and enhanced card on the table",
 			"Re-deal the table — 20% chance the deck isn't used up",
 			"Re-deal the table — 35% chance the deck isn't used up"]},
+	"finish:holo": {"vals": {"score": [50, 75, 100]},
+		"pdesc": ["Adds a flat +50 to the hand's score before any multipliers.",
+			"Adds a flat +75 to the hand's score before any multipliers.",
+			"Adds a flat +100 to the hand's score before any multipliers."]},
+	"finish:negative": {"vals": {"secs": [10, 15]},
+		"pdesc": ["Scoring it gives the hand back: +1 hand, or +10 seconds on a clock table.",
+			"Scoring it gives the hand back: +1 hand, or +15 seconds on a clock table."]},
 	"mod:mult": {"vals": {"x": [1.5, 1.6, 1.75]},
 		"pdesc": ["×1.5 to the hand's score.", "×1.6 to the hand's score.", "×1.75 to the hand's score."]},
 	"mod:chip": {"vals": {"chips": [8, 10, 12]},

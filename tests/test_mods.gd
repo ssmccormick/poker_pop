@@ -57,6 +57,29 @@ func _init() -> void:
 	failures += _check(res.score == 40 and res.cash_earned == 2,
 			"two gold cards earn $2, score unchanged")
 
+	# HOLO: a flat +50 before the multipliers, which then multiply it.
+	var holo := PlayingCard.new()
+	holo.finish = "holo"
+	b.selected.assign([cards[0], holo])
+	res = {"score": 100}
+	b._apply_card_mods(res)
+	failures += _check(res.score == 150 and res.holo_bonus == 50,
+			"a Holo card adds a flat +50 to the hand")
+	b.selected.assign([holo, cards[1]])
+	res = {"score": 100}
+	b._apply_card_mods(res)
+	failures += _check(res.score == 225, "a Mult card multiplies the Holo bump too: (100 + 50) × 1.5")
+	# NEGATIVE: flagged for the trail to hand the hand back.
+	var neg := PlayingCard.new()
+	neg.finish = "negative"
+	b.selected.assign([neg, cards[0]])
+	res = {"score": 100}
+	b._apply_card_mods(res)
+	failures += _check(res.score == 100 and res.negatives == 1,
+			"a Negative card leaves the score alone and is counted")
+	holo.free()
+	neg.free()
+
 	b.selected.clear()
 	for c in cards:
 		c.free()

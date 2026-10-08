@@ -77,10 +77,12 @@ func _catalog() -> void:
 	for r in Progression.CATALOG:
 		per_level[int(r.level)] = int(per_level.get(int(r.level), 0)) + 1
 	var bad: Array = []
-	for lv in range(2, 45):
+	for lv in range(2, 48):
+		if lv == 45:
+			continue  # the Dealer's
 		if int(per_level.get(lv, 0)) != 1:
 			bad.append(lv)
-	_check(bad.is_empty(), "exactly one unlock on each level 2-44 %s" % str(bad))
+	_check(bad.is_empty(), "exactly one unlock on each level 2-47 (45 is the Dealer's) %s" % str(bad))
 	_check(Progression.row("room", "dealer").get("reserved", false)
 			and int(Progression.row("room", "dealer").level) == 45,
 			"level 45 is reserved for the Dealer's table")

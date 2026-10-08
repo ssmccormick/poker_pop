@@ -141,6 +141,31 @@ func _run() -> void:
 		trail.use_signature()  # pocket it again
 	trail.sleight_level = 0
 
+	# --- NEGATIVE gives the hand (or the seconds) back --------------------
+	await _enter_room("the_machine")
+	trail.room_limit = "hands"
+	var neg_pair := _plain_neighbors()
+	if neg_pair.is_empty():
+		failures += _check(false, "found two plain neighbors for the Negative test")
+	else:
+		var hands_before: int = trail.room_hands_left
+		(neg_pair[0] as PlayingCard).finish = "negative"
+		await _play_pair_of(neg_pair)
+		failures += _check(trail.room_hands_left == hands_before or not trail.in_room,
+				"a hand with a Negative card costs no hand (%d -> %d)"
+				% [hands_before, trail.room_hands_left])
+	await _enter_room("the_machine")
+	trail.room_limit = "time"
+	trail.room_time_left = 100.0
+	var clock_pair := _plain_neighbors()
+	if not clock_pair.is_empty():
+		(clock_pair[0] as PlayingCard).finish = "negative"
+		await _play_pair_of(clock_pair)
+		# (the clock keeps ticking through the play, so allow it a few)
+		failures += _check(trail.room_time_left >= 104.0 or not trail.in_room,
+				"on a clock table it adds 10 seconds (%.1f)" % trail.room_time_left)
+	trail.room_limit = "hands"
+
 	# --- METAL scores but stays on the table -----------------------------
 	await _enter_room("the_machine")
 	var pair2 := _plain_neighbors()
@@ -440,20 +465,27 @@ func _play_pair() -> bool:
 	var pair := _plain_neighbors()
 	if pair.is_empty():
 		return false
+	await _play_pair_of(pair, true)
+	return true
+
+
+## Makes the two cards a pair (keeping a finish only if `wipe` is off)
+## and plays them.
+func _play_pair_of(pair: Array, wipe := false) -> void:
 	var a: PlayingCard = pair[0]
 	var b: PlayingCard = pair[1]
 	b.rank = a.rank
 	a.mod = ""
 	b.mod = ""
-	a.finish = ""
 	b.finish = ""
+	if wipe:
+		a.finish = ""
 	main.board.selected.assign([a, b])
 	a.selected = true
 	b.selected = true
 	main.board._update_hand_validity()
 	await main.board.play_hand()
 	await _settle()
-	return true
 
 
 ## Two side-by-side cards Sleight of Hand may shuffle.

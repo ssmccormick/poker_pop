@@ -260,9 +260,15 @@ var mod := "":
 # FINISHES ride over a card's whole face, like Balatro's editions:
 # a shimmer you can read at a glance, separate from the enhancement.
 # "" is none. Each finish also changes how the card plays.
+## `fx` picks the card shader's finish effect (card_fx.gdshaderinc):
+## 1 holo, 2 negative, 3 the foil shimmer over the Prism art.
 const FINISHES := {
-	"prism": {"name": "PRISM",
+	"prism": {"name": "PRISM", "fx": 3,
 			"desc": "Clearing it spreads its enhancement to every neighbor."},
+	"holo": {"name": "HOLO", "fx": 1,
+			"desc": "Adds a flat +50 to the hand's score before any multipliers."},
+	"negative": {"name": "NEGATIVE", "fx": 2,
+			"desc": "Scoring it gives the hand back: +1 hand, or +10 seconds on a clock table."},
 	"metal": {"name": "METAL",
 			"desc": "Pinned under steel: it stays on the table when scored and no hazard can touch it. Each play pops a pin; with the last one the cover comes off and it plays as a normal card."},
 }
@@ -277,6 +283,8 @@ const PIN_ORDER := [Vector2(0, 1), Vector2(1, 1), Vector2(0, 0), Vector2(1, 0)]
 var finish := "":
 	set(value):
 		finish = value if FINISHES.has(value) else ""
+		if _tilt_mat != null:
+			_tilt_mat.set_shader_parameter("fx_mode", _fx_mode())
 		_update_processing()
 		queue_redraw()
 # Scoring plays a METAL card has taken at this table.
@@ -356,7 +364,26 @@ func _process(delta: float) -> void:
 		set_process(false)
 		return
 	_t += delta
+	var fx := _fx_mode()
+	if fx > 0:
+		# Shader finishes need this card's own material, tilting or not.
+		_hold_tilt_material()
+		_tilt_mat.set_shader_parameter("fx_mode", fx)
+		_tilt_mat.set_shader_parameter("fx_time", _t + _phase * 3.0)
+		var face := _face_xform() * Rect2(-W / 2.0, -H / 2.0, W, H).grow(-4)
+		_tilt_mat.set_shader_parameter("fx_rect", Vector4(face.position.x, face.position.y,
+				face.end.x, face.end.y))
+	elif not tilting:
+		_release_tilt_material()
 	queue_redraw()
+
+
+## The shader effect this card's finish wears (0 = none); a card still
+## flipping in, or face down, shows only its back.
+func _fx_mode() -> int:
+	if finish == "" or face_down or deal_flip < 1.0:
+		return 0
+	return int(FINISHES[finish].get("fx", 0))
 
 
 ## Eases the tilt toward the cursor while hovered, and back to flat
@@ -373,7 +400,10 @@ func _ease_tilt(delta: float) -> bool:
 	if not hovered and _tilt.length() < 0.01 and _hover_amt < 0.01:
 		_tilt = Vector2.ZERO
 		_hover_amt = 0.0
-		_release_tilt_material()
+		if _fx_mode() == 0:
+			_release_tilt_material()
+		elif _tilt_mat != null:
+			_tilt_mat.set_shader_parameter("tilt", Vector2.ZERO)
 		return false
 	_hold_tilt_material()
 	_tilt_mat.set_shader_parameter("tilt", _tilt * TILT_MAX)
@@ -394,6 +424,7 @@ func _hold_tilt_material() -> void:
 		_tilt_mat = ShaderMaterial.new()
 		_tilt_mat.shader = _card_shader
 		_tilt_mat.set_shader_parameter("pattern_strength", 0.0)
+	_tilt_mat.set_shader_parameter("fx_mode", _fx_mode())
 	material = _tilt_mat
 
 

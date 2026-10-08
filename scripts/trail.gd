@@ -746,6 +746,7 @@ func _apply_relic_effects() -> void:
 	main.board.mult_factor = float(mv("mult", "x")) \
 			+ (float(rv("mirror_shades", "plus")) if has_relic("mirror_shades") else 0.0)
 	main.board.gold_pay = int(mv("gold", "cash"))
+	main.board.holo_bonus = int(progress.val("finish", "holo", "score", 50))
 	main.board.gold_find_chance = float(rv("chisel", "gold")) if has_relic("chisel") \
 			else Board.GOLD_FIND_CHANCE
 	PlayingCard.washed_show_suit = has_relic("swimming_goggles")
@@ -2049,6 +2050,9 @@ func _catalog_desc(kind: String, id: String) -> String:
 			if d != "":
 				return d
 		"finish":
+			var fd := progress.pdesc("finish", id)
+			if fd != "":
+				return fd
 			return String(PlayingCard.FINISHES[id].desc) if PlayingCard.FINISHES.has(id) else ""
 		"rider":
 			return "%s — %s" % [String(CHARACTERS[id].ability), String(CHARACTERS[id].line)]
@@ -3246,6 +3250,18 @@ func _generate_combo() -> Array:
 func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
 	chips += result.get("bonus_chips", 0)
+	var negs := int(result.get("negatives", 0))
+	if negs > 0 and in_room:
+		# NEGATIVE cards give the time back — banked before the hand is
+		# charged, so a hand that scores one costs nothing.
+		if room_on_clock():
+			var secs := negs * int(progress.val("finish", "negative", "secs", 10))
+			room_time_left += secs
+			_announce_after_settle("NEGATIVE  +%d SECONDS" % secs)
+		else:
+			room_hands_left += negs
+			_announce_after_settle("NEGATIVE — HAND BACK" if negs == 1
+					else "NEGATIVE — %d HANDS BACK" % negs)
 	room_score += result.score
 	if int(result.score) > best_hand_score:
 		best_hand_score = int(result.score)

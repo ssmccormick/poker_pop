@@ -20,12 +20,39 @@ const ART_NAMES := {"bomb_badge": "bomb_squad_badge"}
 var relic_id := "":
 	set(value):
 		relic_id = value
+		_update_shine()
 		queue_redraw()
+# Epic and Legendary relics wear the CardFX foil shimmer.
+var _fx_mat: ShaderMaterial
+var _fx_t := randf() * 10.0
 # A used-up relic (Second Wind after its free life) wears its spent art.
 var spent := false:
 	set(value):
 		spent = value
 		queue_redraw()
+
+
+func _update_shine() -> void:
+	var rarity := int(TrailMode.RELICS.get(relic_id, {}).get("rarity", 0))
+	if rarity < 2:
+		material = null
+		_fx_mat = null
+		set_process(false)
+		return
+	if _fx_mat == null:
+		_fx_mat = ShaderMaterial.new()
+		_fx_mat.shader = load("res://shaders/card_pattern.gdshader")
+		_fx_mat.set_shader_parameter("pattern_strength", 0.0)
+		_fx_mat.set_shader_parameter("fx_rect", Vector4(-36, -36, 36, 36))
+	_fx_mat.set_shader_parameter("fx_mode", 3)  # the foil shimmer keeps their frames' colours
+	material = _fx_mat
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	_fx_t += delta
+	if _fx_mat != null:
+		_fx_mat.set_shader_parameter("fx_time", _fx_t)
 
 
 func _draw() -> void:

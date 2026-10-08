@@ -739,6 +739,8 @@ func _open_cardgrid() -> void:
 		["The Joker", func(c: PlayingCard) -> void: c.rank = 14; c.joker = true; c.mod = "wild"],
 		["Prism mult", func(c: PlayingCard) -> void: c.mod = "mult"; c.finish = "prism"],
 		["Metal chip, 2 pins left", func(c: PlayingCard) -> void: c.mod = "chip"; c.finish = "metal"; c.metal_wear = 2],
+		["Holo 9", func(c: PlayingCard) -> void: c.rank = 9; c.suit = 1; c.finish = "holo"],
+		["Negative King", func(c: PlayingCard) -> void: c.rank = 13; c.finish = "negative"],
 		["Crazy 8 (wild)", func(c: PlayingCard) -> void: c.rank = 8],
 		["Fire on an Ace", func(c: PlayingCard) -> void: c.rank = 14; c.hazard = "fire"],
 		["Fire on a 2", func(c: PlayingCard) -> void: c.rank = 2; c.hazard = "fire"],
@@ -1656,6 +1658,10 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if PlayingCard.eights_wild and card.rank == 8 and not card.washed:
 		lines.append("CRAZY 8 — wild at this table")
 	match card.finish:
+		"holo":
+			lines.append("HOLO — +%d to the hand, before multipliers" % board.holo_bonus)
+		"negative":
+			lines.append("NEGATIVE — scoring it gives the hand back")
 		"prism":
 			lines.append("PRISM — spreads its enhancement when cleared")
 		"metal":

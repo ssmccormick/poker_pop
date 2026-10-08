@@ -68,6 +68,7 @@ const MULT_FACTOR := 1.5   # per played mult-mod card, stacking
 var chip_bonus := CHIP_BONUS
 var mult_factor := MULT_FACTOR
 var gold_pay := 1               # $ per played gold card (POWER upgrades)
+var holo_bonus := 50            # flat score per HOLO card in a hand (POWER upgrades)
 const HAZARD_DIRS: Array[Vector2i] = [
 	Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
@@ -1713,7 +1714,14 @@ func _apply_card_mods(result: Dictionary) -> void:
 	var chip_pay := 0
 	var gold_cards := 0
 	var jokers := 0
+	var holos := 0
+	var negatives := 0
 	for card in selected:
+		# Finishes ride alongside the enhancement.
+		if card.finish == "holo":
+			holos += 1
+		elif card.finish == "negative":
+			negatives += 1
 		if card.joker:
 			jokers += 1  # wild, and his own ×2 on top
 		elif card.mod == "mult":
@@ -1723,6 +1731,14 @@ func _apply_card_mods(result: Dictionary) -> void:
 			chip_pay += chip_bonus * (1 + card.chip_level)
 		elif card.mod == "gold":
 			gold_cards += 1
+	if holos > 0:
+		# HOLO: a flat bump to the hand BEFORE any multiplier, so Mult
+		# cards, the Joker and the Tonic all multiply it too.
+		result.score = int(result.score) + holo_bonus * holos
+		result["holo_bonus"] = holo_bonus * holos
+	if negatives > 0:
+		# NEGATIVE: trail mode hands back a hand (or seconds) per card.
+		result["negatives"] = negatives
 	if mults > 0:
 		result.score = int(result.score * pow(mult_factor, mults))
 	if jokers > 0:
