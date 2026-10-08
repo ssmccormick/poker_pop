@@ -329,6 +329,32 @@ func _run() -> void:
 			"the RIDERS shelf lists three riders and both tricks")
 	trail._up_tab = "gear"
 
+	# --- POWER upgrades reach the table ---------------------------------
+	trail.cash = 5000
+	trail._buy_power("mod", "mult")
+	trail._buy_power("mod", "mult")
+	failures += _check(trail.progress.power_level("mod", "mult") == 2 and trail.cash == 5000 - 80 - 160,
+			"Mult's two POWER levels cost $80 then $160")
+	trail._buy_power("relic", "horseshoe")
+	trail._buy_power("relic", "horseshoe")
+	trail._buy_power("provision", "pocket_flask")
+	trail._load_meta()
+	trail.progress.unlock_all = true
+	await _enter_room("the_gambler")
+	failures += _check(is_equal_approx(main.board.mult_factor, 1.75),
+			"a POWER 2 Mult card multiplies ×1.75 (%.2f)" % main.board.mult_factor)
+	trail.relics.append("horseshoe")
+	trail.relics.append("mirror_shades")
+	trail._apply_relic_effects()
+	failures += _check(is_equal_approx(main.board.mult_factor, 2.25),
+			"Mirror Shades still add their +0.5 on top")
+	var hands_before: int = trail.room_hands_left
+	trail.room_limit = "hands"
+	trail._apply_instant_provision("pocket_flask")
+	failures += _check(trail.room_hands_left == hands_before + 3,
+			"a POWER 1 Pocket Flask pours three hands")
+	trail.progress.unlock_all = false
+
 	# --- Contracts: done, claimed once, remembered ------------------------
 	var cash_c: int = trail.cash
 	main.stats["tables_cleared"] = 10

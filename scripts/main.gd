@@ -930,7 +930,7 @@ func _update_kit() -> void:
 				btn.tooltip_text = "Pick a card on the table — right-click or press again to holster."
 			else:
 				btn.text = p.name
-				btn.tooltip_text = p.desc + (
+				btn.tooltip_text = trail.provision_desc(String(trail.provisions[i])) + (
 						"\nClick, then pick a card on the table. Free action."
 						if p.kind == "target" else "\nFires on the spot. Free action.")
 		else:
@@ -1633,7 +1633,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"mult":
 			lines.append("MULT — ×%.1f hand score" % board.mult_factor)
 		"gold":
-			lines.append("GOLD — +$1 cash when played")
+			lines.append("GOLD — +$%d cash when played" % board.gold_pay)
 		"plus":
 			lines.append("PLUS — +1 rank to the card it aims at")
 		"minus":

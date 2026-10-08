@@ -362,7 +362,7 @@ var _aiming_sleeve := false
 var _shop_stock_provisions: Array = []   # [{id, bought}] on the shelf
 var burns_used := 0      # run-wide: each burn costs more than the last
 var _second_wind_used := false
-var _fire_tick_flip := false
+var _fire_ticks := 0
 var _shop_stock: Array = []      # this shop room's shelves (no restocking)
 var _shop_stock_room := -1
 var _shop_stock_relics: Array = []   # [{id, bought}] on this merchant's shelf
@@ -699,15 +699,46 @@ func _cost_mult(room: int) -> int:
 
 func _price(base: int) -> int:
 	var p := base * _cost_mult(room_index)
-	return int(p * 0.75) if has_relic("snake_oil") else p
+	return int(p * (1.0 - float(rv("snake_oil", "off")))) if has_relic("snake_oil") else p
 
 
-## Pushes relic-driven settings into the board/card layer. Call at run
-## start, on load, and whenever a relic is gained.
+## POWER values at the Outfitter level the player bought: a relic's,
+## a provision's, an enhancement's.
+func rv(id: String, k: String) -> Variant:
+	return progress.val("relic", id, k)
+
+
+func pv(id: String, k: String, fallback: Variant = 0) -> Variant:
+	return progress.val("provision", id, k, fallback)
+
+
+func mv(id: String, k: String) -> Variant:
+	return progress.val("mod", id, k)
+
+
+## What a relic does at the POWER level the player owns.
+func relic_desc(id: String) -> String:
+	var d := progress.pdesc("relic", id)
+	return d if d != "" else String(RELICS.get(id, {}).get("desc", ""))
+
+
+func provision_desc(id: String) -> String:
+	var d := progress.pdesc("provision", id)
+	return d if d != "" else String(PROVISIONS.get(id, {}).get("desc", ""))
+
+
+## Pushes relic- and POWER-driven settings into the board/card layer.
+## Call at run start, on load, and whenever a relic is gained.
 func _apply_relic_effects() -> void:
-	main.board.chip_bonus = Board.CHIP_BONUS * (2 if has_relic("gold_tooth") else 1)
+	var chip := float(mv("chip", "chips")) \
+			* (float(rv("gold_tooth", "x")) if has_relic("gold_tooth") else 1.0)
+	main.board.chip_bonus = roundi(chip)
 	PlayingCard.chip_pay_base = main.board.chip_bonus
-	main.board.mult_factor = 2.0 if has_relic("mirror_shades") else Board.MULT_FACTOR
+	main.board.mult_factor = float(mv("mult", "x")) \
+			+ (float(rv("mirror_shades", "plus")) if has_relic("mirror_shades") else 0.0)
+	main.board.gold_pay = int(mv("gold", "cash"))
+	main.board.gold_find_chance = float(rv("chisel", "gold")) if has_relic("chisel") \
+			else Board.GOLD_FIND_CHANCE
 	PlayingCard.washed_show_suit = has_relic("swimming_goggles")
 
 
@@ -717,6 +748,8 @@ func _gain_relic(id: String) -> void:
 	main.tutor_show("relics")
 	main.stat_bump("relics_found")
 	relics.append(id)
+	if id == "saddlebags" and int(rv("saddlebags", "packed")) > 0 and run_active:
+		gain_provision(_random_provision())
 	_apply_relic_effects()
 	_save_run()
 
@@ -855,22 +888,22 @@ func use_sleight() -> void:
 
 ## Two picks for a side-by-side swap: returns the first card once
 ## `card` completes a neighboring pair, null while still choosing.
-func _swap_pair_pick(card: PlayingCard) -> PlayingCard:
+func _swap_pair_pick(card: PlayingCard, anywhere := false) -> PlayingCard:
 	if _swap_first == null or not is_instance_valid(_swap_first) \
 			or not main.board.grid.has(_swap_first.grid_pos) \
 			or main.board.grid[_swap_first.grid_pos] != _swap_first:
 		_swap_first = card
 		main.board._play_sound(Board.SFX_FLIP, 1.3, -10.0)
 		main.board._fx(card.position, "pop", main.GOLD)
-		main._announce("NOW PICK THE CARD BESIDE IT — right-click to holster",
-				main.GOLD)
+		main._announce("NOW PICK %s — right-click to holster"
+				% ("ANY OTHER CARD" if anywhere else "THE CARD BESIDE IT"), main.GOLD)
 		return null
 	if card == _swap_first:
 		_swap_first = null
 		main._announce("UNPICKED — choose the first card again", main.DIM)
 		return null
 	var dp: Vector2i = card.grid_pos - _swap_first.grid_pos
-	if absi(dp.x) + absi(dp.y) != 1:
+	if absi(dp.x) + absi(dp.y) != 1 and not anywhere:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
 		main._announce("THEY MUST SIT SIDE BY SIDE", main.RED)
 		return null
@@ -1017,7 +1050,7 @@ func second_wind_ready() -> bool:
 ## stays in the satchel, spent, so no merchant sells a second one.
 func _second_wind_revive(seat := -1) -> void:
 	_second_wind_used = true
-	hp = maxi(hp, CAMP_REST_HP)
+	hp = maxi(hp, int(rv("second_wind", "hp")))
 	chips = maxi(chips, seat if seat >= 0 else _cheapest_seat(room_index))
 	main.stat_bump("second_winds")
 	main.board._play_sound(Board.SFX_STING_WIN, 0.9, -6.0)
@@ -1114,7 +1147,12 @@ func use_provision(slot: int) -> void:
 
 
 func _spend_provision(slot: int) -> void:
-	provisions.remove_at(slot)
+	var id: String = provisions[slot]
+	# Upgraded tools sometimes survive the job.
+	if randf() < float(pv(id, "keep", 0.0)):
+		main._announce("THE %s HOLDS UP — still in the kit" % String(PROVISIONS[id].name).to_upper())
+	else:
+		provisions.remove_at(slot)
 	_aiming_slot = -1
 	main.board.pending_provision = ""
 	main.stat_bump("provisions_used")
@@ -1128,16 +1166,19 @@ func _apply_instant_provision(id: String) -> void:
 			main.board.provision_redeal()
 		"pocket_flask":
 			if room_limit == "time":
-				room_time_left += 20.0
-				main._announce("POCKET FLASK  +20 SECONDS")
+				var secs := int(pv("pocket_flask", "secs"))
+				room_time_left += secs
+				main._announce("POCKET FLASK  +%d SECONDS" % secs)
 			else:
-				room_hands_left += 2
-				main._announce("POCKET FLASK  +2 HANDS")
+				var more := int(pv("pocket_flask", "hands"))
+				room_hands_left += more
+				main._announce("POCKET FLASK  +%d HANDS" % more)
 			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.2, -8.0)
 		"tonic":
-			main.board.next_hand_mult = 2.0
+			var x := float(pv("tonic", "x"))
+			main.board.next_hand_mult = x
 			main.board._play_sound(Board.SFX_FLIP, 0.8, -8.0)
-			main._announce("RATTLESNAKE TONIC — NEXT HAND COUNTS DOUBLE")
+			main._announce("RATTLESNAKE TONIC — NEXT HAND COUNTS ×%s" % String.num(x, 1))
 
 
 ## The aimed provision or sleeve picked a card (null = holstered).
@@ -1207,8 +1248,9 @@ func _on_provision_target(card) -> void:
 		main._announce(why, main.RED)
 		return  # still aiming — pick another card or holster
 	if id == "shell_game":
-		# Two picks: the first card waits while you choose its neighbor.
-		var first := _swap_pair_pick(card)
+		# Two picks: the first card waits while you choose its neighbor
+		# (any card at all, once the Outfitter has taught the trick).
+		var first := _swap_pair_pick(card, int(pv("shell_game", "any")) > 0)
 		if first == null:
 			return  # still aiming
 		_spend_provision(_aiming_slot)
@@ -1253,6 +1295,12 @@ func _apply_target_provision(id: String, card: PlayingCard) -> void:
 		"canteen":
 			main._announce("DOUSED")
 			main.board.provision_clean(card)
+			if int(pv("canteen", "spread")) > 0:
+				# The upgraded canteen splashes the four neighbors too.
+				for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+					var n: PlayingCard = main.board.grid.get(card.grid_pos + d)
+					if n != null and _provision_refusal("canteen", n) == "":
+						main.board.provision_clean(n)
 		"dynamite":
 			if card.hazard == "stone" and room_goal == "mine":
 				# Blasting the seam still counts toward the quota.
@@ -1272,7 +1320,8 @@ func _apply_target_provision(id: String, card: PlayingCard) -> void:
 			main.board.provision_enhance(card, "gold")
 		"razor":
 			main._announce("A FRESH FACE")
-			main.board.provision_reroll(card)
+			main.board.provision_reroll(card,
+					card.rank if int(pv("razor", "up")) > 0 else 2)
 
 
 ## A random provision id for shops and loot.
@@ -1391,7 +1440,7 @@ func _fresh_deck() -> Array:
 
 
 func _cashout_value(rate_bonus := 1.0) -> int:
-	var rate: float = _table().rate + (0.25 if has_relic("bankroll_clip") else 0.0)
+	var rate: float = _table().rate + (float(rv("bankroll_clip", "rate")) if has_relic("bankroll_clip") else 0.0)
 	return int(chips * rate * rate_bonus / 10.0)
 
 
@@ -1833,16 +1882,45 @@ func _catalog_row(r: Dictionary) -> Control:
 	if fl > 0:
 		note += "  ·  FOUND %s× AS OFTEN" % String.num(float(Progression.FIND_MULT[fl]), 1)
 	_row_status(row, note)
+	var pmax := Progression.power_max(kind, id)
 	if kind in Progression.FINDABLE:
 		var fcost := progress.find_cost(kind, id)
 		var label := "FIND %d / %d — $%d" % [fl + 1, Progression.MAX_FIND, fcost] \
-				if fcost > 0 else "FOUND AS OFTEN AS IT GETS"
-		var fb := _row_button(row, label, Vector2(700, 46), Vector2(324, 40))
+				if fcost > 0 else "FIND MAXED"
+		var wide := Vector2(324, 40) if pmax == 0 else Vector2(158, 40)
+		var fb := _row_button(row, label, Vector2(700, 46), wide)
 		fb.disabled = fcost <= 0 or cash < fcost
 		fb.tooltip_text = "Turns up more often on the trail. Applies to rides in progress too."
 		fb.pressed.connect(func() -> void:
 			_buy_find(kind, id))
+	if pmax > 0:
+		var plv := progress.power_level(kind, id)
+		var pcost := progress.power_cost(kind, id)
+		var plabel := "POWER %d / %d — $%d" % [plv + 1, pmax, pcost] if pcost > 0 \
+				else "POWER MAXED"
+		var pb := _row_button(row, plabel, Vector2(866, 46), Vector2(158, 40), pcost > 0)
+		pb.disabled = pcost <= 0 or cash < pcost
+		pb.tooltip_text = ("Next: " + progress.pdesc(kind, id, plv + 1)) if pcost > 0 \
+				else "As strong as it gets."
+		pb.pressed.connect(func() -> void:
+			_buy_power(kind, id))
 	return row
+
+
+func _buy_power(kind: String, id: String) -> void:
+	var cost := progress.power_cost(kind, id)
+	if cost <= 0 or cash < cost:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	cash -= cost
+	progress.raise_power(kind, id)
+	_save_meta()
+	if run_active:
+		_apply_relic_effects()
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+	main._announce("%s — POWER %d" % [String(Progression.row(kind, id).name).to_upper(),
+			progress.power_level(kind, id)])
+	_refresh_upgrades()
 
 
 func _buy_catalog(kind: String, id: String) -> void:
@@ -1954,9 +2032,13 @@ func _row_icon(row: Control, kind: String, id: String) -> void:
 func _catalog_desc(kind: String, id: String) -> String:
 	match kind:
 		"relic":
-			return String(RELICS[id].desc) if RELICS.has(id) else ""
+			return relic_desc(id)
 		"provision":
-			return String(PROVISIONS[id].desc) if PROVISIONS.has(id) else ""
+			return provision_desc(id)
+		"mod":
+			var d := progress.pdesc("mod", id)
+			if d != "":
+				return d
 		"finish":
 			return String(PlayingCard.FINISHES[id].desc) if PlayingCard.FINISHES.has(id) else ""
 		"rider":
@@ -2026,7 +2108,7 @@ func _start_run(tier: int) -> void:
 	trail_log = []
 	burns_used = 0
 	_second_wind_used = false
-	_fire_tick_flip = false
+	_fire_ticks = 0
 	_shop_stock_room = -1
 	_offers_room = -1
 	_room_save = {}
@@ -2907,6 +2989,11 @@ func _start_room() -> void:
 		if gain_provision(ration):
 			main._announce("THE CHUCK WAGON PROVIDES — %s"
 					% String(PROVISIONS[ration].name).to_upper())
+	elif has_relic("chuck_wagon") and int(rv("chuck_wagon", "chips")) > 0:
+		# A full kit takes its rations in chips instead.
+		var ration_chips := _blind_for(room_index)
+		chips += ration_chips
+		main._announce("THE CHUCK WAGON PAYS  +%d CHIPS" % ration_chips)
 	match character:
 		"the_machine":
 			main.tutor_show("laser")
@@ -2949,12 +3036,13 @@ func _start_room() -> void:
 			and CharacterKit.available():
 		room_outlaws = _roll_posse(int(current_offer.get("posse", 1)))
 	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
-			+ (1 if has_relic("horseshoe") else 0)
+			+ (int(rv("horseshoe", "hands")) if has_relic("horseshoe") else 0)
 	room_time_left = 0.0
 	if room_on_clock():
 		# The clock is the budget, not hands.
 		room_time_left = 60.0 * int(current_offer.get("minutes_bought",
-				current_offer.get("minutes", 3)))
+				current_offer.get("minutes", 3))) \
+				+ (float(rv("horseshoe", "secs")) if has_relic("horseshoe") else 0.0)
 		room_hands_left = 999
 	main.mode_kind = "trail"
 	main.mode_label_text = "Trail · %s · %s" % [_table().name.capitalize(),
@@ -3024,7 +3112,7 @@ func _seed_room_specials() -> void:
 			main.board.spawn_objective("bullet")
 		for i in 2:
 			main.board.spawn_objective("hisbullet")
-	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0) \
+	elif randf() < AMBIENT_CHANCE * (float(rv("rabbits_foot", "x")) if has_relic("rabbits_foot") else 1.0) \
 			and (_avail("room", "safe") or _avail("room", "chest")):
 		# Surprise loot in a plain room — only jobs the rider has met.
 		var safe_ok := _avail("room", "safe")
@@ -3060,7 +3148,7 @@ func _seed_room_specials() -> void:
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
 		if card.hazard == "bomb" and has_relic("bomb_badge"):
-			card.fuse = Board.BOMB_FUSE + 2
+			card.fuse = Board.BOMB_FUSE + int(rv("bomb_badge", "fuse"))
 		elif card.hazard == "stone" and has_relic("chisel"):
 			card.stone_hits = Board.STONE_HITS_START - 1
 	# Opening seeds fight from hand one — spreading, soaking, burning
@@ -3134,7 +3222,7 @@ func _tutor_room_intros() -> void:
 
 ## A 4-digit combination drawn from low ranks present on the board.
 func _generate_combo() -> Array:
-	var max_rank := 6 if has_relic("dowsing_rod") else 9
+	var max_rank := int(rv("dowsing_rod", "max")) if has_relic("dowsing_rod") else 9
 	var pool: Array = []
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
@@ -3316,7 +3404,7 @@ func _consume_hand() -> void:
 		# Clock rooms never run out of hands — only of seconds.
 		_tick_room_hazards()
 		return
-	if has_relic("lucky_chip") and randf() < 0.10:
+	if has_relic("lucky_chip") and randf() < float(rv("lucky_chip", "p")):
 		_announce_after_settle("LUCKY CHIP — free hand!")
 	else:
 		room_hands_left -= 1
@@ -3764,8 +3852,9 @@ func _tick_room_hazards() -> void:
 			return
 	var tick_fire := true
 	if has_relic("fire_blanket"):
-		_fire_tick_flip = not _fire_tick_flip
-		tick_fire = _fire_tick_flip
+		# Fire burns on the 1st hand, then every Nth after it.
+		_fire_ticks += 1
+		tick_fire = (_fire_ticks - 1) % int(rv("fire_blanket", "every")) == 0
 	await main.board.tick_hazards(tick_fire)
 	if not in_room:
 		return
@@ -3830,7 +3919,7 @@ func _room_cleared() -> void:
 			String.num(stake_odds, 1)], pot]]
 	if has_relic("tin_star"):
 		# The badge pays a blind, so it keeps pace with the trail.
-		var star := _blind_for(room_index)
+		var star := roundi(_blind_for(room_index) * float(rv("tin_star", "blinds")))
 		winnings += star
 		_win_rows.append(["TIN STAR", star])
 	# Swift work pays: every spare hand (or every spare 10 seconds on
@@ -4118,7 +4207,7 @@ func _show_relic_reward_now() -> void:
 	var r: Dictionary = RELICS.get(_pending_relic_reward, {})
 	_relic_icon.relic_id = _pending_relic_reward
 	_relic_name.text = String(r.get("name", "")).to_upper()
-	_relic_desc.text = String(r.get("desc", ""))
+	_relic_desc.text = relic_desc(_pending_relic_reward)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 0.9, -6.0)
 	relic_layer.visible = true
 
@@ -4145,8 +4234,8 @@ func _show_pick_now() -> void:
 	for child in _pick_box.get_children():
 		child.queue_free()
 	var pick_count := 3 if _in_chest_pick \
-			else (4 if has_relic("card_sleeve") else 3)
-	var start_x := 545.0 if pick_count == 4 else 660.0
+			else (int(rv("card_sleeve", "picks")) if has_relic("card_sleeve") else 3)
+	var start_x := (1920.0 - (pick_count * 220.0 - 50.0)) / 2.0
 	for i in pick_count:
 		var card_data := _random_card_offer(0.25 if _in_chest_pick else PICK_MOD_CHANCE)
 		var holder: Button = main._button(_pick_box, "", Vector2(start_x + i * 220, 0), Vector2(170, 240))
@@ -4456,7 +4545,7 @@ func _render_shop_relics() -> void:
 		var name_l := _face_label(btn, r.name, 14.0, 30.0, 20, main.GOLD)
 		name_l.position.x = 96
 		name_l.size.x = 292
-		var desc_l := _face_label(btn, r.desc, 46.0, 64.0, 16, main.OFFWHITE)
+		var desc_l := _face_label(btn, relic_desc(String(slot.id)), 46.0, 64.0, 16, main.OFFWHITE)
 		desc_l.position.x = 96
 		desc_l.size.x = 292
 		var price_l := _face_label(btn, "%d chips" % cost, 116.0, 30.0, 18, main.GOLD)
@@ -4521,7 +4610,7 @@ func _render_shop_provisions() -> void:
 		name_l.size.x = 190
 		# Keep the blurb clear of the icon in the right column; three
 		# short lines fit at 12.
-		var desc_l := _face_label(btn, p.desc, 38.0, 58.0, 12, main.OFFWHITE)
+		var desc_l := _face_label(btn, provision_desc(String(slot.id)), 38.0, 58.0, 12, main.OFFWHITE)
 		desc_l.position.x = 10
 		desc_l.size.x = 142
 		var price_l := _face_label(btn, "%d chips" % cost, 96.0, 24.0, 16, main.GOLD)

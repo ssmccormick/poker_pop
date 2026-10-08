@@ -67,6 +67,7 @@ const MULT_FACTOR := 1.5   # per played mult-mod card, stacking
 # Relic-tunable copies (Gold Tooth / Mirror Shades adjust these).
 var chip_bonus := CHIP_BONUS
 var mult_factor := MULT_FACTOR
+var gold_pay := 1               # $ per played gold card (POWER upgrades)
 const HAZARD_DIRS: Array[Vector2i] = [
 	Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
@@ -81,6 +82,7 @@ var dragging := false
 var suppress_refill := false
 # Broken stones can uncover gold cards in the rubble — everywhere.
 const GOLD_FIND_CHANCE := 0.35
+var gold_find_chance := GOLD_FIND_CHANCE  # the Chisel's POWER lifts it
 # LAND RUSH rooms: cells a scored card has been cleared from (drawn
 # as claim stakes under the cards).
 var landrush_marks := {}
@@ -1064,7 +1066,7 @@ func play_hand() -> void:
 	# Every stone ground to dust may leave gold behind — mining pays.
 	if breaking > 0:
 		for i in breaking:
-			if randf() >= GOLD_FIND_CHANCE:
+			if randf() >= gold_find_chance:
 				continue
 			var plain: Array = []
 			for p in grid:
@@ -1728,8 +1730,9 @@ func _apply_card_mods(result: Dictionary) -> void:
 	if chip_pay > 0:
 		result["bonus_chips"] = chip_pay
 	if gold_cards > 0:
-		# Real money, straight to the pocket: $1 per gold card.
-		result["cash_earned"] = gold_cards
+		# Real money, straight to the pocket: $1 per gold card (more
+		# once the Outfitter has gilded them).
+		result["cash_earned"] = gold_cards * gold_pay
 	if next_hand_mult != 1.0:
 		# Rattlesnake Tonic: the promised double, shown in the preview
 		# too. play_hand consumes the flag when the hand actually scores.
@@ -1977,8 +1980,8 @@ func provision_enhance(card: PlayingCard, mod: String) -> void:
 
 
 ## Barber's Razor: a fresh face on the same card (mods survive the cut).
-func provision_reroll(card: PlayingCard) -> void:
-	card.rank = randi_range(2, 14)
+func provision_reroll(card: PlayingCard, min_rank := 2) -> void:
+	card.rank = randi_range(clampi(min_rank, 2, 14), 14)
 	card.suit = randi_range(0, 3)
 	card.queue_redraw()
 	_play_sound(SFX_FLIP, 1.3, -8.0)

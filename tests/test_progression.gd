@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_odds()
 	_round_trip()
 	_contracts()
+	_power()
 	if failures == 0:
 		print("ALL PROGRESSION TESTS PASSED")
 	else:
@@ -294,6 +295,37 @@ func _contracts() -> void:
 	_check(sorted_ok and int(order[0]) == 0 and int(order[-1]) == 3,
 			"the page reads ready, in progress, greyed, then claimed")
 	_check(Contracts.lock_text(safe, p).contains("Level 4"), "a greyed row says when it opens")
+
+
+func _power() -> void:
+	var bad: Array = []
+	for k in Progression.POWER:
+		var parts := String(k).split(":")
+		if Progression.row(parts[0], parts[1]).is_empty():
+			bad.append(k)
+		var n := (Progression.POWER[k].pdesc as Array).size()
+		for vk in Progression.POWER[k].vals:
+			if (Progression.POWER[k].vals[vk] as Array).size() != n:
+				bad.append("%s.%s" % [k, vk])
+	_check(bad.is_empty(), "every POWER row is a catalog item with a value per level %s" % str(bad))
+	_check(Progression.power_max("relic", "horseshoe") == 2
+			and Progression.power_max("mod", "gold") == 1
+			and Progression.power_max("relic", "swimming_goggles") == 0,
+			"POWER tops out per item (Goggles have none)")
+	var p := Progression.new()
+	_check(int(p.val("relic", "horseshoe", "hands")) == 1, "POWER 0 is today's Horseshoe")
+	_check(p.power_cost("relic", "horseshoe") == 80, "POWER 1 on a starter relic costs $80")
+	_check(p.power_cost("relic", "rabbits_foot") == 0, "a relic not bought has no POWER for sale")
+	p.raise_power("relic", "horseshoe")
+	_check(p.power_cost("relic", "horseshoe") == 160 and int(p.val("relic", "horseshoe", "secs")) == 15,
+			"POWER 1 adds the clock seconds, and POWER 2 costs double")
+	p.raise_power("relic", "horseshoe")
+	p.raise_power("relic", "horseshoe")
+	_check(p.power_level("relic", "horseshoe") == 2 and int(p.val("relic", "horseshoe", "hands")) == 2
+			and p.power_cost("relic", "horseshoe") == 0, "POWER caps at its top level")
+	_check(p.pdesc("relic", "horseshoe").begins_with("+2 hands"), "the description follows the level")
+	_check(float(p.val("provision", "dynamite", "keep")) == 0.0
+			and float(p.val("relic", "nope", "x", 1.5)) == 1.5, "missing values fall back")
 
 
 func _check(cond: bool, label: String) -> void:

@@ -94,6 +94,97 @@ const CATALOG := [
 	{"kind": "room", "id": "dealer", "name": "The Dealer's Table", "level": RESERVED_LEVEL, "price": 0, "reserved": true},
 ]
 
+## POWER levels, hand-designed: each value has one entry per level, and
+## `pdesc` says what the item does at each level (its length is the
+## number of levels, so max POWER = pdesc.size() - 1).
+const POWER := {
+	"relic:horseshoe": {"vals": {"hands": [1, 1, 2], "secs": [0, 15, 15]},
+		"pdesc": ["+1 hand in every room", "+1 hand in every room, +15s on clock tables",
+			"+2 hands in every room, +15s on clock tables"]},
+	"relic:card_sleeve": {"vals": {"picks": [4, 5]},
+		"pdesc": ["Card picks offer 4 choices", "Card picks offer 5 choices"]},
+	"relic:snake_oil": {"vals": {"off": [0.25, 0.30, 0.35]},
+		"pdesc": ["Shop prices -25%", "Shop prices -30%", "Shop prices -35%"]},
+	"relic:tin_star": {"vals": {"blinds": [1.0, 1.5, 2.0]},
+		"pdesc": ["Every cleared table pays an extra blind",
+			"Every cleared table pays an extra blind and a half",
+			"Every cleared table pays two extra blinds"]},
+	"relic:rabbits_foot": {"vals": {"x": [2.0, 2.5, 3.0]},
+		"pdesc": ["Surprise safes and chests turn up twice as often on plain tables",
+			"Surprise safes and chests turn up 2.5× as often on plain tables",
+			"Surprise safes and chests turn up three times as often on plain tables"]},
+	"relic:bomb_badge": {"vals": {"fuse": [2, 3, 4]},
+		"pdesc": ["Bombs start with +2 fuse", "Bombs start with +3 fuse", "Bombs start with +4 fuse"]},
+	"relic:chisel": {"vals": {"gold": [0.35, 0.50]},
+		"pdesc": ["Stones need one fewer use",
+			"Stones need one fewer use, and half of them leave gold in the rubble"]},
+	"relic:fire_blanket": {"vals": {"every": [2, 3]},
+		"pdesc": ["Fire only ticks every 2nd hand", "Fire only ticks every 3rd hand"]},
+	"relic:gold_tooth": {"vals": {"x": [2.0, 2.5, 3.0]},
+		"pdesc": ["Chip cards pay double", "Chip cards pay 2.5×", "Chip cards pay triple"]},
+	"relic:mirror_shades": {"vals": {"plus": [0.5, 0.75, 1.0]},
+		"pdesc": ["Mult cards multiply +0.5 more", "Mult cards multiply +0.75 more",
+			"Mult cards multiply +1 more"]},
+	"relic:second_wind": {"vals": {"hp": [5, 8, 10]},
+		"pdesc": ["One free life: when the trail would end you, rise with 5 HP and chips for the table. Then it's spent",
+			"One free life: rise with 8 HP and chips for the table. Then it's spent",
+			"One free life: rise with full HP and chips for the table. Then it's spent"]},
+	"relic:bankroll_clip": {"vals": {"rate": [0.25, 0.4, 0.5]},
+		"pdesc": ["Trail completion pays +0.25x", "Trail completion pays +0.4x",
+			"Trail completion pays +0.5x"]},
+	"relic:dowsing_rod": {"vals": {"max": [6, 5]},
+		"pdesc": ["Safe combos use only ranks 2-6", "Safe combos use only ranks 2-5"]},
+	"relic:saddlebags": {"vals": {"packed": [0, 1]},
+		"pdesc": ["A 4th slot in your provision kit",
+			"A 4th slot in your provision kit, and it arrives packed"]},
+	"relic:chuck_wagon": {"vals": {"chips": [0, 1]},
+		"pdesc": ["A random provision at every table's start",
+			"A random provision at every table's start — a blind in chips if the kit is full"]},
+	"relic:lucky_chip": {"vals": {"p": [0.10, 0.15, 0.20]},
+		"pdesc": ["10% chance a hand costs no hand", "15% chance a hand costs no hand",
+			"20% chance a hand costs no hand"]},
+	"provision:pocket_flask": {"vals": {"hands": [2, 3, 4], "secs": [20, 30, 40]},
+		"pdesc": ["+2 hands at this table (+20s on a timed one)",
+			"+3 hands at this table (+30s on a timed one)",
+			"+4 hands at this table (+40s on a timed one)"]},
+	"provision:tonic": {"vals": {"x": [2.0, 2.5, 3.0]},
+		"pdesc": ["Your next scored hand counts DOUBLE", "Your next scored hand counts 2.5×",
+			"Your next scored hand counts TRIPLE"]},
+	"provision:shell_game": {"vals": {"any": [0, 1]},
+		"pdesc": ["Swap two neighboring cards - pick one, then its neighbor",
+			"Swap ANY two cards on the table"]},
+	"provision:razor": {"vals": {"up": [0, 1]},
+		"pdesc": ["Re-roll one card's rank and suit",
+			"Re-roll one card's rank and suit — never to a lower rank"]},
+	"provision:canteen": {"vals": {"spread": [0, 1]},
+		"pdesc": ["Douse one card: removes any hazard or soak",
+			"Douse one card and its four neighbors"]},
+	"provision:dynamite": {"vals": {"keep": [0.0, 0.20, 0.35]},
+		"pdesc": ["Destroy one card outright, unscored - stones and curses included",
+			"Destroy one card outright — 20% chance the stick isn't used up",
+			"Destroy one card outright — 35% chance the stick isn't used up"]},
+	"provision:gold_pan": {"vals": {"keep": [0.0, 0.20, 0.35]},
+		"pdesc": ["Turn one plain card solid GOLD",
+			"Turn one plain card solid GOLD — 20% chance the pan isn't used up",
+			"Turn one plain card solid GOLD — 35% chance the pan isn't used up"]},
+	"provision:branding_iron": {"vals": {"keep": [0.0, 0.20, 0.35]},
+		"pdesc": ["Brand a plain card with a random enhancement",
+			"Brand a plain card — 20% chance the iron stays hot for another",
+			"Brand a plain card — 35% chance the iron stays hot for another"]},
+	"provision:fresh_deck": {"vals": {"keep": [0.0, 0.20, 0.35]},
+		"pdesc": ["Re-deal every plain and enhanced card on the table",
+			"Re-deal the table — 20% chance the deck isn't used up",
+			"Re-deal the table — 35% chance the deck isn't used up"]},
+	"mod:mult": {"vals": {"x": [1.5, 1.6, 1.75]},
+		"pdesc": ["×1.5 to the hand's score.", "×1.6 to the hand's score.", "×1.75 to the hand's score."]},
+	"mod:chip": {"vals": {"chips": [8, 10, 12]},
+		"pdesc": ["+8 chips on every score, growing each time it's played.",
+			"+10 chips on every score, growing each time it's played.",
+			"+12 chips on every score, growing each time it's played."]},
+	"mod:gold": {"vals": {"cash": [1, 2]},
+		"pdesc": ["+$1 cash every time it's played.", "+$2 cash every time it's played."]},
+}
+
 # --- Per-profile state ----------------------------------------------------
 var exp_total := 0
 var owned := {}           # "kind:id" -> true (bought, or granted)
@@ -308,6 +399,46 @@ func find_cost(kind: String, id: String) -> int:
 
 func raise_find(kind: String, id: String) -> void:
 	find[key(kind, id)] = mini(MAX_FIND, find_level(kind, id) + 1)
+
+
+## The highest POWER level kind/id has (0 = no POWER upgrades).
+static func power_max(kind: String, id: String) -> int:
+	var p: Dictionary = POWER.get(key(kind, id), {})
+	return maxi(0, (p.get("pdesc", []) as Array).size() - 1)
+
+
+## A POWER value at the item's current level (`fallback` if it has none).
+func val(kind: String, id: String, k: String, fallback: Variant = 0) -> Variant:
+	var p: Dictionary = POWER.get(key(kind, id), {})
+	var vals: Array = p.get("vals", {}).get(k, [])
+	if vals.is_empty():
+		return fallback
+	return vals[clampi(power_level(kind, id), 0, vals.size() - 1)]
+
+
+## What the item does at `lv` (-1 = its current level); "" if no POWER.
+func pdesc(kind: String, id: String, lv := -1) -> String:
+	var p: Dictionary = POWER.get(key(kind, id), {})
+	var lines: Array = p.get("pdesc", [])
+	if lines.is_empty():
+		return ""
+	return String(lines[clampi(power_level(kind, id) if lv < 0 else lv, 0, lines.size() - 1)])
+
+
+## $ for the next POWER level, 0 when maxed, powerless or not owned.
+func power_cost(kind: String, id: String) -> int:
+	var r := row(kind, id)
+	if r.is_empty() or not is_available(kind, id):
+		return 0
+	var lv := power_level(kind, id)
+	if lv >= power_max(kind, id):
+		return 0
+	var first := maxi(80, base_price(r))
+	return first if lv == 0 else 2 * first
+
+
+func raise_power(kind: String, id: String) -> void:
+	power[key(kind, id)] = mini(power_max(kind, id), power_level(kind, id) + 1)
 
 
 # --- Save / load ------------------------------------------------------------
