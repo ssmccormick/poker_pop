@@ -240,6 +240,10 @@ func _ready() -> void:
 			"trail":
 				trail.open_buyin()
 			"upgrades":
+				# POKERPOP_TAB picks the shelf (gear, riders, relics, ...).
+				var tab := OS.get_environment("POKERPOP_TAB")
+				if tab != "":
+					trail._up_tab = tab
 				trail.open_upgrades()
 			"trailselect":
 				menu_layer.visible = false
@@ -1920,6 +1924,7 @@ var _level_plate: Button
 var _level_label: Label
 var _level_sub: Label
 var _level_fill: Panel
+var _upgrades_pip: Label
 
 
 func _build_level_plate() -> void:
@@ -1961,7 +1966,12 @@ func _refresh_level_plate() -> void:
 	var into: Array = pr.exp_into_level()
 	_level_label.text = "LEVEL %d" % pr.level()
 	_level_fill.size.x = 192.0 * clampf(float(into[0]) / maxf(1.0, float(into[1])), 0.0, 1.0)
-	_level_sub.text = "%d / %d EXP" % [int(into[0]), int(into[1])]
+	var news: int = trail.outfitter_news()
+	_level_sub.text = "%d NEW AT THE OUTFITTER" % news if news > 0 			else "%d / %d EXP" % [int(into[0]), int(into[1])]
+	_level_sub.add_theme_color_override("font_color", GOLD if news > 0 else DIM)
+	if _upgrades_pip != null:
+		_upgrades_pip.text = str(news)
+		_upgrades_pip.visible = news > 0
 	_level_plate.tooltip_text = "Every ride's score turns into EXP. Each level unlocks something new for the trail."
 
 
@@ -2583,6 +2593,16 @@ func _build_menu() -> void:
 	upgrades_btn.add_theme_font_size_override("font_size", 20)
 	upgrades_btn.pressed.connect(func() -> void:
 		trail.open_upgrades())
+	# A gold pip: how many unlocks the Outfitter hasn't shown yet.
+	_upgrades_pip = _label(menu_layer, "", Vector2(1420, 322), 18, Color("1a1208"))
+	_upgrades_pip.size = Vector2(34, 34)
+	_upgrades_pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_upgrades_pip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var pip_bg := StyleBoxFlat.new()
+	pip_bg.bg_color = GOLD
+	pip_bg.set_corner_radius_all(17)
+	_upgrades_pip.add_theme_stylebox_override("normal", pip_bg)
+	_refresh_level_plate()
 	_menu_center("Buy in · bet at every table · sculpt your deck · ride to the end or bust", 408, 20, DIM)
 
 	_menu_center("TIME TRIAL", 456, 24, GOLD)

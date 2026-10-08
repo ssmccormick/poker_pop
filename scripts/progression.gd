@@ -371,6 +371,8 @@ func grandfather(stats: Dictionary, legacy: Dictionary = {}) -> void:
 		mark_owned("rider", "the_doctor")
 	if int(legacy.get("sleight", 0)) > 0 or String(legacy.get("gambler_ability", "")) == "sleight":
 		mark_owned("trick", "sleight")
+	if int(legacy.get("provisions", 0)) > 0:
+		mark_owned("gear", "provisions")
 	for t in 3:
 		mark_owned("stake", str(t))
 	seen_level = lv

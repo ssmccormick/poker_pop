@@ -32,6 +32,9 @@ func _run() -> void:
 	main._dismiss_splash()
 	failures += _check(trail.progress.level() == 1 and not trail.progress.grandfathered,
 			"a fresh profile starts at level 1")
+	# Most checks ride every rider and trick; the gates get their own
+	# section at the end.
+	trail.progress.unlock_all = true
 
 	# --- Tin Star pays a blind that climbs with the trail ---------------
 	failures += _check(trail._blind_for(0) == 25 and trail._blind_for(7) > 25 * 6,
@@ -259,6 +262,72 @@ func _run() -> void:
 	await _wait(0.5)
 	failures += _check(trail.progress.exp_total == exp2,
 			"re-saddling a fresh ride earns nothing")
+
+	# --- The gates: a fresh level-1 rider ---------------------------------
+	trail._hide_all()
+	trail.progress.unlock_all = false
+	trail.progress.read(ConfigFile.new(), {})
+	trail.character = "the_gambler"
+	trail.gambler_ability = "sleeve"
+	trail._pick_character("the_machine")
+	failures += _check(trail.character == "the_gambler",
+			"at level 1 the Machine can't be saddled")
+	trail._pick_gambler_ability("sleight")
+	failures += _check(trail.gambler_ability == "sleeve",
+			"nor can the Gambler pull Sleight of Hand")
+	trail.cash = 2000
+	trail._start_run(1)
+	failures += _check(trail.cash == 2000, "Table Stakes is shut at level 1")
+	trail.laser_level = 0
+	trail._buy_upgrade("laser")
+	failures += _check(trail.laser_level == 0 and trail.cash == 2000,
+			"the Laser's upgrades wait on the Machine")
+	trail.room_index = 5
+	var all_plain := true
+	for i in 200:
+		var o: Dictionary = trail._make_one_offer(true)
+		if o.kind == "shop":
+			if int(o.merchant) != 0:
+				all_plain = false
+		elif String(o.get("goal", "")) != "" or String(o.get("limit", "")) != "hands":
+			all_plain = false
+	failures += _check(all_plain, "level 1 deals only plain hand-limited tables and the Peddler")
+	var starters := ["horseshoe", "card_sleeve", "snake_oil", "tin_star", "bomb_badge", "chisel"]
+	trail.relics.clear()
+	var shelf: Array = trail._relic_shelf(10)
+	failures += _check(shelf.size() == starters.size()
+			and shelf.all(func(id): return starters.has(id)),
+			"a merchant shelf holds only relics on the trail")
+	var kit: Array = trail._provision_shelf(9)
+	failures += _check(kit.size() == 4 and not kit.has("tonic"),
+			"and only provisions on the trail")
+	var mods_ok := true
+	for i in 300:
+		if not trail._random_mod() in ["mult", "chip", "gold"]:
+			mods_ok = false
+	failures += _check(mods_ok, "only Mult, Chip and Gold cards are dealt at level 1")
+
+	# --- Level up, then buy ------------------------------------------------
+	trail.progress.exp_total = Progression.exp_at_level(18)
+	failures += _check(not trail._avail("rider", "the_machine"),
+			"reaching level 18 unlocks the Machine but doesn't hand him over")
+	trail._buy_catalog("rider", "the_machine")
+	failures += _check(trail.cash == 1700 and trail._avail("rider", "the_machine"),
+			"buying the Machine costs $300 and saddles him up")
+	trail._buy_catalog("rider", "the_machine")
+	failures += _check(trail.cash == 1700, "he can't be bought twice")
+	trail._buy_find("relic", "horseshoe")
+	failures += _check(trail.progress.find_level("relic", "horseshoe") == 1 and trail.cash == 1660,
+			"FIND on a starter relic costs $40")
+	trail._load_meta()
+	failures += _check(trail.progress.owns("rider", "the_machine")
+			and trail.progress.find_level("relic", "horseshoe") == 1 and trail.cash == 1660,
+			"purchases are saved with the profile")
+	trail._up_tab = "riders"
+	trail._refresh_upgrades()
+	failures += _check(trail._up_list.get_child_count() == 5,
+			"the RIDERS shelf lists three riders and both tricks")
+	trail._up_tab = "gear"
 
 	_cleanup()
 	if failures == 0:

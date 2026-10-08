@@ -141,6 +141,67 @@ const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
 
 # Meta and run saves live under the active profile (main.profile_path).
 
+# The Outfitter's shelves: GEAR holds the upgrade ladders, the rest list
+# the catalog by kind.
+const OUTFITTER_TABS := [["gear", "GEAR"], ["riders", "RIDERS"], ["relics", "RELICS"],
+		["provisions", "PROVISIONS"], ["cards", "CARDS"], ["tables", "TABLES"]]
+const TAB_KINDS := {"riders": ["rider", "trick"], "relics": ["relic"],
+		"provisions": ["provision"], "cards": ["mod", "finish"],
+		"tables": ["stake", "room", "merchant"]}
+# [ladder id, title, blurb, owner kind, owner id]
+const LADDERS := [
+	["sleeve", "ACE UP THE SLEEVE — THE GAMBLER",
+		"His hidden swap card — once per table, trade it for any plain card on the felt. Raising it raises its starting rank, all the way to an Ace.",
+		"rider", "the_gambler"],
+	["sleight", "SLEIGHT OF HAND — THE GAMBLER",
+		"His other trick: swap two cards that sit side by side. Each upgrade palms another trick per table.",
+		"trick", "sleight"],
+	["laser", "THE LASER — THE MACHINE",
+		"One shot per table burns a card clean off the felt. Each upgrade extends the beam one more card into a full cross.",
+		"rider", "the_machine"],
+	["watch", "THE POCKET WATCH — THE DOCTOR",
+		"Turns the last hand back: cards, score, the spent hand, all of it. Each upgrade winds in another turn per table.",
+		"rider", "the_doctor"],
+	["bankroll", "BANKROLL",
+		"Ride out heavier: +20 starting chips on every buy-in, per level, at every stake.",
+		"gear", "bankroll"],
+	["provisions", "PACKED KIT",
+		"Never leave town empty-handed: a random provision already in the kit at every run's start, per level.",
+		"gear", "provisions"],
+]
+const ROOM_EMBLEMS := {"room:plain": "limit_table", "room:clock": "high_noon",
+		"room:safe": "bank_job", "room:outlaw": "wanted", "room:hands": "dealers_call",
+		"room:chest": "stagecoach_haul", "room:purge": "powder_keg", "room:mine": "gold_mine",
+		"room:collect": "the_roundup", "room:crazy8": "crazy_8s", "room:landrush": "land_rush",
+		"room:blackjack": "blackjack", "room:holdem": "texas_holdem", "room:royal": "royal_hunt",
+		"room:dealer": "showdown", "merchant:peddler": "traveling_merchant",
+		"merchant:collector": "traveling_merchant", "merchant:sharp": "traveling_merchant",
+		"stake:0": "limit_table", "stake:1": "pot_limit", "stake:2": "no_limit"}
+const CATALOG_DESCS := {
+	"mod:mult": "×1.5 to the hand's score.",
+	"mod:chip": "Extra chips on every score, growing each time it's played.",
+	"mod:gold": "+$1 cash every time it's played.",
+	"mod:plus": "+1 rank to the card it aims at. Lifts an Ace into THE JOKER: wild, ×2.",
+	"mod:minus": "−1 rank to the card it aims at; a 2 breaks.",
+	"mod:bumper": "Cleared, it shoves the line it aims at one step.",
+	"mod:wild": "Any rank, any suit. The rarest card on the trail.",
+	"room:plain": "Score the target before the hands run out.",
+	"room:clock": "HIGH NOON: tables against a countdown instead of a hand budget.",
+	"room:safe": "BANK JOB: play the safe's combo in order, then crack it.",
+	"room:outlaw": "BOUNTY: clear your bullets, dodge his — outdraw a wanted gun or his posse.",
+	"room:hands": "DEALER'S CALL: play exactly the hands the table demands.",
+	"room:chest": "STAGECOACH HAUL: pair keys with chests. The strongbox holds a relic.",
+	"room:purge": "Powder Keg, Wildfire, Dust Storm, Flash Flood: clear a quota of one hazard.",
+	"room:mine": "GOLD MINE: break the seam of stones. Gold turns up in the rubble.",
+	"room:collect": "THE ROUNDUP & THE CENSUS: clear the called suit, rank, or every rank.",
+	"room:crazy8": "Every 8 on the board is wild.",
+	"room:landrush": "Stake a claim on every plot: clear a card from all 25 cells.",
+	"room:blackjack": "Chains count to 21. Beat the dealer, round after round.",
+	"room:holdem": "Five community cards, two in the hole.",
+	"room:royal": "One Royal Flush. On the clock.",
+	"room:dealer": "Past the last saloon, THE DEALER shuffles a perfect deck and waits.",
+}
+
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
 const MAX_RELICS := 999  # no satchel limit — the price is the gate
 const RELIC_PRICES := [150, 300, 600, 1000]  # by rarity C/R/EPIC/L — carry is unlimited, so they cost dear
@@ -338,6 +399,8 @@ var _buyin_tier_btns: Array = []
 var upgrades_layer: ColorRect    # the OUTFITTER: meta upgrades for $cash
 var select_layer: ColorRect      # pick your rider before the buy-in
 var _select_cards := {}          # id -> TextureRect (full card art)
+var _select_locks := {}          # id -> the dim veil over a locked rider
+var _select_lock_labels := {}    # id -> its lock text
 var camp_layer: ColorRect        # the campfire: rest, tend, or cast off
 var _camp_scene: CampScene       # the animated night camp behind it all
 var _camp_hp_label: Label
@@ -345,8 +408,13 @@ var _camp_rest_btn: BaseButton
 var _camp_mode := ""             # "" | "tend" | "burn" — deck view purpose
 var _swap_first: PlayingCard = null  # the Shell Game's first pick
 var _up_cash: Label
-var _up_rows: Array = []         # [{id, status: Label, btn: Button}]
-var _sleeve_pc: PlayingCard      # the sleeve on show beside its row
+var _up_level: Label
+var _up_fill: Panel
+var _up_tab := "gear"
+var _up_tab_btns := {}
+var _up_tab_pips := {}
+var _up_scroll: ScrollContainer
+var _up_list: VBoxContainer
 var _win_rows: Array = []        # last table's winnings, itemized for the pick screen
 var _win_box: Control
 var _pick_title: Label
@@ -426,10 +494,23 @@ func _load_meta() -> void:
 		gambler_ability = "sleeve"
 	var legacy := {"character": character, "laser": laser_level,
 			"watch": watch_level, "sleight": sleight_level,
-			"gambler_ability": gambler_ability}
+			"gambler_ability": gambler_ability, "provisions": meta_provisions}
 	if progress.read(cf, main.stats, legacy):
 		_save_meta()  # an old profile, seated at the level its stats earned
-	progress.unlock_all = true  # TODO(phase 3): gates go live with the catalog
+	if OS.get_environment("POKERPOP_SHOT") != "":
+		# Screenshots show everything on the trail — or, with
+		# POKERPOP_LEVEL=N, a fresh rider at that level.
+		var lv_env := OS.get_environment("POKERPOP_LEVEL")
+		progress.unlock_all = lv_env == ""
+		if lv_env != "":
+			progress.read(ConfigFile.new(), {})
+			progress.exp_total = Progression.exp_at_level(int(lv_env))
+			progress.seen_level = maxi(1, int(lv_env) - 2)
+	# A rider or trick that isn't the player's yet can't be the saddle.
+	if not _avail("rider", character):
+		character = "the_gambler"
+	if not _avail("trick", gambler_ability):
+		gambler_ability = "sleeve"
 
 
 func _save_meta() -> void:
@@ -1390,7 +1471,27 @@ func _refresh_select() -> void:
 		_gambler_ab_label.text = String(pick.ability)
 		_gambler_line_label.text = String(pick.line)
 	for key in _gambler_ability_btns:
-		_style_signature_toggle(_gambler_ability_btns[key], key == gambler_ability)
+		var tb: Button = _gambler_ability_btns[key]
+		_style_signature_toggle(tb, key == gambler_ability)
+		var open := _avail("trick", key)
+		tb.modulate = Color.WHITE if open else Color(1, 1, 1, 0.45)
+		tb.tooltip_text = String(GAMBLER_ABILITIES[key].ability) if open \
+				else _lock_text("trick", key)
+	for id in _select_locks:
+		var lock: Control = _select_locks[id]
+		lock.visible = not _avail("rider", id)
+		(_select_lock_labels[id] as Label).text = _lock_text("rider", id)
+
+
+## Why an item can't be had yet: the level it unlocks at, or its price
+## at the Outfitter.
+func _lock_text(kind: String, id: String) -> String:
+	var r := Progression.row(kind, id)
+	if r.is_empty():
+		return ""
+	if not progress.is_unlocked(kind, id):
+		return "UNLOCKS AT LEVEL %d" % int(r.level)
+	return "BUY AT THE OUTFITTER — $%d" % int(r.price)
 
 
 ## The Gambler's two-way selector: the kit's oxblood "selected" face
@@ -1430,6 +1531,10 @@ func _style_signature_toggle(b: Button, chosen: bool) -> void:
 func _pick_gambler_ability(key: String) -> void:
 	if not GAMBLER_ABILITIES.has(key):
 		return
+	if not _avail("trick", key):
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce(_lock_text("trick", key), main.RED)
+		return
 	var changed := gambler_ability != key or character != "the_gambler"
 	gambler_ability = key
 	character = "the_gambler"
@@ -1441,6 +1546,10 @@ func _pick_gambler_ability(key: String) -> void:
 
 func _pick_character(id: String) -> void:
 	if not CHARACTERS.has(id) or character == id:
+		return
+	if not _avail("rider", id):
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		main._announce(_lock_text("rider", id), main.RED)
 		return
 	character = id
 	main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
@@ -1462,6 +1571,13 @@ func _open_buyin_now() -> void:
 	main.menu_open = false
 	_hide_all()
 	_buyin_cash_label.text = "CASH  $%d" % cash
+	for i in _buyin_tier_btns.size():
+		var tb: Button = _buyin_tier_btns[i]
+		var open := _avail("stake", str(i))
+		tb.disabled = not open
+		var t: Dictionary = TABLES[i]
+		tb.text = _tier_label(i) if open \
+				else "%s\nunlocks at level %d" % [t.name, int(Progression.row("stake", str(i)).level)]
 	# A ride in progress takes top billing; fresh saddles move down.
 	var riding := _has_saved_run() or preview_riding
 	_buyin_resume_btn.visible = riding
@@ -1511,7 +1627,7 @@ func upgrade_cost(id: String) -> int:
 
 func _buy_upgrade(id: String) -> void:
 	var cost := upgrade_cost(id)
-	if cost <= 0 or cash < cost:
+	if cost <= 0 or cash < cost or not _ladder_open(id):
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
 		return
 	cash -= cost
@@ -1535,51 +1651,333 @@ func _buy_upgrade(id: String) -> void:
 
 func _refresh_upgrades() -> void:
 	_up_cash.text = "CASH  $%d" % cash
-	_sleeve_pc.rank = sleeve_rank
-	_sleeve_pc.suit = 0
-	_sleeve_pc.queue_redraw()
-	for row in _up_rows:
-		var id: String = row.id
-		var status: Label = row.status
-		var btn: Button = row.btn
-		var cost := upgrade_cost(id)
-		match id:
-			"sleeve":
-				status.text = "Starts every run as a %s of a random suit" \
-						% String(RANK_CHARS.get(sleeve_rank, str(sleeve_rank)))
-				btn.text = "FULLY SHARPENED — AN ACE" if cost <= 0 \
-						else "RAISE TO %s — $%d" % [String(RANK_CHARS.get(
-								sleeve_rank + 1, str(sleeve_rank + 1))), cost]
-			"laser":
-				status.text = "Beam burns %d card%s%s" % [1 + laser_level,
-						"" if laser_level == 0 else "s",
-						"" if laser_level == 0 else " in a cross"]
-				btn.text = "EXTEND THE BEAM — $%d" % cost if cost > 0 \
-						else "A FULL CROSS"
-			"watch":
-				status.text = "Level %d / 2  ·  %d turn%s back per table" \
-						% [watch_level, 1 + watch_level,
-						"" if watch_level == 0 else "s"]
-				btn.text = "WIND ANOTHER TURN — $%d" % cost if cost > 0 \
-						else "WOUND TO THE LIMIT"
-			"sleight":
-				status.text = "Level %d / 2  ·  %d trick%s per table" \
-						% [sleight_level, 1 + sleight_level,
-						"" if sleight_level == 0 else "s"]
-				btn.text = "PALM ANOTHER TRICK — $%d" % cost if cost > 0 \
-						else "QUICKEST HANDS ON THE TRAIL"
-			"bankroll":
-				status.text = "Level %d / 5  ·  +%d chips at every buy-in" \
-						% [meta_bankroll, 20 * meta_bankroll]
-				btn.text = "SADDLE HEAVIER — $%d" % cost if cost > 0 \
-						else "AS HEAVY AS IT GETS"
-			"provisions":
-				status.text = "Level %d / 2  ·  %d provision%s at the start" \
-						% [meta_provisions, meta_provisions,
-						"" if meta_provisions == 1 else "s"]
-				btn.text = "PACK ANOTHER — $%d" % cost if cost > 0 \
-						else "THE KIT RIDES FULL"
-		btn.disabled = cost <= 0 or cash < cost
+	var into: Array = progress.exp_into_level()
+	_up_level.text = "LEVEL %d   ·   %d / %d EXP to level %d" % [progress.level(),
+			int(into[0]), int(into[1]), progress.level() + 1]
+	_up_fill.size.x = 600.0 * clampf(float(into[0]) / maxf(1.0, float(into[1])), 0.0, 1.0)
+	for key in _up_tab_btns:
+		_style_signature_toggle(_up_tab_btns[key], key == _up_tab)
+		(_up_tab_pips[key] as Label).visible = _tab_news(key) > 0
+	var keep := _up_scroll.scroll_vertical
+	for child in _up_list.get_children():
+		_up_list.remove_child(child)
+		child.queue_free()
+	if _up_tab == "gear":
+		for def in LADDERS:
+			_up_list.add_child(_ladder_row(def))
+	else:
+		for r in Progression.CATALOG:
+			if String(r.kind) in TAB_KINDS[_up_tab]:
+				_up_list.add_child(_catalog_row(r))
+	_up_scroll.set_deferred("scroll_vertical", keep)
+
+
+func _set_up_tab(key: String) -> void:
+	if _up_tab == key:
+		return
+	_up_tab = key
+	main.board._play_sound(Board.SFX_FLIP, 1.2, -10.0)
+	_up_scroll.scroll_vertical = 0
+	_refresh_upgrades()
+
+
+## Unlocks the Outfitter hasn't shown yet (NEW since its last visit).
+func outfitter_news() -> int:
+	var n := 0
+	for r in Progression.unlocks_between(progress.seen_level, progress.level()):
+		n += 1
+	return n
+
+
+func _tab_news(key: String) -> int:
+	if key == "gear" or not TAB_KINDS.has(key):
+		return 0
+	var n := 0
+	for r in Progression.unlocks_between(progress.seen_level, progress.level()):
+		if String(r.kind) in TAB_KINDS[key]:
+			n += 1
+	return n
+
+
+## Leaving the Outfitter marks everything on show as seen.
+func _close_upgrades() -> void:
+	if progress.seen_level != progress.level():
+		progress.seen_level = progress.level()
+		_save_meta()
+	back_to_menu()
+
+
+## A ladder's upgrades can only be bought once its owner is the player's.
+func _ladder_open(id: String) -> bool:
+	for def in LADDERS:
+		if String(def[0]) == id:
+			return _avail(String(def[3]), String(def[4]))
+	return true
+
+
+func _ladder_texts(id: String, cost: int) -> Array:
+	var st := ""
+	var bt := ""
+	match id:
+		"sleeve":
+			st = "Starts every run as a %s of a random suit" \
+					% String(RANK_CHARS.get(sleeve_rank, str(sleeve_rank)))
+			bt = "FULLY SHARPENED — AN ACE" if cost <= 0 \
+					else "RAISE TO %s — $%d" % [String(RANK_CHARS.get(
+							sleeve_rank + 1, str(sleeve_rank + 1))), cost]
+		"laser":
+			st = "Beam burns %d card%s%s" % [1 + laser_level,
+					"" if laser_level == 0 else "s",
+					"" if laser_level == 0 else " in a cross"]
+			bt = "EXTEND THE BEAM — $%d" % cost if cost > 0 \
+					else "A FULL CROSS"
+		"watch":
+			st = "Level %d / 2  ·  %d turn%s back per table" \
+					% [watch_level, 1 + watch_level,
+					"" if watch_level == 0 else "s"]
+			bt = "WIND ANOTHER TURN — $%d" % cost if cost > 0 \
+					else "WOUND TO THE LIMIT"
+		"sleight":
+			st = "Level %d / 2  ·  %d trick%s per table" \
+					% [sleight_level, 1 + sleight_level,
+					"" if sleight_level == 0 else "s"]
+			bt = "PALM ANOTHER TRICK — $%d" % cost if cost > 0 \
+					else "QUICKEST HANDS ON THE TRAIL"
+		"bankroll":
+			st = "Level %d / 5  ·  +%d chips at every buy-in" \
+					% [meta_bankroll, 20 * meta_bankroll]
+			bt = "SADDLE HEAVIER — $%d" % cost if cost > 0 \
+					else "AS HEAVY AS IT GETS"
+		"provisions":
+			st = "Level %d / 2  ·  %d provision%s at the start" \
+					% [meta_provisions, meta_provisions,
+					"" if meta_provisions == 1 else "s"]
+			bt = "PACK ANOTHER — $%d" % cost if cost > 0 \
+					else "THE KIT RIDES FULL"
+	return [st, bt]
+
+
+## One GEAR row: an existing upgrade ladder, behind its owner's lock.
+func _ladder_row(def: Array) -> Control:
+	var id := String(def[0])
+	var row := _row_shell()
+	var icon_id := id if id in ["sleeve", "sleight", "laser", "watch"] else ""
+	if id == "sleeve":
+		var pc := PlayingCard.new()
+		pc.material = Themes.current_material()
+		pc.rank = sleeve_rank
+		pc.suit = 0
+		pc.position = Vector2(56, 48)
+		pc.scale = Vector2(0.72, 0.72)
+		row.add_child(pc)
+	elif icon_id != "":
+		_row_texture(row, CardArt.tex("icon", icon_id))
+	_row_text(row, String(def[1]), String(def[2]))
+	var cost := upgrade_cost(id)
+	var texts := _ladder_texts(id, cost)
+	var open := _ladder_open(id)
+	var status := _row_status(row, String(texts[0]))
+	if not open:
+		row.modulate = Color(1, 1, 1, 0.5)
+		status.text = "LOCKED  ·  " + _owner_lock(String(def[3]), String(def[4]))
+		return row
+	var b := _row_button(row, String(texts[1]), Vector2(700, 46), Vector2(324, 40))
+	b.disabled = cost <= 0 or cash < cost
+	b.pressed.connect(func() -> void:
+		_buy_upgrade(id))
+	return row
+
+
+func _owner_lock(kind: String, id: String) -> String:
+	var r := Progression.row(kind, id)
+	if not progress.is_unlocked(kind, id):
+		return "%s AT LEVEL %d" % [String(r.name).to_upper(), int(r.level)]
+	return "BUY %s FIRST" % String(r.name).to_upper()
+
+
+## One catalog row: locked, waiting to be bought, or on the trail with
+## FIND upgrades.
+func _catalog_row(r: Dictionary) -> Control:
+	var kind := String(r.kind)
+	var id := String(r.id)
+	var row := _row_shell()
+	_row_icon(row, kind, id)
+	_row_text(row, String(r.name), _catalog_desc(kind, id))
+	if r.get("reserved", false):
+		row.modulate = Color(1, 1, 1, 0.5)
+		_row_status(row, "COMING SOON  ·  LEVEL %d" % int(r.level))
+		return row
+	if not progress.is_unlocked(kind, id):
+		row.modulate = Color(1, 1, 1, 0.5)
+		_row_status(row, "UNLOCKS AT LEVEL %d" % int(r.level))
+		return row
+	if int(r.level) > progress.seen_level:
+		var pip: Label = main._label(row, "NEW", Vector2(966, 8), 15, main.GOLD)
+		pip.size = Vector2(60, 20)
+		pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	if not progress.is_available(kind, id):
+		var cost := progress.buy_cost(kind, id)
+		_row_status(row, "UNLOCKED  ·  LEVEL %d" % int(r.level))
+		var b := _row_button(row, "BUY — $%d" % cost, Vector2(700, 46), Vector2(324, 40), true)
+		b.disabled = cash < cost
+		b.pressed.connect(func() -> void:
+			_buy_catalog(kind, id))
+		return row
+	var fl := progress.find_level(kind, id)
+	var note := "ON THE TRAIL"
+	if kind == "stake":
+		note = "AT THE BUY-IN"
+	elif kind in ["rider", "trick"]:
+		note = "YOURS TO RIDE"
+	if fl > 0:
+		note += "  ·  FOUND %s× AS OFTEN" % String.num(float(Progression.FIND_MULT[fl]), 1)
+	_row_status(row, note)
+	if kind in Progression.FINDABLE:
+		var fcost := progress.find_cost(kind, id)
+		var label := "FIND %d / %d — $%d" % [fl + 1, Progression.MAX_FIND, fcost] \
+				if fcost > 0 else "FOUND AS OFTEN AS IT GETS"
+		var fb := _row_button(row, label, Vector2(700, 46), Vector2(324, 40))
+		fb.disabled = fcost <= 0 or cash < fcost
+		fb.tooltip_text = "Turns up more often on the trail. Applies to rides in progress too."
+		fb.pressed.connect(func() -> void:
+			_buy_find(kind, id))
+	return row
+
+
+func _buy_catalog(kind: String, id: String) -> void:
+	var cost := progress.buy_cost(kind, id)
+	if cost <= 0 or cash < cost:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	cash -= cost
+	progress.mark_owned(kind, id)
+	_save_meta()
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+	main._announce("%s — %s" % [String(Progression.row(kind, id).name).to_upper(),
+			"YOURS TO RIDE" if kind in ["rider", "trick"] else "ON THE TRAIL"])
+	_refresh_upgrades()
+
+
+func _buy_find(kind: String, id: String) -> void:
+	var cost := progress.find_cost(kind, id)
+	if cost <= 0 or cash < cost:
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	cash -= cost
+	progress.raise_find(kind, id)
+	_save_meta()
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
+	_refresh_upgrades()
+
+
+func _row_shell() -> Control:
+	var row := Control.new()
+	row.custom_minimum_size = Vector2(1040, 96)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	UiKit.plate(row, Rect2(0, 0, 1040, 96))
+	return row
+
+
+func _row_text(row: Control, title: String, desc: String) -> void:
+	var name_l: Label = main._label(row, title, Vector2(112, 10), 22, main.GOLD)
+	name_l.size = Vector2(570, 30)
+	name_l.clip_text = true
+	_wrap_label(row, desc, Rect2(112, 42, 570, 48), 15, main.OFFWHITE)
+
+
+func _row_status(row: Control, text: String) -> Label:
+	var l: Label = main._label(row, text, Vector2(700, 12), 16, main.DIM)
+	l.size = Vector2(324, 26)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.clip_text = true
+	return l
+
+
+func _row_button(row: Control, text: String, pos: Vector2, size: Vector2,
+		primary := false) -> Button:
+	var b: Button = main._button(row, text, pos, size, primary)
+	b.add_theme_font_size_override("font_size", 15)
+	UiKit.fit_button_text(b, 15, 12)
+	return b
+
+
+func _row_texture(row: Control, t: Texture2D, rect := Rect2(16, 8, 80, 80)) -> void:
+	if t == null:
+		return
+	var tr := TextureRect.new()
+	tr.texture = t
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.position = rect.position
+	tr.size = rect.size
+	tr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(tr)
+
+
+func _row_icon(row: Control, kind: String, id: String) -> void:
+	match kind:
+		"relic":
+			var icon := RelicIcon.new()
+			icon.relic_id = id
+			icon.position = Vector2(56, 48)
+			icon.scale = Vector2(1.1, 1.1)
+			row.add_child(icon)
+		"provision":
+			_row_texture(row, CardArt.provision_icon(id))
+		"mod", "finish":
+			var pc := PlayingCard.new()
+			pc.material = Themes.current_material()
+			pc.rank = 14 if id == "wild" else 10
+			pc.suit = 1
+			if kind == "mod":
+				pc.mod = id
+			else:
+				pc.mod = "chip"
+				pc.finish = id
+			pc.position = Vector2(56, 48)
+			pc.scale = Vector2(0.72, 0.72)
+			row.add_child(pc)
+		"rider":
+			_row_texture(row, load("res://assets/art/playable/hud/%s_512.png" % id)
+					if ResourceLoader.exists("res://assets/art/playable/hud/%s_512.png" % id) else null)
+		"trick":
+			_row_texture(row, CardArt.tex("icon", id))
+		"room", "merchant", "stake":
+			var emblem := String(ROOM_EMBLEMS.get("%s:%s" % [kind, id], ""))
+			var path := "res://assets/art/r2/posters/emblem/%s.png" % emblem
+			if emblem != "" and ResourceLoader.exists(path):
+				_row_texture(row, load(path))
+
+
+func _catalog_desc(kind: String, id: String) -> String:
+	match kind:
+		"relic":
+			return String(RELICS[id].desc) if RELICS.has(id) else ""
+		"provision":
+			return String(PROVISIONS[id].desc) if PROVISIONS.has(id) else ""
+		"finish":
+			return String(PlayingCard.FINISHES[id].desc) if PlayingCard.FINISHES.has(id) else ""
+		"rider":
+			return "%s — %s" % [String(CHARACTERS[id].ability), String(CHARACTERS[id].line)]
+		"trick":
+			return String(GAMBLER_ABILITIES[id].line)
+		"merchant":
+			for m in MERCHANTS:
+				if String(m.id) == id:
+					return String(m.line)
+		"stake":
+			var t: Dictionary = TABLES[int(id)]
+			return "Buy in for $%d: %d chips, payout ×%.1f%s." % [int(t.cost), int(t.chips),
+					float(t.rate), "" if int(id) == 0 else ", tougher tables"]
+	return String(CATALOG_DESCS.get("%s:%s" % [kind, id], ""))
+
+
+func _tier_label(i: int) -> String:
+	var t: Dictionary = TABLES[i]
+	if t.cost == 0:
+		return "%s\n%d chips · payout ×%.1f" % [t.name, t.chips, t.rate]
+	return "%s — $%d\n%d chips · payout ×%.1f · harder" % [t.name, t.cost, t.chips, t.rate]
 
 
 func _has_saved_run() -> bool:
@@ -1589,8 +1987,12 @@ func _has_saved_run() -> bool:
 
 func _start_run(tier: int) -> void:
 	var cost: int = TABLES[tier].cost
-	if cash < cost:
+	if cash < cost or not _avail("stake", str(tier)):
 		return
+	if not _avail("rider", character):
+		character = "the_gambler"
+	if not _avail("trick", gambler_ability):
+		gambler_ability = "sleeve"
 	cash -= cost
 	# A ride left saddled up is paid its EXP before the new one starts.
 	_credit_abandoned_ride()
@@ -1608,7 +2010,7 @@ func _start_run(tier: int) -> void:
 	chips += 20 * meta_bankroll
 	relics.clear()
 	provisions.clear()
-	for i in meta_provisions:
+	for i in (meta_provisions if _avail("gear", "provisions") else 0):
 		provisions.append(_random_provision())
 	_aiming_slot = -1
 	sleeve_card = _fresh_sleeve()
@@ -4545,6 +4947,19 @@ func build_ui() -> void:
 		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(tr)
 		_select_cards[id] = tr
+		var veil := ColorRect.new()
+		veil.color = Color(0.04, 0.03, 0.02, 0.72)
+		veil.size = Vector2(300, 450)
+		veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(veil)
+		var lock_l: Label = main._label(veil, "", Vector2(0, 0), 22, main.GOLD)
+		lock_l.size = Vector2(300, 450)
+		lock_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lock_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lock_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		veil.visible = false
+		_select_locks[id] = veil
+		_select_lock_labels[id] = lock_l
 		b.pressed.connect(func() -> void:
 			_pick_character(id))
 		var ch: Dictionary = CHARACTERS[id]
@@ -4580,13 +4995,7 @@ func build_ui() -> void:
 	_screen_title(buyin_layer, "THE TRAIL")
 	_buyin_cash_label = _center(buyin_layer, "", 240, 30, main.GOLD)
 	for i in TABLES.size():
-		var t: Dictionary = TABLES[i]
-		var label: String
-		if t.cost == 0:
-			label = "%s\n%d chips · payout ×%.1f" % [t.name, t.chips, t.rate]
-		else:
-			label = "%s — $%d\n%d chips · payout ×%.1f · harder" % [t.name, t.cost, t.chips, t.rate]
-		var b: Button = main._button(buyin_layer, label, Vector2(660, 330 + i * 130), Vector2(600, 100))
+		var b: Button = main._button(buyin_layer, _tier_label(i), Vector2(660, 330 + i * 130), Vector2(600, 100))
 		b.add_theme_font_size_override("font_size", 24)
 		_buyin_tier_btns.append(b)
 		var tier := i
@@ -4603,49 +5012,48 @@ func build_ui() -> void:
 	_buyin_rider_btn.pressed.connect(open_select)
 	_back_button(buyin_layer, back_to_menu)
 
-	# THE OUTFITTER — every meta upgrade $cash can buy, one shelf each.
+	# THE OUTFITTER — the level, the catalog of unlocks by tab, and the
+	# gear ladders. Rows are rebuilt on every refresh.
 	upgrades_layer = _layer()
 	_screen_title(upgrades_layer, "THE OUTFITTER")
-	_center(upgrades_layer, "Permanent gear, paid in $cash banked from finished rides.", 200, 22, main.DIM)
-	_up_cash = _center(upgrades_layer, "", 238, 30, main.GOLD)
-	var updefs := [
-		["sleeve", "ACE UP THE SLEEVE — THE GAMBLER",
-			"His hidden swap card — once per table, trade it for any plain card on the felt. Raising it raises its starting rank, all the way to an Ace."],
-		["sleight", "SLEIGHT OF HAND — THE GAMBLER",
-			"His other trick: swap two cards that sit side by side. Each upgrade palms another trick per table."],
-		["laser", "THE LASER — THE MACHINE",
-			"One shot per table burns a card clean off the felt. Each upgrade extends the beam one more card — up, right, down, left — into a full cross."],
-		["watch", "THE POCKET WATCH — THE DOCTOR",
-			"Turns the last hand back: cards, score, the spent hand, all of it. Each upgrade winds in another turn per table."],
-		["bankroll", "BANKROLL",
-			"Ride out heavier: +20 starting chips on every buy-in, per level, at every stake."],
-		["provisions", "PACKED KIT",
-			"Never leave town empty-handed: a random provision already in the kit at every run's start, per level."],
-	]
-	for i in updefs.size():
-		var def: Array = updefs[i]
-		var top := 282.0 + i * 118.0
-		UiKit.plate(upgrades_layer, Rect2(440, top, 1040, 108))
-		var name_l: Label = main._label(upgrades_layer, String(def[1]),
-				Vector2(560, top + 10), 22, main.GOLD)
-		name_l.size = Vector2(580, 30)
-		_wrap_label(upgrades_layer, String(def[2]),
-				Rect2(560, top + 42, 570, 58), 15, main.OFFWHITE)
-		var status := _wrap_label(upgrades_layer, "",
-				Rect2(1170, top + 10, 290, 46), 16, main.DIM)
-		var buy: Button = main._button(upgrades_layer, "",
-				Vector2(1170, top + 60), Vector2(290, 40))
-		buy.add_theme_font_size_override("font_size", 15)
-		var uid := String(def[0])
-		buy.pressed.connect(func() -> void:
-			_buy_upgrade(uid))
-		_up_rows.append({"id": uid, "status": status, "btn": buy})
-	_sleeve_pc = PlayingCard.new()
-	_sleeve_pc.material = Themes.current_material()
-	_sleeve_pc.position = Vector2(502, 336)
-	_sleeve_pc.scale = Vector2(0.84, 0.84)
-	upgrades_layer.add_child(_sleeve_pc)
-	_back_button(upgrades_layer, back_to_menu, "MENU")
+	_up_level = _center(upgrades_layer, "", 192, 24, main.GOLD)
+	var track := Panel.new()
+	track.position = Vector2(660, 232)
+	track.size = Vector2(600, 14)
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.add_theme_stylebox_override("panel", UiKit.bar_box("track"))
+	upgrades_layer.add_child(track)
+	_up_fill = Panel.new()
+	_up_fill.position = Vector2(660, 232)
+	_up_fill.size = Vector2(0, 14)
+	_up_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_up_fill.add_theme_stylebox_override("panel", UiKit.bar_box("gold"))
+	upgrades_layer.add_child(_up_fill)
+	_up_cash = main._label(upgrades_layer, "", Vector2(1500, 66), 30, main.GOLD)
+	_up_cash.size = Vector2(360, 40)
+	_up_cash.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	for i in OUTFITTER_TABS.size():
+		var key := String(OUTFITTER_TABS[i][0])
+		var tb: Button = main._button(upgrades_layer, String(OUTFITTER_TABS[i][1]),
+				Vector2(425 + i * 180, 278), Vector2(170, 50))
+		tb.focus_mode = Control.FOCUS_NONE
+		tb.pressed.connect(func() -> void:
+			_set_up_tab(key))
+		_up_tab_btns[key] = tb
+		var pip: Label = main._label(upgrades_layer, "NEW", Vector2(425 + i * 180 + 120, 262), 14, main.GOLD)
+		pip.size = Vector2(50, 18)
+		pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_up_tab_pips[key] = pip
+	_up_scroll = ScrollContainer.new()
+	_up_scroll.position = Vector2(430, 346)
+	_up_scroll.size = Vector2(1070, 600)
+	_up_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	upgrades_layer.add_child(_up_scroll)
+	_up_list = VBoxContainer.new()
+	_up_list.add_theme_constant_override("separation", 10)
+	_up_list.custom_minimum_size = Vector2(1040, 0)
+	_up_scroll.add_child(_up_list)
+	_back_button(upgrades_layer, _close_upgrades, "MENU")
 
 	# THE CAMPFIRE — one comfort per stop: rest, tend, or cast off.
 	# With the design kit in: the living night camp behind baked
