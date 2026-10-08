@@ -5,8 +5,6 @@ extends SceneTree
 ## Run: godot --headless --path . --script res://tests/test_progression.gd
 
 const MODS := ["mult", "chip", "gold", "plus", "minus", "bumper", "wild"]
-const ROOMS := ["plain", "clock", "safe", "outlaw", "hands", "chest", "purge",
-		"mine", "collect", "crazy8", "landrush", "blackjack", "holdem", "royal"]
 
 var failures := 0
 
@@ -51,12 +49,10 @@ func _catalog() -> void:
 		want.append(Progression.key("trick", id))
 	for m in TrailMode.MERCHANTS:
 		want.append(Progression.key("merchant", String(m.id)))
-	for t in TrailMode.TABLES.size():
-		want.append(Progression.key("stake", str(t)))
-	for id in ROOMS:
-		want.append(Progression.key("room", id))
 	var missing := want.filter(func(k): return not counts.has(k))
-	_check(missing.is_empty(), "every relic, provision, card, rider, merchant, stake and table is in the catalog %s" % str(missing))
+	_check(missing.is_empty(), "every relic, provision, card, rider and merchant is in the catalog %s" % str(missing))
+	var gated_tables := Progression.CATALOG.filter(func(r): return String(r.kind) in ["room", "stake"])
+	_check(gated_tables.is_empty(), "no table type or stake is gated — they're all on the trail")
 
 	# The starter set, exactly.
 	var starters: Array = []
@@ -64,33 +60,39 @@ func _catalog() -> void:
 		if int(r.level) == 1:
 			starters.append(Progression.key(String(r.kind), String(r.id)))
 	starters.sort()
-	var expect := ["rider:the_gambler", "trick:sleeve", "gear:bankroll", "stake:0",
-			"merchant:peddler", "room:plain", "mod:mult", "mod:chip", "mod:gold",
+	var expect := ["rider:the_gambler", "trick:sleeve", "gear:bankroll",
+			"merchant:peddler", "mod:mult", "mod:chip", "mod:gold",
 			"relic:horseshoe", "relic:card_sleeve", "relic:snake_oil", "relic:tin_star",
 			"relic:bomb_badge", "relic:chisel", "provision:canteen",
 			"provision:dynamite", "provision:pocket_flask", "provision:gold_pan"]
 	expect.sort()
 	_check(starters == expect, "the starter set is exactly the small kit")
 
-	# One unlock on every level 2..44; 45 reserved for the Dealer.
+	# One unlock on every level 2..29, nothing past it.
 	var per_level := {}
 	for r in Progression.CATALOG:
-		per_level[int(r.level)] = int(per_level.get(int(r.level), 0)) + 1
+		if not r.has("after_win"):
+			per_level[int(r.level)] = int(per_level.get(int(r.level), 0)) + 1
 	var bad: Array = []
-	for lv in range(2, 48):
-		if lv == 45:
-			continue  # the Dealer's
+	for lv in range(2, Progression.LAST_UNLOCK + 1):
 		if int(per_level.get(lv, 0)) != 1:
 			bad.append(lv)
-	_check(bad.is_empty(), "exactly one unlock on each level 2-47 (45 is the Dealer's) %s" % str(bad))
-	_check(Progression.row("room", "dealer").get("reserved", false)
-			and int(Progression.row("room", "dealer").level) == 45,
-			"level 45 is reserved for the Dealer's table")
-	# Tables that always run on the clock can't come before the clock.
-	var clock := int(Progression.row("room", "clock").level)
-	for id in ["safe", "chest", "mine", "royal"]:
-		_check(int(Progression.row("room", id).level) >= clock,
-				"%s unlocks at or after High Noon" % id)
+	_check(bad.is_empty() and Progression.LAST_UNLOCK == 29,
+			"exactly one unlock on each level 2-29 %s" % str(bad))
+	var past := per_level.keys().filter(func(lv): return int(lv) > Progression.LAST_UNLOCK)
+	_check(past.is_empty(), "no unlocks past level 29")
+	# Riders are won, not levelled.
+	var p := Progression.new()
+	p.exp_total = Progression.exp_at_level(60)
+	_check(not p.is_available("rider", "the_machine") and not p.is_available("rider", "the_doctor"),
+			"even at level 60 the Machine and the Doctor wait for a win")
+	p.stats = {"trail_wins_the_gambler": 1}
+	_check(p.is_available("rider", "the_machine") and not p.is_available("rider", "the_doctor"),
+			"a Gambler win frees the Machine (no price), not yet the Doctor")
+	p.stats["trail_wins_the_machine"] = 1
+	_check(p.is_available("rider", "the_doctor"), "a Machine win frees the Doctor")
+	_check(Progression.unlocks_between(0, 99).all(func(r): return not r.has("after_win")),
+			"riders never show up as level-up unlocks")
 
 
 func _curve() -> void:
@@ -104,7 +106,7 @@ func _curve() -> void:
 			ok = false
 	_check(ok, "the curve climbs and level_for_exp inverts it")
 	_check(Progression.exp_at_level(2) == 80, "level 2 at 80 EXP")
-	_check(Progression.exp_at_level(45) == 22440, "level 45 at 22,440 EXP")
+	_check(Progression.exp_at_level(29) == 9800, "every unlock is in hand by 9,800 EXP (level 29)")
 	_check(Progression.purse_between(1, 3) == 25, "levels 2 and 3 pay $10 + $15")
 
 
@@ -116,8 +118,8 @@ func _ride_exp() -> void:
 	_check(absi(int(deep.total) - 560) <= 20, "a death at table 10 with 41k ≈ 560 EXP (%d)" % int(deep.total))
 	var win := Progression.run_exp(100000, 21, 3, 0, true)
 	_check(absi(int(win.total) - 1610) <= 20, "a Penny Ante win ≈ 1,600 EXP (%d)" % int(win.total))
-	var high := Progression.run_exp(150000, 21, 3, 2, true)
-	_check(int(high.total) > int(win.total) * 2, "a High Roller win pays more than double")
+	var high := Progression.run_exp(100000, 21, 3, 20, true)
+	_check(int(high.total) == int(win.total) * 2, "an Ascension 20 win pays double EXP")
 	var sum := 0
 	for r in high.rows:
 		sum += int(r[1])
@@ -137,7 +139,19 @@ func _grandfather() -> void:
 	_check(p.level() >= 25, "a trail winner starts at level 25 or more (L%d)" % p.level())
 	_check(p.is_available("relic", "rabbits_foot") and p.is_available("rider", "the_doctor"),
 			"everything at or below the level, and the rider they rode, is theirs")
-	_check(p.is_available("stake", "2"), "every stake they could already ride stays open")
+	_check(p.asc_max("the_doctor") == 1 and p.asc_max("the_gambler") == 0,
+			"a past winner has Ascension 1 open for the rider they rode")
+	# A version-1 save from before the repack: owns the old layout only.
+	var old := Progression.new()
+	old.read(ConfigFile.new(), vet, {"character": "the_gambler"})
+	old.owned.erase(Progression.key("relic", "mirror_shades"))
+	old.catalog_version = 1
+	var ocf := ConfigFile.new()
+	old.write(ocf)
+	var moved := Progression.new()
+	var resave := moved.read(ocf, vet)
+	_check(resave and moved.owns("relic", "mirror_shades") and moved.catalog_version == 2,
+			"the repack hands a grandfathered profile everything at its level")
 	var fresh := Progression.new()
 	_check(not fresh.read(ConfigFile.new(), {"hands_played": 50}),
 			"a profile that never rode the trail starts fresh")
@@ -151,12 +165,14 @@ func _gates() -> void:
 	var p := Progression.new()
 	_check(p.is_available("relic", "horseshoe"), "starters are available at level 1")
 	_check(not p.is_available("relic", "rabbits_foot"), "a level-3 relic is locked at level 1")
-	_check(not p.is_available("room", "clock"), "High Noon is locked at level 1")
+	_check(p.is_available("room", "clock") and p.is_available("room", "blackjack"),
+			"every table type is open at level 1")
 	_check(p.is_available("relic", "not_in_catalog"), "unknown ids are never gated")
 	var gain := p.add_exp(Progression.exp_at_level(3))
 	_check(int(gain.to) == 3 and gain.unlocks.size() == 2 and int(gain.purse) == 25,
 			"climbing to 3 unlocks two things and pays the purse")
-	_check(p.is_available("room", "clock"), "a free unlock goes straight onto the trail")
+	p.add_exp(Progression.exp_at_level(5) - p.exp_total)
+	_check(p.is_available("gear", "provisions"), "a free unlock (Packed Kit) is ready on the spot")
 	_check(p.is_unlocked("relic", "rabbits_foot") and not p.is_available("relic", "rabbits_foot"),
 			"a priced unlock waits to be bought")
 	_check(p.buy_cost("relic", "rabbits_foot") == 60, "it costs its price")
@@ -170,7 +186,12 @@ func _gates() -> void:
 	_check(p.find_level("relic", "horseshoe") == 2 and p.find_cost("relic", "horseshoe") == 0,
 			"FIND tops out at 2")
 	_check(p.find_cost("rider", "the_gambler") == 0, "riders have no FIND level")
-	_check(not p.is_available("room", "dealer"), "the Dealer's table stays shut")
+	_check(p.asc_max("the_gambler") == 0 and p.open_ascension("the_gambler", 1)
+			and not p.open_ascension("the_gambler", 1) and p.asc_max("the_gambler") == 1,
+			"a win opens the next Ascension once")
+	p.open_ascension("the_gambler", 99)
+	_check(p.asc_max("the_gambler") == Ascension.MAX and p.asc_max("the_machine") == 0,
+			"Ascension caps at 20 and is kept per rider")
 
 
 func _picks() -> void:
@@ -207,14 +228,12 @@ func _odds() -> void:
 	_check(_odds_match(p, "mod", TrailMode.MOD_WEIGHTS, old_mods),
 			"enhancement odds match the old roll within 1.5%")
 	var fresh := Progression.new()
-	var only_plain := true
+	_check(_odds_match(fresh, "room", TrailMode.ROOM_TABLE, old_rooms),
+			"at level 1 every table type deals at its full odds")
 	var mods_ok := true
 	for i in 2000:
-		if fresh.pick("room", TrailMode.ROOM_TABLE) != "plain":
-			only_plain = false
 		if not fresh.pick("mod", TrailMode.MOD_WEIGHTS) in ["mult", "chip", "gold"]:
 			mods_ok = false
-	_check(only_plain, "at level 1 every table is a plain one")
 	_check(mods_ok, "at level 1 only Mult, Chip and Gold turn up")
 
 
@@ -243,6 +262,7 @@ func _round_trip() -> void:
 	p.last_run_uid = "abc"
 	p.contracts_claimed["first_ride"] = true
 	p.contracts_seen["first_ride"] = true
+	p.open_ascension("the_machine", 7)
 	var cf := ConfigFile.new()
 	p.write(cf)
 	var text := cf.encode_to_text()
@@ -255,6 +275,7 @@ func _round_trip() -> void:
 			and q.power_level("relic", "horseshoe") == 1
 			and q.seen_level == 5 and q.last_run_uid == "abc"
 			and q.contracts_claimed.has("first_ride") and q.contracts_seen.has("first_ride")
+			and q.asc_max("the_machine") == 7
 			and not q.grandfathered,
 			"progress survives a save and load (and isn't re-grandfathered)")
 
@@ -276,13 +297,18 @@ func _contracts() -> void:
 	var talk := Contracts.find("table_talk")
 	var wanted := Contracts.find("wanted")
 	var royal := Contracts.find("royal_treatment")
-	var safe := Contracts.find("safecracker")
+	var safe := Contracts.find("climbing")
 	_check(Contracts.state(first, stats, hands, p) == "ready", "a met target is ready to claim")
 	_check(Contracts.progress_of(talk, stats, hands) == 4
 			and Contracts.state(talk, stats, hands, p) == "open", "a part-way one shows its progress")
 	_check(Contracts.state(royal, stats, hands, p) == "ready", "hand contracts read the hand tally")
-	_check(Contracts.state(safe, stats, hands, p) == "locked",
-			"one that needs a locked table is greyed out")
+	_check(Contracts.state(Contracts.find("sharpshooter"), stats, hands, p) == "locked",
+			"one that needs a rider not yet won is greyed out")
+	_check(Contracts.state(Contracts.find("safecracker"), stats, hands, p) == "open",
+			"table contracts are open from the start")
+	_check(Contracts.progress_of(safe, {"ascension_best": 3}, hands) == 3
+			and Contracts.state(safe, {"ascension_best": 5}, hands, p) == "ready",
+			"the Ascension contracts read the best Ascension beaten")
 	_check(Contracts.state(wanted, stats, hands, p) == "ready",
 			"a finished one is claimable even before its content is unlocked")
 	p.contracts_claimed["first_ride"] = true
@@ -296,7 +322,8 @@ func _contracts() -> void:
 			sorted_ok = false
 	_check(sorted_ok and int(order[0]) == 0 and int(order[-1]) == 3,
 			"the page reads ready, in progress, greyed, then claimed")
-	_check(Contracts.lock_text(safe, p).contains("Level 4"), "a greyed row says when it opens")
+	_check(Contracts.lock_text(Contracts.find("sharpshooter"), p) != "",
+			"a greyed row says what it waits on")
 
 
 func _power() -> void:

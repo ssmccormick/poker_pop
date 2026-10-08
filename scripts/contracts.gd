@@ -17,22 +17,25 @@ const LIST := [
 	{"id": "hive_mind", "name": "Hive Mind", "desc": "Beat the Queen Bee.", "stat": "beat_queen", "target": 1, "reward": 125, "requires": []},
 	{"id": "snake_charmer", "name": "Snake Charmer", "desc": "Beat King Cobra.", "stat": "beat_cobra", "target": 1, "reward": 200, "requires": []},
 	{"id": "end_of_the_line", "name": "End of the Line", "desc": "Complete the trail.", "stat": "trail_wins", "target": 1, "reward": 250, "requires": []},
-	{"id": "big_stakes", "name": "Big Stakes", "desc": "Complete the trail at Table Stakes.", "stat": "trail_wins_tier1", "target": 1, "reward": 400, "requires": ["stake", "1"]},
-	{"id": "high_roller", "name": "High Roller", "desc": "Complete the trail at High Roller.", "stat": "trail_wins_tier2", "target": 1, "reward": 750, "requires": ["stake", "2"]},
+	{"id": "ascended", "name": "Ascended", "desc": "Complete the trail at Ascension 1.", "stat": "ascension_best", "target": 1, "reward": 150, "requires": []},
+	{"id": "climbing", "name": "Climbing", "desc": "Complete the trail at Ascension 5.", "stat": "ascension_best", "target": 5, "reward": 300, "requires": []},
+	{"id": "thin_air", "name": "Thin Air", "desc": "Complete the trail at Ascension 10.", "stat": "ascension_best", "target": 10, "reward": 500, "requires": []},
+	{"id": "high_country", "name": "High Country", "desc": "Complete the trail at Ascension 15.", "stat": "ascension_best", "target": 15, "reward": 750, "requires": []},
+	{"id": "summit", "name": "The Summit", "desc": "Complete the trail at Ascension 20.", "stat": "ascension_best", "target": 20, "reward": 1500, "requires": []},
 	{"id": "big_hand", "name": "Big Hand", "desc": "Score 2,000 or more with a single hand.", "stat": "best_hand", "target": 2000, "reward": 100, "requires": []},
 	{"id": "score_keeper", "name": "Score Keeper", "desc": "Score 50,000 in a single ride.", "stat": "trail_score_best", "target": 50000, "reward": 150, "requires": []},
 	{"id": "royal_treatment", "name": "Royal Treatment", "desc": "Play a Royal Flush.", "stat": "hand:Royal Flush", "target": 1, "reward": 150, "requires": []},
 	{"id": "flushed_five", "name": "Flushed Five", "desc": "Play a Flushed Five: five of a kind, all one suit.", "stat": "hand:Flushed Five", "target": 1, "reward": 300, "requires": []},
-	{"id": "safecracker", "name": "Safecracker", "desc": "Crack 5 Bank Jobs.", "stat": "cleared_safe", "target": 5, "reward": 80, "requires": ["room", "safe"]},
-	{"id": "wanted", "name": "Wanted", "desc": "Win 5 bounties.", "stat": "duels_won", "target": 5, "reward": 100, "requires": ["room", "outlaw"]},
-	{"id": "dealers_choice", "name": "Dealer's Choice", "desc": "Clear 5 Dealer's Calls.", "stat": "cleared_hands", "target": 5, "reward": 100, "requires": ["room", "hands"]},
-	{"id": "stage_robber", "name": "Stage Robber", "desc": "Clear 3 Stagecoach Hauls.", "stat": "cleared_chest", "target": 3, "reward": 120, "requires": ["room", "chest"]},
-	{"id": "prospector", "name": "Prospector", "desc": "Clear a Gold Mine.", "stat": "cleared_mine", "target": 1, "reward": 80, "requires": ["room", "mine"]},
-	{"id": "exterminator", "name": "Exterminator", "desc": "Clear 5 purge jobs.", "stat": "cleared_purge", "target": 5, "reward": 100, "requires": ["room", "purge"]},
-	{"id": "land_baron", "name": "Land Baron", "desc": "Clear a Land Rush.", "stat": "cleared_landrush", "target": 1, "reward": 80, "requires": ["room", "landrush"]},
-	{"id": "crazy_eights", "name": "Crazy Eights", "desc": "Clear a Crazy 8s table.", "stat": "cleared_crazy8", "target": 1, "reward": 80, "requires": ["room", "crazy8"]},
-	{"id": "card_counter", "name": "Card Counter", "desc": "Win 10 blackjack rounds.", "stat": "blackjack_rounds", "target": 10, "reward": 120, "requires": ["room", "blackjack"]},
-	{"id": "river_rat", "name": "River Rat", "desc": "Clear a Texas Hold'em table.", "stat": "cleared_holdem", "target": 1, "reward": 100, "requires": ["room", "holdem"]},
+	{"id": "safecracker", "name": "Safecracker", "desc": "Crack 5 Bank Jobs.", "stat": "cleared_safe", "target": 5, "reward": 80, "requires": []},
+	{"id": "wanted", "name": "Wanted", "desc": "Win 5 bounties.", "stat": "duels_won", "target": 5, "reward": 100, "requires": []},
+	{"id": "dealers_choice", "name": "Dealer's Choice", "desc": "Clear 5 Dealer's Calls.", "stat": "cleared_hands", "target": 5, "reward": 100, "requires": []},
+	{"id": "stage_robber", "name": "Stage Robber", "desc": "Clear 3 Stagecoach Hauls.", "stat": "cleared_chest", "target": 3, "reward": 120, "requires": []},
+	{"id": "prospector", "name": "Prospector", "desc": "Clear a Gold Mine.", "stat": "cleared_mine", "target": 1, "reward": 80, "requires": []},
+	{"id": "exterminator", "name": "Exterminator", "desc": "Clear 5 purge jobs.", "stat": "cleared_purge", "target": 5, "reward": 100, "requires": []},
+	{"id": "land_baron", "name": "Land Baron", "desc": "Clear a Land Rush.", "stat": "cleared_landrush", "target": 1, "reward": 80, "requires": []},
+	{"id": "crazy_eights", "name": "Crazy Eights", "desc": "Clear a Crazy 8s table.", "stat": "cleared_crazy8", "target": 1, "reward": 80, "requires": []},
+	{"id": "card_counter", "name": "Card Counter", "desc": "Win 10 blackjack rounds.", "stat": "blackjack_rounds", "target": 10, "reward": 120, "requires": []},
+	{"id": "river_rat", "name": "River Rat", "desc": "Clear a Texas Hold'em table.", "stat": "cleared_holdem", "target": 1, "reward": 100, "requires": []},
 	{"id": "up_the_sleeve", "name": "Up the Sleeve", "desc": "Swap 25 cards up the sleeve.", "stat": "sleeve_swaps", "target": 25, "reward": 60, "requires": []},
 	{"id": "sleight_master", "name": "Sleight Master", "desc": "Pull 25 sleights of hand.", "stat": "sleights", "target": 25, "reward": 80, "requires": ["trick", "sleight"]},
 	{"id": "sharpshooter", "name": "Sharpshooter", "desc": "Fire the Laser 25 times.", "stat": "laser_shots", "target": 25, "reward": 80, "requires": ["rider", "the_machine"]},
@@ -112,5 +115,8 @@ static func lock_text(c: Dictionary, prog: Progression) -> String:
 	if r.is_empty():
 		return ""
 	if not prog.is_unlocked(String(req[0]), String(req[1])):
+		if r.has("after_win"):
+			var by: Dictionary = Progression.row("rider", String(r.after_win))
+			return "Unlocks with %s · win a ride as %s" % [String(r.name), String(by.get("name", ""))]
 		return "Unlocks with %s · Level %d" % [String(r.name), int(r.level)]
 	return "Needs %s · buy it at the Outfitter" % String(r.name)

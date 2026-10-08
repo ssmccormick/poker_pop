@@ -836,7 +836,7 @@ func play_hand() -> void:
 			# Both royals bleed SCORE; only the Jack raises his bar.
 			card.boss_hp -= result.score
 			if card.boss == "jack":
-				jack_bar += JACK_BAR_STEP
+				jack_bar += JACK_BAR_STEP + jack_bar_bonus
 			boss_hits.append(card)  # the shot lands after the shoves
 			if card.boss_hp <= 0:
 				defeated_boss = true
@@ -954,7 +954,7 @@ func play_hand() -> void:
 			# score pool.
 			bounced_boss.boss_hp -= 1000
 			if bounced_boss.boss == "jack":
-				jack_bar += JACK_BAR_STEP
+				jack_bar += JACK_BAR_STEP + jack_bar_bonus
 			_play_sound(SFX_REVOLVERS.pick_random(), 1.0, -7.0)
 			shake_requested.emit(6.0)
 			if bounced_boss.boss_hp <= 0:
@@ -2053,9 +2053,23 @@ static func migrate_mod(mod: String) -> String:
 # The Jack's life is a SCORE pool: qualifying hands deal their score
 # as damage, and 2,500 total puts him down. The Queen carries a pool
 # too — her defense is the honey and the wandering, not a bar.
-const JACK_HP := 2500
-const QUEEN_HP := 3000
+const JACK_HP := 2000
+const QUEEN_HP := 2400
 const COBRA_START_TAIL := 2
+# Ascension's grip on the bosses (the trail sets these every table).
+var boss_hp_mult := 1.0
+var jack_bar_bonus := 0         # extra climb per wound
+var cobra_start_tail := COBRA_START_TAIL
+
+
+## A boss's full score pool at this table's Ascension.
+func boss_max_hp(kind: String) -> int:
+	match kind:
+		"jack":
+			return roundi(JACK_HP * boss_hp_mult)
+		"queen":
+			return roundi(QUEEN_HP * boss_hp_mult)
+	return 0
 # The Jack only respects strong hands: the hand that clears him must
 # beat this bar to wound him, and every wound raises it.
 const JACK_BAR_BASE := 30
@@ -2077,12 +2091,12 @@ func spawn_boss(kind: String) -> void:
 	card.boss = kind
 	match kind:
 		"jack":
-			card.boss_hp = JACK_HP
+			card.boss_hp = boss_max_hp("jack")
 			jack_bar = JACK_BAR_BASE
 			card.rank = randi_range(2, 14)
 			card.suit = randi_range(0, 3)
 		"queen":
-			card.boss_hp = QUEEN_HP
+			card.boss_hp = boss_max_hp("queen")
 			card.rank = 12  # she IS a queen — pair her to sting her
 			card.suit = randi_range(0, 3)
 		"cobra":
@@ -2095,7 +2109,7 @@ func spawn_boss(kind: String) -> void:
 			# backtracking so a dead-end first step can't shorten the
 			# tail; only a truly cramped board yields a shorter snake.
 			var chain: Array = []
-			for want in range(COBRA_START_TAIL, 0, -1):
+			for want in range(cobra_start_tail, 0, -1):
 				chain = _grow_cobra_chain([card.grid_pos], want)
 				if not chain.is_empty():
 					break

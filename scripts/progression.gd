@@ -13,14 +13,15 @@ extends RefCounted
 const FIND_MULT := [1.0, 1.5, 2.0]   # pool weight by FIND level
 const MAX_FIND := 2
 const MAX_POWER := 2
-const RESERVED_LEVEL := 45           # The Dealer's table, when it opens
+const LAST_UNLOCK := 29              # every level past this pays only the purse
+const CATALOG_VERSION := 2           # 2: tables open, riders won, curve repacked
 const PURSE_PER_LEVEL := 5           # each level-up pays $5 × the new level
 # Kinds whose odds a FIND upgrade can lift.
-const FINDABLE := ["relic", "provision", "mod", "finish", "room", "merchant"]
+const FINDABLE := ["relic", "provision", "mod", "finish", "merchant"]
 # What a starter (owned for free) would have cost — the base its
 # upgrade prices are worked out from.
 const VIRTUAL_PRICE := {"relic": 80, "provision": 50, "mod": 80, "finish": 150,
-		"room": 60, "merchant": 60}
+		"merchant": 60}
 
 ## One row per unlockable. level 1 = the starter set. price 0 = goes
 ## straight onto the trail on unlock; a price = buy it at the Outfitter.
@@ -31,9 +32,7 @@ const CATALOG := [
 	{"kind": "rider", "id": "the_gambler", "name": "The Gambler", "level": 1, "price": 0, "ladder": "sleeve_rank"},
 	{"kind": "trick", "id": "sleeve", "name": "Ace up the Sleeve", "level": 1, "price": 0, "ladder": "sleeve_rank"},
 	{"kind": "gear", "id": "bankroll", "name": "Bankroll", "level": 1, "price": 0, "ladder": "bankroll"},
-	{"kind": "stake", "id": "0", "name": "Penny Ante", "level": 1, "price": 0},
 	{"kind": "merchant", "id": "peddler", "name": "The Peddler", "level": 1, "price": 0},
-	{"kind": "room", "id": "plain", "name": "Plain tables", "level": 1, "price": 0},
 	{"kind": "mod", "id": "mult", "name": "Mult", "level": 1, "price": 0},
 	{"kind": "mod", "id": "chip", "name": "Chip", "level": 1, "price": 0},
 	{"kind": "mod", "id": "gold", "name": "Gold", "level": 1, "price": 0},
@@ -47,54 +46,38 @@ const CATALOG := [
 	{"kind": "provision", "id": "dynamite", "name": "Dynamite Stick", "level": 1, "price": 0},
 	{"kind": "provision", "id": "pocket_flask", "name": "Pocket Flask", "level": 1, "price": 0},
 	{"kind": "provision", "id": "gold_pan", "name": "Gold Pan", "level": 1, "price": 0},
-	# --- One unlock per level ----------------------------------------------
-	{"kind": "room", "id": "clock", "name": "High Noon", "level": 2, "price": 0},
+	# --- Riders are WON: a full ride with the one before opens the next ---
+	{"kind": "rider", "id": "the_machine", "name": "The Machine", "level": 0, "price": 0, "ladder": "laser", "after_win": "the_gambler"},
+	{"kind": "rider", "id": "the_doctor", "name": "The Doctor", "level": 0, "price": 0, "ladder": "watch", "after_win": "the_machine"},
+	# --- One unlock per level (every table type is on the trail from the start)
+	{"kind": "mod", "id": "plus", "name": "Plus", "level": 2, "price": 80},
 	{"kind": "relic", "id": "rabbits_foot", "name": "Rabbit's Foot", "level": 3, "price": 60},
-	{"kind": "room", "id": "safe", "name": "Bank Job", "level": 4, "price": 0},
-	{"kind": "provision", "id": "razor", "name": "Barber's Razor", "level": 5, "price": 40},
-	{"kind": "room", "id": "outlaw", "name": "Bounty", "level": 6, "price": 0},
-	{"kind": "gear", "id": "provisions", "name": "Packed Kit", "level": 7, "price": 0, "ladder": "provisions"},
-	{"kind": "mod", "id": "plus", "name": "Plus", "level": 8, "price": 80},
+	{"kind": "provision", "id": "razor", "name": "Barber's Razor", "level": 4, "price": 40},
+	{"kind": "gear", "id": "provisions", "name": "Packed Kit", "level": 5, "price": 0, "ladder": "provisions"},
+	{"kind": "relic", "id": "fire_blanket", "name": "Fire Blanket", "level": 6, "price": 100},
+	{"kind": "finish", "id": "prism", "name": "Prism", "level": 7, "price": 150},
+	{"kind": "provision", "id": "shell_game", "name": "Shell Game", "level": 8, "price": 40},
 	{"kind": "trick", "id": "sleight", "name": "Sleight of Hand", "level": 9, "price": 150, "ladder": "sleight"},
-	{"kind": "room", "id": "hands", "name": "Dealer's Call", "level": 10, "price": 0},
-	{"kind": "relic", "id": "fire_blanket", "name": "Fire Blanket", "level": 11, "price": 100},
-	{"kind": "provision", "id": "shell_game", "name": "Shell Game", "level": 12, "price": 40},
-	{"kind": "room", "id": "chest", "name": "Stagecoach Haul", "level": 13, "price": 0},
-	{"kind": "stake", "id": "1", "name": "Table Stakes", "level": 14, "price": 0},
-	{"kind": "merchant", "id": "collector", "name": "The Collector", "level": 15, "price": 0},
-	{"kind": "mod", "id": "minus", "name": "Minus", "level": 16, "price": 80},
-	{"kind": "room", "id": "purge", "name": "Purge jobs", "level": 17, "price": 0},
-	{"kind": "rider", "id": "the_machine", "name": "The Machine", "level": 18, "price": 300, "ladder": "laser"},
-	{"kind": "relic", "id": "gold_tooth", "name": "Gold Tooth", "level": 19, "price": 120},
-	{"kind": "room", "id": "mine", "name": "Gold Mine", "level": 20, "price": 0},
-	{"kind": "provision", "id": "branding_iron", "name": "Branding Iron", "level": 21, "price": 60},
-	{"kind": "relic", "id": "saddlebags", "name": "Saddlebags", "level": 22, "price": 120},
-	{"kind": "room", "id": "collect", "name": "Roundup & Census", "level": 23, "price": 0},
-	{"kind": "mod", "id": "bumper", "name": "Bumper", "level": 24, "price": 100},
-	{"kind": "relic", "id": "swimming_goggles", "name": "Swimming Goggles", "level": 25, "price": 80},
-	{"kind": "finish", "id": "prism", "name": "Prism", "level": 26, "price": 150},
-	{"kind": "provision", "id": "fresh_deck", "name": "Fresh Deck", "level": 27, "price": 50},
-	{"kind": "merchant", "id": "sharp", "name": "The Card Sharp", "level": 28, "price": 0},
-	{"kind": "relic", "id": "second_wind", "name": "Second Wind", "level": 29, "price": 150},
-	{"kind": "room", "id": "crazy8", "name": "Crazy 8s", "level": 30, "price": 0},
-	{"kind": "relic", "id": "dowsing_rod", "name": "Dowsing Rod", "level": 31, "price": 100},
-	{"kind": "stake", "id": "2", "name": "High Roller", "level": 32, "price": 0},
-	{"kind": "rider", "id": "the_doctor", "name": "The Doctor", "level": 33, "price": 400, "ladder": "watch"},
-	{"kind": "provision", "id": "tonic", "name": "Rattlesnake Tonic", "level": 34, "price": 80},
-	{"kind": "room", "id": "landrush", "name": "Land Rush", "level": 35, "price": 0},
-	{"kind": "relic", "id": "mirror_shades", "name": "Mirror Shades", "level": 36, "price": 150},
-	{"kind": "finish", "id": "metal", "name": "Metal", "level": 37, "price": 200},
-	{"kind": "relic", "id": "bankroll_clip", "name": "Bankroll Clip", "level": 38, "price": 150},
-	{"kind": "room", "id": "blackjack", "name": "Blackjack", "level": 39, "price": 0},
-	{"kind": "relic", "id": "chuck_wagon", "name": "Chuck Wagon", "level": 40, "price": 300},
-	{"kind": "room", "id": "holdem", "name": "Texas Hold'em", "level": 41, "price": 0},
-	{"kind": "mod", "id": "wild", "name": "Wild", "level": 42, "price": 250},
-	{"kind": "room", "id": "royal", "name": "Royal Hunt", "level": 43, "price": 0},
-	{"kind": "relic", "id": "lucky_chip", "name": "Lucky Chip", "level": 44, "price": 500},
-	{"kind": "room", "id": "dealer", "name": "The Dealer's Table", "level": RESERVED_LEVEL, "price": 0, "reserved": true},
-	# --- Past the Dealer: the CardFX finishes ------------------------------
-	{"kind": "finish", "id": "holo", "name": "Holo", "level": 46, "price": 200},
-	{"kind": "finish", "id": "negative", "name": "Negative", "level": 47, "price": 250},
+	{"kind": "merchant", "id": "collector", "name": "The Collector", "level": 10, "price": 0},
+	{"kind": "mod", "id": "minus", "name": "Minus", "level": 11, "price": 80},
+	{"kind": "relic", "id": "gold_tooth", "name": "Gold Tooth", "level": 12, "price": 120},
+	{"kind": "provision", "id": "branding_iron", "name": "Branding Iron", "level": 13, "price": 60},
+	{"kind": "relic", "id": "saddlebags", "name": "Saddlebags", "level": 14, "price": 120},
+	{"kind": "finish", "id": "metal", "name": "Metal", "level": 15, "price": 200},
+	{"kind": "mod", "id": "bumper", "name": "Bumper", "level": 16, "price": 100},
+	{"kind": "merchant", "id": "sharp", "name": "The Card Sharp", "level": 17, "price": 0},
+	{"kind": "relic", "id": "swimming_goggles", "name": "Swimming Goggles", "level": 18, "price": 80},
+	{"kind": "provision", "id": "fresh_deck", "name": "Fresh Deck", "level": 19, "price": 50},
+	{"kind": "relic", "id": "second_wind", "name": "Second Wind", "level": 20, "price": 150},
+	{"kind": "finish", "id": "holo", "name": "Holo", "level": 21, "price": 200},
+	{"kind": "relic", "id": "dowsing_rod", "name": "Dowsing Rod", "level": 22, "price": 100},
+	{"kind": "provision", "id": "tonic", "name": "Rattlesnake Tonic", "level": 23, "price": 80},
+	{"kind": "relic", "id": "mirror_shades", "name": "Mirror Shades", "level": 24, "price": 150},
+	{"kind": "finish", "id": "negative", "name": "Negative", "level": 25, "price": 250},
+	{"kind": "relic", "id": "bankroll_clip", "name": "Bankroll Clip", "level": 26, "price": 150},
+	{"kind": "relic", "id": "chuck_wagon", "name": "Chuck Wagon", "level": 27, "price": 300},
+	{"kind": "mod", "id": "wild", "name": "Wild", "level": 28, "price": 250},
+	{"kind": "relic", "id": "lucky_chip", "name": "Lucky Chip", "level": 29, "price": 500},
 ]
 
 ## POWER levels, hand-designed: each value has one entry per level, and
@@ -207,6 +190,10 @@ var contracts_claimed := {}  # contract id -> true
 var contracts_seen := {}     # contract id -> true (completion announced)
 var contracts_init := false  # contracts met before they existed are marked seen
 var unlock_all := false      # screenshots / tests: everything on the trail
+var ascension_max := {}      # rider id -> highest Ascension open (0-20)
+var catalog_version := CATALOG_VERSION
+# The profile's lifetime stats (main.stats), for rows unlocked by wins.
+var stats: Dictionary = {}
 
 static var _index := {}
 
@@ -255,7 +242,7 @@ func exp_into_level() -> Array:
 
 ## A ride's EXP: {total, rows: [[label, amount], ...]} — the rows are
 ## the game-over breakdown.
-static func run_exp(score: int, reached: int, bosses: int, tier: int,
+static func run_exp(score: int, reached: int, bosses: int, asc: int,
 		complete: bool) -> Dictionary:
 	var rows: Array = []
 	var score_exp := score / 100
@@ -267,14 +254,14 @@ static func run_exp(score: int, reached: int, bosses: int, tier: int,
 	if bosses > 0:
 		rows.append(["BOSSES BEATEN", 50 * bosses])
 	if complete:
-		rows.append(["TRAIL COMPLETE", 250 * (tier + 1)])
+		rows.append(["TRAIL COMPLETE", 250])
 	var sum := 0
 	for r in rows:
 		sum += int(r[1])
-	var mult: float = [1.0, 1.25, 1.5][clampi(tier, 0, 2)]
+	var mult: float = Ascension.exp_mult(asc)
 	var total := roundi(sum * mult)
 	if total > sum:
-		rows.append(["STAKE BONUS ×%s" % String.num(mult, 2), total - sum])
+		rows.append(["ASCENSION %d ×%s" % [asc, String.num(mult, 2)], total - sum])
 	return {"total": total, "rows": rows}
 
 
@@ -306,7 +293,7 @@ static func purse_between(l0: int, l1: int) -> int:
 static func unlocks_between(l0: int, l1: int) -> Array:
 	var out: Array = []
 	for r in CATALOG:
-		if int(r.level) > l0 and int(r.level) <= l1 and not r.get("reserved", false):
+		if int(r.level) > l0 and int(r.level) <= l1 and not r.has("after_win"):
 			out.append(r)
 	return out
 
@@ -326,7 +313,16 @@ func is_unlocked(kind: String, id: String) -> bool:
 	if unlock_all:
 		return true
 	var r := row(kind, id)
-	return r.is_empty() or owned.has(key(kind, id)) or level() >= int(r.level)
+	if r.is_empty() or owned.has(key(kind, id)):
+		return true
+	if r.has("after_win"):
+		return won_as(String(r.after_win))
+	return level() >= int(r.level)
+
+
+## The trail has been completed with this rider at least once.
+func won_as(rider: String) -> bool:
+	return int(stats.get("trail_wins_" + rider, 0)) > 0
 
 
 ## The one gate every pool asks: unlocked, and owned if it has a price.
@@ -336,11 +332,24 @@ func is_available(kind: String, id: String) -> bool:
 	var r := row(kind, id)
 	if r.is_empty():
 		return true
-	if r.get("reserved", false):
-		return false
 	if owned.has(key(kind, id)):
 		return true  # bought — or grandfathered in above the curve
-	return level() >= int(r.level) and int(r.price) == 0
+	return is_unlocked(kind, id) and int(r.price) == 0
+
+
+# --- Ascension, per rider -------------------------------------------------
+
+func asc_max(rider: String) -> int:
+	return clampi(int(ascension_max.get(rider, 0)), 0, Ascension.MAX)
+
+
+## A win at Ascension n-1 opens n for the rider. True if it's new.
+func open_ascension(rider: String, n: int) -> bool:
+	n = clampi(n, 0, Ascension.MAX)
+	if n <= asc_max(rider):
+		return false
+	ascension_max[rider] = n
+	return true
 
 
 func find_level(kind: String, id: String) -> int:
@@ -465,6 +474,8 @@ func write(cf: ConfigFile) -> void:
 	cf.set_value("progress", "contracts_claimed", PackedStringArray(contracts_claimed.keys()))
 	cf.set_value("progress", "contracts_seen", PackedStringArray(contracts_seen.keys()))
 	cf.set_value("progress", "contracts_init", contracts_init)
+	cf.set_value("progress", "ascension_max", ascension_max)
+	cf.set_value("progress", "catalog_version", catalog_version)
 
 
 ## Loads from cf. A profile without a [progress] section that has
@@ -491,6 +502,15 @@ func read(cf: ConfigFile, stats: Dictionary, legacy: Dictionary = {}) -> bool:
 		for k in cf.get_value("progress", "contracts_seen", PackedStringArray()):
 			contracts_seen[String(k)] = true
 		contracts_init = bool(cf.get_value("progress", "contracts_init", false))
+		var am = cf.get_value("progress", "ascension_max", null)
+		if am is Dictionary:
+			ascension_max = am.duplicate()
+		else:
+			_seed_ascension(stats, legacy)
+		catalog_version = int(cf.get_value("progress", "catalog_version", 1))
+		if catalog_version < CATALOG_VERSION:
+			_migrate_catalog()
+			return true  # save the migrated state
 		return false
 	if int(stats.get("trail_runs", 0)) <= 0:
 		return false  # a fresh saddle: level 1, the starter set
@@ -504,7 +524,7 @@ func grandfather(stats: Dictionary, legacy: Dictionary = {}) -> void:
 	exp_total = grandfather_exp(stats)
 	var lv := level()
 	for r in CATALOG:
-		if int(r.level) <= lv and not r.get("reserved", false):
+		if int(r.level) <= lv and not r.has("after_win"):
 			mark_owned(String(r.kind), String(r.id))
 	var rider := String(legacy.get("character", ""))
 	if row("rider", rider).size() > 0:
@@ -517,10 +537,31 @@ func grandfather(stats: Dictionary, legacy: Dictionary = {}) -> void:
 		mark_owned("trick", "sleight")
 	if int(legacy.get("provisions", 0)) > 0:
 		mark_owned("gear", "provisions")
-	for t in 3:
-		mark_owned("stake", str(t))
+	_seed_ascension(stats, legacy)
 	seen_level = lv
 	grandfathered = true
+
+
+## Ascension for a profile from before it existed: a past win opens
+## Ascension 1 for the rider they rode.
+func _seed_ascension(stats_in: Dictionary, legacy: Dictionary) -> void:
+	ascension_max = {}
+	if int(stats_in.get("trail_wins", 0)) > 0:
+		var rider := String(legacy.get("character", "the_gambler"))
+		ascension_max[rider if rider != "" else "the_gambler"] = 1
+
+
+## The catalog moved (version 2: tables open, riders won, the curve
+## repacked): a grandfathered profile owns everything at or below its
+## level under the new layout too.
+func _migrate_catalog() -> void:
+	if grandfathered:
+		var lv := level()
+		for r in CATALOG:
+			if int(r.level) <= lv and not r.has("after_win"):
+				mark_owned(String(r.kind), String(r.id))
+		seen_level = maxi(seen_level, mini(lv, LAST_UNLOCK))
+	catalog_version = CATALOG_VERSION
 
 
 func owns(kind: String, id: String) -> bool:
@@ -538,3 +579,5 @@ func _reset() -> void:
 	contracts_claimed = {}
 	contracts_seen = {}
 	contracts_init = false
+	ascension_max = {}
+	catalog_version = CATALOG_VERSION

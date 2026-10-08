@@ -486,7 +486,7 @@ func _build_ledger() -> void:
 	var serif: Font = _font(FontLib.card)
 	var top := start.y - r.position.y + 23.0
 	var rows := ["Run score", "Best hand", "Outlaws caught", "Tables reached",
-			"Cash banked", "Stake played"]
+			"Cash banked", "Ascension"]
 	for i in rows.size():
 		var row := Control.new()
 		row.position = Vector2(0, top + i * line_h)

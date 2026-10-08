@@ -213,7 +213,7 @@ func _run() -> void:
 	trail.open_trail()
 	await _wait(0.5)
 	var resume: Button = trail._buyin_resume_btn
-	var first_tier: Button = trail._buyin_tier_btns[0]
+	var first_tier: Button = trail._buyin_saddle_btn
 	failures += _check(trail.buyin_layer.visible and not trail.select_layer.visible,
 			"THE TRAIL skips rider select when a ride is saved")
 	failures += _check(resume.visible and resume.position.y < first_tier.position.y,
@@ -304,27 +304,35 @@ func _run() -> void:
 	trail.gambler_ability = "sleeve"
 	trail._pick_character("the_machine")
 	failures += _check(trail.character == "the_gambler",
-			"at level 1 the Machine can't be saddled")
+			"without a Gambler win the Machine can't be saddled")
 	trail._pick_gambler_ability("sleight")
 	failures += _check(trail.gambler_ability == "sleeve",
 			"nor can the Gambler pull Sleight of Hand")
 	trail.cash = 2000
+	var uid_before: String = trail.run_uid
 	trail._start_run(1)
-	failures += _check(trail.cash == 2000, "Table Stakes is shut at level 1")
+	failures += _check(trail.run_uid == uid_before and trail.ascension_open() == 0,
+			"Ascension 1 stays shut until the trail is beaten")
 	trail.laser_level = 0
 	trail._buy_upgrade("laser")
 	failures += _check(trail.laser_level == 0 and trail.cash == 2000,
 			"the Laser's upgrades wait on the Machine")
 	trail.room_index = 5
-	var all_plain := true
-	for i in 200:
+	var goals := {}
+	var only_peddler := true
+	var clocks := 0
+	for i in 400:
 		var o: Dictionary = trail._make_one_offer(true)
 		if o.kind == "shop":
 			if int(o.merchant) != 0:
-				all_plain = false
-		elif String(o.get("goal", "")) != "" or String(o.get("limit", "")) != "hands":
-			all_plain = false
-	failures += _check(all_plain, "level 1 deals only plain hand-limited tables and the Peddler")
+				only_peddler = false
+		else:
+			goals[String(o.get("goal", ""))] = true
+			if String(o.get("limit", "")) == "time":
+				clocks += 1
+	failures += _check(goals.size() >= 8 and clocks > 0,
+			"a level-1 rider meets every kind of table (%d kinds, %d on the clock)" % [goals.size(), clocks])
+	failures += _check(only_peddler, "merchants are still unlocked one by one: only the Peddler at level 1")
 	var starters := ["horseshoe", "card_sleeve", "snake_oil", "tin_star", "bomb_badge", "chisel"]
 	trail.relics.clear()
 	var shelf: Array = trail._relic_shelf(10)
@@ -341,21 +349,32 @@ func _run() -> void:
 	failures += _check(mods_ok, "only Mult, Chip and Gold cards are dealt at level 1")
 
 	# --- Level up, then buy ------------------------------------------------
-	trail.progress.exp_total = Progression.exp_at_level(18)
-	failures += _check(not trail._avail("rider", "the_machine"),
-			"reaching level 18 unlocks the Machine but doesn't hand him over")
-	trail._buy_catalog("rider", "the_machine")
-	failures += _check(trail.cash == 1700 and trail._avail("rider", "the_machine"),
-			"buying the Machine costs $300 and saddles him up")
-	trail._buy_catalog("rider", "the_machine")
-	failures += _check(trail.cash == 1700, "he can't be bought twice")
+	trail.progress.exp_total = Progression.exp_at_level(3)
+	failures += _check(not trail._avail("relic", "rabbits_foot"),
+			"reaching level 3 unlocks the Rabbit's Foot but doesn't hand it over")
+	trail._buy_catalog("relic", "rabbits_foot")
+	failures += _check(trail.cash == 1940 and trail._avail("relic", "rabbits_foot"),
+			"buying it costs $60 and puts it on the trail")
+	trail._buy_catalog("relic", "rabbits_foot")
+	failures += _check(trail.cash == 1940, "it can't be bought twice")
 	trail._buy_find("relic", "horseshoe")
-	failures += _check(trail.progress.find_level("relic", "horseshoe") == 1 and trail.cash == 1660,
+	failures += _check(trail.progress.find_level("relic", "horseshoe") == 1 and trail.cash == 1900,
 			"FIND on a starter relic costs $40")
 	trail._load_meta()
-	failures += _check(trail.progress.owns("rider", "the_machine")
-			and trail.progress.find_level("relic", "horseshoe") == 1 and trail.cash == 1660,
+	failures += _check(trail.progress.owns("relic", "rabbits_foot")
+			and trail.progress.find_level("relic", "horseshoe") == 1 and trail.cash == 1900,
 			"purchases are saved with the profile")
+
+	# --- Riders are won ----------------------------------------------------
+	trail.cash = 1900
+	main.stats["trail_wins_the_gambler"] = 1
+	failures += _check(trail._avail("rider", "the_machine") and not trail._avail("rider", "the_doctor"),
+			"a full ride won as the Gambler frees the Machine — and only him")
+	trail._pick_character("the_machine")
+	failures += _check(trail.character == "the_machine" and trail.cash == 1900,
+			"he saddles up free")
+	trail.character = "the_gambler"
+	main.stats.erase("trail_wins_the_gambler")
 	trail._up_tab = "riders"
 	trail._refresh_upgrades()
 	failures += _check(trail._up_list.get_child_count() == 5,
@@ -388,6 +407,38 @@ func _run() -> void:
 			"a POWER 1 Pocket Flask pours three hands")
 	trail.progress.unlock_all = false
 
+	# --- Ascension: the ladder, per rider ---------------------------------
+	trail.progress.unlock_all = false
+	trail.character = "the_gambler"
+	trail.progress.ascension_max = {}
+	await _enter_room("the_gambler")
+	trail.room_index = TrailMode.ROOMS_TOTAL
+	trail._trail_complete()
+	failures += _check(trail.progress.asc_max("the_gambler") == 1
+			and trail.progress.asc_max("the_machine") == 0,
+			"beating the trail at Ascension 0 opens Ascension 1 for that rider only")
+	failures += _check(int(main.stats.get("trail_wins_the_gambler", 0)) >= 1,
+			"the win is counted for the Gambler")
+	trail._hide_all()
+	trail.progress.open_ascension("the_gambler", 18)
+	trail.character = "the_gambler"
+	var uid0: String = trail.run_uid
+	trail._start_run(19)
+	failures += _check(trail.run_uid == uid0, "the buy-in refuses an Ascension above the rider's highest")
+	await _enter_room_at("the_gambler", 0)
+	var base_hands: int = trail.room_hands_left
+	var base_hp: int = trail.hp
+	await _enter_room_at("the_gambler", 18)
+	failures += _check(trail.ascension == 18 and trail.hp == 8 and trail.max_hp() == 8 and base_hp == 10,
+			"Ascension 18 starts the rider at 8 HP")
+	failures += _check(trail.room_limit == "time" or trail.room_hands_left <= base_hands,
+			"higher Ascensions deal fewer hands")
+	var cursed: Array = trail.deck.filter(func(d): return bool(d.get("cursed", false)))
+	failures += _check(cursed.size() >= 1, "Ascension 16+ rides with a cursed card")
+	failures += _check(trail._target_for(3, TrailMode.RISKS[0]) > int((TrailMode.BASE_TARGET + TrailMode.TARGET_STEP * 3) * 0.85),
+			"higher Ascensions ask for more score")
+	trail.progress.ascension_max = {}
+
 	# --- Contracts: done, claimed once, remembered ------------------------
 	var cash_c: int = trail.cash
 	main.stats["tables_cleared"] = 10
@@ -403,8 +454,11 @@ func _run() -> void:
 	failures += _check(trail.progress.contracts_claimed.has("table_talk") and trail.cash == cash_c + 40,
 			"the claim survives a save and load")
 	failures += _check(Contracts.state(Contracts.find("card_counter"), main.stats,
+			main.stats_hands, trail.progress) != "locked",
+			"Card Counter is open from the start, like every table")
+	failures += _check(Contracts.state(Contracts.find("time_keeper"), main.stats,
 			main.stats_hands, trail.progress) == "locked",
-			"Card Counter is greyed until Blackjack unlocks")
+			"Time Keeper is greyed until the Doctor is won")
 	main._refresh_contracts()
 	await process_frame
 	failures += _check(main._contracts_list.get_child_count() == Contracts.LIST.size(),
@@ -440,6 +494,27 @@ func _enter_room(rider: String, trick := "sleeve") -> void:
 		if offer.kind == "play":
 			trail._choose_offer(offer, false)
 			break
+	await _wait(0.5)
+	trail._confirm_bet()
+	await _wait(0.5)
+	await _settle()
+
+
+## Like _enter_room, at a chosen Ascension, on a plain hand table.
+func _enter_room_at(rider: String, asc: int) -> void:
+	trail.character = rider
+	trail.gambler_ability = "sleeve"
+	trail._start_run(asc)
+	await _wait(0.5)
+	var pick: Dictionary = {}
+	for offer in trail._offers:
+		if offer.kind != "play":
+			continue
+		if pick.is_empty() or (String(offer.get("goal", "")) == ""
+				and String(offer.get("limit", "")) == "hands"):
+			pick = offer
+	if not pick.is_empty():
+		trail._choose_offer(pick, false)
 	await _wait(0.5)
 	trail._confirm_bet()
 	await _wait(0.5)

@@ -26,22 +26,17 @@ const BOSSES := {
 	"cobra": {"tarot": "THE KING", "name": "King Cobra", "hands": 14},
 }
 
-# Buy-in tables: [name, cash cost, starting chips, cash-out rate,
-# target multiplier, blind multiplier]
-const TABLES := [
-	{"name": "PENNY ANTE", "cost": 0, "chips": 140, "rate": 1.0, "target_mult": 1.0, "blind_mult": 1.0},
-	{"name": "TABLE STAKES", "cost": 250, "chips": 300, "rate": 1.5, "target_mult": 1.35, "blind_mult": 1.5},
-	{"name": "HIGH ROLLER", "cost": 1000, "chips": 600, "rate": 2.5, "target_mult": 1.75, "blind_mult": 2.0},
-]
+# One buy-in: the difficulty dial is ASCENSION 0-20 (scripts/ascension.gd),
+# climbed per rider. Ascension 0 is the plain trail.
 
 # Room risk tiers offered by the draw, named for what they pay — a
 # safe grind, a sweetened pot, a rich table that'll bleed you.
 # "hands" is the budget the table deals you — it shrinks as the
 # trail deepens; the player doesn't haggle over it.
 const RISKS := [
-	{"tarot": "EASY MONEY", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 11},
-	{"tarot": "FAT POT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 9},
-	{"tarot": "HIGH STAKES", "label": "Dangerous", "target_scale": 1.4, "odds": 2.0, "hands": 8},
+	{"tarot": "EASY MONEY", "label": "Steady", "target_scale": 0.85, "odds": 1.0, "hands": 12},
+	{"tarot": "FAT POT", "label": "Risky", "target_scale": 1.15, "odds": 1.5, "hands": 10},
+	{"tarot": "HIGH STAKES", "label": "Dangerous", "target_scale": 1.4, "odds": 2.0, "hands": 9},
 ]
 
 # Entering a room costs its ANTE (the house keeps it, win or lose),
@@ -54,16 +49,15 @@ const WIN_LINGER_SECS := 2.5  # savour a cleared table before the pick
 # with the chance and count climbing with depth and table stakes. The
 # tarot decides only the room's GOAL.
 const HAZARD_KINDS := ["bomb", "fire", "wind", "stone", "water"]
-const HAZARD_BASE_CHANCE := 0.20
-const HAZARD_ROOM_STEP := 0.055  # + per room index — deep tables always bite
-const HAZARD_TIER_STEP := 0.15   # + per buy-in tier
+const HAZARD_BASE_CHANCE := 0.10
+const HAZARD_ROOM_STEP := 0.04   # + per room index — deep tables always bite
 const HAZARD_COUNT_ROOMS := 5    # seed count grows every N tables
 const HAZARD_COUNT_MAX := 6
 # Every refill can deal danger: chance per fresh card, climbing with
 # depth. Purge rooms are exempt (extra hazards would warp the goal).
-const REFILL_HAZARD_BASE := 0.03
-const REFILL_HAZARD_STEP := 0.006  # + per room index
-const REFILL_HAZARD_MAX := 0.16
+const REFILL_HAZARD_BASE := 0.015
+const REFILL_HAZARD_STEP := 0.004  # + per room index
+const REFILL_HAZARD_MAX := 0.10
 const OBJECTIVE_CHANCE := 0.12   # heist/treasure rooms, from room 2 on
 const PURGE_CHANCE := 0.12       # purge rooms: clear a QUOTA of one hazard kind
 const COLLECT_CHANCE := 0.08     # roundup rooms: clear called suits/ranks
@@ -124,8 +118,8 @@ const REQUIRE_POOLS := [
 			[["Four of a Kind", 1], ["Pair", 5], ["Two Pair", 2]]],
 ]
 
-const BASE_TARGET := 1000         # table 1 target before scaling
-const TARGET_STEP := 165          # + per table (21-table curve)
+const BASE_TARGET := 850          # table 1 target before scaling
+const TARGET_STEP := 140          # + per table (21-table curve)
 const BLIND_BASE := 25            # table 1 ante / minimum bet
 const BLIND_STEP := 6             # + per table cleared — the floor climbs
 const SHOP_CARD_PRICE := 40       # plain card
@@ -137,17 +131,17 @@ const PICK_MOD_CHANCE := 0.25     # card picks: chance of an enhanced offer
 const SHOP_MOD_CHANCE := 0.35     # shop slots: chance of an enhanced card
 const FATE_KICKER := 15           # chips for trusting The Fool
 const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
-const COMPLETE_PURSE := 100       # x (tier+1) cash on finishing
+const COMPLETE_PURSE := 100       # cash on finishing, x Ascension.purse_mult
 
 # Meta and run saves live under the active profile (main.profile_path).
 
 # The Outfitter's shelves: GEAR holds the upgrade ladders, the rest list
 # the catalog by kind.
 const OUTFITTER_TABS := [["gear", "GEAR"], ["riders", "RIDERS"], ["relics", "RELICS"],
-		["provisions", "PROVISIONS"], ["cards", "CARDS"], ["tables", "TABLES"]]
+		["provisions", "PROVISIONS"], ["cards", "CARDS"], ["merchants", "MERCHANTS"]]
 const TAB_KINDS := {"riders": ["rider", "trick"], "relics": ["relic"],
 		"provisions": ["provision"], "cards": ["mod", "finish"],
-		"tables": ["stake", "room", "merchant"]}
+		"merchants": ["merchant"]}
 # [ladder id, title, blurb, owner kind, owner id]
 const LADDERS := [
 	["sleeve", "ACE UP THE SLEEVE — THE GAMBLER",
@@ -280,7 +274,7 @@ var _ride_contracts: Array = []  # contract names completed this ride
 var run_active := false
 var run_uid := ""        # one id per ride, so it's only ever paid EXP once
 var run_bosses := 0      # boss tables beaten this ride
-var table_tier := 0
+var ascension := 0       # this ride's Ascension (0-20)
 var chips := 0
 var deck: Array = []          # [{rank, suit, cursed}]
 var room_index := 0           # 0-based; next room to play
@@ -342,8 +336,7 @@ var _aiming_sleight := false
 # The rider's HITPOINTS, run-wide: burnt-out flames, dynamite, outlaw
 # lead and lost tables all take their pound of flesh; campfires give
 # some back. Zero and the trail claims the rider.
-const MAX_HP := 10
-const CAMP_REST_HP := 5
+const MAX_HP := 10                # at Ascension 0; see max_hp()
 var hp := MAX_HP
 # The ride's tally for the end-of-trail ledger.
 var outlaws_caught := 0
@@ -396,7 +389,16 @@ var _buyin_resume_btn: Button
 var _buyin_rider_btn: Button
 var _buyin_new_label: Label
 var preview_riding := false  # screenshot mode: show the buy-in as if a ride were saved
-var _buyin_tier_btns: Array = []
+var _buyin_saddle_btn: Button
+var _asc_pick := 0               # the Ascension the dial is on
+var _asc_box: Control
+var _asc_prev: Button
+var _asc_next: Button
+var _asc_label: Label
+var _asc_sub: Label
+var _asc_rule: Label
+var _asc_rest: Label
+var _asc_reward: Label
 var upgrades_layer: ColorRect    # the OUTFITTER: meta upgrades for $cash
 var select_layer: ColorRect      # pick your rider before the buy-in
 var _select_cards := {}          # id -> TextureRect (full card art)
@@ -496,6 +498,7 @@ func _load_meta() -> void:
 	var legacy := {"character": character, "laser": laser_level,
 			"watch": watch_level, "sleight": sleight_level,
 			"gambler_ability": gambler_ability, "provisions": meta_provisions}
+	progress.stats = main.stats
 	var built := progress.read(cf, main.stats, legacy)
 	if not progress.contracts_init:
 		# Contracts already met before they existed are claimable on the
@@ -547,7 +550,7 @@ func _save_run() -> void:
 		return
 	var cf := ConfigFile.new()
 	cf.set_value("run", "active", run_active)
-	cf.set_value("run", "tier", table_tier)
+	cf.set_value("run", "ascension", ascension)
 	cf.set_value("run", "chips", chips)
 	cf.set_value("run", "room", room_index)
 	cf.set_value("run", "uid", run_uid)
@@ -617,7 +620,7 @@ func _load_run() -> bool:
 	var cf := ConfigFile.new()
 	if cf.load(main.profile_path("trail_run.cfg")) != OK or not cf.get_value("run", "active", false):
 		return false
-	table_tier = int(cf.get_value("run", "tier", 0))
+	ascension = Ascension.clamp_a(int(cf.get_value("run", "ascension", 0)))  # stake-era saves ride at 0
 	chips = int(cf.get_value("run", "chips", 0))
 	room_index = int(cf.get_value("run", "room", 0))
 	run_uid = String(cf.get_value("run", "uid", ""))
@@ -669,7 +672,7 @@ func _load_run() -> bool:
 	gambler_ability = String(cf.get_value("run", "gambler_ability", "sleeve"))
 	if not GAMBLER_ABILITIES.has(gambler_ability):
 		gambler_ability = "sleeve"
-	hp = clampi(int(cf.get_value("run", "hp", MAX_HP)), 1, MAX_HP)
+	hp = clampi(int(cf.get_value("run", "hp", max_hp())), 1, max_hp())
 	outlaws_caught = int(cf.get_value("run", "outlaws_caught", 0))
 	best_hand_score = int(cf.get_value("run", "best_hand_score", 0))
 	best_hand_name = String(cf.get_value("run", "best_hand_name", ""))
@@ -689,8 +692,16 @@ func _load_run() -> bool:
 
 # --- Run math -------------------------------------------------------------
 
-func _table() -> Dictionary:
-	return TABLES[table_tier]
+## The rider's most HP on this ride.
+func max_hp() -> int:
+	return Ascension.max_hp(ascension)
+
+
+## The highest Ascension this rider may start at.
+func ascension_open(rider := "") -> int:
+	if progress.unlock_all:
+		return Ascension.MAX
+	return progress.asc_max(rider if rider != "" else character)
 
 
 func has_relic(id: String) -> bool:
@@ -707,7 +718,7 @@ func _cost_mult(room: int) -> int:
 
 
 func _price(base: int) -> int:
-	var p := base * _cost_mult(room_index)
+	var p := int(base * _cost_mult(room_index) * Ascension.shop_mult(ascension))
 	return int(p * (1.0 - float(rv("snake_oil", "off")))) if has_relic("snake_oil") else p
 
 
@@ -1060,7 +1071,7 @@ func second_wind_ready() -> bool:
 ## stays in the satchel, spent, so no merchant sells a second one.
 func _second_wind_revive(seat := -1) -> void:
 	_second_wind_used = true
-	hp = maxi(hp, int(rv("second_wind", "hp")))
+	hp = mini(max_hp(), maxi(hp, int(rv("second_wind", "hp"))))
 	chips = maxi(chips, seat if seat >= 0 else _cheapest_seat(room_index))
 	main.stat_bump("second_winds")
 	main.board._play_sound(Board.SFX_STING_WIN, 0.9, -6.0)
@@ -1401,7 +1412,7 @@ func _unowned_relic() -> String:
 
 
 func _blind_for(room: int) -> int:
-	return int((BLIND_BASE + BLIND_STEP * room) * _table().blind_mult) \
+	return int((BLIND_BASE + BLIND_STEP * room) * Ascension.blind_mult(ascension)) \
 			* _cost_mult(room)
 
 
@@ -1438,7 +1449,7 @@ func _short_stacked(cost: int) -> bool:
 
 func _target_for(room: int, risk: Dictionary) -> int:
 	var base := BASE_TARGET + TARGET_STEP * room
-	return int(base * risk.target_scale * _table().target_mult)
+	return int(base * risk.target_scale * Ascension.target_mult(ascension))
 
 
 func _fresh_deck() -> Array:
@@ -1449,8 +1460,22 @@ func _fresh_deck() -> Array:
 	return d
 
 
+## Ascension's rules for the board this table.
+func _apply_ascension_to_board() -> void:
+	main.board.boss_hp_mult = Ascension.boss_mult(ascension)
+	main.board.jack_bar_bonus = Ascension.jack_bar_bonus(ascension)
+	main.board.cobra_start_tail = Ascension.cobra_tail(ascension, Board.COBRA_START_TAIL)
+
+
+## The chance a refilled card arrives hazarded at this table.
+func _refill_chance() -> float:
+	return clampf((REFILL_HAZARD_BASE + REFILL_HAZARD_STEP * room_index)
+			* Ascension.refill_mult(ascension), 0.0, REFILL_HAZARD_MAX * Ascension.refill_mult(ascension))
+
+
 func _cashout_value(rate_bonus := 1.0) -> int:
-	var rate: float = _table().rate + (float(rv("bankroll_clip", "rate")) if has_relic("bankroll_clip") else 0.0)
+	var rate: float = 1.0 + Ascension.rate_bonus(ascension) \
+			+ (float(rv("bankroll_clip", "rate")) if has_relic("bankroll_clip") else 0.0)
 	return int(chips * rate * rate_bonus / 10.0)
 
 
@@ -1550,8 +1575,16 @@ func _lock_text(kind: String, id: String) -> String:
 	if r.is_empty():
 		return ""
 	if not progress.is_unlocked(kind, id):
-		return "UNLOCKS AT LEVEL %d" % int(r.level)
+		return _unlock_rule(r)
 	return "BUY AT THE OUTFITTER — $%d" % int(r.price)
+
+
+## How a locked row opens: a level, or a full ride won by another rider.
+func _unlock_rule(r: Dictionary) -> String:
+	var after := String(r.get("after_win", ""))
+	if after != "":
+		return "COMPLETE THE TRAIL AS %s" % String(CHARACTERS[after].name).to_upper()
+	return "UNLOCKS AT LEVEL %d" % int(r.level)
 
 
 ## The Gambler's two-way selector: the kit's oxblood "selected" face
@@ -1631,26 +1664,58 @@ func _open_buyin_now() -> void:
 	main.menu_open = false
 	_hide_all()
 	_buyin_cash_label.text = "CASH  $%d" % cash
-	for i in _buyin_tier_btns.size():
-		var tb: Button = _buyin_tier_btns[i]
-		var open := _avail("stake", str(i))
-		tb.disabled = not open
-		var t: Dictionary = TABLES[i]
-		tb.text = _tier_label(i) if open \
-				else "%s\nunlocks at level %d" % [t.name, int(Progression.row("stake", str(i)).level)]
-	# A ride in progress takes top billing; fresh saddles move down.
+	# The dial opens on the highest Ascension this rider has earned.
+	_asc_pick = ascension_open()
+	# A ride in progress takes top billing; a fresh saddle moves down.
 	var riding := _has_saved_run() or preview_riding
 	_buyin_resume_btn.visible = riding
 	_buyin_rider_btn.visible = riding and not _select_cards.is_empty()
 	_buyin_new_label.visible = riding
-	if riding:
-		_buyin_resume_btn.position = Vector2(660, 320)
-		for i in _buyin_tier_btns.size():
-			(_buyin_tier_btns[i] as Button).position = Vector2(660, 470 + i * 130)
-	else:
-		for i in _buyin_tier_btns.size():
-			(_buyin_tier_btns[i] as Button).position = Vector2(660, 330 + i * 130)
+	var dy := 120.0 if riding else 0.0
+	_buyin_resume_btn.position = Vector2(660, 300)
+	_buyin_new_label.position.y = 388
+	_asc_box.position = Vector2(0, dy)
+	_buyin_saddle_btn.position = Vector2(660 if riding else 810, 790 + dy * 0.2)
+	_buyin_saddle_btn.size = Vector2(290 if riding else 300, 66)
+	_buyin_rider_btn.position = Vector2(970, 790 + dy * 0.2)
+	_buyin_rider_btn.size = Vector2(290, 66)
+	_render_ascension()
 	buyin_layer.visible = true
+
+
+## The Ascension dial: the level, its newest rule, every rule below it,
+## and what the climb pays.
+func _render_ascension() -> void:
+	var top := ascension_open()
+	_asc_pick = clampi(_asc_pick, 0, top)
+	_asc_prev.disabled = _asc_pick <= 0
+	_asc_next.disabled = _asc_pick >= top
+	_asc_label.text = "ASCENSION %d" % _asc_pick
+	_asc_sub.text = "%s  ·  highest open: %d" % [character_name().to_upper(), top] \
+			if top < Ascension.MAX else "%s  ·  every level open" % character_name().to_upper()
+	if _asc_pick == 0:
+		_asc_rule.text = "The plain trail. A good first ride."
+		_asc_rest.text = "Beat the trail to open Ascension 1 for this rider."
+	else:
+		var row: Dictionary = Ascension.LEVELS[_asc_pick - 1]
+		_asc_rule.text = "%d · %s — %s" % [_asc_pick, String(row.name).to_upper(), String(row.desc)]
+		var below := PackedStringArray()
+		for pair in Ascension.active(_asc_pick - 1):
+			below.append(String(pair[1].name))
+		_asc_rest.text = "Also in force: " + ", ".join(below) + "." if not below.is_empty() \
+				else "The first rung of the ladder."
+	_asc_reward.text = "EXP ×%s   ·   cash-out ×%s   ·   finish purse $%d" % [
+			String.num(Ascension.exp_mult(_asc_pick), 2),
+			String.num(1.0 + Ascension.rate_bonus(_asc_pick), 2),
+			roundi(COMPLETE_PURSE * Ascension.purse_mult(_asc_pick))]
+
+
+func _step_ascension(d: int) -> void:
+	var was := _asc_pick
+	_asc_pick = clampi(_asc_pick + d, 0, ascension_open())
+	if _asc_pick != was:
+		main.board._play_sound(Board.SFX_FLIP, 1.1 + 0.02 * _asc_pick, -10.0)
+	_render_ascension()
 
 
 # --- The Outfitter: meta upgrades bought with $cash -----------------------
@@ -1851,6 +1916,8 @@ func _ladder_row(def: Array) -> Control:
 func _owner_lock(kind: String, id: String) -> String:
 	var r := Progression.row(kind, id)
 	if not progress.is_unlocked(kind, id):
+		if String(r.get("after_win", "")) != "":
+			return "WIN A RIDE AS %s" % String(CHARACTERS[String(r.after_win)].name).to_upper()
 		return "%s AT LEVEL %d" % [String(r.name).to_upper(), int(r.level)]
 	return "BUY %s FIRST" % String(r.name).to_upper()
 
@@ -1869,15 +1936,15 @@ func _catalog_row(r: Dictionary) -> Control:
 		return row
 	if not progress.is_unlocked(kind, id):
 		row.modulate = Color(1, 1, 1, 0.5)
-		_row_status(row, "UNLOCKS AT LEVEL %d" % int(r.level))
+		_row_status(row, _unlock_rule(r))
 		return row
-	if int(r.level) > progress.seen_level:
+	if int(r.level) > progress.seen_level and r.get("after_win", "") == "":
 		var pip: Label = main._label(row, "NEW", Vector2(966, 8), 15, main.GOLD)
 		pip.size = Vector2(60, 20)
 		pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	if not progress.is_available(kind, id):
 		var cost := progress.buy_cost(kind, id)
-		_row_status(row, "UNLOCKED  ·  LEVEL %d" % int(r.level))
+		_row_status(row, "UNLOCKED")
 		var b := _row_button(row, "BUY — $%d" % cost, Vector2(700, 46), Vector2(324, 40), true)
 		b.disabled = cash < cost
 		b.pressed.connect(func() -> void:
@@ -1885,9 +1952,7 @@ func _catalog_row(r: Dictionary) -> Control:
 		return row
 	var fl := progress.find_level(kind, id)
 	var note := "ON THE TRAIL"
-	if kind == "stake":
-		note = "AT THE BUY-IN"
-	elif kind in ["rider", "trick"]:
+	if kind in ["rider", "trick"]:
 		note = "YOURS TO RIDE"
 	if fl > 0:
 		note += "  ·  FOUND %s× AS OFTEN" % String.num(float(Progression.FIND_MULT[fl]), 1)
@@ -2062,18 +2127,7 @@ func _catalog_desc(kind: String, id: String) -> String:
 			for m in MERCHANTS:
 				if String(m.id) == id:
 					return String(m.line)
-		"stake":
-			var t: Dictionary = TABLES[int(id)]
-			return "Buy in for $%d: %d chips, payout ×%.1f%s." % [int(t.cost), int(t.chips),
-					float(t.rate), "" if int(id) == 0 else ", tougher tables"]
 	return String(CATALOG_DESCS.get("%s:%s" % [kind, id], ""))
-
-
-func _tier_label(i: int) -> String:
-	var t: Dictionary = TABLES[i]
-	if t.cost == 0:
-		return "%s\n%d chips · payout ×%.1f" % [t.name, t.chips, t.rate]
-	return "%s — $%d\n%d chips · payout ×%.1f · harder" % [t.name, t.cost, t.chips, t.rate]
 
 
 func _has_saved_run() -> bool:
@@ -2081,15 +2135,14 @@ func _has_saved_run() -> bool:
 	return cf.load(main.profile_path("trail_run.cfg")) == OK and cf.get_value("run", "active", false)
 
 
-func _start_run(tier: int) -> void:
-	var cost: int = TABLES[tier].cost
-	if cash < cost or not _avail("stake", str(tier)):
-		return
+func _start_run(asc: int) -> void:
 	if not _avail("rider", character):
 		character = "the_gambler"
 	if not _avail("trick", gambler_ability):
 		gambler_ability = "sleeve"
-	cash -= cost
+	if asc < 0 or asc > ascension_open():
+		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
 	# A ride left saddled up is paid its EXP before the new one starts.
 	_credit_abandoned_ride()
 	main.stat_bump("trail_runs")
@@ -2098,9 +2151,11 @@ func _start_run(tier: int) -> void:
 	run_uid = _mint_run_uid()
 	run_bosses = 0
 	_ride_contracts = []
-	table_tier = tier
-	chips = TABLES[tier].chips
+	ascension = asc
+	chips = Ascension.start_chips(asc)
 	deck = _fresh_deck()
+	for i in Ascension.cursed_start(asc):
+		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 	room_index = 0
 	# The Outfitter's gear rides along: extra chips on the stack, and
 	# provisions already in the kit.
@@ -2114,7 +2169,7 @@ func _start_run(tier: int) -> void:
 	sleeve_used = false
 	_aiming_sleeve = false
 	_aiming_sleight = false
-	hp = MAX_HP
+	hp = max_hp()
 	outlaws_caught = 0
 	best_hand_score = 0
 	best_hand_name = ""
@@ -2360,7 +2415,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer.label = "Bounty"
 			offer.odds = 2.0 + 0.5 * posse
 			offer["goal"] = "outlaw"
-			offer["outlaw_hp"] = 5 + region
+			offer["outlaw_hp"] = 5 + region + Ascension.outlaw_hp_plus(ascension)
 			offer["outlaws"] = _roll_posse(posse)
 			offer.hands = 10 + 3 * (posse - 1)
 			offer.target = 0
@@ -2488,11 +2543,11 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		if _apply_camp_poster(b):
 			_poster_face(b, "CAMPFIRE", "rest stop",
 					"Rest your bones, tend a card, or cast one to the flames",
-					"No bet — one comfort\nHP %d / %d" % [hp, MAX_HP])
+					"No bet — one comfort\nHP %d / %d" % [hp, max_hp()])
 		else:
 			_tarot_face(b, "THE CAMPFIRE", "Rest stop",
 					"Rest, tend a card, or cast one to the flames",
-					"No bet — one comfort\nHP %d / %d" % [hp, MAX_HP])
+					"No bet — one comfort\nHP %d / %d" % [hp, max_hp()])
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
@@ -2993,6 +3048,7 @@ func _start_room() -> void:
 	_watch_snapshot = {}
 	main.board.undo_state = {}
 	main.board.undo_enabled = character == "the_doctor"
+	_apply_ascension_to_board()
 	_chest_rewards.clear()  # unopened luck doesn't carry between tables
 	_chest_won_cards.clear()
 	main.tutor_show("hp")
@@ -3048,18 +3104,18 @@ func _start_room() -> void:
 	if room_outlaws.is_empty() and room_goal == "outlaw" \
 			and CharacterKit.available():
 		room_outlaws = _roll_posse(int(current_offer.get("posse", 1)))
-	room_hands_left = int(current_offer.get("hands_bought", current_offer.hands)) \
+	room_hands_left = maxi(1, int(current_offer.get("hands_bought", current_offer.hands))
+			- Ascension.hands_minus(ascension)) \
 			+ (int(rv("horseshoe", "hands")) if has_relic("horseshoe") else 0)
 	room_time_left = 0.0
 	if room_on_clock():
 		# The clock is the budget, not hands.
-		room_time_left = 60.0 * int(current_offer.get("minutes_bought",
-				current_offer.get("minutes", 3))) \
+		room_time_left = maxf(60.0, 60.0 * int(current_offer.get("minutes_bought",
+				current_offer.get("minutes", 3))) - Ascension.clock_minus_secs(ascension)) \
 				+ (float(rv("horseshoe", "secs")) if has_relic("horseshoe") else 0.0)
 		room_hands_left = 999
 	main.mode_kind = "trail"
-	main.mode_label_text = "Trail · %s · %s" % [_table().name.capitalize(),
-			character_name()]
+	main.mode_label_text = "Trail · Ascension %d · %s" % [ascension, character_name()]
 	main.board.custom_deck = deck.duplicate(true)
 	main.game_started = true
 	main.game_over = false
@@ -3144,19 +3200,16 @@ func _seed_room_specials() -> void:
 	# Purge rooms are exempt: their hazards ARE the room.
 	if room_goal != "purge" and storm == 0:
 		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * room_index
-				+ HAZARD_TIER_STEP * table_tier, 0.0, 0.95)
+				+ Ascension.hazard_bonus(ascension), 0.0, 0.95)
 		if randf() < hz_chance:
-			var count := 1 + room_index / HAZARD_COUNT_ROOMS
-			if table_tier == 2 and randf() < 0.5:
-				count += 1
+			var count := 1 + room_index / HAZARD_COUNT_ROOMS + Ascension.extra_seed(ascension)
 			count = mini(count, HAZARD_COUNT_MAX)
 			for i in count:
 				main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
 	# And the deck itself turns mean: every refilled card has a chance
 	# to arrive hazarded, climbing the deeper you ride.
 	if room_goal != "purge":
-		main.board.refill_hazard_chance = clampf(REFILL_HAZARD_BASE
-				+ REFILL_HAZARD_STEP * room_index, 0.0, REFILL_HAZARD_MAX)
+		main.board.refill_hazard_chance = _refill_chance()
 	# Relic adjustments to freshly-seeded hazards (purge seeds included).
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
@@ -3677,7 +3730,7 @@ func _deal_dealer() -> void:
 
 ## Score an Outlaw hand must reach or he takes a free shot.
 func _outlaw_bar() -> int:
-	return OUTLAW_BAR_BASE + 15 * (room_index / REGION_SIZE)
+	return OUTLAW_BAR_BASE + 15 * (room_index / REGION_SIZE) + Ascension.outlaw_bar_plus(ascension)
 
 
 ## Rolls a bounty posse: a named leader off the wanted wall (presets
@@ -3893,7 +3946,7 @@ func _tick_room_hazards() -> void:
 			else "%d FIRES BURN DOWN TO YOU" % burns,
 			"Burned at the table."):
 		return
-	if blasts > 0 and not take_damage(2 * blasts, "CAUGHT IN THE BLAST",
+	if blasts > 0 and not take_damage(Ascension.bomb_hp(ascension) * blasts, "CAUGHT IN THE BLAST",
 			"Caught in the blast."):
 		return
 	if in_room and main.board.board_ablaze():
@@ -4036,7 +4089,7 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
 	main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
 	# Losing a table leaves a mark on the rider too.
-	if not take_damage(2, "", "One lost table too many."):
+	if not take_damage(Ascension.lost_table_hp(ascension), "", "One lost table too many."):
 		return
 	main._announce(reason, main.RED)
 	_after_board_settles(_retry_room)
@@ -4143,8 +4196,7 @@ func _restore_room_state() -> void:
 	_swap_first = null
 	in_room = true
 	main.mode_kind = "trail"
-	main.mode_label_text = "Trail · %s · %s" % [_table().name.capitalize(),
-			character_name()]
+	main.mode_label_text = "Trail · Ascension %d · %s" % [ascension, character_name()]
 	main.game_started = true
 	main.game_over = false
 	main.play_music("boss" if current_offer.has("boss") else "room")
@@ -4158,9 +4210,8 @@ func _restore_room_state() -> void:
 	main.board.suppress_refill = false
 	main.board.custom_deck = deck.duplicate(true)
 	main.board.undo_enabled = character == "the_doctor"
-	main.board.refill_hazard_chance = 0.0 if room_goal == "purge" \
-			else clampf(REFILL_HAZARD_BASE + REFILL_HAZARD_STEP * room_index,
-			0.0, REFILL_HAZARD_MAX)
+	_apply_ascension_to_board()
+	main.board.refill_hazard_chance = 0.0 if room_goal == "purge" else _refill_chance()
 	main.board.apply_state_snapshot(rs.board)
 	if room_goal == "crazy8":
 		main.board.eights_wild = true
@@ -4203,17 +4254,22 @@ func on_abandon_room() -> void:
 
 func _trail_complete() -> void:
 	main.stat_bump("trail_wins")
-	main.stat_bump("trail_wins_tier%d" % table_tier)
 	main.stat_bump("trail_wins_" + character)
+	if ascension >= 1:
+		main.stat_max("ascension_best", ascension)
+	var opened := progress.open_ascension(character, ascension + 1)
 	main._stats_save()
 	main.board._play_sound(Board.SFX_STING_COMPLETE, 1.0, -5.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.5)
-	var payout := _cashout_value(COMPLETE_RATE_BONUS) + COMPLETE_PURSE * (table_tier + 1)
+	var payout := _cashout_value(COMPLETE_RATE_BONUS) \
+			+ roundi(COMPLETE_PURSE * Ascension.purse_mult(ascension))
 	cash += payout
 	_save_meta()
 	_clear_run_save()
 	var body := "You rode all %d rooms and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
-	if table_tier == 2:
+	if opened:
+		body += "\n\nASCENSION %d is open for %s." % [ascension + 1, character_name()]
+	if ascension >= Ascension.MAX:
 		body += "\n\nSomewhere past the last saloon, THE DEALER shuffles\na perfect deck and waits. (His table opens soon.)"
 	_end_run("TRAIL COMPLETE", body, payout)
 
@@ -4719,8 +4775,10 @@ func _show_camp() -> void:
 	_hide_all()
 	_camp_mode = ""
 	main.tutor_show("campfire")
-	_camp_hp_label.text = "HP  %d / %d" % [hp, MAX_HP]
-	_camp_rest_btn.disabled = hp >= MAX_HP
+	_camp_hp_label.text = "HP  %d / %d" % [hp, max_hp()]
+	if Ascension.camp_rest(ascension) != 5:
+		_camp_hp_label.text += "   ·   rest heals %d" % Ascension.camp_rest(ascension)
+	_camp_rest_btn.disabled = hp >= max_hp()
 	# The chosen rider takes the log by the fire.
 	_camp_scene.setup(character)
 	main.board._play_sound(Board.SFX_MATCHES.pick_random(), 0.8, -10.0)
@@ -4739,7 +4797,7 @@ func _leave_camp() -> void:
 
 
 func _camp_rest() -> void:
-	hp = mini(MAX_HP, hp + CAMP_REST_HP)
+	hp = mini(max_hp(), hp + Ascension.camp_rest(ascension))
 	main.stat_bump("campfire_rests")
 	main._announce("RESTED BY THE FIRE — HP %d" % hp)
 	_save_run()
@@ -4983,7 +5041,7 @@ func _grant_run_exp(complete: bool) -> Dictionary:
 	if run_uid != "" and run_uid == progress.last_run_uid:
 		return _last_grant
 	var reached := ROOMS_TOTAL if complete else mini(room_index + 1, ROOMS_TOTAL)
-	_last_grant = _credit_ride(main.score, reached, run_bosses, table_tier,
+	_last_grant = _credit_ride(main.score, reached, run_bosses, ascension,
 			complete, run_uid)
 	return _last_grant
 
@@ -5024,7 +5082,7 @@ func _credit_abandoned_ride() -> void:
 	if reached <= 0 and int(cf.get_value("run", "score", 0)) <= 0:
 		return
 	var grant := _credit_ride(int(cf.get_value("run", "score", 0)), reached,
-			int(cf.get_value("run", "bosses", 0)), int(cf.get_value("run", "tier", 0)),
+			int(cf.get_value("run", "bosses", 0)), int(cf.get_value("run", "ascension", 0)),
 			false, uid if uid != "" else _mint_run_uid())
 	_clear_run_save()
 	var text := "LAST RIDE LEFT BEHIND  ·  +%d EXP" % int(grant.exp_gain)
@@ -5052,7 +5110,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 			epitaph = "So close. The next seat cost more than you had."
 		_:
 			epitaph = "King Cobra folds. The Dealer's table is yours — for now." \
-					if table_tier == 2 \
+					if ascension >= Ascension.MAX \
 					else "King Cobra folds. The trail pays $%d in tribute." % payout
 	var stops: Array = []
 	for i in ROOMS_TOTAL:
@@ -5062,7 +5120,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"rider": character, "score": main.score,
 		"best_name": best_hand_name, "best_score": best_hand_score,
 		"outlaws": outlaws_caught, "reached": reached, "total": ROOMS_TOTAL,
-		"cash": cash, "stake": _title_case(String(TABLES[table_tier].name)),
+		"cash": cash, "stake": "Ascension %d" % ascension,
 		"relics": relics.duplicate(), "stops": stops,
 		"relic_descs": _relic_descs(),
 		"spent": ["second_wind"] if _second_wind_used else [],
@@ -5165,20 +5223,44 @@ func build_ui() -> void:
 	buyin_layer = _layer()
 	_screen_title(buyin_layer, "THE TRAIL")
 	_buyin_cash_label = _center(buyin_layer, "", 240, 30, main.GOLD)
-	for i in TABLES.size():
-		var b: Button = main._button(buyin_layer, _tier_label(i), Vector2(660, 330 + i * 130), Vector2(600, 100))
-		b.add_theme_font_size_override("font_size", 24)
-		_buyin_tier_btns.append(b)
-		var tier := i
-		b.pressed.connect(func() -> void:
-			_start_run(tier))
-	_buyin_resume_btn = main._button(buyin_layer, "RESUME YOUR RIDE", Vector2(660, 740), Vector2(600, 70), true)
+	# The Ascension dial, in one box so a saved ride can push it down.
+	_asc_box = Control.new()
+	_asc_box.size = Vector2(1920, 1080)
+	_asc_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	buyin_layer.add_child(_asc_box)
+	_asc_prev = main._button(_asc_box, "◀", Vector2(660, 300), Vector2(80, 76))
+	_asc_prev.add_theme_font_size_override("font_size", 28)
+	_asc_prev.pressed.connect(func() -> void:
+		_step_ascension(-1))
+	_asc_next = main._button(_asc_box, "▶", Vector2(1180, 300), Vector2(80, 76))
+	_asc_next.add_theme_font_size_override("font_size", 28)
+	_asc_next.pressed.connect(func() -> void:
+		_step_ascension(1))
+	_asc_label = main._label(_asc_box, "", Vector2(740, 304), 40, main.GOLD)
+	_asc_label.size = Vector2(440, 50)
+	_asc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_asc_sub = main._label(_asc_box, "", Vector2(740, 352), 16, main.DIM)
+	_asc_sub.size = Vector2(440, 24)
+	_asc_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UiKit.plate(_asc_box, Rect2(560, 400, 800, 250))
+	_asc_rule = _wrap_label(_asc_box, "", Rect2(600, 420, 720, 64), 22, main.GOLD)
+	_asc_rule.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_asc_rest = _wrap_label(_asc_box, "", Rect2(600, 490, 720, 100), 16, main.OFFWHITE)
+	_asc_rest.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_asc_reward = main._label(_asc_box, "", Vector2(600, 604), 17, main.GOLD)
+	_asc_reward.size = Vector2(720, 26)
+	_asc_reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_buyin_saddle_btn = main._button(buyin_layer, "SADDLE UP", Vector2(810, 790), Vector2(300, 66), true)
+	_buyin_saddle_btn.add_theme_font_size_override("font_size", 26)
+	_buyin_saddle_btn.pressed.connect(func() -> void:
+		_start_run(_asc_pick))
+	_buyin_resume_btn = main._button(buyin_layer, "RESUME YOUR RIDE", Vector2(660, 300), Vector2(600, 70), true)
 	_buyin_new_label = _center(buyin_layer, "or start a new ride", 418, 20, main.DIM)
 	_buyin_resume_btn.add_theme_font_size_override("font_size", 24)
 	_buyin_resume_btn.pressed.connect(_resume_run)
 	# With a ride saved, THE TRAIL lands here; a fresh ride can still
 	# saddle someone new.
-	_buyin_rider_btn = main._button(buyin_layer, "NEW RIDER", Vector2(810, 852), Vector2(300, 56))
+	_buyin_rider_btn = main._button(buyin_layer, "NEW RIDER", Vector2(970, 790), Vector2(290, 66))
 	_buyin_rider_btn.add_theme_font_size_override("font_size", 20)
 	_buyin_rider_btn.pressed.connect(open_select)
 	_back_button(buyin_layer, back_to_menu)
@@ -5273,7 +5355,7 @@ func build_ui() -> void:
 		camp_leave.pressed.connect(_leave_camp)
 	else:
 		var camp_opts := [
-			["REST", "Sleep off the road.\nRecover %d HP." % CAMP_REST_HP],
+			["REST", "Sleep off the road.\nRecover %d HP." % Ascension.camp_rest(0)],
 			["TEND A CARD", "Hold a plain card to the light —\nit takes a random enhancement."],
 			["CAST ONE OFF", "Feed a card to the flames.\nGone from the deck for good."],
 		]

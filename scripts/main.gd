@@ -268,6 +268,12 @@ func _ready() -> void:
 				menu_layer.visible = false
 				trail.preview_riding = OS.get_environment("POKERPOP_RIDING") != ""
 				trail._open_buyin_now()
+				# POKERPOP_ASCENSION=N turns the dial to N.
+				if OS.get_environment("POKERPOP_ASCENSION") != "":
+					trail._asc_pick = int(OS.get_environment("POKERPOP_ASCENSION"))
+				else:
+					trail._asc_pick = 0
+				trail._render_ascension()
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -285,9 +291,7 @@ func _ready() -> void:
 				# blinded_out or trail_complete.
 				menu_layer.visible = false
 				var ending := OS.get_environment("POKERPOP_ENDING")
-				if ending == "trail_complete":
-					trail.cash = maxi(trail.cash, 1200)  # the High Roller seat
-				trail._start_run(2 if ending == "trail_complete" else 0)
+				trail._start_run(int(OS.get_environment("POKERPOP_ASCENSION")))
 				trail.outlaws_caught = 7 if ending == "trail_complete" else 3
 				trail.best_hand_score = 840
 				trail.best_hand_name = "Full House"
@@ -557,7 +561,8 @@ func _update_labels() -> void:
 	_hp_label.visible = show_hp
 	for i in _hp_pips.size():
 		var pip: Panel = _hp_pips[i]
-		pip.visible = show_hp
+		# Pips past the rider's max (8 from Ascension 18) stay hidden.
+		pip.visible = show_hp and i < trail.max_hp()
 		if show_hp:
 			pip.add_theme_stylebox_override("panel",
 					UiKit.bar_box("red") if i < trail.hp else UiKit.bar_box("track"))
@@ -589,11 +594,11 @@ func _update_labels() -> void:
 				match bcard.boss:
 					"jack":
 						bhp = bcard.boss_hp
-						bhp_max = Board.JACK_HP
+						bhp_max = board.boss_max_hp("jack")
 						bname = "JACK OF ALL TRADES  ·  BEAT %d TO WOUND" % board.jack_bar
 					"queen":
 						bhp = bcard.boss_hp
-						bhp_max = Board.QUEEN_HP
+						bhp_max = board.boss_max_hp("queen")
 						bname = "QUEEN BEE  ·  SCORE HANDS WITH HER"
 					"cobra":
 						var tail := 0
@@ -601,7 +606,7 @@ func _update_labels() -> void:
 							if board.grid[q].snake_tail:
 								tail += 1
 						bhp = tail + 1  # the head is his last life
-						bhp_max = Board.COBRA_START_TAIL + 1
+						bhp_max = board.cobra_start_tail + 1
 						bname = "KING COBRA  ·  STRIP THE TAIL"
 			target_label.text = "TABLE %d / %d      %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, bname]
@@ -762,7 +767,7 @@ func _open_cardgrid() -> void:
 		["Honeyed", func(c: PlayingCard) -> void: c.honey = true],
 		["The Safe", func(c: PlayingCard) -> void: c.is_safe = true; c.combo = [3, 9, 5, 2]; c.combo_progress = 2],
 		["Cobra tail", func(c: PlayingCard) -> void: c.snake_tail = true],
-		["Jack of All Trades", func(c: PlayingCard) -> void: c.boss = "jack"; c.boss_hp = 2500; c.rank = 11; c.suit = 2],
+		["Jack of All Trades", func(c: PlayingCard) -> void: c.boss = "jack"; c.boss_hp = 2000; c.rank = 11; c.suit = 2],
 		["Queen Bee", func(c: PlayingCard) -> void: c.boss = "queen"; c.boss_hp = 2; c.rank = 12; c.suit = 1],
 		["King Cobra", func(c: PlayingCard) -> void: c.boss = "cobra"; c.rank = 9],
 		["The Outlaw (card)", func(c: PlayingCard) -> void: c.boss = "outlaw"; c.rank = 10; c.suit = 3],
@@ -1685,7 +1690,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 # --- First-time tutorials (per profile) ------------------------------------
 
 const TUTOR := {
-	"levels": ["LEVELS & UNLOCKS", "Every ride's score turns into EXP, win or bust, and every level unlocks ONE new thing for the trail: a table, a relic, a provision, a card, a rider, a merchant or a stake. Tables and merchants go straight onto the trail; relics, provisions, cards and riders must be BOUGHT at the Outfitter (UPGRADES) before they turn up. Owned items can be upgraded too: FIND makes them turn up more often, POWER makes them hit harder. Each level-up also pays a little purse — and CONTRACTS on the menu pay cash for goals met."],
+	"levels": ["LEVELS & UNLOCKS", "Every ride's score turns into EXP, win or bust, and every level unlocks ONE new thing for the trail: a relic, a provision, a card, a trick or a merchant. Merchants go straight onto the trail; the rest must be BOUGHT at the Outfitter (UPGRADES) before they turn up. New RIDERS are won, not bought: complete the trail as the Gambler to unlock the Machine, and as the Machine to unlock the Doctor. Beat the trail with a rider to open the next ASCENSION for them, up to 20. Owned items can be upgraded too: FIND makes them turn up more often, POWER makes them hit harder. Each level-up also pays a little purse — and CONTRACTS on the menu pay cash for goals met."],
 	"mode_time": ["TIME TRIAL", "Score as much as you can before the clock runs out. Hands are unlimited and the deck reshuffles forever — speed is everything."],
 	"mode_single": ["SINGLE DECK", "One 52-card deck, no timer. When the deck runs dry the run is over — squeeze every point from every card."],
 	"mode_arcade": ["ARCADE", "The bar at the top is always draining. Scoring refills it; hit the level target to move up. When the bar empties, the run ends."],
@@ -1702,8 +1707,8 @@ const TUTOR := {
 	"goal_mine": ["GOLD MINE", "The board is choked with stone, and the seam runs 20 stones deep. Chip the rocks by clearing cards BESIDE them (three chips each) — broken rock has a chance of leaving GOLD cards in the rubble, and fresh rock rides in on the deal until the whole seam is on the table. Mine it DRY: the table clears only when every last stone is rubble."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
-	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE bleeds off him — the bar rises with every hit. Deal 2,500 total to put him away."],
-	"boss_queen": ["QUEEN BEE", "The Queen carries a 3,000 SCORE pool — every hand she's in deals its score as damage. But she never sits still: each turn she flits to a new cell and leaves HONEY where she walked. Honey plays in any hand, but once a honeyed card joins your chain, only ONE more card can follow it — her hive slows your biggest hands."],
+	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE bleeds off him — the bar rises with every hit. Deal 2,000 total to put him away (more on higher Ascensions)."],
+	"boss_queen": ["QUEEN BEE", "The Queen carries a 2,400 SCORE pool (deeper on higher Ascensions) — every hand she's in deals its score as damage. But she never sits still: each turn she flits to a new cell and leaves HONEY where she walked. Honey plays in any hand, but once a honeyed card joins your chain, only ONE more card can follow it — her hive slows your biggest hands."],
 	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
