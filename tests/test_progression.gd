@@ -18,6 +18,7 @@ func _initialize() -> void:
 	_grandfather()
 	_gates()
 	_picks()
+	_odds()
 	_round_trip()
 	if failures == 0:
 		print("ALL PROGRESSION TESTS PASSED")
@@ -185,6 +186,47 @@ func _picks() -> void:
 		n[id] = int(n.get(id, 0)) + 1
 	var ratio := float(n.get("horseshoe", 0)) / maxf(1.0, float(n.get("chisel", 0)))
 	_check(absf(ratio - 2.0) < 0.15, "FIND 2 doubles how often it turns up (%.2f×)" % ratio)
+
+
+## Fully unlocked, the weighted tables deal exactly the old odds.
+func _odds() -> void:
+	var p := Progression.new()
+	p.unlock_all = true
+	# The old cumulative chain, goal by goal.
+	var old_rooms := {"safe": 0.06, "chest": 0.06, "mine": 0.024, "purge": 0.096,
+			"hands": 0.10, "holdem": 0.08, "crazy8": 0.07, "blackjack": 0.08,
+			"outlaw": 0.08, "collect": 0.08, "landrush": 0.07, "plain": 0.20}
+	_check(_odds_match(p, "room", TrailMode.ROOM_TABLE, old_rooms),
+			"table odds match the old draw within 1.5%")
+	var old_mods := {"mult": 0.26, "chip": 0.26, "plus": 0.14, "minus": 0.10,
+			"bumper": 0.11, "gold": 0.10, "wild": 0.03}
+	_check(_odds_match(p, "mod", TrailMode.MOD_WEIGHTS, old_mods),
+			"enhancement odds match the old roll within 1.5%")
+	var fresh := Progression.new()
+	var only_plain := true
+	var mods_ok := true
+	for i in 2000:
+		if fresh.pick("room", TrailMode.ROOM_TABLE) != "plain":
+			only_plain = false
+		if not fresh.pick("mod", TrailMode.MOD_WEIGHTS) in ["mult", "chip", "gold"]:
+			mods_ok = false
+	_check(only_plain, "at level 1 every table is a plain one")
+	_check(mods_ok, "at level 1 only Mult, Chip and Gold turn up")
+
+
+func _odds_match(p: Progression, kind: String, weights: Dictionary, want: Dictionary) -> bool:
+	var n := {}
+	var draws := 20000
+	for i in draws:
+		var id := p.pick(kind, weights)
+		n[id] = int(n.get(id, 0)) + 1
+	var ok := true
+	for id in want:
+		var got := float(n.get(id, 0)) / draws
+		if absf(got - float(want[id])) > 0.015:
+			print("  %s %s: %.3f vs %.3f" % [kind, id, got, float(want[id])])
+			ok = false
+	return ok
 
 
 func _round_trip() -> void:

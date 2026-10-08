@@ -84,6 +84,21 @@ const CRAZY8_CHANCE := 0.07      # every 8 on the board is wild
 const BLACKJACK_CHANCE := 0.08   # sum to 21, beat the dealer
 const OUTLAW_CHANCE := 0.08      # the duel: your bullets vs his
 const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
+# Every table the draw can deal, by weight (from table 2 on). These are
+# the chances above, split per goal: a locked goal drops out and the
+# rest share its odds. FIND upgrades lift a goal's weight.
+const ROOM_TABLE := {
+	"safe": OBJECTIVE_CHANCE * 0.5, "chest": OBJECTIVE_CHANCE * 0.5,
+	"mine": PURGE_CHANCE * 0.2, "purge": PURGE_CHANCE * 0.8,
+	"hands": REQUIRE_CHANCE, "holdem": HOLDEM_CHANCE, "crazy8": CRAZY8_CHANCE,
+	"blackjack": BLACKJACK_CHANCE, "outlaw": OUTLAW_CHANCE,
+	"collect": COLLECT_CHANCE, "landrush": LANDRUSH_CHANCE,
+	"plain": 0.20,
+}
+# Enhancements by weight: the classics common, the exotics rarer, and
+# WILD the unicorn.
+const MOD_WEIGHTS := {"mult": 26, "chip": 26, "plus": 14, "minus": 10,
+		"bumper": 11, "gold": 10, "wild": 3}
 
 # Western job names for the purge rooms; a stone roll becomes the
 # GOLD MINE instead (its own room type).
@@ -414,6 +429,7 @@ func _load_meta() -> void:
 			"gambler_ability": gambler_ability}
 	if progress.read(cf, main.stats, legacy):
 		_save_meta()  # an old profile, seated at the level its stats earned
+	progress.unlock_all = true  # TODO(phase 3): gates go live with the catalog
 
 
 func _save_meta() -> void:
@@ -1178,17 +1194,69 @@ func _apply_target_provision(id: String, card: PlayingCard) -> void:
 
 
 ## A random provision id for shops and loot.
-func _random_provision() -> String:
-	return PROVISIONS.keys().pick_random()
+func _random_provision(exclude: Array = []) -> String:
+	var w := {}
+	for id in PROVISIONS:
+		w[id] = 1.0
+	var id := progress.pick("provision", w, exclude)
+	return id if id != "" else "canteen"
+
+
+## `n` different provisions for a shelf (fewer if the pool runs dry).
+func _provision_shelf(n: int) -> Array:
+	var out: Array = []
+	var w := {}
+	for id in PROVISIONS:
+		w[id] = 1.0
+	for i in n:
+		var id := progress.pick("provision", w, out)
+		if id == "":
+			break
+		out.append(id)
+	return out
+
+
+## A relic the rider doesn't carry yet, weighted by FIND ("" if none).
+func _relic_pick(exclude: Array = [], common_only := false) -> String:
+	var w := {}
+	for id in RELICS:
+		if relics.has(id) or (common_only and int(RELICS[id].rarity) != 0):
+			continue
+		w[id] = 1.0
+	return progress.pick("relic", w, exclude)
+
+
+## `n` different relics for a merchant's shelf.
+func _relic_shelf(n: int) -> Array:
+	var out: Array = []
+	for i in n:
+		var id := _relic_pick(out)
+		if id == "":
+			break
+		out.append(id)
+	return out
+
+
+func _avail(kind: String, id: String) -> bool:
+	return progress.is_available(kind, id)
+
+
+## A merchant on the trail, by MERCHANTS index (saves keep the index,
+## so that list is never reordered).
+func _random_merchant_index() -> int:
+	var w := {}
+	for m in MERCHANTS:
+		w[String(m.id)] = 1.0
+	var id := progress.pick("merchant", w)
+	for i in MERCHANTS.size():
+		if String(MERCHANTS[i].id) == id:
+			return i
+	return 0
 
 
 ## A random relic id the player doesn't own yet, or "" if none left.
 func _unowned_relic() -> String:
-	var pool: Array = []
-	for id in RELICS:
-		if not relics.has(id):
-			pool.append(id)
-	return pool.pick_random() if not pool.is_empty() else ""
+	return _relic_pick()
 
 
 func _blind_for(room: int) -> int:
@@ -1245,23 +1313,10 @@ func _cashout_value(rate_bonus := 1.0) -> int:
 	return int(chips * rate * rate_bonus / 10.0)
 
 
-## Weighted enhancement roll: the classics stay common, the exotic
-## payloads rarer, and WILD is the unicorn.
+## Weighted enhancement roll over the ones on the trail (MOD_WEIGHTS).
 func _random_mod() -> String:
-	var roll := randf()
-	if roll < 0.26:
-		return "mult"
-	if roll < 0.52:
-		return "chip"
-	if roll < 0.66:
-		return "plus"
-	if roll < 0.76:
-		return "minus"
-	if roll < 0.87:
-		return "bumper"
-	if roll < 0.97:
-		return "gold"
-	return "wild"
+	var id := progress.pick("mod", MOD_WEIGHTS)
+	return id if id != "" else "chip"
 
 
 ## FINISHES ride along as a rare extra on any enhanced card, one of
@@ -1270,7 +1325,12 @@ const FINISH_CHANCE := 0.2
 
 
 func _roll_finish() -> String:
-	return PlayingCard.FINISHES.keys().pick_random() if randf() < FINISH_CHANCE else ""
+	if randf() >= FINISH_CHANCE:
+		return ""
+	var w := {}
+	for id in PlayingCard.FINISHES:
+		w[id] = 1.0
+	return progress.pick("finish", w)
 
 
 func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
@@ -1665,7 +1725,14 @@ func _make_offers() -> Array:
 ## WHO is waiting before you commit to the stop.
 func _make_shop_offer() -> Dictionary:
 	return {"kind": "shop", "tarot": "TRAVELING MERCHANT",
-			"merchant": randi() % MERCHANTS.size()}
+			"merchant": _random_merchant_index()}
+
+
+## Which kind of table the draw deals (ROOM_TABLE over the goals on
+## the trail); "plain" is the ordinary score table.
+func _roll_room_goal() -> String:
+	var goal := progress.pick("room", ROOM_TABLE)
+	return goal if goal != "" else "plain"
 
 
 func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
@@ -1685,11 +1752,11 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		"odds": float(risk.odds),
 		"min_bet": _blind_for(room_index),
 	}
-	if room_index >= 1:
-		var roll := randf()
-		if roll < OBJECTIVE_CHANCE:
+	var goal := _roll_room_goal() if room_index >= 1 else "plain"
+	if goal != "plain":
+		if goal in ["safe", "chest"]:
 			# Objective rooms: no score target — do the job to clear.
-			if randf() < 0.5:
+			if goal == "safe":
 				offer.tarot = "BANK JOB"
 				offer.label = "Heist"
 				offer.odds = 2.0
@@ -1710,8 +1777,9 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			if offer.get("goal", "") == "safe":
 				offer.hands = maxi(1, 8 - region)
 			offer.target = 0
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE:
-			var kind: String = HAZARD_KINDS.pick_random()
+		elif goal in ["mine", "purge"]:
+			var kind: String = "stone" if goal == "mine" \
+					else ["bomb", "fire", "wind", "water"].pick_random()
 			if kind == "stone":
 				# GOLD MINE: a board of solid rock — break stones free
 				# and gold cards turn up in the rubble.
@@ -1737,10 +1805,10 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 				offer["purge_quota"] = PURGE_QUOTA_BASE + PURGE_QUOTA_REGION * region
 				offer.hands = mini(MAX_HANDS_BUY, 9 + region)
 				offer.target = 0
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE:
+		elif goal == "hands":
 			# Called hands: play exactly what the table demands.
 			offer["goal"] = "hands"
-			if region >= 1 and randf() < ROYAL_CHANCE:
+			if region >= 1 and randf() < ROYAL_CHANCE and _avail("room", "royal"):
 				offer.tarot = "ROYAL HUNT"
 				offer.label = "Royal Hunt"
 				offer.odds = 5.0
@@ -1759,8 +1827,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			# hands to waste — every other play works toward a demand.
 			offer.hands = 10
 			offer.target = 0
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
-				+ HOLDEM_CHANCE:
+		elif goal == "holdem":
 			# Hold'em: 5 community cards, pick 2 hole cards per hand.
 			offer.tarot = "TEXAS HOLD'EM"
 			offer.label = "Hold'em"
@@ -1768,16 +1835,14 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer["goal"] = "holdem"
 			offer.target = _target_for(room_index, {"target_scale": 1.1})
 			offer.hands = 8
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
-				+ HOLDEM_CHANCE + CRAZY8_CHANCE:
+		elif goal == "crazy8":
 			# Crazy 8s: a normal table, but every 8 is wild.
 			offer.tarot = "CRAZY 8s"
 			offer.label = "Wild Eights"
 			offer.odds = 1.5
 			offer["goal"] = "crazy8"
 			offer.target = _target_for(room_index, {"target_scale": 1.25})
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
-				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE:
+		elif goal == "blackjack":
 			# Blackjack: chains score their pip sum — beat the dealer.
 			offer.tarot = "BLACKJACK"
 			offer.label = "Twenty-One"
@@ -1786,9 +1851,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer["wins"] = 4 + region
 			offer.hands = mini(MAX_HANDS_BUY, 2 * (4 + region) + 1)
 			offer.target = 0
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
-				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
-				+ OUTLAW_CHANCE:
+		elif goal == "outlaw":
 			# The bounty: a wanted gun — or a whole posse, hunted down
 			# one head at a time. Clear YOUR bullets to shoot, dodge HIS.
 			# region is 0-based: lone guns in region one, pairs from
@@ -1802,9 +1865,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 			offer["outlaws"] = _roll_posse(posse)
 			offer.hands = 10 + 3 * (posse - 1)
 			offer.target = 0
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
-				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
-				+ OUTLAW_CHANCE + COLLECT_CHANCE:
+		elif goal == "collect":
 			# Roundup family: clear a called count of one suit, one
 			# rank, or many DIFFERENT ranks.
 			offer["goal"] = "collect"
@@ -1832,9 +1893,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 					offer.label = "Census"
 					offer["collect_kinds"] = true
 					offer["collect_need"] = mini(13, 11 + region)
-		elif roll < OBJECTIVE_CHANCE + PURGE_CHANCE + REQUIRE_CHANCE \
-				+ HOLDEM_CHANCE + CRAZY8_CHANCE + BLACKJACK_CHANCE \
-				+ OUTLAW_CHANCE + COLLECT_CHANCE + LANDRUSH_CHANCE:
+		elif goal == "landrush":
 			# Land rush: stake a claim on every plot — clear a card
 			# from each of the 25 cells.
 			offer.tarot = "LAND RUSH"
@@ -1848,8 +1907,11 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 	# ROYAL HUNT, which always run on the clock: vaults, schedules,
 	# collapsing seams and stalked royals wait for no hand count.
 	# Plain score tables that draw the clock take the HIGH NOON name.
+	# The clock itself (HIGH NOON) is an unlock: before it, only the
+	# always-timed jobs run on one — and those unlock after it.
 	if String(offer.get("goal", "")) in ["safe", "chest", "mine"] \
-			or String(offer.get("tarot", "")) == "ROYAL HUNT" or randf() < 0.5:
+			or String(offer.get("tarot", "")) == "ROYAL HUNT" \
+			or (randf() < 0.5 and _avail("room", "clock")):
 		offer["limit"] = "time"
 		if not offer.has("minutes"):
 			offer["minutes"] = clampi(roundi(int(offer.hands) * 0.35), 2,
@@ -2558,9 +2620,11 @@ func _seed_room_specials() -> void:
 			main.board.spawn_objective("bullet")
 		for i in 2:
 			main.board.spawn_objective("hisbullet")
-	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0):
-		# Surprise loot in a plain room.
-		if randf() < 0.5:
+	elif randf() < AMBIENT_CHANCE * (2.0 if has_relic("rabbits_foot") else 1.0) \
+			and (_avail("room", "safe") or _avail("room", "chest")):
+		# Surprise loot in a plain room — only jobs the rider has met.
+		var safe_ok := _avail("room", "safe")
+		if safe_ok and (not _avail("room", "chest") or randf() < 0.5):
 			room_combo = _generate_combo()
 			main.board.spawn_safe(room_combo)
 		else:
@@ -2942,11 +3006,7 @@ func _defer_chest_reward() -> void:
 
 ## A random COMMON relic the player doesn't own yet, or "".
 func _unowned_common_relic() -> String:
-	var pool: Array = []
-	for id in RELICS:
-		if int(RELICS[id].rarity) == 0 and not relics.has(id):
-			pool.append(id)
-	return pool.pick_random() if not pool.is_empty() else ""
+	return _relic_pick([], true)
 
 
 ## Chest reward roll (treasure rooms — ambient chests defer instead).
@@ -3865,25 +3925,18 @@ func _show_shop() -> void:
 	if _shop_stock_room != room_index:
 		# The tarot card already introduced the merchant — same trader.
 		_shop_merchant = MERCHANTS[int(current_offer.get("merchant",
-				randi() % MERCHANTS.size()))]
+				_random_merchant_index()))]
 		_shop_stock = []
 		for i in int(_shop_merchant.cards):
 			var o := _shop_card_offer()
 			o["bought"] = false
 			_shop_stock.append(o)
-		var pool: Array = []
-		for id in RELICS:
-			if not relics.has(id):
-				pool.append(id)
-		pool.shuffle()
 		_shop_stock_relics = []
-		for i in mini(int(_shop_merchant.relics), pool.size()):
-			_shop_stock_relics.append({"id": pool[i], "bought": false})
-		var ppool: Array = PROVISIONS.keys()
-		ppool.shuffle()
+		for id in _relic_shelf(int(_shop_merchant.relics)):
+			_shop_stock_relics.append({"id": id, "bought": false})
 		_shop_stock_provisions = []
-		for i in mini(int(_shop_merchant.get("provisions", 0)), ppool.size()):
-			_shop_stock_provisions.append({"id": ppool[i], "bought": false})
+		for id in _provision_shelf(int(_shop_merchant.get("provisions", 0))):
+			_shop_stock_provisions.append({"id": id, "bought": false})
 		_shop_burned_here = false
 		_shop_stock_room = room_index
 	_shop_title.text = _shop_merchant.name
