@@ -1562,89 +1562,89 @@ func _update_tooltip(delta: float) -> void:
 	_tooltip.visible = true
 
 
-## Everything the hovered card is, in one small panel.
+## Everything the hovered card is, in one small panel: its name, then
+## one short "NAME — fact" line per thing on it. The long explanations
+## live in the first-time tutorials and the Almanac.
 func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.is_safe:
-		return "THE SAFE\nChain its combination in order, add the safe, and play to crack it."
+		return "THE SAFE\nPlay its combo in order, then the safe."
 	if card.hazard == "stone":
-		return "STONE\nA blocker — no rank, no suit, can't be played. Clear cards BESIDE it to chip it: %d chip%s left. Broken rock sometimes bares GOLD." \
+		return "STONE\nUnplayable. Clear cards beside it: %d chip%s left." \
 				% [card.stone_hits, "" if card.stone_hits == 1 else "s"]
 	if card.snake_tail:
-		return "COBRA TAIL\nA wall. Clear the head's face to make him cough it back up."
+		return "COBRA TAIL\nA wall. Clear the head's face to free one."
+	if card.face_down:
+		return "FACE DOWN\nSelect to hit. Past 21 busts the round."
 	var rank_names := {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
 	var lines: Array[String] = []
-	if card.face_down:
-		return "FACE DOWN\nSelect it to HIT: it flips on the spot and its pips join your sum. No take-backs — flip past 21 and you bust the round."
 	if card.washed:
-		lines.append("FILLED — water to the brim: the card is under there somewhere, and it POURS into its neighbors every hand. It still is what it was — play it blind if you remember, or bail it out with a canteen.")
+		lines.append("FILLED — face hidden · pours every hand")
+	elif card.joker:
+		lines.append("The Joker")
 	else:
-		if card.joker:
-			lines.append("The Joker")
-		else:
-			lines.append("%s of %s  ·  pips %d" % [rank_names.get(card.rank, str(card.rank)),
-					PlayingCard.SUIT_NAMES[card.suit], card.rank])
+		lines.append("%s of %s" % [rank_names.get(card.rank, str(card.rank)),
+				PlayingCard.SUIT_NAMES[card.suit]])
 	match card.boss:
 		"jack":
-			lines.append("JACK OF ALL TRADES — %d score left to deal him. A hand beating %d with him in it bleeds its WHOLE SCORE off him; the bar rises per hit." % [card.boss_hp, board.jack_bar])
+			lines.append("JACK — %d left · beat %d to wound him" % [card.boss_hp, board.jack_bar])
 		"queen":
-			lines.append("QUEEN BEE — a %d score pool: every hand she's in deals its score. She flits to a new cell each turn and leaves honey where she walked." % card.boss_hp)
+			lines.append("QUEEN — %d left · moves and honeys each turn" % card.boss_hp)
 		"cobra":
-			lines.append("KING COBRA — %d meals in the tail. Clear his current face." % card.cobra_body.size())
-	if card.honey:
-		lines.append("HONEYED — plays in any hand, but once it's in your chain you can add only ONE more card after it.")
-	if card.cursed:
-		lines.append("CURSED — unplayable, blocks chains. Burn it at a shop.")
+			lines.append("COBRA — %d in the tail · clear his face" % card.cobra_body.size())
 	match card.hazard:
 		"bomb":
-			lines.append("BOMB — %d hands left on the fuse. Play it to defuse." % card.fuse)
+			lines.append("BOMB — %d hand%s left · play to defuse" % [card.fuse,
+					"" if card.fuse == 1 else "s"])
 		"fire":
-			lines.append("FIRE — spreads every hand and burns its rank down. Play it to douse it.")
+			lines.append("FIRE — spreads, burns rank down · play to douse")
 		"wind":
-			lines.append("WIND — every hand it BLOWS the first card in its facing direction clean off the board, unscored. The direction turns each hand — watch which way the dust streams. Play it to still the air.")
-		"stone":
-			lines.append("STONE — %d scoring use%s left before it breaks." % [card.stone_hits,
-					"" if card.stone_hits == 1 else "s"])
+			lines.append("WIND — blows a card off each hand · play to still")
 		"water":
-			lines.append("WATER — fills 1/4 per hand (%d/4 now). Full to the brim it POURS, turning all four neighbors into water cards. Play it at any level to clear it." % card.water_level)
+			lines.append("WATER — %d/4 full · pours when full · play to clear" % card.water_level)
+	if card.incoming != "":
+		lines.append("NEXT IN LINE — the %s strikes here" % card.incoming.to_lower())
+	if card.honey:
+		lines.append("HONEY — only 1 card can follow it")
+	if card.cursed:
+		lines.append("CURSED — unplayable · burn it at a forge")
+	if card.joker:
+		lines.append("JOKER — wild · ×2 hand score")
 	match card.mod:
 		"chip":
-			lines.append("CHIP — pays +%d chips when played, and SEASONS: every score grows it +%d for the rest of the run." % [
-					board.chip_bonus * (1 + card.chip_level), board.chip_bonus])
+			lines.append("CHIP — +%d chips · grows each score" % (board.chip_bonus * (1 + card.chip_level)))
 		"mult":
-			lines.append("MULT — hand score ×%.1f. Stacks with other mults." % board.mult_factor)
+			lines.append("MULT — ×%.1f hand score" % board.mult_factor)
 		"gold":
-			lines.append("GOLD — pays $1 of permanent cash when played.")
+			lines.append("GOLD — +$1 cash when played")
 		"plus":
-			lines.append("PLUS — clearing it gives the aimed card +1 rank. The arrow turns each hand. Boosting an ACE lifts it into THE JOKER.")
+			lines.append("PLUS — +1 rank to the card it aims at")
 		"minus":
-			lines.append("MINUS — clearing it drops the aimed card one rank; a 2 ground lower is DESTROYED (unscored). The arrow turns each hand.")
+			lines.append("MINUS — −1 rank to its target · 2s break")
 		"bumper":
-			lines.append("BUMPER — clearing it shoves the line beside it one step along the arrow; past the edge is gone. The arrow turns each hand.")
+			lines.append("BUMPER — shoves the line it aims at")
 		"wild":
-			if not card.joker:  # the Joker's own line says it
-				lines.append("WILD — counts as ANY rank and suit.")
+			if not card.joker:
+				lines.append("WILD — any rank, any suit")
 	if PlayingCard.eights_wild and card.rank == 8 and not card.washed:
-		lines.append("CRAZY 8s — this 8 counts as WILD: any rank, any suit.")
-	if card.joker:
-		lines.append("THE JOKER — one step above the Ace. Always WILD (any rank, any suit) and he DOUBLES every hand he scores in. A MINUS knocks him back down to a plain Ace.")
-	if card.incoming != "":
-		lines.append("IN THE PATH — the %s beside it strikes HERE next hand." % card.incoming.to_upper())
-	if card.finish != "":
-		var fin: Dictionary = PlayingCard.FINISHES[card.finish]
-		lines.append("%s — %s" % [fin.name, fin.desc])
-		if card.finish == "metal" and card.metal_covered():
-			lines.append("%d of %d pins left: one pops out per play, then the cover comes off." \
-					% [PlayingCard.METAL_PINS - card.metal_wear, PlayingCard.METAL_PINS])
-		elif card.finish == "metal":
-			lines.append("The cover is off: it plays as a normal card now, and clears on its next play.")
-	if card.objective == "key":
-		lines.append("THE KEY — get it and the chest into one scoring hand.")
-	elif card.objective == "chest":
-		lines.append("THE CHEST — opens when played together with the key.")
-	elif card.objective == "bullet":
-		lines.append("YOUR BULLET — clear it in a scoring hand to shoot the Outlaw.")
-	elif card.objective == "hisbullet":
-		lines.append("HIS BULLET — a waiting slug. Clear this card in a hand and he SHOOTS you for it (−1 HP). Step around it.")
+		lines.append("CRAZY 8 — wild at this table")
+	match card.finish:
+		"prism":
+			lines.append("PRISM — spreads its enhancement when cleared")
+		"metal":
+			if card.metal_covered():
+				lines.append("METAL — stays when scored · hazard-proof · %d/%d pins" \
+						% [PlayingCard.METAL_PINS - card.metal_wear, PlayingCard.METAL_PINS])
+			else:
+				lines.append("METAL — cover off · clears on its next play")
+	match card.objective:
+		"key":
+			lines.append("KEY — score it with the chest")
+		"chest":
+			lines.append("CHEST — score it with the key")
+		"bullet":
+			lines.append("YOUR BULLET — score it to shoot")
+		"hisbullet":
+			lines.append("HIS BULLET — clear it and he shoots you (−1 HP)")
 	return "\n".join(lines)
 
 
@@ -2701,8 +2701,8 @@ func _build_profiles_and_tutor() -> void:
 	_tooltip.visible = false
 	_tooltip_label = Label.new()
 	_tooltip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tooltip_label.custom_minimum_size = Vector2(360, 0)
-	_tooltip_label.add_theme_font_size_override("font_size", 20)
+	_tooltip_label.custom_minimum_size = Vector2(330, 0)
+	_tooltip_label.add_theme_font_size_override("font_size", 18)
 	if FontLib.body != null:
 		_tooltip_label.add_theme_font_override("font", FontLib.body)
 	_tooltip_label.add_theme_color_override("font_color", OFFWHITE)

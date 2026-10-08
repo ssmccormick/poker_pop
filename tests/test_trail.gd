@@ -177,6 +177,25 @@ func _run() -> void:
 	failures += _check(resume.visible and resume.position.y < first_tier.position.y,
 			"RESUME YOUR RIDE is the first choice")
 
+	# --- A busy card's tooltip stays a few short lines -------------------
+	var busy_card := PlayingCard.new()
+	busy_card.rank = 9
+	busy_card.suit = 1
+	busy_card.mod = "plus"
+	busy_card.finish = "prism"
+	busy_card.hazard = "fire"
+	busy_card.honey = true
+	busy_card.objective = "hisbullet"
+	var tip: String = main._card_tooltip_text(busy_card)
+	print("TOOLTIP SAMPLE:\n" + tip)
+	var tip_lines := tip.split("\n")
+	var longest := 0
+	for ln in tip_lines:
+		longest = maxi(longest, ln.length())
+	failures += _check(tip_lines.size() <= 6 and longest <= 50,
+			"a busy card's tooltip is a few short lines (longest %d)" % longest)
+	busy_card.free()
+
 	_cleanup()
 	if failures == 0:
 		print("ALL TRAIL TESTS PASSED")
