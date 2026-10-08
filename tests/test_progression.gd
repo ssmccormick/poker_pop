@@ -1,0 +1,219 @@
+extends SceneTree
+
+## Pure tests for meta progression: the catalog, the EXP curve, ride
+## EXP, grandfathering, gates, weighted picks and the save round-trip.
+## Run: godot --headless --path . --script res://tests/test_progression.gd
+
+const MODS := ["mult", "chip", "gold", "plus", "minus", "bumper", "wild"]
+const ROOMS := ["plain", "clock", "safe", "outlaw", "hands", "chest", "purge",
+		"mine", "collect", "crazy8", "landrush", "blackjack", "holdem", "royal"]
+
+var failures := 0
+
+
+func _initialize() -> void:
+	_catalog()
+	_curve()
+	_ride_exp()
+	_grandfather()
+	_gates()
+	_picks()
+	_round_trip()
+	if failures == 0:
+		print("ALL PROGRESSION TESTS PASSED")
+	else:
+		print("%d PROGRESSION TEST(S) FAILED" % failures)
+	quit(failures)
+
+
+func _catalog() -> void:
+	var counts := {}
+	for r in Progression.CATALOG:
+		var k := Progression.key(String(r.kind), String(r.id))
+		counts[k] = int(counts.get(k, 0)) + 1
+	var dupes := counts.keys().filter(func(k): return int(counts[k]) > 1)
+	_check(dupes.is_empty(), "no item appears twice in the catalog %s" % str(dupes))
+	var want: Array = []
+	for id in TrailMode.RELICS:
+		want.append(Progression.key("relic", id))
+	for id in TrailMode.PROVISIONS:
+		want.append(Progression.key("provision", id))
+	for id in MODS:
+		want.append(Progression.key("mod", id))
+	for id in PlayingCard.FINISHES:
+		want.append(Progression.key("finish", id))
+	for id in TrailMode.CHARACTERS:
+		want.append(Progression.key("rider", id))
+	for id in TrailMode.GAMBLER_ABILITIES:
+		want.append(Progression.key("trick", id))
+	for m in TrailMode.MERCHANTS:
+		want.append(Progression.key("merchant", String(m.id)))
+	for t in TrailMode.TABLES.size():
+		want.append(Progression.key("stake", str(t)))
+	for id in ROOMS:
+		want.append(Progression.key("room", id))
+	var missing := want.filter(func(k): return not counts.has(k))
+	_check(missing.is_empty(), "every relic, provision, card, rider, merchant, stake and table is in the catalog %s" % str(missing))
+
+	# The starter set, exactly.
+	var starters: Array = []
+	for r in Progression.CATALOG:
+		if int(r.level) == 1:
+			starters.append(Progression.key(String(r.kind), String(r.id)))
+	starters.sort()
+	var expect := ["rider:the_gambler", "trick:sleeve", "gear:bankroll", "stake:0",
+			"merchant:peddler", "room:plain", "mod:mult", "mod:chip", "mod:gold",
+			"relic:horseshoe", "relic:card_sleeve", "relic:snake_oil", "relic:tin_star",
+			"relic:bomb_badge", "relic:chisel", "provision:canteen",
+			"provision:dynamite", "provision:pocket_flask", "provision:gold_pan"]
+	expect.sort()
+	_check(starters == expect, "the starter set is exactly the small kit")
+
+	# One unlock on every level 2..44; 45 reserved for the Dealer.
+	var per_level := {}
+	for r in Progression.CATALOG:
+		per_level[int(r.level)] = int(per_level.get(int(r.level), 0)) + 1
+	var bad: Array = []
+	for lv in range(2, 45):
+		if int(per_level.get(lv, 0)) != 1:
+			bad.append(lv)
+	_check(bad.is_empty(), "exactly one unlock on each level 2-44 %s" % str(bad))
+	_check(Progression.row("room", "dealer").get("reserved", false)
+			and int(Progression.row("room", "dealer").level) == 45,
+			"level 45 is reserved for the Dealer's table")
+	# Tables that always run on the clock can't come before the clock.
+	var clock := int(Progression.row("room", "clock").level)
+	for id in ["safe", "chest", "mine", "royal"]:
+		_check(int(Progression.row("room", id).level) >= clock,
+				"%s unlocks at or after High Noon" % id)
+
+
+func _curve() -> void:
+	var ok := true
+	for lv in range(1, 60):
+		if Progression.exp_at_level(lv + 1) <= Progression.exp_at_level(lv):
+			ok = false
+		if Progression.level_for_exp(Progression.exp_at_level(lv)) != lv:
+			ok = false
+		if Progression.level_for_exp(Progression.exp_at_level(lv + 1) - 1) != lv:
+			ok = false
+	_check(ok, "the curve climbs and level_for_exp inverts it")
+	_check(Progression.exp_at_level(2) == 80, "level 2 at 80 EXP")
+	_check(Progression.exp_at_level(45) == 22440, "level 45 at 22,440 EXP")
+	_check(Progression.purse_between(1, 3) == 25, "levels 2 and 3 pay $10 + $15")
+
+
+func _ride_exp() -> void:
+	# Three cleared tables (~1,000-1,500 a table), busted at the fourth.
+	var bust := Progression.run_exp(4500, 4, 0, 0, false)
+	_check(int(bust.total) >= 80, "an early bust still reaches level 2 (%d EXP)" % int(bust.total))
+	var deep := Progression.run_exp(41000, 10, 1, 0, false)
+	_check(absi(int(deep.total) - 560) <= 20, "a death at table 10 with 41k ≈ 560 EXP (%d)" % int(deep.total))
+	var win := Progression.run_exp(100000, 21, 3, 0, true)
+	_check(absi(int(win.total) - 1610) <= 20, "a Penny Ante win ≈ 1,600 EXP (%d)" % int(win.total))
+	var high := Progression.run_exp(150000, 21, 3, 2, true)
+	_check(int(high.total) > int(win.total) * 2, "a High Roller win pays more than double")
+	var sum := 0
+	for r in high.rows:
+		sum += int(r[1])
+	_check(sum == int(high.total), "the breakdown rows add up to the total")
+	var huge := Progression.run_exp(10000000, 21, 3, 0, true)
+	_check(int(huge.rows[0][1]) == 2500, "score EXP is soft-capped at 2,500")
+
+
+func _grandfather() -> void:
+	_check(Progression.grandfather_exp({}) == 0, "no stats, no head start")
+	var vet := {"trail_runs": 30, "tables_cleared": 200, "bosses_beaten": 12,
+			"trail_wins": 2, "deepest_table": 21}
+	var p := Progression.new()
+	var cf := ConfigFile.new()
+	var built := p.read(cf, vet, {"character": "the_doctor", "watch": 1})
+	_check(built and p.grandfathered, "a veteran profile with no progress is grandfathered")
+	_check(p.level() >= 25, "a trail winner starts at level 25 or more (L%d)" % p.level())
+	_check(p.is_available("relic", "rabbits_foot") and p.is_available("rider", "the_doctor"),
+			"everything at or below the level, and the rider they rode, is theirs")
+	_check(p.is_available("stake", "2"), "every stake they could already ride stays open")
+	var fresh := Progression.new()
+	_check(not fresh.read(ConfigFile.new(), {"hands_played": 50}),
+			"a profile that never rode the trail starts fresh")
+	_check(fresh.level() == 1, "fresh is level 1")
+	var floor_only := Progression.new()
+	floor_only.read(ConfigFile.new(), {"trail_runs": 1, "deepest_table": 8})
+	_check(floor_only.level() >= 10, "reaching table 7 floors the level at 10")
+
+
+func _gates() -> void:
+	var p := Progression.new()
+	_check(p.is_available("relic", "horseshoe"), "starters are available at level 1")
+	_check(not p.is_available("relic", "rabbits_foot"), "a level-3 relic is locked at level 1")
+	_check(not p.is_available("room", "clock"), "High Noon is locked at level 1")
+	_check(p.is_available("relic", "not_in_catalog"), "unknown ids are never gated")
+	var gain := p.add_exp(Progression.exp_at_level(3))
+	_check(int(gain.to) == 3 and gain.unlocks.size() == 2 and int(gain.purse) == 25,
+			"climbing to 3 unlocks two things and pays the purse")
+	_check(p.is_available("room", "clock"), "a free unlock goes straight onto the trail")
+	_check(p.is_unlocked("relic", "rabbits_foot") and not p.is_available("relic", "rabbits_foot"),
+			"a priced unlock waits to be bought")
+	_check(p.buy_cost("relic", "rabbits_foot") == 60, "it costs its price")
+	p.mark_owned("relic", "rabbits_foot")
+	_check(p.is_available("relic", "rabbits_foot") and p.buy_cost("relic", "rabbits_foot") == 0,
+			"bought, it's on the trail")
+	_check(p.find_cost("relic", "horseshoe") == 40 and p.find_cost("relic", "rabbits_foot") == 30,
+			"FIND 1 costs half the buy price, at least $30")
+	p.raise_find("relic", "horseshoe")
+	p.raise_find("relic", "horseshoe")
+	_check(p.find_level("relic", "horseshoe") == 2 and p.find_cost("relic", "horseshoe") == 0,
+			"FIND tops out at 2")
+	_check(p.find_cost("rider", "the_gambler") == 0, "riders have no FIND level")
+	_check(not p.is_available("room", "dealer"), "the Dealer's table stays shut")
+
+
+func _picks() -> void:
+	var p := Progression.new()
+	var weights := {"horseshoe": 1.0, "rabbits_foot": 1.0, "lucky_chip": 1.0}
+	var leaked := false
+	for i in 500:
+		if p.pick("relic", weights) != "horseshoe":
+			leaked = true
+	_check(not leaked, "pick never returns a locked id")
+	_check(p.pick("relic", weights, ["horseshoe"]) == "", "nothing available picks \"\"")
+	p.unlock_all = true
+	p.find[Progression.key("relic", "horseshoe")] = 2
+	var n := {}
+	for i in 20000:
+		var id := p.pick("relic", {"horseshoe": 1.0, "chisel": 1.0})
+		n[id] = int(n.get(id, 0)) + 1
+	var ratio := float(n.get("horseshoe", 0)) / maxf(1.0, float(n.get("chisel", 0)))
+	_check(absf(ratio - 2.0) < 0.15, "FIND 2 doubles how often it turns up (%.2f×)" % ratio)
+
+
+func _round_trip() -> void:
+	var p := Progression.new()
+	p.add_exp(1234)
+	p.mark_owned("relic", "rabbits_foot")
+	p.raise_find("mod", "mult")
+	p.power[Progression.key("relic", "horseshoe")] = 1
+	p.seen_level = 5
+	p.last_run_uid = "abc"
+	p.contracts_claimed["first_ride"] = true
+	p.contracts_seen["first_ride"] = true
+	var cf := ConfigFile.new()
+	p.write(cf)
+	var text := cf.encode_to_text()
+	var cf2 := ConfigFile.new()
+	cf2.parse(text)
+	var q := Progression.new()
+	q.read(cf2, {"trail_runs": 99})
+	_check(q.exp_total == 1234 and q.owns("relic", "rabbits_foot")
+			and q.find_level("mod", "mult") == 1
+			and q.power_level("relic", "horseshoe") == 1
+			and q.seen_level == 5 and q.last_run_uid == "abc"
+			and q.contracts_claimed.has("first_ride") and q.contracts_seen.has("first_ride")
+			and not q.grandfathered,
+			"progress survives a save and load (and isn't re-grandfathered)")
+
+
+func _check(cond: bool, label: String) -> void:
+	if not cond:
+		print("FAIL: " + label)
+		failures += 1

@@ -25,7 +25,13 @@ func _run() -> void:
 		await process_frame
 	main.profile = TEST_PROFILE
 	trail = main.trail
+	# A clean slate on the throwaway profile: no stats, level 1.
+	_cleanup()
+	main._stats_load()
+	trail._load_meta()
 	main._dismiss_splash()
+	failures += _check(trail.progress.level() == 1 and not trail.progress.grandfathered,
+			"a fresh profile starts at level 1")
 
 	# --- Tin Star pays a blind that climbs with the trail ---------------
 	failures += _check(trail._blind_for(0) == 25 and trail._blind_for(7) > 25 * 6,
@@ -196,6 +202,64 @@ func _run() -> void:
 			"a busy card's tooltip is a few short lines (longest %d)" % longest)
 	busy_card.free()
 
+	# --- The ride's score rides in the save -----------------------------
+	await _enter_room("the_machine")
+	main.score = 4321
+	trail._save_run()
+	main.score = 0
+	trail._load_run()
+	failures += _check(main.score == 4321, "the run score survives a save and resume")
+
+	# --- The pocket watch turns the run score back too ------------------
+	await _enter_room("the_doctor")
+	var before_hand: int = main.score
+	if await _play_pair():
+		failures += _check(main.score > before_hand, "the Doctor's pair scored")
+		trail.use_watch()
+		failures += _check(main.score == before_hand,
+				"the watch winds the run score back with the hand")
+	else:
+		failures += _check(false, "found a pair for the watch test")
+
+	# --- A ride is paid its EXP exactly once ----------------------------
+	await _enter_room("the_machine")
+	main.score = 50000
+	var exp0: int = trail.progress.exp_total
+	var cash0: int = trail.cash
+	trail._end_run("LAID LOW", "Test.", 0, "Test.")
+	var gained: int = trail.progress.exp_total - exp0
+	failures += _check(gained > 500 and int(trail._last_grant.exp_gain) == gained,
+			"the ride's end pays its EXP (%d)" % gained)
+	failures += _check(trail.progress.level() > 1 and trail.cash > cash0,
+			"the climb pays the level purse")
+	trail._end_run("LAID LOW", "Test.", 0, "Test.")
+	failures += _check(trail.progress.exp_total == exp0 + gained,
+			"ending the same ride twice pays once")
+	failures += _check(trail._ending_data("LAID LOW", 0, "").has("exp_gain"),
+			"the last page hears about the EXP")
+	var reloaded := Progression.new()
+	var mcf := ConfigFile.new()
+	mcf.load(main.profile_path("trail_meta.cfg"))
+	reloaded.read(mcf, {})
+	failures += _check(reloaded.exp_total == trail.progress.exp_total,
+			"the EXP is saved with the profile")
+
+	# --- A ride ridden over is still paid --------------------------------
+	await _enter_room("the_machine")
+	trail.room_index = 3
+	main.score = 9000
+	trail._save_run()
+	var exp1: int = trail.progress.exp_total
+	trail._start_run(0)
+	await _wait(0.5)
+	failures += _check(trail.progress.exp_total > exp1,
+			"starting over a saved ride credits the one left behind")
+	var exp2: int = trail.progress.exp_total
+	trail._start_run(0)
+	await _wait(0.5)
+	failures += _check(trail.progress.exp_total == exp2,
+			"re-saddling a fresh ride earns nothing")
+
 	_cleanup()
 	if failures == 0:
 		print("ALL TRAIL TESTS PASSED")
@@ -234,6 +298,27 @@ func _settle() -> void:
 		await create_timer(0.1).timeout
 		waited += 0.1
 	await process_frame
+
+
+## Plays a pair of two plain neighbors; false if none could be made.
+func _play_pair() -> bool:
+	var pair := _plain_neighbors()
+	if pair.is_empty():
+		return false
+	var a: PlayingCard = pair[0]
+	var b: PlayingCard = pair[1]
+	b.rank = a.rank
+	a.mod = ""
+	b.mod = ""
+	a.finish = ""
+	b.finish = ""
+	main.board.selected.assign([a, b])
+	a.selected = true
+	b.selected = true
+	main.board._update_hand_validity()
+	await main.board.play_hand()
+	await _settle()
+	return true
 
 
 ## Two side-by-side cards Sleight of Hand may shuffle.

@@ -1488,6 +1488,7 @@ func _select_profile(n: int) -> void:
 	trail.pending_retry = {}
 	trail._load_meta()
 	_refresh_profile_ui()
+	_refresh_level_plate()
 	profile_layer.visible = false
 
 
@@ -1501,6 +1502,7 @@ func _erase_profile(n: int) -> void:
 		trail.pending_retry = {}
 		trail._load_meta()
 	_refresh_profile_ui()
+	_refresh_level_plate()
 
 
 ## One line of life per slot for the picker.
@@ -1513,7 +1515,9 @@ func _profile_summary(n: int) -> String:
 			and run.get_value("run", "active", false)
 	if not has_meta and not FileAccess.file_exists("user://p%d_tutorial.cfg" % n):
 		return "PROFILE %d\n\nfresh saddle" % n
-	return "PROFILE %d\n\n$%d banked%s" % [n, cash,
+	var lv := Progression.level_for_exp(int(cf.get_value("progress", "exp", 0))) \
+			if has_meta else 1
+	return "PROFILE %d\n\nLevel %d  ·  $%d banked%s" % [n, lv, cash,
 			"\nride in progress" if riding else ""]
 
 
@@ -1907,6 +1911,58 @@ func _open_menu_now() -> void:
 	over_layer.visible = false
 	board.locked = true
 	menu_layer.visible = true
+	_refresh_level_plate()
+
+
+## The rider's level under STATS: the number, a sliver of EXP bar, and
+## what's waiting at the Outfitter. Clicking it opens the Outfitter.
+var _level_plate: Button
+var _level_label: Label
+var _level_sub: Label
+var _level_fill: Panel
+
+
+func _build_level_plate() -> void:
+	_level_plate = Button.new()
+	_level_plate.position = Vector2(60, 196)
+	_level_plate.size = Vector2(240, 96)
+	_level_plate.flat = true
+	_level_plate.focus_mode = Control.FOCUS_NONE
+	_level_plate.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	menu_layer.add_child(_level_plate)
+	UiKit.plate(_level_plate, Rect2(Vector2.ZERO, _level_plate.size))
+	_level_label = _label(_level_plate, "", Vector2(0, 8), 26, GOLD)
+	_level_label.size = Vector2(240, 34)
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var track := Panel.new()
+	track.position = Vector2(24, 46)
+	track.size = Vector2(192, 12)
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.add_theme_stylebox_override("panel", UiKit.bar_box("track"))
+	_level_plate.add_child(track)
+	_level_fill = Panel.new()
+	_level_fill.position = Vector2(24, 46)
+	_level_fill.size = Vector2(0, 12)
+	_level_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_level_fill.add_theme_stylebox_override("panel", UiKit.bar_box("gold"))
+	_level_plate.add_child(_level_fill)
+	_level_sub = _label(_level_plate, "", Vector2(0, 64), 15, DIM)
+	_level_sub.size = Vector2(240, 22)
+	_level_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_level_plate.pressed.connect(func() -> void:
+		trail.open_upgrades())
+	_refresh_level_plate()
+
+
+func _refresh_level_plate() -> void:
+	if _level_plate == null:
+		return
+	var pr: Progression = trail.progress
+	var into: Array = pr.exp_into_level()
+	_level_label.text = "LEVEL %d" % pr.level()
+	_level_fill.size.x = 192.0 * clampf(float(into[0]) / maxf(1.0, float(into[1])), 0.0, 1.0)
+	_level_sub.text = "%d / %d EXP" % [int(into[0]), int(into[1])]
+	_level_plate.tooltip_text = "Every ride's score turns into EXP. Each level unlocks something new for the trail."
 
 
 func _start_mode(kind: String, seconds: float = 0.0) -> void:
@@ -2516,6 +2572,7 @@ func _build_menu() -> void:
 	var how_btn := _button(menu_layer, "HOW TO PLAY", Vector2(1620, 60), Vector2(240, 54))
 	how_btn.add_theme_font_size_override("font_size", 20)
 	how_btn.pressed.connect(_start_tutorial)
+	_build_level_plate()
 
 	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66), true)
 	trail_btn.add_theme_font_size_override("font_size", 26)
@@ -2862,8 +2919,10 @@ func _open_stats_now() -> void:
 		["Royal Flushes", str(int(stats_hands.get("Royal Flush", 0)))],
 	]
 	var the_trail: Array = [
+		["Rider level", "%d" % trail.progress.level()],
 		["Runs saddled up", str(s.call("trail_runs"))],
 		["Trails completed", str(s.call("trail_wins"))],
+		["Best ride score", str(s.call("trail_score_best"))],
 		["Busted out", str(s.call("trail_busts"))],
 		["Deepest table", "%d / %d" % [s.call("deepest_table"), TrailMode.ROOMS_TOTAL]],
 		["Tables cleared", str(s.call("tables_cleared"))],

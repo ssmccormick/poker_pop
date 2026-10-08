@@ -195,9 +195,14 @@ var cash := 0
 var sleeve_rank := 2     # ACE UP THE SLEEVE: the starting rank, up to an Ace
 var meta_bankroll := 0   # +20 starting chips per level on every buy-in (max 5)
 var meta_provisions := 0 # random provisions in the kit at run start (max 2)
+# Levels, unlocks, purchases and contracts (scripts/progression.gd).
+var progress := Progression.new()
+var _last_grant := {}    # the last ride's EXP payout, for the game-over page
 
 # Run state
 var run_active := false
+var run_uid := ""        # one id per ride, so it's only ever paid EXP once
+var run_bosses := 0      # boss tables beaten this ride
 var table_tier := 0
 var chips := 0
 var deck: Array = []          # [{rank, suit, cursed}]
@@ -404,6 +409,11 @@ func _load_meta() -> void:
 	gambler_ability = String(cf.get_value("meta", "gambler_ability", "sleeve"))
 	if not GAMBLER_ABILITIES.has(gambler_ability):
 		gambler_ability = "sleeve"
+	var legacy := {"character": character, "laser": laser_level,
+			"watch": watch_level, "sleight": sleight_level,
+			"gambler_ability": gambler_ability}
+	if progress.read(cf, main.stats, legacy):
+		_save_meta()  # an old profile, seated at the level its stats earned
 
 
 func _save_meta() -> void:
@@ -419,6 +429,9 @@ func _save_meta() -> void:
 	cf.set_value("meta", "sleight", sleight_level)
 	cf.set_value("meta", "character", character)
 	cf.set_value("meta", "gambler_ability", gambler_ability)
+	# The [progress] section rides in the same file — it MUST be written
+	# here, since every save rebuilds the file from blank.
+	progress.write(cf)
 	cf.save(main.profile_path("trail_meta.cfg"))
 
 
@@ -430,6 +443,9 @@ func _save_run() -> void:
 	cf.set_value("run", "tier", table_tier)
 	cf.set_value("run", "chips", chips)
 	cf.set_value("run", "room", room_index)
+	cf.set_value("run", "uid", run_uid)
+	cf.set_value("run", "score", main.score)
+	cf.set_value("run", "bosses", run_bosses)
 	var ranks := PackedInt32Array()
 	var suits := PackedInt32Array()
 	var curses := PackedInt32Array()
@@ -497,6 +513,11 @@ func _load_run() -> bool:
 	table_tier = int(cf.get_value("run", "tier", 0))
 	chips = int(cf.get_value("run", "chips", 0))
 	room_index = int(cf.get_value("run", "room", 0))
+	run_uid = String(cf.get_value("run", "uid", ""))
+	if run_uid == "":
+		run_uid = _mint_run_uid()  # a ride saved before EXP existed
+	main.score = int(cf.get_value("run", "score", 0))
+	run_bosses = int(cf.get_value("run", "bosses", 0))
 	var ranks: PackedInt32Array = cf.get_value("run", "ranks", PackedInt32Array())
 	var suits: PackedInt32Array = cf.get_value("run", "suits", PackedInt32Array())
 	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
@@ -838,6 +859,7 @@ func use_watch() -> void:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
 		return
 	room_score = int(_watch_snapshot.room_score)
+	main.score = int(_watch_snapshot.get("run_score", main.score))
 	room_hands_left = int(_watch_snapshot.room_hands_left)
 	room_wins = int(_watch_snapshot.room_wins)
 	hp = int(_watch_snapshot.hp)
@@ -872,6 +894,7 @@ func _on_hand_committing() -> void:
 		return
 	_watch_snapshot = {
 		"room_score": room_score, "room_hands_left": room_hands_left,
+		"run_score": main.score,
 		"room_wins": room_wins, "hp": hp,
 		"room_outlaw_hp": room_outlaw_hp, "room_outlaw_idx": room_outlaw_idx,
 		"room_stones_broken": room_stones_broken,
@@ -1509,9 +1532,13 @@ func _start_run(tier: int) -> void:
 	if cash < cost:
 		return
 	cash -= cost
+	# A ride left saddled up is paid its EXP before the new one starts.
+	_credit_abandoned_ride()
 	main.stat_bump("trail_runs")
 	_save_meta()
 	main.menu_open = false
+	run_uid = _mint_run_uid()
+	run_bosses = 0
 	table_tier = tier
 	chips = TABLES[tier].chips
 	deck = _fresh_deck()
@@ -1549,7 +1576,6 @@ func _start_run(tier: int) -> void:
 
 func _resume_run() -> void:
 	if _load_run():
-		main.score = 0
 		_apply_relic_effects()
 		if not _room_save.is_empty():
 			# The photographed table: back to the exact stage you
@@ -3318,6 +3344,7 @@ func _room_cleared() -> void:
 	main.stat_bump("tables_cleared")
 	if current_offer.has("boss"):
 		main.stat_bump("bosses_beaten")
+		run_bosses += 1
 	elif room_goal == "outlaw":
 		main.stat_bump("duels_won")
 	main.board.locked = true
@@ -3463,6 +3490,7 @@ func _capture_room_state() -> Dictionary:
 		"offer": current_offer.duplicate(true),
 		"stake": stake, "stake_odds": stake_odds,
 		"room_score": room_score, "room_hands_left": room_hands_left,
+		"run_score": main.score,
 		"room_time_left": room_time_left, "room_wins": room_wins,
 		"room_outlaw_hp": room_outlaw_hp, "room_outlaw_idx": room_outlaw_idx,
 		"room_stones_broken": room_stones_broken,
@@ -3486,6 +3514,9 @@ func _restore_room_state() -> void:
 	stake = int(rs.stake)
 	stake_odds = float(rs.stake_odds)
 	room_score = int(rs.room_score)
+	# The photograph's score wins: a hand in flight at the save is
+	# replayed from the pre-hand board, so it mustn't count twice.
+	main.score = int(rs.get("run_score", main.score))
 	room_target = int(current_offer.get("target", 0))
 	room_goal = String(current_offer.get("goal", ""))
 	if room_goal == "timed":
@@ -4298,6 +4329,7 @@ func _end_run(title: String, body: String, payout: int, cause := "") -> void:
 	main.game_started = false
 	if title in ["BUSTED OUT", "BLINDED OUT"]:
 		main.stat_bump("trail_busts")
+	_grant_run_exp(title == "TRAIL COMPLETE")
 	if title != "TRAIL COMPLETE":
 		main.play_music("lost")
 		# A lone howl over the sad harmonica.
@@ -4311,12 +4343,77 @@ func _end_run(title: String, body: String, payout: int, cause := "") -> void:
 			else "%s  (%d)" % [best_hand_name.to_upper(), best_hand_score]
 	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nBest hand: %s\nOutlaws caught: %d\nCash: $%d" \
 			% [title, body, main.score, best, outlaws_caught, cash]
+	if not _last_grant.is_empty():
+		_end_label.text += "\n+%d EXP  ·  Level %d" % [int(_last_grant.exp_gain),
+				int(_last_grant.level_after)]
+		if int(_last_grant.level_after) > int(_last_grant.level_before):
+			_end_label.text += "  ·  LEVEL UP! +$%d" % int(_last_grant.purse)
 	# The painted last page when the art is installed; the plain
 	# text page otherwise.
 	var painted: bool = _gameover_scene.show_ending(_ending_data(title, payout, cause))
 	_end_label.visible = not painted
 	_end_leave_btn.visible = not painted
 	end_layer.visible = true
+
+
+## A fresh id for a ride — the guard against paying its EXP twice.
+func _mint_run_uid() -> String:
+	return "%d-%d" % [int(Time.get_unix_time_from_system() * 1000.0), randi()]
+
+
+## Pays the ride that is ending its EXP (once — a ride whose id was
+## already paid gets the same report back) along with any level purse.
+func _grant_run_exp(complete: bool) -> Dictionary:
+	if run_uid != "" and run_uid == progress.last_run_uid:
+		return _last_grant
+	var reached := ROOMS_TOTAL if complete else mini(room_index + 1, ROOMS_TOTAL)
+	_last_grant = _credit_ride(main.score, reached, run_bosses, table_tier,
+			complete, run_uid)
+	return _last_grant
+
+
+## EXP, level-ups and the level purse for one ride's numbers.
+func _credit_ride(score: int, reached: int, bosses: int, tier: int,
+		complete: bool, uid: String) -> Dictionary:
+	var earned := Progression.run_exp(score, reached, bosses, tier, complete)
+	var exp_before := progress.exp_total
+	var gain := progress.add_exp(int(earned.total))
+	cash += int(gain.purse)
+	if uid != "":
+		progress.last_run_uid = uid
+	main.stat_bump("trail_score_total", maxi(score, 0))
+	main.stat_max("trail_score_best", score)
+	_save_meta()
+	main._stats_save()
+	return {"exp_gain": int(earned.total), "exp_rows": earned.rows,
+			"exp_before": exp_before, "exp_after": progress.exp_total,
+			"level_before": int(gain.from), "level_after": int(gain.to),
+			"unlocks": gain.unlocks, "purse": int(gain.purse)}
+
+
+## A saved ride that's being ridden over by a new one never reaches
+## the end — credit what it earned before it's lost.
+func _credit_abandoned_ride() -> void:
+	var cf := ConfigFile.new()
+	if cf.load(main.profile_path("trail_run.cfg")) != OK \
+			or not cf.get_value("run", "active", false):
+		return
+	var uid := String(cf.get_value("run", "uid", ""))
+	if uid != "" and uid == progress.last_run_uid:
+		return
+	# Only the tables actually put behind it count — re-saddling a
+	# fresh ride over and over earns nothing.
+	var reached := mini(int(cf.get_value("run", "room", 0)), ROOMS_TOTAL)
+	if reached <= 0 and int(cf.get_value("run", "score", 0)) <= 0:
+		return
+	var grant := _credit_ride(int(cf.get_value("run", "score", 0)), reached,
+			int(cf.get_value("run", "bosses", 0)), int(cf.get_value("run", "tier", 0)),
+			false, uid if uid != "" else _mint_run_uid())
+	_clear_run_save()
+	var text := "LAST RIDE LEFT BEHIND  ·  +%d EXP" % int(grant.exp_gain)
+	if int(grant.level_after) > int(grant.level_before):
+		text += "  ·  LEVEL %d" % int(grant.level_after)
+	main._announce(text)
 
 
 ## Everything the last page shows, gathered while the run still exists.
@@ -4352,7 +4449,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"relics": relics.duplicate(), "stops": stops,
 		"spent": ["second_wind"] if _second_wind_used else [],
 		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": 3,
-	}
+	}.merged(_last_grant)
 
 
 ## "BLACK JACK MCGREW" -> "Black Jack McGrew".
