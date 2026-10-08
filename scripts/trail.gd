@@ -274,6 +274,7 @@ var meta_provisions := 0 # random provisions in the kit at run start (max 2)
 # Levels, unlocks, purchases and contracts (scripts/progression.gd).
 var progress := Progression.new()
 var _last_grant := {}    # the last ride's EXP payout, for the game-over page
+var _ride_contracts: Array = []  # contract names completed this ride
 
 # Run state
 var run_active := false
@@ -2001,6 +2002,7 @@ func _start_run(tier: int) -> void:
 	main.menu_open = false
 	run_uid = _mint_run_uid()
 	run_bosses = 0
+	_ride_contracts = []
 	table_tier = tier
 	chips = TABLES[tier].chips
 	deck = _fresh_deck()
@@ -3806,9 +3808,15 @@ func _room_cleared() -> void:
 	main.stat_bump("tables_cleared")
 	if current_offer.has("boss"):
 		main.stat_bump("bosses_beaten")
+		main.stat_bump("beat_" + String(current_offer.boss))
 		run_bosses += 1
 	elif room_goal == "outlaw":
 		main.stat_bump("duels_won")
+	if String(current_offer.get("tarot", "")) == "ROYAL HUNT":
+		main.stat_bump("cleared_royal")
+	elif room_goal != "" and room_goal != "boss":
+		main.stat_bump("cleared_" + room_goal)
+	_check_contracts(true)
 	main.board.locked = true
 	main.board.suppress_refill = true
 	if main.board._refill_active:
@@ -4081,6 +4089,8 @@ func on_abandon_room() -> void:
 
 func _trail_complete() -> void:
 	main.stat_bump("trail_wins")
+	main.stat_bump("trail_wins_tier%d" % table_tier)
+	main.stat_bump("trail_wins_" + character)
 	main._stats_save()
 	main.board._play_sound(Board.SFX_STING_COMPLETE, 1.0, -5.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.5)
@@ -4785,6 +4795,7 @@ func _end_run(title: String, body: String, payout: int, cause := "") -> void:
 	if title in ["BUSTED OUT", "BLINDED OUT"]:
 		main.stat_bump("trail_busts")
 	_grant_run_exp(title == "TRAIL COMPLETE")
+	_check_contracts(false)  # the last page lists them
 	if title != "TRAIL COMPLETE":
 		main.play_music("lost")
 		# A lone howl over the sad harmonica.
@@ -4809,6 +4820,42 @@ func _end_run(title: String, body: String, payout: int, cause := "") -> void:
 	_end_label.visible = not painted
 	_end_leave_btn.visible = not painted
 	end_layer.visible = true
+
+
+## Contracts finished since the last look get their moment once: a
+## notice at the table (or a line on the last page).
+func _check_contracts(announce: bool) -> void:
+	var fresh: Array = []
+	for c in Contracts.LIST:
+		var id := String(c.id)
+		if progress.contracts_seen.has(id) or progress.contracts_claimed.has(id):
+			continue
+		if Contracts.is_complete(c, main.stats, main.stats_hands):
+			progress.contracts_seen[id] = true
+			fresh.append(String(c.name))
+	if fresh.is_empty():
+		return
+	_ride_contracts.append_array(fresh)
+	_save_meta()
+	if not announce:
+		return
+	var text := "CONTRACT COMPLETE — %s" % String(fresh[0]).to_upper() if fresh.size() == 1 			else "%d CONTRACTS COMPLETE — claim them from the menu" % fresh.size()
+	# After the TABLE CLEARED flash has had its moment.
+	get_tree().create_timer(1.8).timeout.connect(func() -> void:
+		main._announce(text, main.GOLD))
+
+
+## Pays a finished contract's reward once. Returns the $ paid (0 if it
+## wasn't ready to claim).
+func claim_contract(id: String) -> int:
+	var c := Contracts.find(id)
+	if c.is_empty() or Contracts.state(c, main.stats, main.stats_hands, progress) != "ready":
+		return 0
+	cash += int(c.reward)
+	progress.contracts_claimed[id] = true
+	progress.contracts_seen[id] = true
+	_save_meta()
+	return int(c.reward)
 
 
 ## A fresh id for a ride — the guard against paying its EXP twice.
@@ -4836,6 +4883,7 @@ func _credit_ride(score: int, reached: int, bosses: int, tier: int,
 	cash += int(gain.purse)
 	if uid != "":
 		progress.last_run_uid = uid
+	main.stat_bump("rides_ended")
 	main.stat_bump("trail_score_total", maxi(score, 0))
 	main.stat_max("trail_score_best", score)
 	_save_meta()
@@ -4903,6 +4951,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"cash": cash, "stake": _title_case(String(TABLES[table_tier].name)),
 		"relics": relics.duplicate(), "stops": stops,
 		"spent": ["second_wind"] if _second_wind_used else [],
+		"contracts": _ride_contracts.duplicate(),
 		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": 3,
 	}.merged(_last_grant)
 

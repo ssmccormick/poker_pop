@@ -329,6 +329,37 @@ func _run() -> void:
 			"the RIDERS shelf lists three riders and both tricks")
 	trail._up_tab = "gear"
 
+	# --- Contracts: done, claimed once, remembered ------------------------
+	var cash_c: int = trail.cash
+	main.stats["tables_cleared"] = 10
+	var talk := Contracts.find("table_talk")
+	failures += _check(Contracts.state(talk, main.stats, main.stats_hands, trail.progress) == "ready",
+			"clearing 10 tables makes Table Talk claimable")
+	failures += _check(trail.claim_contract("table_talk") == 40 and trail.cash == cash_c + 40,
+			"CLAIM pays the reward")
+	failures += _check(trail.claim_contract("table_talk") == 0 and trail.cash == cash_c + 40,
+			"a second claim is refused")
+	failures += _check(trail.claim_contract("road_worn") == 0, "an unfinished one can't be claimed")
+	trail._load_meta()
+	failures += _check(trail.progress.contracts_claimed.has("table_talk") and trail.cash == cash_c + 40,
+			"the claim survives a save and load")
+	failures += _check(Contracts.state(Contracts.find("card_counter"), main.stats,
+			main.stats_hands, trail.progress) == "locked",
+			"Card Counter is greyed until Blackjack unlocks")
+	main._refresh_contracts()
+	await process_frame
+	failures += _check(main._contracts_list.get_child_count() == Contracts.LIST.size(),
+			"the CONTRACTS page lists every contract")
+	trail.progress.contracts_seen.erase("road_worn")
+	main.stats["tables_cleared"] = 100
+	trail._ride_contracts = []
+	trail._check_contracts(false)
+	failures += _check(trail._ride_contracts.has("Road Worn")
+			and trail.progress.contracts_seen.has("road_worn"),
+			"a contract finished on the ride is noted once")
+	trail._check_contracts(false)
+	failures += _check(trail._ride_contracts.count("Road Worn") == 1, "and only once")
+
 	_cleanup()
 	if failures == 0:
 		print("ALL TRAIL TESTS PASSED")

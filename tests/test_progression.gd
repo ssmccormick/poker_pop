@@ -20,6 +20,7 @@ func _initialize() -> void:
 	_picks()
 	_odds()
 	_round_trip()
+	_contracts()
 	if failures == 0:
 		print("ALL PROGRESSION TESTS PASSED")
 	else:
@@ -253,6 +254,46 @@ func _round_trip() -> void:
 			and q.contracts_claimed.has("first_ride") and q.contracts_seen.has("first_ride")
 			and not q.grandfathered,
 			"progress survives a save and load (and isn't re-grandfathered)")
+
+
+func _contracts() -> void:
+	var ids := {}
+	var bad_req: Array = []
+	for c in Contracts.LIST:
+		ids[String(c.id)] = true
+		var req: Array = c.requires
+		if not req.is_empty() and Progression.row(String(req[0]), String(req[1])).is_empty():
+			bad_req.append(String(c.id))
+	_check(ids.size() == Contracts.LIST.size(), "every contract id is unique")
+	_check(bad_req.is_empty(), "every contract's requirement is a catalog item %s" % str(bad_req))
+	var p := Progression.new()
+	var stats := {"rides_ended": 1, "tables_cleared": 4, "duels_won": 9}
+	var hands := {"Royal Flush": 1}
+	var first := Contracts.find("first_ride")
+	var talk := Contracts.find("table_talk")
+	var wanted := Contracts.find("wanted")
+	var royal := Contracts.find("royal_treatment")
+	var safe := Contracts.find("safecracker")
+	_check(Contracts.state(first, stats, hands, p) == "ready", "a met target is ready to claim")
+	_check(Contracts.progress_of(talk, stats, hands) == 4
+			and Contracts.state(talk, stats, hands, p) == "open", "a part-way one shows its progress")
+	_check(Contracts.state(royal, stats, hands, p) == "ready", "hand contracts read the hand tally")
+	_check(Contracts.state(safe, stats, hands, p) == "locked",
+			"one that needs a locked table is greyed out")
+	_check(Contracts.state(wanted, stats, hands, p) == "ready",
+			"a finished one is claimable even before its content is unlocked")
+	p.contracts_claimed["first_ride"] = true
+	_check(Contracts.state(first, stats, hands, p) == "claimed", "claimed stays claimed")
+	var order: Array = []
+	for r in Contracts.sorted(stats, hands, p):
+		order.append(Contracts.ORDER[r.state])
+	var sorted_ok := true
+	for i in range(1, order.size()):
+		if int(order[i]) < int(order[i - 1]):
+			sorted_ok = false
+	_check(sorted_ok and int(order[0]) == 0 and int(order[-1]) == 3,
+			"the page reads ready, in progress, greyed, then claimed")
+	_check(Contracts.lock_text(safe, p).contains("Level 4"), "a greyed row says when it opens")
 
 
 func _check(cond: bool, label: String) -> void:

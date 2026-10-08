@@ -140,6 +140,10 @@ var profile_layer: ColorRect
 var _profile_menu_btn: Button
 var _profile_slot_btns: Array = []
 var stats_layer: ColorRect
+var contracts_layer: ColorRect
+var _contracts_sub: Label
+var _contracts_scroll: ScrollContainer
+var _contracts_list: VBoxContainer
 var _stats_cols: Array = []  # 3 × [names Label, values Label]
 
 # First-time tutorials, tracked per profile.
@@ -239,6 +243,12 @@ func _ready() -> void:
 				_open_stats()
 			"trail":
 				trail.open_buyin()
+			"contracts":
+				_refresh_contracts()
+				contracts_layer.visible = true
+				# POKERPOP_SCROLL=N shows the page scrolled N px down.
+				_contracts_scroll.set_deferred("scroll_vertical",
+						int(OS.get_environment("POKERPOP_SCROLL")))
 			"upgrades":
 				# POKERPOP_TAB picks the shelf (gear, riders, relics, ...).
 				var tab := OS.get_environment("POKERPOP_TAB")
@@ -1925,6 +1935,21 @@ var _level_label: Label
 var _level_sub: Label
 var _level_fill: Panel
 var _upgrades_pip: Label
+var _contracts_pip: Label
+
+
+## A small round gold counter on the menu (hidden at zero).
+func _gold_pip(pos: Vector2) -> Label:
+	var pip := _label(menu_layer, "", pos, 18, Color("1a1208"))
+	pip.size = Vector2(34, 34)
+	pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = GOLD
+	bg.set_corner_radius_all(17)
+	pip.add_theme_stylebox_override("normal", bg)
+	pip.visible = false
+	return pip
 
 
 func _build_level_plate() -> void:
@@ -1972,6 +1997,10 @@ func _refresh_level_plate() -> void:
 	if _upgrades_pip != null:
 		_upgrades_pip.text = str(news)
 		_upgrades_pip.visible = news > 0
+	if _contracts_pip != null:
+		var ready := Contracts.ready_count(stats, stats_hands, pr)
+		_contracts_pip.text = str(ready)
+		_contracts_pip.visible = ready > 0
 	_level_plate.tooltip_text = "Every ride's score turns into EXP. Each level unlocks something new for the trail."
 
 
@@ -2582,6 +2611,10 @@ func _build_menu() -> void:
 	var how_btn := _button(menu_layer, "HOW TO PLAY", Vector2(1620, 60), Vector2(240, 54))
 	how_btn.add_theme_font_size_override("font_size", 20)
 	how_btn.pressed.connect(_start_tutorial)
+	var contracts_btn := _button(menu_layer, "CONTRACTS", Vector2(1620, 124), Vector2(240, 54))
+	contracts_btn.add_theme_font_size_override("font_size", 20)
+	contracts_btn.pressed.connect(_open_contracts)
+	_contracts_pip = _gold_pip(Vector2(1836, 112))
 	_build_level_plate()
 
 	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66), true)
@@ -2594,14 +2627,7 @@ func _build_menu() -> void:
 	upgrades_btn.pressed.connect(func() -> void:
 		trail.open_upgrades())
 	# A gold pip: how many unlocks the Outfitter hasn't shown yet.
-	_upgrades_pip = _label(menu_layer, "", Vector2(1420, 322), 18, Color("1a1208"))
-	_upgrades_pip.size = Vector2(34, 34)
-	_upgrades_pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_upgrades_pip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var pip_bg := StyleBoxFlat.new()
-	pip_bg.bg_color = GOLD
-	pip_bg.set_corner_radius_all(17)
-	_upgrades_pip.add_theme_stylebox_override("normal", pip_bg)
+	_upgrades_pip = _gold_pip(Vector2(1440, 322))
 	_refresh_level_plate()
 	_menu_center("Buy in · bet at every table · sculpt your deck · ride to the end or bust", 408, 20, DIM)
 
@@ -2722,6 +2748,34 @@ func _build_profiles_and_tutor() -> void:
 	sback.pressed.connect(func() -> void:
 		transition(func() -> void:
 			stats_layer.visible = false))
+
+	# CONTRACTS: goals that pay cash, claimed here.
+	contracts_layer = ColorRect.new()
+	contracts_layer.color = BG
+	contracts_layer.size = VIEW
+	contracts_layer.visible = false
+	ui_root.add_child(contracts_layer)
+	var ct := _label(contracts_layer, "CONTRACTS", Vector2(0, 90), 64, UiKit.BRASS_HI)
+	ct.size = Vector2(VIEW.x, 90)
+	ct.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_contracts_sub = _label(contracts_layer, "", Vector2(0, 186), 24, GOLD)
+	_contracts_sub.size = Vector2(VIEW.x, 34)
+	_contracts_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_contracts_scroll = ScrollContainer.new()
+	_contracts_scroll.position = Vector2(430, 246)
+	_contracts_scroll.size = Vector2(1070, 680)
+	_contracts_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	contracts_layer.add_child(_contracts_scroll)
+	_contracts_list = VBoxContainer.new()
+	_contracts_list.add_theme_constant_override("separation", 10)
+	_contracts_list.custom_minimum_size = Vector2(1040, 0)
+	_contracts_scroll.add_child(_contracts_list)
+	var cback := _button(contracts_layer, "BACK", Vector2(860, 960), Vector2(200, 54))
+	cback.add_theme_font_size_override("font_size", 20)
+	cback.pressed.connect(func() -> void:
+		transition(func() -> void:
+			contracts_layer.visible = false
+			_refresh_level_plate()))
 
 	# The one-time explainer popup, above everything in-game.
 	tutor_layer = ColorRect.new()
@@ -2972,6 +3026,96 @@ func _open_stats_now() -> void:
 		(_stats_cols[i][0] as Label).text = "\n".join(names)
 		(_stats_cols[i][1] as Label).text = "\n".join(values)
 	stats_layer.visible = true
+
+
+func _open_contracts() -> void:
+	transition(func() -> void:
+		_contracts_scroll.scroll_vertical = 0
+		_refresh_contracts()
+		contracts_layer.visible = true)
+
+
+## Rebuilds the contract rows: ready to claim on top, then in progress,
+## then greyed (content not unlocked), then claimed.
+func _refresh_contracts() -> void:
+	var rows := Contracts.sorted(stats, stats_hands, trail.progress)
+	var ready := 0
+	for r in rows:
+		if r.state == "ready":
+			ready += 1
+	_contracts_sub.text = "CASH  $%d%s" % [trail.cash,
+			"   ·   %d READY TO CLAIM" % ready if ready > 0 else ""]
+	var keep := _contracts_scroll.scroll_vertical
+	for child in _contracts_list.get_children():
+		_contracts_list.remove_child(child)
+		child.queue_free()
+	for r in rows:
+		_contracts_list.add_child(_contract_row(r.c, String(r.state)))
+	_contracts_scroll.set_deferred("scroll_vertical", keep)
+
+
+func _contract_row(c: Dictionary, state: String) -> Control:
+	var row := Control.new()
+	row.custom_minimum_size = Vector2(1040, 84)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	UiKit.plate(row, Rect2(0, 0, 1040, 84))
+	var name_l := _label(row, String(c.name), Vector2(28, 8), 22, GOLD)
+	name_l.size = Vector2(600, 30)
+	var desc := _label(row, String(c.desc), Vector2(28, 42), 16, OFFWHITE)
+	desc.size = Vector2(620, 26)
+	desc.clip_text = true
+	var reward := _label(row, "$%d" % int(c.reward), Vector2(900, 10), 22, GOLD)
+	reward.size = Vector2(120, 30)
+	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	match state:
+		"ready":
+			reward.visible = false
+			var b := _button(row, "CLAIM  $%d" % int(c.reward), Vector2(764, 18),
+					Vector2(256, 48), true)
+			b.add_theme_font_size_override("font_size", 20)
+			var id := String(c.id)
+			b.pressed.connect(func() -> void:
+				_claim_contract(id))
+		"open":
+			var have := Contracts.progress_of(c, stats, stats_hands)
+			var count := _label(row, "%d / %d" % [have, int(c.target)],
+					Vector2(660, 10), 18, DIM)
+			count.size = Vector2(220, 26)
+			var track := Panel.new()
+			track.position = Vector2(660, 48)
+			track.size = Vector2(360, 12)
+			track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			track.add_theme_stylebox_override("panel", UiKit.bar_box("track"))
+			row.add_child(track)
+			var fill := Panel.new()
+			fill.position = Vector2(660, 48)
+			fill.size = Vector2(360.0 * float(have) / maxf(1.0, float(c.target)), 12)
+			fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			fill.add_theme_stylebox_override("panel", UiKit.bar_box("gold"))
+			row.add_child(fill)
+		"locked":
+			row.modulate = Color(1, 1, 1, 0.45)
+			var lock := _label(row, Contracts.lock_text(c, trail.progress),
+					Vector2(560, 48), 16, DIM)
+			lock.size = Vector2(460, 26)
+			lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		"claimed":
+			row.modulate = Color(1, 1, 1, 0.55)
+			reward.text = "CLAIMED  ·  $%d" % int(c.reward)
+			reward.position.x = 720
+			reward.size.x = 300
+			reward.add_theme_color_override("font_color", DIM)
+	return row
+
+
+func _claim_contract(id: String) -> void:
+	var paid: int = trail.claim_contract(id)
+	if paid <= 0:
+		board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0)
+	_announce("CONTRACT CLAIMED  +$%d" % paid)
+	_refresh_contracts()
 
 
 func _open_options() -> void:
