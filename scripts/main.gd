@@ -222,6 +222,7 @@ func _ready() -> void:
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(_fade_rect)
 	_build_splash()
+	_build_ui_tip()
 
 	# Music (Western Audio Bundle): one jukebox player, fed a random
 	# track from the area's playlist. Nothing plays until the splash is
@@ -235,6 +236,8 @@ func _ready() -> void:
 		if m != "splash":
 			_dismiss_splash()
 		match m:
+			"tutoroffer":
+				offer_tutorial(Callable())
 			"splash", "menu":
 				pass
 			"options":
@@ -481,6 +484,7 @@ func _process(delta: float) -> void:
 			and not get_tree().paused)
 	_update_labels()
 	_update_tooltip(delta)
+	_update_ui_tip(delta)
 
 
 func _arcade_target() -> int:
@@ -1597,6 +1601,100 @@ func _update_tooltip(delta: float) -> void:
 	_tooltip.visible = true
 
 
+## Hover tips for every button and panel (kit, abilities, shelves,
+## the Outfitter...): the control's tooltip_text in the card tooltip's
+## chrome, wrapped to a readable width. Godot's own tooltip popup is
+## switched off (gui/timers/tooltip_delay_sec in project.godot).
+const UI_TIP_DELAY := 0.4
+const UI_TIP_WRAP := 360.0
+var _ui_tip: PanelContainer
+var _ui_tip_label: Label
+var _ui_tip_src: Control
+var _ui_tip_time := 0.0
+var _ui_tip_force: Control  # screenshots: the control to tip as if hovered
+
+
+## The deepest visible control with a tooltip under `at` (screenshots).
+func _tip_control_at(node: Node, at: Vector2) -> Control:
+	var found: Control = null
+	for child in node.get_children():
+		if child is CanvasItem and not (child as CanvasItem).visible:
+			continue
+		var deeper := _tip_control_at(child, at)
+		if deeper != null:
+			found = deeper
+		elif child is Control and (child as Control).tooltip_text != "" 				and (child as Control).get_global_rect().has_point(at):
+			found = child
+	return found
+
+
+func _build_ui_tip() -> void:
+	_ui_tip = PanelContainer.new()
+	_ui_tip.add_theme_stylebox_override("panel", UiKit.tooltip_box())
+	_ui_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_tip.visible = false
+	_ui_tip.z_index = 100
+	_ui_tip_label = Label.new()
+	_ui_tip_label.add_theme_font_size_override("font_size", 18)
+	if FontLib.body != null:
+		_ui_tip_label.add_theme_font_override("font", FontLib.body)
+	_ui_tip_label.add_theme_color_override("font_color", OFFWHITE)
+	_ui_tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_tip.add_child(_ui_tip_label)
+	ui_root.add_child(_ui_tip)
+
+
+func _update_ui_tip(delta: float) -> void:
+	if _ui_tip == null:
+		return
+	var c := _ui_tip_force if _ui_tip_force != null else get_viewport().gui_get_hovered_control()
+	var text := ""
+	if c != null and c.is_visible_in_tree():
+		text = c.tooltip_text
+	if c != _ui_tip_src:
+		_ui_tip_src = c
+		_ui_tip_time = 0.0
+		_ui_tip.visible = false
+		return
+	if text == "":
+		_ui_tip.visible = false
+		return
+	if _ui_tip.visible:
+		if _ui_tip_label.text != text:
+			_show_ui_tip(text)  # the tip changed under the cursor (kit states)
+		return
+	_ui_tip_time += delta
+	if _ui_tip_time >= UI_TIP_DELAY:
+		_show_ui_tip(text)
+
+
+func _show_ui_tip(text: String) -> void:
+	# Short tips sit on one line; long ones wrap at UI_TIP_WRAP.
+	var font: Font = _ui_tip_label.get_theme_font("font")
+	var natural := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT,
+			-1, 18).x
+	var w := minf(ceilf(natural) + 2.0, UI_TIP_WRAP)
+	_ui_tip_label.text = text
+	_ui_tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ui_tip_label.custom_minimum_size = Vector2(w, 0)
+	# Lay the label out at its real width first, so the wrapped height
+	# is measured right (a zero width wraps every letter).
+	_ui_tip_label.size = Vector2(w, 0)
+	_ui_tip.move_to_front()
+	_ui_tip.visible = true
+	_fit_ui_tip()
+	_fit_ui_tip.call_deferred()
+
+
+func _fit_ui_tip() -> void:
+	_ui_tip.reset_size()
+	var mp := ui_root.get_global_mouse_position()
+	var tip_size := _ui_tip.size
+	_ui_tip.position = Vector2(
+			clampf(mp.x + 18.0, 0.0, VIEW.x - tip_size.x - 10.0),
+			clampf(mp.y + 24.0, 0.0, VIEW.y - tip_size.y - 10.0))
+
+
 ## Everything the hovered card is, in one small panel: its name, then
 ## one short "NAME — fact" line per thing on it. The long explanations
 ## live in the first-time tutorials and the Almanac.
@@ -1797,6 +1895,38 @@ const TUT_STEPS := [
 ]
 
 
+## A brand-new profile is asked once, before its first ride or mode:
+## play the tutorial, or skip it for good. `then` is where they were
+## headed — taken right after the tutorial, or at once on a skip.
+var _offer_layer: ColorRect
+var _after_tutorial := Callable()
+
+
+func offer_tutorial(then: Callable) -> void:
+	_after_tutorial = then
+	_offer_layer.move_to_front()
+	_offer_layer.visible = true
+
+
+func _offer_take_tutorial() -> void:
+	_offer_layer.visible = false
+	board._play_sound(Board.SFX_CLICK, 1.0, -8.0)
+	transition(func() -> void:
+		trail._hide_all()
+		_start_tutorial())
+
+
+func _offer_skip_tutorial() -> void:
+	_offer_layer.visible = false
+	board._play_sound(Board.SFX_CLICK, 1.0, -8.0)
+	tutor_seen["core"] = true
+	_tutor_save()
+	var then := _after_tutorial
+	_after_tutorial = Callable()
+	if then.is_valid():
+		then.call()
+
+
 func _start_tutorial() -> void:
 	tutor_seen["core"] = true
 	_tutor_save()
@@ -1869,6 +1999,13 @@ func _end_tutorial() -> void:
 	_tut_label.visible = false
 	_tut_skip_btn.visible = false
 	mode_kind = ""
+	var then := _after_tutorial
+	_after_tutorial = Callable()
+	if then.is_valid():
+		# Straight on to where they were headed before the lesson.
+		_open_menu_now()
+		then.call()
+		return
 	_open_menu()
 
 
@@ -2037,9 +2174,10 @@ func _start_mode(kind: String, seconds: float = 0.0) -> void:
 
 
 func _start_mode_now(kind: String, seconds: float = 0.0) -> void:
-	# A brand-new profile learns the game before its first mode.
+	# A brand-new profile is asked about the tutorial before its first mode.
 	if tutor_needs("core"):
-		_start_tutorial()
+		offer_tutorial(func() -> void:
+			_start_mode(kind, seconds))
 		return
 	tutor_show("mode_" + kind)
 	mode_kind = kind
@@ -2852,6 +2990,40 @@ func _build_profiles_and_tutor() -> void:
 	ok.add_theme_font_size_override("font_size", 24)
 	ok.pressed.connect(_tutor_next)
 
+	# A fresh profile's first ride asks: learn the ropes, or skip them?
+	_offer_layer = ColorRect.new()
+	_offer_layer.color = Color(0, 0, 0, 0.7)
+	_offer_layer.size = VIEW
+	_offer_layer.visible = false
+	_offer_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	ui_root.add_child(_offer_layer)
+	var offer_panel := Panel.new()
+	offer_panel.position = Vector2(560, 330)
+	offer_panel.size = Vector2(800, 400)
+	offer_panel.add_theme_stylebox_override("panel", UiKit.poster_box())
+	_offer_layer.add_child(offer_panel)
+	if not UiKit.has_art():
+		var offer_nails := UiKit.Rivets.new()
+		offer_nails.plate_size = offer_panel.size
+		offer_panel.add_child(offer_nails)
+	var ot := _label(_offer_layer, "NEW IN TOWN?", Vector2(560, 360), 44, RED)
+	ot.size = Vector2(800, 60)
+	ot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var ob := _label(_offer_layer, "A short tutorial shows you how to chain cards into poker hands. It takes about a minute, and you can replay it any time from HOW TO PLAY.",
+			Vector2(640, 440), 26, UiKit.POSTER_INK)
+	ob.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ob.custom_minimum_size = Vector2(640, 0)
+	ob.size = Vector2(640, 150)
+	ob.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if FontLib.body != null:
+		ob.add_theme_font_override("font", FontLib.body)
+	var play := _button(_offer_layer, "PLAY THE TUTORIAL", Vector2(620, 620), Vector2(330, 64), true)
+	play.add_theme_font_size_override("font_size", 22)
+	play.pressed.connect(_offer_take_tutorial)
+	var skip := _button(_offer_layer, "SKIP IT", Vector2(970, 620), Vector2(330, 64))
+	skip.add_theme_font_size_override("font_size", 22)
+	skip.pressed.connect(_offer_skip_tutorial)
+
 	# Hover tooltip for board cards — above the HUD, ignores the mouse.
 	_tooltip = PanelContainer.new()
 	_tooltip.add_theme_stylebox_override("panel", UiKit.tooltip_box())
@@ -3275,6 +3447,19 @@ func _debug_seed_hazards() -> void:
 ## Debug helper: POKERPOP_SHOT=<png path> captures a frame after the deal
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
+	# POKERPOP_HOVER=x,y parks the mouse there (view pixels) and waits for
+	# the hover tip before the shot.
+	var hover := OS.get_environment("POKERPOP_HOVER")
+	if hover != "":
+		await get_tree().create_timer(3.0).timeout
+		var xy := hover.split(",")
+		var at := Vector2(float(xy[0]), float(xy[1]))
+		Input.warp_mouse(at * Vector2(get_window().size) / VIEW)
+		_ui_tip_force = _tip_control_at(ui_root, at)
+		await get_tree().create_timer(1.2).timeout
+		get_viewport().get_texture().get_image().save_png(path)
+		get_tree().quit()
+		return
 	match OS.get_environment("POKERPOP_MODE"):
 		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover":
 			# The last page's EXP bar and level-up banner come in last.

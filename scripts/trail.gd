@@ -1523,6 +1523,10 @@ func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 ## THE TRAIL from the menu: a ride in progress comes first, straight to
 ## the buy-in with RESUME on top; otherwise saddle a rider.
 func open_trail() -> void:
+	# A fresh profile is asked about the tutorial before its first ride.
+	if main.tutor_needs("core"):
+		main.offer_tutorial(open_trail)
+		return
 	if _has_saved_run():
 		open_buyin()
 	else:
@@ -1655,9 +1659,10 @@ func open_buyin() -> void:
 
 
 func _open_buyin_now() -> void:
-	# A brand-new profile learns the game before hitting the trail.
+	# A brand-new profile is asked about the tutorial first (THE TRAIL
+	# asks already; this catches any other way in).
 	if main.tutor_needs("core"):
-		main._start_tutorial()
+		main.offer_tutorial(open_buyin)
 		return
 	main.tutor_show("mode_trail")
 	main.menu_layer.visible = false

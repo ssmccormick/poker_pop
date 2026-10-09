@@ -206,6 +206,25 @@ func _run() -> void:
 			and String(trail.deck[1].get("finish", "")) == "",
 			"a Prism deck card keeps its finish across a save")
 
+	# --- A fresh profile is asked about the tutorial, once --------------
+	main.tutor_seen.erase("core")
+	trail._hide_all()
+	trail.open_trail()
+	await _wait(0.3)
+	failures += _check(main._offer_layer.visible and not trail.select_layer.visible
+			and main.mode_kind != "tutorial",
+			"THE TRAIL on a fresh profile asks about the tutorial before anything starts")
+	main._offer_skip_tutorial()
+	await _wait(0.6)
+	failures += _check(not main._offer_layer.visible and main.tutor_seen.get("core", false)
+			and main.mode_kind != "tutorial"
+			and (trail.select_layer.visible or trail.buyin_layer.visible),
+			"SKIP IT turns the tutorial off and rides straight on")
+	trail.open_trail()
+	await _wait(0.6)
+	failures += _check(not main._offer_layer.visible, "and it never asks again")
+	trail._hide_all()
+
 	# --- With a ride saved, THE TRAIL puts RESUME first ------------------
 	trail._save_run()
 	main.tutor_seen["core"] = true
