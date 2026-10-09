@@ -131,6 +131,7 @@ const PICK_MOD_CHANCE := 0.25     # card picks: chance of an enhanced offer
 const SHOP_MOD_CHANCE := 0.35     # shop slots: chance of an enhanced card
 const FATE_KICKER := 15           # chips for trusting The Fool
 const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
+const CHIPS_PER_CASH := 1000      # finishing chips bank as $1 per 1,000 (x the rate)
 const COMPLETE_PURSE := 100       # cash on finishing, x Ascension.purse_mult
 
 # Meta and run saves live under the active profile (main.profile_path).
@@ -1476,7 +1477,7 @@ func _refill_chance() -> float:
 func _cashout_value(rate_bonus := 1.0) -> int:
 	var rate: float = 1.0 + Ascension.rate_bonus(ascension) \
 			+ (float(rv("bankroll_clip", "rate")) if has_relic("bankroll_clip") else 0.0)
-	return int(chips * rate * rate_bonus / 10.0)
+	return int(chips * rate * rate_bonus / CHIPS_PER_CASH)
 
 
 ## Weighted enhancement roll over the ones on the trail (MOD_WEIGHTS).

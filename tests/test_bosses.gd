@@ -45,6 +45,8 @@ func _init() -> void:
 		elif b.grid[p].snake_tail:
 			tails += 1
 	failures += _check(found_head != null, "cobra head spawned")
+	failures += _check(found_head != null and found_head.boss_hp == Board.COBRA_HP
+			and Board.COBRA_HP == 5000, "King Cobra carries a 5,000 score pool")
 	failures += _check(tails == Board.COBRA_START_TAIL
 			and found_head.cobra_body.size() == Board.COBRA_START_TAIL,
 			"starting body segments placed and tracked")

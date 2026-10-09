@@ -605,13 +605,9 @@ func _update_labels() -> void:
 						bhp_max = board.boss_max_hp("queen")
 						bname = "QUEEN BEE  ·  SCORE HANDS WITH HER"
 					"cobra":
-						var tail := 0
-						for q in board.grid:
-							if board.grid[q].snake_tail:
-								tail += 1
-						bhp = tail + 1  # the head is his last life
-						bhp_max = board.cobra_start_tail + 1
-						bname = "KING COBRA  ·  STRIP THE TAIL"
+						bhp = bcard.boss_hp
+						bhp_max = board.boss_max_hp("cobra")
+						bname = "KING COBRA  ·  SCORE HANDS WITH HIS HEAD"
 			target_label.text = "TABLE %d / %d      %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, bname]
 			_style_boss_bar(bhp, bhp_max)
@@ -773,7 +769,7 @@ func _open_cardgrid() -> void:
 		["Cobra tail", func(c: PlayingCard) -> void: c.snake_tail = true],
 		["Jack of All Trades", func(c: PlayingCard) -> void: c.boss = "jack"; c.boss_hp = 2000; c.rank = 11; c.suit = 2],
 		["Queen Bee", func(c: PlayingCard) -> void: c.boss = "queen"; c.boss_hp = 2; c.rank = 12; c.suit = 1],
-		["King Cobra", func(c: PlayingCard) -> void: c.boss = "cobra"; c.rank = 9],
+		["King Cobra", func(c: PlayingCard) -> void: c.boss = "cobra"; c.boss_hp = 5000; c.rank = 9],
 		["The Outlaw (card)", func(c: PlayingCard) -> void: c.boss = "outlaw"; c.rank = 10; c.suit = 3],
 	]
 	var cols := 10
@@ -1705,7 +1701,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		return "STONE\nUnplayable. Clear cards beside it: %d chip%s left." \
 				% [card.stone_hits, "" if card.stone_hits == 1 else "s"]
 	if card.snake_tail:
-		return "COBRA TAIL\nA wall. Clear the head's face to free one."
+		return "COBRA TAIL\nA wall. Every hit on his head crumbles one."
 	if card.face_down:
 		return "FACE DOWN\nSelect to hit. Past 21 busts the round."
 	var rank_names := {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
@@ -1723,7 +1719,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"queen":
 			lines.append("QUEEN — %d left · moves and honeys each turn" % card.boss_hp)
 		"cobra":
-			lines.append("COBRA — %d in the tail · clear his face" % card.cobra_body.size())
+			lines.append("COBRA — %d left · score hands with his head" % card.boss_hp)
 	match card.hazard:
 		"bomb":
 			lines.append("BOMB — %d hand%s left · play to defuse" % [card.fuse,
@@ -1807,7 +1803,7 @@ const TUTOR := {
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
 	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE bleeds off him — the bar rises with every hit. Deal 2,000 total to put him away (more on higher Ascensions)."],
 	"boss_queen": ["QUEEN BEE", "The Queen carries a 2,400 SCORE pool (deeper on higher Ascensions) — every hand she's in deals its score as damage. But she never sits still: each turn she flits to a new cell and leaves HONEY where she walked. Honey plays in any hand, but once a honeyed card joins your chain, only ONE more card can follow it — her hive slows your biggest hands."],
-	"boss_cobra": ["KING COBRA", "The Cobra EATS an adjacent card every hand, taking its face and growing his tail. Clear his current face to make him cough one back up. Strip the whole tail, then clear the head."],
+	"boss_cobra": ["KING COBRA", "King Cobra carries a 5,000 SCORE pool (deeper on higher Ascensions) — every hand his head is in deals its score as damage. Each hit stuns him and crumbles the tip of his tail. He EATS an adjacent card every hand, taking its face, and his tail is a wall you must chain around."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
 	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
 	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house at a FACE-DOWN table, corners showing. Start a chain from a face-up card, then HIT one card at a time: each face-down card you select flips ON THE SPOT and its pips join your sum (faces 10, aces 11 or 1). Hits are binding — no clearing, no take-backs — and if a flip carries you past 21 you BUST right there. PLAY HAND to stand: the dealer flips his hole card and draws to beat you or bust. Every hand turns another random card face-up. Win enough rounds to clear."],

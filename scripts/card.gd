@@ -909,6 +909,14 @@ func suit_color() -> Color:
 	return t.red if suit == 1 or suit == 2 else t.black
 
 
+## King Cobra's score pool, in thousands, on a green chip like the royals'.
+func _draw_cobra_pool(font: Font) -> void:
+	var cc := Vector2(-W / 2.0 + 16, H / 2.0 - 17)
+	draw_circle(cc, 12, SNAKE_GREEN)
+	draw_string(font, cc + Vector2(-11, 5), "%dK" % ceili(boss_hp / 1000.0),
+			HORIZONTAL_ALIGNMENT_CENTER, 22, 12, Color.WHITE)
+
+
 func _draw() -> void:
 	if _face_box == null:
 		_make_boxes()
@@ -1152,6 +1160,7 @@ func _draw() -> void:
 					HORIZONTAL_ALIGNMENT_CENTER, 22, 12, BLACK)
 		"cobra":
 			draw_rect(rect.grow(-2), SNAKE_GREEN, false, 5.0)
+			_draw_cobra_pool(font)
 			draw_colored_polygon(PackedVector2Array([
 				Vector2(-14, H / 2.0 - 20), Vector2(-8, H / 2.0 - 8), Vector2(-2, H / 2.0 - 20)]), SNAKE_DARK)
 			draw_colored_polygon(PackedVector2Array([
@@ -1341,6 +1350,7 @@ func _draw_art(rect: Rect2) -> void:
 						"%dK" % ceili(boss_hp / 1000.0),
 						HORIZONTAL_ALIGNMENT_CENTER, 22, 12, BLACK)
 			"cobra":
+				_draw_cobra_pool(font)
 				if stunned:
 					draw_string(font, Vector2(-W / 2.0, -H / 2.0 - 4), "zzz",
 							HORIZONTAL_ALIGNMENT_CENTER, W, 18, WIND_BLUE)

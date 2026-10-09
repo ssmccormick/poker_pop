@@ -801,7 +801,7 @@ func play_hand() -> void:
 				if card.boss_hp <= result.score:
 					result["boss_defeated"] = true
 			"cobra":
-				if card.cobra_body.is_empty():
+				if card.boss_hp <= result.score:
 					result["boss_defeated"] = true
 	# Purge rooms watch this: hazards surviving the pops.
 	result["hazards_left"] = predicted_hazards_left()
@@ -843,10 +843,13 @@ func play_hand() -> void:
 				poppers.append(card)  # down he goes
 			continue
 		if card.boss == "cobra":
-			if card.cobra_body.is_empty():
+			# King Cobra bleeds SCORE like the royals; each hit also
+			# stuns him and crumbles the tip of his tail.
+			card.boss_hp -= result.score
+			boss_hits.append(card)
+			if card.boss_hp <= 0:
 				defeated_boss = true
 				poppers.append(card)
-				boss_hits.append(card)
 			else:
 				_cobra_revert(card)
 			continue
@@ -2055,6 +2058,7 @@ static func migrate_mod(mod: String) -> String:
 # too — her defense is the honey and the wandering, not a bar.
 const JACK_HP := 2000
 const QUEEN_HP := 2400
+const COBRA_HP := 5000
 const COBRA_START_TAIL := 2
 # Ascension's grip on the bosses (the trail sets these every table).
 var boss_hp_mult := 1.0
@@ -2069,6 +2073,8 @@ func boss_max_hp(kind: String) -> int:
 			return roundi(JACK_HP * boss_hp_mult)
 		"queen":
 			return roundi(QUEEN_HP * boss_hp_mult)
+		"cobra":
+			return roundi(COBRA_HP * boss_hp_mult)
 	return 0
 # The Jack only respects strong hands: the hand that clears him must
 # beat this bar to wound him, and every wound raises it.
@@ -2100,6 +2106,7 @@ func spawn_boss(kind: String) -> void:
 			card.rank = 12  # she IS a queen — pair her to sting her
 			card.suit = randi_range(0, 3)
 		"cobra":
+			card.boss_hp = boss_max_hp("cobra")
 			card.rank = randi_range(2, 14)
 			card.suit = randi_range(0, 3)
 			_play_sound(SFX_SNAKES.pick_random(), 1.0, -6.0)
