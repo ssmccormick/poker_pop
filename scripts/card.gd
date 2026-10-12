@@ -345,6 +345,13 @@ var stunned := false:
 	set(value):
 		stunned = value
 		queue_redraw()
+# The tutorial's numbered glow: this card's place in the chain to play
+# (0 = not part of the lesson).
+var tut_order := 0:
+	set(value):
+		tut_order = value
+		_update_processing()
+		queue_redraw()
 var error_flash := false:  # brief red border after an invalid submit
 	set(value):
 		error_flash = value
@@ -360,7 +367,7 @@ var _phase := randf() * TAU
 
 func _process(delta: float) -> void:
 	var tilting := _ease_tilt(delta)
-	if hazard == "" and incoming == "" and finish == "" and not tilting:
+	if hazard == "" and incoming == "" and finish == "" and tut_order == 0 and not tilting:
 		set_process(false)
 		return
 	_t += delta
@@ -473,7 +480,7 @@ func _draw_tilt_sheen(rect: Rect2) -> void:
 ## (stone sits still) or an incoming-strike preview.
 func _update_processing() -> void:
 	set_process((hazard != "" and hazard != "stone") or incoming != ""
-			or water_level > 0 or washed or finish != ""
+			or water_level > 0 or washed or finish != "" or tut_order > 0
 			or hovered or _tilt != Vector2.ZERO or _hover_amt > 0.0)
 
 
@@ -917,6 +924,21 @@ func _draw_cobra_pool(font: Font) -> void:
 			HORIZONTAL_ALIGNMENT_CENTER, 22, 12, Color.WHITE)
 
 
+## The tutorial's pulsing gold ring and step number (hidden once picked:
+## the chain badge takes over).
+func _draw_tut_hint(rect: Rect2) -> void:
+	if tut_order <= 0 or selected:
+		return
+	var a := 0.75 + 0.25 * sin(_t * 4.0)
+	draw_rect(rect.grow(7), Color(GOLD.r, GOLD.g, GOLD.b, 0.25 * a), false, 6.0)
+	draw_rect(rect.grow(3), Color(GOLD.r, GOLD.g, GOLD.b, a), false, 4.0)
+	var bc := Vector2(W / 2.0 - 12, -H / 2.0 + 12)
+	draw_circle(bc, 11, GOLD)
+	var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font
+	draw_string(font, bc + Vector2(-11, 6), str(tut_order),
+			HORIZONTAL_ALIGNMENT_CENTER, 22, 16, BLACK)
+
+
 func _draw() -> void:
 	if _face_box == null:
 		_make_boxes()
@@ -959,6 +981,7 @@ func _draw() -> void:
 		# and badges ride on top. Game logic untouched.
 		_draw_art(rect)
 		_draw_tilt_sheen(rect)
+		_draw_tut_hint(rect)
 		return
 	if selected:
 		var box := _selected_box

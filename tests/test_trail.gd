@@ -211,18 +211,26 @@ func _run() -> void:
 	trail._hide_all()
 	trail.open_trail()
 	await _wait(0.3)
-	failures += _check(main._offer_layer.visible and not trail.select_layer.visible
+	failures += _check(main.help_open(main._offer_layer) and not trail.select_layer.visible
 			and main.mode_kind != "tutorial",
 			"THE TRAIL on a fresh profile asks about the tutorial before anything starts")
+	failures += _check(main._offer_layer.modulate.a < 0.5, "the question fades in")
+	await _wait(2.0)
+	failures += _check(is_equal_approx(main._offer_layer.modulate.a, 1.0),
+			"over two seconds")
 	main._offer_skip_tutorial()
 	await _wait(0.6)
-	failures += _check(not main._offer_layer.visible and main.tutor_seen.get("core", false)
+	failures += _check(not main.help_open(main._offer_layer) and main.tutor_seen.get("core", false)
 			and main.mode_kind != "tutorial"
 			and (trail.select_layer.visible or trail.buyin_layer.visible),
 			"SKIP IT turns the tutorial off and rides straight on")
+	failures += _check(main._offer_layer.visible and main._offer_layer.modulate.a < 1.0,
+			"the question fades out rather than vanishing")
+	await _wait(1.8)
+	failures += _check(not main._offer_layer.visible, "and is gone once its 2-second fade ends")
 	trail.open_trail()
 	await _wait(0.6)
-	failures += _check(not main._offer_layer.visible, "and it never asks again")
+	failures += _check(not main.help_open(main._offer_layer), "and it never asks again")
 	trail._hide_all()
 
 	# --- With a ride saved, THE TRAIL puts RESUME first ------------------

@@ -94,11 +94,49 @@ func _init() -> void:
 		print("FAIL: K+Q+5 should bust at 25")
 		failures += 1
 
+	failures += _tutorial_steps()
 	if failures == 0:
 		print("ALL POKER TESTS PASSED")
 	else:
 		print("%d POKER TEST(S) FAILED" % failures)
 	quit(failures)
+
+
+## The tutorial's lessons: every pattern is an unbroken chain (each
+## card touching the one before it), and its cards make the hand it
+## teaches. Together they cover every hand in the game.
+func _tutorial_steps() -> int:
+	var steps: Array = load("res://scripts/main.gd").TUT_STEPS
+	var bad := 0
+	var taught := {}
+	for step in steps:
+		var cells: Array = step.cells
+		if cells.is_empty():
+			continue
+		var cards: Array = []
+		var seen := {}
+		for n in cells.size():
+			var p := Vector2i(int(cells[n][0]), int(cells[n][1]))
+			if seen.has(p) or p.x < 0 or p.x > 4 or p.y < 0 or p.y > 4:
+				print("FAIL: tutorial %s reuses or leaves the board at %s" % [step.want, p])
+				bad += 1
+			seen[p] = true
+			if n > 0:
+				var q := Vector2i(int(cells[n - 1][0]), int(cells[n - 1][1]))
+				if not Board._is_adjacent(p, q):
+					print("FAIL: tutorial %s breaks the chain between %s and %s" % [step.want, q, p])
+					bad += 1
+			cards.append(c(int(cells[n][2]), int(cells[n][3])))
+		var got := String(Poker.evaluate(cards).name)
+		if got != String(step.want):
+			print("FAIL: tutorial step %s deals a %s" % [step.want, got])
+			bad += 1
+		taught[got] = true
+	for hand_name in Poker.BASE_SCORES:
+		if not taught.has(hand_name):
+			print("FAIL: the tutorial never teaches %s" % hand_name)
+			bad += 1
+	return bad
 
 
 func c(rank: int, suit: int) -> Dictionary:

@@ -438,6 +438,8 @@ func _ready() -> void:
 			"tutorial":
 				menu_layer.visible = false
 				_start_tutorial()
+				# POKERPOP_TUT_STEP=N opens on lesson N (1-based).
+
 			"ready":
 				_start_mode("arcade")
 			"time":
@@ -1068,7 +1070,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if menu_open:
 			return
-		if tutor_layer != null and tutor_layer.visible:
+		if tutor_layer != null and help_open(tutor_layer):
 			# The explainer popup eats keys; ENTER/SPACE advance it.
 			if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
 				_tutor_next()
@@ -1213,7 +1215,7 @@ func _on_hand_played(result: Dictionary) -> void:
 		# Candy Crush announcer.
 		board._play_sound(Board.SFX_LAUGHS.pick_random(), 1.0, -8.0, 0.35)
 	if mode_kind == "tutorial":
-		_tut_on_hand(String(result.name))
+		_tut_on_hand(result)
 		return
 	if mode_kind == "trail":
 		trail.on_hand_played(result)
@@ -1569,7 +1571,7 @@ func _update_tooltip(delta: float) -> void:
 		return
 	var can := game_started and not menu_open and not game_over \
 			and not get_tree().paused and not board.busy and not board.locked \
-			and not tutor_layer.visible
+			and not help_open(tutor_layer)
 	var card: PlayingCard = board._card_under_mouse(true) if can else null
 	if card != _hover_card:
 		if _hover_card != null and is_instance_valid(_hover_card):
@@ -1837,7 +1839,7 @@ func tutor_show(key: String) -> void:
 	tutor_seen[key] = true
 	_tutor_save()
 	_tutor_queue.append(key)
-	if not tutor_layer.visible:
+	if not help_open(tutor_layer):
 		_tutor_next()
 
 
@@ -1846,13 +1848,14 @@ func _tutor_next() -> void:
 	# _unhandled_input gates the keys while the popup is up. (Locking
 	# raced with the deal countdown's own unlock and froze the board.)
 	if _tutor_queue.is_empty():
-		tutor_layer.visible = false
+		help_fade_out(tutor_layer)
 		return
 	var key: String = _tutor_queue.pop_front()
 	_tutor_title.text = TUTOR[key][0]
 	_tutor_body.text = TUTOR[key][1]
 	_tutor_scroll.scroll_vertical = 0
-	tutor_layer.visible = true
+	tutor_layer.move_to_front()
+	help_fade_in(tutor_layer)
 
 
 func _tutor_load() -> void:
@@ -1874,21 +1877,36 @@ func _tutor_save() -> void:
 
 # --- The how-to-play tutorial (interactive) --------------------------------
 
-# Each step stamps its cards onto the TOP ROW and waits for the player
-# to actually play that hand.
+# Each step stamps a hand onto the board in a PATTERN — across, down,
+# diagonal, around corners and rings — numbers the cards in the order a
+# chain can take them, and waits for the player to play exactly those
+# cards. cells: [[col, row, rank, suit], ...] in path order (suits: 0
+# spades, 1 hearts, 2 diamonds, 3 clubs). Every hand in the game is here.
 const TUT_STEPS := [
-	{"want": "Pair", "cards": [[7, 0], [7, 1]],
-		"text": "Two cards of the SAME RANK make a PAIR. Click the two 7s at the top-left (they're side by side), then press SPACE or the PLAY HAND button."},
-	{"want": "Three of a Kind", "cards": [[9, 0], [9, 1], [9, 2]],
-		"text": "THREE OF A KIND: three matching ranks. Chain the three 9s along the top row — click them in order, each next to the last — and play."},
-	{"want": "Straight", "cards": [[5, 0], [6, 1], [7, 2], [8, 3], [9, 0]],
-		"text": "A STRAIGHT is five ranks in a row — suits don't matter, and you can pick them in any order. The top row holds 5-6-7-8-9. Chain and play!"},
-	{"want": "Flush", "cards": [[2, 1], [6, 1], [9, 1], [11, 1], [13, 1]],
-		"text": "A FLUSH is five cards of ONE SUIT. The top row is all hearts — chain all five and play."},
-	{"want": "Full House", "cards": [[4, 0], [4, 1], [4, 2], [11, 0], [11, 1]],
-		"text": "A FULL HOUSE: three of a kind PLUS a pair. Top row: three 4s and two Jacks. Every card must be part of the hand — no stray extras, ever."},
-	{"want": "", "cards": [],
-		"text": "Last one's on you: find and play ANY hand — a pair or better. Drag or click to chain adjacent cards (all 8 directions count)."},
+	{"want": "Pair", "cells": [[1, 2, 7, 0], [2, 2, 7, 1]],
+		"text": "Welcome to the table! Hands are chains of cards that TOUCH. Two cards of the same rank make a PAIR. Click the glowing card 1, then card 2, then press SPACE or PLAY HAND."},
+	{"want": "Two Pair", "cells": [[3, 0, 5, 3], [3, 1, 5, 2], [3, 2, 9, 0], [3, 3, 9, 1]],
+		"text": "Chains run in ANY direction. Two pairs in one chain is TWO PAIR — this one runs straight DOWN a column. Take them 1, 2, 3, 4."},
+	{"want": "Three of a Kind", "cells": [[0, 0, 9, 0], [1, 1, 9, 1], [2, 2, 9, 2]],
+		"text": "DIAGONALS count too: every card touches all 8 around it. THREE OF A KIND runs corner to corner here."},
+	{"want": "Straight", "cells": [[0, 4, 5, 0], [1, 4, 6, 1], [2, 4, 7, 2], [3, 3, 8, 3], [3, 2, 9, 0]],
+		"text": "A chain can TURN. Each card only has to touch the one picked before it. This STRAIGHT (five ranks in a row, any suits) runs along the bottom, up a diagonal, then up."},
+	{"want": "Flush", "cells": [[0, 1, 2, 1], [1, 0, 6, 1], [2, 1, 9, 1], [3, 0, 11, 1], [4, 1, 13, 1]],
+		"text": "A FLUSH is five cards of ONE suit, any ranks. This one zig-zags up and down along the top two rows."},
+	{"want": "Full House", "cells": [[2, 1, 4, 0], [1, 2, 4, 1], [2, 3, 4, 2], [3, 2, 11, 0], [2, 2, 11, 1]],
+		"text": "ORDER MATTERS: each pick must touch the LAST card picked, so the chain is a path. Go round the diamond 1 → 4, then finish in the middle on 5 — jumping from 1 to 3 won't take, they don't touch. Misclick? Click a picked card to cut the chain back to it. This is a FULL HOUSE: three of a kind plus a pair."},
+	{"want": "Four of a Kind", "cells": [[3, 3, 13, 0], [4, 3, 13, 1], [4, 4, 13, 2], [3, 4, 13, 3]],
+		"text": "FOUR OF A KIND: four of one rank. A tight square works — walk round the block 1 → 4. Every card in the chain must be part of the hand: no spare cards, ever."},
+	{"want": "Straight Flush", "cells": [[0, 3, 5, 3], [1, 4, 6, 3], [2, 3, 7, 3], [3, 4, 8, 3], [4, 3, 9, 3]],
+		"text": "A STRAIGHT FLUSH is a straight all in one suit. Diagonal zig-zags are still one chain: down, up, down, up."},
+	{"want": "Five of a Kind", "cells": [[2, 1, 12, 0], [2, 2, 12, 1], [1, 2, 12, 2], [2, 3, 12, 3], [3, 2, 12, 0]],
+		"text": "FIVE OF A KIND: five of one rank — on the trail it takes duplicate cards or wilds. Around the cross: top, the middle, left, bottom, right."},
+	{"want": "Royal Flush", "cells": [[0, 0, 10, 2], [0, 1, 11, 2], [1, 2, 12, 2], [1, 3, 13, 2], [0, 4, 14, 2]],
+		"text": "A ROYAL FLUSH: 10, J, Q, K, A of one suit, the best straight there is. This one snakes down the left side."},
+	{"want": "Flushed Five", "cells": [[0, 1, 8, 1], [1, 2, 8, 1], [2, 3, 8, 1], [3, 2, 8, 1], [4, 1, 8, 1]],
+		"text": "And the best hand of all: the FLUSHED FIVE, five of the very same card. Down the V and back up."},
+	{"want": "", "cells": [],
+		"text": "Last one's on you: find ANY hand — a pair or better — and play it. Click or drag across touching cards in any direction. The PAYOUTS list on the right shows what every hand is worth."},
 ]
 
 
@@ -1896,17 +1914,99 @@ const TUT_STEPS := [
 ## play the tutorial, or skip it for good. `then` is where they were
 ## headed — taken right after the tutorial, or at once on a skip.
 var _offer_layer: ColorRect
+var _tut_panel: Control
 var _after_tutorial := Callable()
+
+
+## Help windows (explainer popups, the tutorial question, the
+## tutorial's instructions) fade in and out over HELP_FADE seconds. A
+## window fading out is already closed: it ignores the mouse, its
+## buttons go dead, and help_open() says no.
+const HELP_FADE := 2.0
+
+
+func _help_fade_time() -> float:
+	return 0.0 if OS.get_environment("POKERPOP_SHOT") != "" else HELP_FADE
+
+
+func help_open(c: CanvasItem) -> bool:
+	return c != null and c.visible and not bool(c.get_meta("closing", false))
+
+
+func help_fade_in(c: CanvasItem) -> void:
+	if help_open(c):
+		return
+	_kill_help_fade(c)
+	c.set_meta("closing", false)
+	if not c.visible:
+		c.modulate.a = 0.0
+	c.visible = true
+	_help_live(c, true)
+	var t := _help_fade_time()
+	if t <= 0.0:
+		c.modulate.a = 1.0
+		return
+	var tw := create_tween()
+	tw.tween_property(c, "modulate:a", 1.0, t * (1.0 - c.modulate.a))
+	c.set_meta("fade_tw", tw)
+
+
+func help_fade_out(c: CanvasItem, then := Callable()) -> void:
+	if not c.visible or bool(c.get_meta("closing", false)):
+		if then.is_valid():
+			then.call()
+		return
+	_kill_help_fade(c)
+	c.set_meta("closing", true)
+	_help_live(c, false)
+	var t := _help_fade_time()
+	if t <= 0.0:
+		c.visible = false
+		c.modulate.a = 1.0
+		if then.is_valid():
+			then.call()
+		return
+	var tw := create_tween()
+	tw.tween_property(c, "modulate:a", 0.0, t * c.modulate.a)
+	tw.tween_callback(func() -> void:
+		if bool(c.get_meta("closing", false)):
+			c.visible = false
+			c.modulate.a = 1.0
+		if then.is_valid():
+			then.call())
+	c.set_meta("fade_tw", tw)
+
+
+func _kill_help_fade(c: CanvasItem) -> void:
+	if c.has_meta("fade_tw"):
+		var old: Tween = c.get_meta("fade_tw")
+		if old != null and old.is_valid():
+			old.kill()
+		c.remove_meta("fade_tw")
+
+
+## A help window's scrim and buttons take the mouse only while it's open.
+func _help_live(c: CanvasItem, live: bool) -> void:
+	if c is Control and not c is BaseButton:
+		var ctl := c as Control
+		if not ctl.has_meta("filter"):
+			ctl.set_meta("filter", ctl.mouse_filter)
+		ctl.mouse_filter = int(ctl.get_meta("filter")) if live else Control.MOUSE_FILTER_IGNORE
+	if c is BaseButton:
+		(c as BaseButton).disabled = not live
+	for child in c.get_children():
+		if child is BaseButton:
+			(child as BaseButton).disabled = not live
 
 
 func offer_tutorial(then: Callable) -> void:
 	_after_tutorial = then
 	_offer_layer.move_to_front()
-	_offer_layer.visible = true
+	help_fade_in(_offer_layer)
 
 
 func _offer_take_tutorial() -> void:
-	_offer_layer.visible = false
+	help_fade_out(_offer_layer)
 	board._play_sound(Board.SFX_CLICK, 1.0, -8.0)
 	transition(func() -> void:
 		trail._hide_all()
@@ -1914,7 +2014,7 @@ func _offer_take_tutorial() -> void:
 
 
 func _offer_skip_tutorial() -> void:
-	_offer_layer.visible = false
+	help_fade_out(_offer_layer)
 	board._play_sound(Board.SFX_CLICK, 1.0, -8.0)
 	tutor_seen["core"] = true
 	_tutor_save()
@@ -1945,8 +2045,10 @@ func _start_tutorial() -> void:
 		await get_tree().process_frame
 	board.locked = false
 	tut_step = 0
-	_tut_label.visible = true
-	_tut_skip_btn.visible = true
+	if OS.get_environment("POKERPOP_SHOT") != "" and OS.get_environment("POKERPOP_TUT_STEP") != "":
+		tut_step = clampi(int(OS.get_environment("POKERPOP_TUT_STEP")) - 1, 0, TUT_STEPS.size() - 1)
+	help_fade_in(_tut_panel)
+	help_fade_in(_tut_skip_btn)
 	_tut_apply_step()
 
 
@@ -1956,30 +2058,67 @@ func _tut_apply_step() -> void:
 	if mode_kind != "tutorial":
 		return
 	var step: Dictionary = TUT_STEPS[tut_step]
-	var cards: Array = step.cards
-	for i in cards.size():
-		var p := Vector2i(i, 0)
-		if board.grid.has(p):
-			var card: PlayingCard = board.grid[p]
-			card.rank = cards[i][0]
-			card.suit = cards[i][1]
-			card.mod = ""
-			card.hazard = ""
-	_tut_label.text = "STEP %d / %d   —   %s" % [tut_step + 1, TUT_STEPS.size(), step.text]
+	_tut_clear_marks()
+	var cells: Array = step.cells
+	for n in cells.size():
+		var p := Vector2i(int(cells[n][0]), int(cells[n][1]))
+		if not board.grid.has(p):
+			continue
+		var card: PlayingCard = board.grid[p]
+		card.rank = int(cells[n][2])
+		card.suit = int(cells[n][3])
+		card.mod = ""
+		card.finish = ""
+		card.hazard = ""
+		card.joker = false
+		card.cursed = false
+		card.honey = false
+		card.washed = false
+		card.objective = ""
+		card.tut_order = n + 1  # the numbered glow: the path to take
+	var want := String(step.want)
+	var head := "STEP %d / %d" % [tut_step + 1, TUT_STEPS.size()]
+	if want != "":
+		head += "   ·   %s  (%d)" % [want.to_upper(), int(Poker.BASE_SCORES.get(want, 0))]
+	_tut_label.text = "%s\n%s" % [head, step.text]
 
 
-func _tut_on_hand(hand_name: String) -> void:
+func _tut_clear_marks() -> void:
+	for p in board.grid:
+		(board.grid[p] as PlayingCard).tut_order = 0
+
+
+func _tut_on_hand(result: Dictionary) -> void:
+	var hand_name := String(result.name)
 	var step: Dictionary = TUT_STEPS[tut_step]
 	if String(step.want) != "" and hand_name != String(step.want):
 		_announce("THAT'S A %s — WE NEED A %s" % [hand_name.to_upper(),
 				String(step.want).to_upper()], RED)
 		_tut_apply_step()  # re-stamp in case the formation was eaten
 		return
+	if String(step.want) != "" and not _tut_played_marked(result, step):
+		_announce("RIGHT HAND — NOW PLAY THE NUMBERED CARDS", RED)
+		_tut_apply_step()
+		return
 	tut_step += 1
 	if tut_step >= TUT_STEPS.size():
 		_finish_tutorial()
 	else:
 		_tut_apply_step()
+
+
+## The hand used exactly the step's numbered cards.
+func _tut_played_marked(result: Dictionary, step: Dictionary) -> bool:
+	var want := {}
+	for c in step.cells:
+		want[Vector2i(int(c[0]), int(c[1]))] = true
+	var played: Array = result.get("cleared_cells", [])
+	if played.size() != want.size():
+		return false
+	for p in played:
+		if not want.has(p):
+			return false
+	return true
 
 
 func _finish_tutorial() -> void:
@@ -1993,8 +2132,9 @@ func _finish_tutorial() -> void:
 
 
 func _end_tutorial() -> void:
-	_tut_label.visible = false
-	_tut_skip_btn.visible = false
+	_tut_clear_marks()
+	help_fade_out(_tut_panel)
+	help_fade_out(_tut_skip_btn)
 	mode_kind = ""
 	var then := _after_tutorial
 	_after_tutorial = Callable()
@@ -2075,7 +2215,7 @@ func _open_menu_now() -> void:
 	parallax.set_scene("trail_dusk")
 	board.visible = false  # no stale table lingering behind the menu scrim
 	if _tut_label != null:
-		_tut_label.visible = false
+		_tut_panel.visible = false
 		_tut_skip_btn.visible = false
 	menu_open = true
 	game_started = false
@@ -2841,10 +2981,17 @@ func _build_menu() -> void:
 
 func _build_profiles_and_tutor() -> void:
 	# In-game tutorial instruction strip + skip button.
-	_tut_label = _label(hud_root, "", Vector2(380, 8), 22, GOLD)
-	_tut_label.size = Vector2(1160, 84)
+	# The tutorial's instructions ride a plate across the top of the table.
+	_tut_panel = Control.new()
+	_tut_panel.position = Vector2(370, 4)
+	_tut_panel.size = Vector2(1180, 112)
+	_tut_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tut_panel.visible = false
+	hud_root.add_child(_tut_panel)
+	UiKit.plate(_tut_panel, Rect2(Vector2.ZERO, _tut_panel.size))
+	_tut_label = _label(_tut_panel, "", Vector2(24, 10), 19, GOLD)
+	_tut_label.size = Vector2(1132, 92)
 	_tut_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tut_label.visible = false
 	_tut_skip_btn = _button(hud_root, "SKIP TUTORIAL", Vector2(PANEL_R, 60), Vector2(300, 50))
 	_tut_skip_btn.add_theme_font_size_override("font_size", 20)
 	_tut_skip_btn.visible = false
@@ -3458,7 +3605,7 @@ func _take_screenshot(path: String) -> void:
 		get_tree().quit()
 		return
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover":
+		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial":
 			# The last page's EXP bar and level-up banner come in last.
 			await get_tree().create_timer(6.2 if OS.get_environment("POKERPOP_MODE") == "trailover" else 4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
