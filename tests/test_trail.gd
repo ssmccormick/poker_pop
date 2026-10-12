@@ -337,6 +337,7 @@ func _run() -> void:
 	failures += _check(trail.laser_level == 0 and trail.cash == 2000,
 			"the Laser's upgrades wait on the Machine")
 	trail.room_index = 5
+	trail.tables_played = []
 	var goals := {}
 	var only_peddler := true
 	var clocks := 0
@@ -366,6 +367,45 @@ func _run() -> void:
 		if not trail._random_mod() in ["mult", "chip", "gold"]:
 			mods_ok = false
 	failures += _check(mods_ok, "only Mult, Chip and Gold cards are dealt at level 1")
+
+	# --- Table rotation: no repeats until every type has been played -----
+	trail.room_index = 5
+	trail.tables_played = []
+	var all_distinct := true
+	for n in 100:
+		var wall: Array = trail._wall_types(trail._make_offers())
+		var seen := {}
+		for t in wall:
+			if seen.has(t):
+				all_distinct = false
+			seen[t] = true
+	failures += _check(all_distinct, "a wall never deals the same table type twice")
+	var types: Array = TrailMode.ROOM_TABLE.keys()
+	trail.tables_played = types.filter(func(t): return not t in ["safe", "mine"])
+	var only_left := true
+	var sizes := {}
+	for n in 100:
+		var wall: Array = trail._wall_types(trail._make_offers())
+		sizes[wall.size()] = true
+		for t in wall:
+			if not t in ["safe", "mine"]:
+				only_left = false
+	failures += _check(only_left and sizes.keys().all(func(k): return int(k) <= 2 and int(k) >= 1),
+			"with two types unplayed, the wall deals just those two (fewer cards)")
+	trail.tables_played = types.filter(func(t): return t != "safe")
+	var lone: Array = trail._wall_types(trail._make_offers())
+	failures += _check(lone == ["safe"], "with one type left, the wall deals only it (%s)" % str(lone))
+	trail._save_run()
+	trail.tables_played = []
+	trail._load_run()
+	failures += _check(trail.tables_played.size() == types.size() - 1,
+			"the rotation is saved with the ride")
+	trail._mark_table_played({"kind": "play", "goal": "safe"})
+	failures += _check(trail.tables_played.is_empty(),
+			"playing the last unplayed type starts the rotation over")
+	trail._mark_table_played({"kind": "play", "tarot": "EASY MONEY"})
+	failures += _check(trail.tables_played == ["plain"], "plain tables count in the rotation too")
+	trail.tables_played = []
 
 	# --- Level up, then buy ------------------------------------------------
 	trail.progress.exp_total = Progression.exp_at_level(3)

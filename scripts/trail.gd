@@ -275,6 +275,10 @@ var _ride_contracts: Array = []  # contract names completed this ride
 var run_active := false
 var run_uid := ""        # one id per ride, so it's only ever paid EXP once
 var run_bosses := 0      # boss tables beaten this ride
+# Table types played this ride (ROOM_TABLE keys, "plain" included). A
+# played type isn't dealt again until every type has had its turn —
+# then the rotation starts over.
+var tables_played: Array = []
 var ascension := 0       # this ride's Ascension (0-20)
 var chips := 0
 var deck: Array = []          # [{rank, suit, cursed}]
@@ -557,6 +561,7 @@ func _save_run() -> void:
 	cf.set_value("run", "uid", run_uid)
 	cf.set_value("run", "score", main.score)
 	cf.set_value("run", "bosses", run_bosses)
+	cf.set_value("run", "tables_played", PackedStringArray(tables_played))
 	var ranks := PackedInt32Array()
 	var suits := PackedInt32Array()
 	var curses := PackedInt32Array()
@@ -629,6 +634,7 @@ func _load_run() -> bool:
 		run_uid = _mint_run_uid()  # a ride saved before EXP existed
 	main.score = int(cf.get_value("run", "score", 0))
 	run_bosses = int(cf.get_value("run", "bosses", 0))
+	tables_played = Array(cf.get_value("run", "tables_played", PackedStringArray()))
 	var ranks: PackedInt32Array = cf.get_value("run", "ranks", PackedInt32Array())
 	var suits: PackedInt32Array = cf.get_value("run", "suits", PackedInt32Array())
 	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
@@ -2156,6 +2162,7 @@ func _start_run(asc: int) -> void:
 	main.menu_open = false
 	run_uid = _mint_run_uid()
 	run_bosses = 0
+	tables_played = []
 	_ride_contracts = []
 	ascension = asc
 	chips = Ascension.start_chips(asc)
@@ -2242,7 +2249,7 @@ func _show_tarot_now() -> void:
 	# menu, or a saved game never reshuffles the wall.
 	if _offers_room != room_index or _offers.is_empty():
 		_offers = _make_offers()
-		_fate_offer = _make_one_offer(true)
+		_fate_offer = _make_one_offer(true, {}, _wall_types(_offers))
 		_offers_room = room_index
 		_save_run()
 	_render_tarot()
@@ -2276,9 +2283,27 @@ func _make_offers() -> Array:
 			offers.append(_make_shop_offer())
 		elif want_camp and i == 1:
 			offers.append({"kind": "camp", "tarot": "THE CAMPFIRE"})
-		else:
+		elif room_index == 0:
+			# The first table: three plain seats, one per risk.
 			offers.append(_make_one_offer(false, risk_pool[i % risk_pool.size()]))
+		else:
+			# Only types not yet played this ride — if fewer are left
+			# than seats, the wall deals fewer cards.
+			var goal := _roll_room_goal(_wall_types(offers), true)
+			if goal == "":
+				continue
+			offers.append(_make_one_offer(false, risk_pool[i % risk_pool.size()],
+					[], goal))
 	return offers
+
+
+## The table types already dealt onto this wall.
+func _wall_types(offers: Array) -> Array:
+	var out: Array = []
+	for o in offers:
+		if o.get("kind", "") == "play":
+			out.append(table_type(o))
+	return out
 
 
 ## A shop offer names its merchant up front, so the tarot card shows
@@ -2289,13 +2314,43 @@ func _make_shop_offer() -> Dictionary:
 
 
 ## Which kind of table the draw deals (ROOM_TABLE over the goals on
-## the trail); "plain" is the ordinary score table.
-func _roll_room_goal() -> String:
-	var goal := progress.pick("room", ROOM_TABLE)
+## the trail); "plain" is the ordinary score table. Types played this
+## ride and types already on this wall are skipped. `strict` returns ""
+## when none are left (the wall deals fewer cards); otherwise a played
+## type comes back as a last resort (the face-down Fool).
+func _roll_room_goal(on_wall: Array = [], strict := false) -> String:
+	var goal := progress.pick("room", ROOM_TABLE, tables_played + on_wall)
+	if goal == "" and not strict:
+		goal = progress.pick("room", ROOM_TABLE, tables_played)
+		if goal == "":
+			goal = progress.pick("room", ROOM_TABLE)
+	if goal == "" and strict:
+		return ""
 	return goal if goal != "" else "plain"
 
 
-func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
+## The rotation type of a play offer: its goal, or "plain".
+static func table_type(offer: Dictionary) -> String:
+	var goal := String(offer.get("goal", ""))
+	return "plain" if goal == "" or goal == "timed" else goal
+
+
+## A table was sat down at: its type leaves the rotation until every
+## type has been played, then the rotation resets.
+func _mark_table_played(offer: Dictionary) -> void:
+	if offer.get("kind", "") != "play" or offer.has("boss"):
+		return
+	var t := table_type(offer)
+	if not tables_played.has(t):
+		tables_played.append(t)
+	for k in ROOM_TABLE:
+		if not tables_played.has(k):
+			return
+	tables_played = []  # every type has had its turn
+
+
+func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = [],
+		forced_goal := "") -> Dictionary:
 	if random_risk:
 		if randf() < 0.15:
 			return _make_shop_offer()
@@ -2312,7 +2367,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}) -> Dictionary:
 		"odds": float(risk.odds),
 		"min_bet": _blind_for(room_index),
 	}
-	var goal := _roll_room_goal() if room_index >= 1 else "plain"
+	var goal := forced_goal if forced_goal != "" 			else (_roll_room_goal(on_wall) if room_index >= 1 else "plain")
 	if goal != "plain":
 		if goal in ["safe", "chest"]:
 			# Objective rooms: no score target — do the job to clear.
@@ -2919,6 +2974,7 @@ func _choose_offer_now(offer: Dictionary, from_fate: bool) -> void:
 	current_offer = offer
 	tarot_layer.visible = false
 	_log_stop(offer)
+	_mark_table_played(offer)
 	if offer.kind == "shop":
 		_show_shop()
 	elif offer.kind == "camp":
