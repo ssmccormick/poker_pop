@@ -480,7 +480,7 @@ func _draw_tilt_sheen(rect: Rect2) -> void:
 ## (stone sits still) or an incoming-strike preview.
 func _update_processing() -> void:
 	set_process((hazard != "" and hazard != "stone") or incoming != ""
-			or water_level > 0 or washed or finish != "" or tut_order > 0
+			or water_level > 0 or washed or finish != "" or tut_order != 0
 			or hovered or _tilt != Vector2.ZERO or _hover_amt > 0.0)
 
 
@@ -927,11 +927,13 @@ func _draw_cobra_pool(font: Font) -> void:
 ## The tutorial's pulsing gold ring and step number (hidden once picked:
 ## the chain badge takes over).
 func _draw_tut_hint(rect: Rect2) -> void:
-	if tut_order <= 0 or selected:
+	if tut_order == 0 or selected:
 		return
 	var a := 0.75 + 0.25 * sin(_t * 4.0)
 	draw_rect(rect.grow(7), Color(GOLD.r, GOLD.g, GOLD.b, 0.25 * a), false, 6.0)
 	draw_rect(rect.grow(3), Color(GOLD.r, GOLD.g, GOLD.b, a), false, 4.0)
+	if tut_order < 0:
+		return  # a callout's glow: no number
 	var bc := Vector2(W / 2.0 - 12, -H / 2.0 + 12)
 	draw_circle(bc, 11, GOLD)
 	var font: Font = FontLib.card if FontLib.card != null else ThemeDB.fallback_font

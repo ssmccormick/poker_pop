@@ -222,7 +222,13 @@ func _ready() -> void:
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(_fade_rect)
 	_build_splash()
+	_build_callout()
+	_build_plaque()
 	_build_ui_tip()
+	# A hazard dealt in for the first time gets its poster.
+	board.card_dealt.connect(func(card: PlayingCard) -> void:
+		if card.hazard != "":
+			callout_card(card, "hazard_" + card.hazard))
 
 	# Music (Western Audio Bundle): one jukebox player, fed a random
 	# track from the area's playlist. Nothing plays until the splash is
@@ -238,6 +244,22 @@ func _ready() -> void:
 		match m:
 			"tutoroffer":
 				offer_tutorial(Callable())
+			"trailcallout":
+				# A water card's first-deal poster, with the table plaque.
+				menu_layer.visible = false
+				trail._start_run(0)
+				for offer in trail._offers:
+					if offer.kind == "play":
+						trail._choose_offer(offer, false)
+						break
+				get_tree().create_timer(1.0).timeout.connect(func() -> void:
+					trail._confirm_bet())
+				get_tree().create_timer(3.4).timeout.connect(func() -> void:
+					var wet: PlayingCard = board.grid.get(Vector2i(3, 2))
+					if wet != null:
+						wet.hazard = "water"
+						_callout_queue.append({"card": wet, "key": "hazard_water"})
+					table_banner("TABLE CLEARED"))
 			"splash", "menu":
 				pass
 			"options":
@@ -458,7 +480,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if get_tree().paused:
 		return
-	if game_started and not menu_open and not game_over and not countdown_active:
+	if game_started and not menu_open and not game_over and not countdown_active \
+			and not help_blocking():
 		if mode_kind == "time":
 			time_left -= delta
 			if time_left <= 0.0:
@@ -488,6 +511,7 @@ func _process(delta: float) -> void:
 	_update_labels()
 	_update_tooltip(delta)
 	_update_ui_tip(delta)
+	_update_callout()
 
 
 func _arcade_target() -> int:
@@ -1070,6 +1094,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if menu_open:
 			return
+		if _callout_layer != null and help_open(_callout_layer):
+			# The card callout eats keys; ENTER/SPACE dismiss it.
+			if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+				_dismiss_callout()
+			return
 		if tutor_layer != null and help_open(tutor_layer):
 			# The explainer popup eats keys; ENTER/SPACE advance it.
 			if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
@@ -1571,7 +1600,7 @@ func _update_tooltip(delta: float) -> void:
 		return
 	var can := game_started and not menu_open and not game_over \
 			and not get_tree().paused and not board.busy and not board.locked \
-			and not help_open(tutor_layer)
+			and not help_blocking()
 	var card: PlayingCard = board._card_under_mouse(true) if can else null
 	if card != _hover_card:
 		if _hover_card != null and is_instance_valid(_hover_card):
@@ -1997,6 +2026,160 @@ func _help_live(c: CanvasItem, live: bool) -> void:
 	for child in c.get_children():
 		if child is BaseButton:
 			(child as BaseButton).disabled = not live
+
+
+## A help window is up: the table waits (clocks and the arcade bar stop).
+func help_blocking() -> bool:
+	return help_open(tutor_layer) or help_open(_callout_layer)
+
+
+# --- Card callouts: a poster pinned beside the card it explains ------------
+
+var _callout_layer: Control
+var _callout_panel: Panel
+var _callout_title: Label
+var _callout_body: Label
+var _callout_pointer: Polygon2D
+var _callout_queue: Array = []   # [{card, key}] waiting their turn
+var _callout_card: PlayingCard
+var _callout_ok: Button
+
+
+## The first time something new is DEALT to the table (a hazard, for
+## now), a poster pops up beside that very card explaining it. Once per
+## profile per kind, like the tutor popups it shares its text with.
+func callout_card(card: PlayingCard, key: String) -> void:
+	if card == null or not tutor_needs(key) or not TUTOR.has(key):
+		return
+	tutor_seen[key] = true
+	_tutor_save()
+	_callout_queue.append({"card": card, "key": key})
+
+
+func _update_callout() -> void:
+	if _callout_layer == null or _callout_queue.is_empty() or help_open(_callout_layer) \
+			or help_open(tutor_layer) or menu_open or board.busy or not game_started:
+		return
+	var q: Dictionary = _callout_queue.pop_front()
+	var card: PlayingCard = q.card
+	if not is_instance_valid(card) or not board.grid.has(card.grid_pos) \
+			or board.grid[card.grid_pos] != card:
+		return  # it left the table before its turn came
+	_callout_card = card
+	card.tut_order = -1  # the gold glow, no number
+	_callout_title.text = String(TUTOR[q.key][0])
+	_callout_body.text = String(TUTOR[q.key][1])
+	# Fit the poster to its text: title, the wrapped body, then GOT IT.
+	var font: Font = _callout_body.get_theme_font("font")
+	var body_h := font.get_multiline_string_size(_callout_body.text,
+			HORIZONTAL_ALIGNMENT_LEFT, 388.0, 17).y
+	_callout_body.size = Vector2(388, body_h + 4.0)
+	_callout_panel.size.y = 70.0 + body_h + 92.0
+	_callout_ok.position.y = _callout_panel.size.y - 70.0
+	_place_callout(card)
+	_callout_layer.move_to_front()
+	help_fade_in(_callout_layer)
+	board._play_sound(Board.SFX_FLIP, 1.2, -10.0)
+
+
+## Beside the card (right if there's room, else left), with a pointer.
+func _place_callout(card: PlayingCard) -> void:
+	var xf := board.get_global_transform_with_canvas()
+	var at: Vector2 = xf * board.cell_center(card.grid_pos)
+	var half_w := PlayingCard.W * board.scale.x / 2.0
+	var size := _callout_panel.size
+	var right := at.x + half_w + 34.0 + size.x <= VIEW.x - 12.0
+	var x := at.x + half_w + 34.0 if right else at.x - half_w - 34.0 - size.x
+	var y := clampf(at.y - size.y / 2.0, 12.0, VIEW.y - size.y - 12.0)
+	_callout_panel.position = Vector2(x, y)
+	var edge := x if right else x + size.x
+	var tip := at.x + (half_w + 6.0) * (1.0 if right else -1.0)
+	_callout_pointer.polygon = PackedVector2Array([
+		Vector2(edge, at.y - 16.0), Vector2(edge, at.y + 16.0), Vector2(tip, at.y)])
+
+
+func _dismiss_callout() -> void:
+	if not help_open(_callout_layer):
+		return
+	if _callout_card != null and is_instance_valid(_callout_card) and _callout_card.tut_order == -1:
+		_callout_card.tut_order = 0
+	_callout_card = null
+	board._play_sound(Board.SFX_CLICK, 1.0, -8.0)
+	help_fade_out(_callout_layer)
+
+
+func _build_callout() -> void:
+	_callout_layer = Control.new()
+	_callout_layer.size = VIEW
+	_callout_layer.mouse_filter = Control.MOUSE_FILTER_STOP  # the table waits
+	_callout_layer.visible = false
+	ui_root.add_child(_callout_layer)
+	_callout_pointer = Polygon2D.new()
+	_callout_pointer.color = UiKit.POSTER_EDGE
+	_callout_layer.add_child(_callout_pointer)
+	_callout_panel = Panel.new()
+	_callout_panel.size = Vector2(460, 340)
+	_callout_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_callout_panel.add_theme_stylebox_override("panel", UiKit.poster_box())
+	_callout_layer.add_child(_callout_panel)
+	_callout_title = _label(_callout_panel, "", Vector2(0, 22), 30, RED)
+	_callout_title.size = Vector2(460, 40)
+	_callout_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_callout_body = _label(_callout_panel, "", Vector2(36, 70), 17, UiKit.POSTER_INK)
+	_callout_body.size = Vector2(388, 196)
+	_callout_body.custom_minimum_size = Vector2(388, 0)
+	_callout_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if FontLib.body != null:
+		_callout_body.add_theme_font_override("font", FontLib.body)
+	var ok := _button(_callout_layer, "GOT IT", Vector2.ZERO, Vector2(200, 50))
+	ok.add_theme_font_size_override("font_size", 20)
+	ok.reparent(_callout_panel)
+	ok.position = Vector2(130, 276)
+	ok.pressed.connect(_dismiss_callout)
+	_callout_ok = ok
+
+
+# --- The table plaque: how a table ended, dropped in at the top ------------
+
+var _plaque: Control
+var _plaque_label: Label
+var _plaque_tween: Tween
+
+
+func table_banner(text: String, color: Color = GOLD) -> void:
+	_plaque_label.text = text
+	_plaque_label.add_theme_color_override("font_color", color)
+	if _plaque_tween and _plaque_tween.is_valid():
+		_plaque_tween.kill()
+	_plaque.move_to_front()
+	_plaque.position.y = -130.0
+	_plaque.modulate.a = 1.0
+	_plaque.visible = true
+	_plaque_tween = create_tween()
+	_plaque_tween.tween_property(_plaque, "position:y", 10.0, 0.5) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_plaque_tween.tween_interval(2.6)
+	_plaque_tween.tween_property(_plaque, "position:y", -130.0, 0.5) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_plaque_tween.tween_callback(func() -> void: _plaque.visible = false)
+
+
+func _build_plaque() -> void:
+	_plaque = Control.new()
+	_plaque.size = Vector2(820, 112)
+	_plaque.position = Vector2(PLAY_X + (PLAY_WIDTH - 820.0) / 2.0, -130.0)
+	_plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_plaque.visible = false
+	ui_root.add_child(_plaque)
+	UiKit.plate(_plaque, Rect2(Vector2.ZERO, _plaque.size))
+	_plaque_label = _label(_plaque, "", Vector2(0, 0), 46, GOLD)
+	_plaque_label.size = _plaque.size
+	_plaque_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_plaque_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if FontLib.display != null:
+		_plaque_label.add_theme_font_override("font", FontLib.display)
+	_plaque_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	_plaque_label.add_theme_constant_override("shadow_offset_y", 3)
 
 
 func offer_tutorial(then: Callable) -> void:
@@ -3605,9 +3788,9 @@ func _take_screenshot(path: String) -> void:
 		get_tree().quit()
 		return
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial":
+		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial", "trailcallout":
 			# The last page's EXP bar and level-up banner come in last.
-			await get_tree().create_timer(6.2 if OS.get_environment("POKERPOP_MODE") == "trailover" else 4.2).timeout
+			await get_tree().create_timer(6.2 if OS.get_environment("POKERPOP_MODE") in ["trailover", "trailcallout"] else 4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
 			return

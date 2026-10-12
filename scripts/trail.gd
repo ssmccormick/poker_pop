@@ -3400,7 +3400,7 @@ func _tutor_room_intros() -> void:
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
 		if card.hazard != "":
-			main.tutor_show("hazard_" + card.hazard)
+			main.callout_card(card, "hazard_" + card.hazard)
 		if card.objective in ["key", "chest"] and room_goal != "chest":
 			# Ambient loot in an ordinary room — the lighter popup, not
 			# the treasure-room briefing.
@@ -4138,7 +4138,7 @@ func _room_cleared() -> void:
 	main.board._play_sound(Board.SFX_STING_BOSS if current_offer.has("boss")
 			else Board.SFX_STING_WIN, 1.0, -6.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
-	main._announce("TABLE CLEARED")
+	main.table_banner("TABLE CLEARED")
 	main.board.confetti()
 	if current_offer.has("boss") and room_index == JACK_ROOM:
 		_announce_after_settle("BIG LEAGUE NOW — EVERYTHING COSTS 10× FROM HERE")
@@ -4216,7 +4216,7 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	# Losing a table leaves a mark on the rider too.
 	if not take_damage(Ascension.lost_table_hp(ascension), "", "One lost table too many."):
 		return
-	main._announce(reason, main.RED)
+	main.table_banner(reason, main.RED)
 	_after_board_settles(_retry_room)
 
 

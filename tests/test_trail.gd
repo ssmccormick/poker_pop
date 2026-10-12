@@ -233,6 +233,35 @@ func _run() -> void:
 	failures += _check(not main.help_open(main._offer_layer), "and it never asks again")
 	trail._hide_all()
 
+	# --- A hazard dealt in for the first time gets a poster beside it ----
+	await _enter_room("the_machine")
+	main.tutor_seen.erase("hazard_water")
+	var wet: PlayingCard = main.board.grid.values()[7]
+	wet.hazard = "water"
+	main.board.card_dealt.emit(wet)
+	await _wait(0.4)
+	failures += _check(main.help_open(main._callout_layer) and wet.tut_order == -1
+			and main._callout_title.text == "WATER CARD",
+			"a first water card dealt in is explained by a poster beside it")
+	failures += _check(main.help_blocking(), "and the table waits while it's up")
+	var px: float = main._callout_panel.position.x
+	var card_x: float = (main.board.get_global_transform_with_canvas() * main.board.cell_center(wet.grid_pos)).x
+	failures += _check(absf(px - card_x) < 420.0 or absf(px + main._callout_panel.size.x - card_x) < 420.0,
+			"the poster sits next to the card")
+	main._dismiss_callout()
+	failures += _check(not main.help_open(main._callout_layer) and wet.tut_order == 0,
+			"GOT IT dismisses it and drops the glow")
+	main.board.card_dealt.emit(wet)
+	await _wait(0.3)
+	failures += _check(main._callout_queue.is_empty() and not main.help_open(main._callout_layer),
+			"the same hazard is only ever explained once")
+	main.table_banner("TABLE CLEARED")
+	await _wait(0.8)
+	failures += _check(main._plaque.visible and main._plaque.position.y > 0.0
+			and main._plaque.position.y < 60.0 and main._plaque_label.text == "TABLE CLEARED",
+			"a finished table is announced on a plaque at the top of the screen")
+	trail._hide_all()
+
 	# --- With a ride saved, THE TRAIL puts RESUME first ------------------
 	trail._save_run()
 	main.tutor_seen["core"] = true
