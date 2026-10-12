@@ -52,7 +52,7 @@ func _run() -> void:
 			"table", "outlaw", "table"]
 	for kind in ["laid_low", "busted_out", "blinded_out", "trail_complete"]:
 		var complete: bool = kind == "trail_complete"
-		var reached := 21 if complete else 10
+		var reached := TrailMode.ROOMS_TOTAL if complete else 10
 		var scene := GameOverScene.new()
 		scene.host = host
 		root.add_child(scene)
@@ -61,10 +61,10 @@ func _run() -> void:
 		var shown := scene.show_ending({
 			"kind": kind, "title": "TITLE", "epitaph": "Epitaph.", "cause": "A cause.",
 			"rider": "the_doctor", "score": 41300, "best_name": "Full House",
-			"best_score": 840, "outlaws": 7, "reached": reached, "total": 21,
+			"best_score": 840, "outlaws": 7, "reached": reached, "total": TrailMode.ROOMS_TOTAL,
 			"cash": 88, "stake": "Penny Ante", "relics": ["horseshoe", "rabbits_foot"],
-			"stops": stops, "bosses": TrailMode.BOSS_ROOMS, "region_size": 7,
-			"camp_slot": 3})
+			"stops": stops, "bosses": TrailMode.BOSS_ROOMS, "region_size": TrailMode.REGION_SIZE,
+			"camp_slot": 5})
 		failures += _check(shown, "%s: the painted page builds" % kind)
 		if not shown:
 			scene.free()
@@ -111,9 +111,9 @@ func _run() -> void:
 	var lv_shown := lv_scene.show_ending({
 		"kind": "laid_low", "title": "LAID LOW", "epitaph": "Epitaph.", "cause": "",
 		"rider": "the_gambler", "score": 41300, "best_name": "Full House",
-		"best_score": 840, "outlaws": 3, "reached": 10, "total": 21,
+		"best_score": 840, "outlaws": 3, "reached": 10, "total": TrailMode.ROOMS_TOTAL,
 		"cash": 88, "stake": "Penny Ante", "relics": [], "stops": stops,
-		"bosses": TrailMode.BOSS_ROOMS, "region_size": 7, "camp_slot": 3,
+		"bosses": TrailMode.BOSS_ROOMS, "region_size": TrailMode.REGION_SIZE, "camp_slot": 5,
 		"exp_gain": gain, "exp_rows": [["SCORE", 413], ["TABLES REACHED", 100]],
 		"exp_before": e0, "exp_after": e0 + gain,
 		"level_before": Progression.level_for_exp(e0),

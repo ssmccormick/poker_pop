@@ -309,10 +309,11 @@ func _ready() -> void:
 				trail.relics.assign(["horseshoe", "rabbits_foot", "second_wind",
 						"snake_oil", "chuck_wagon"])
 				trail._second_wind_used = true  # or the free life would save the ride
-				var log_kinds := ["table", "table", "outlaw", "camp", "table", "shop",
-						"boss", "table", "outlaw", "table", "camp", "shop", "table",
-						"boss", "table", "outlaw", "table", "camp", "table", "shop", "boss"]
-				trail.room_index = 20 if ending == "trail_complete" else 9
+				var log_kinds: Array = []
+				for i in TrailMode.ROOMS_TOTAL:
+					var k := TrailMode.stop_kind(i)
+					log_kinds.append("outlaw" if k == "table" and i % 4 == 1 else k)
+				trail.room_index = TrailMode.ROOMS_TOTAL - 1 if ending == "trail_complete" else 13
 				for i in trail.room_index + 1:
 					trail.room_index = i
 					trail._log_stop({"kind": "camp"} if log_kinds[i] == "camp"
@@ -430,7 +431,7 @@ func _ready() -> void:
 			"trailboss":
 				menu_layer.visible = false
 				trail._start_run(0)
-				trail.room_index = 20  # King Cobra's table
+				trail.room_index = TrailMode.ROOMS_TOTAL - 1  # King Cobra's table
 				trail.chips = 500000  # rich enough for the late-trail seat
 				trail._show_tarot()
 				trail._choose_offer(trail._offers[0], false)  # bosses auto all-in
@@ -1789,7 +1790,7 @@ const TUTOR := {
 	"mode_single": ["SINGLE DECK", "One 52-card deck, no timer. When the deck runs dry the run is over — squeeze every point from every card."],
 	"mode_arcade": ["ARCADE", "The bar at the top is always draining. Scoring refills it; hit the level target to move up. When the bar empties, the run ends."],
 	"mode_zen": ["ZEN", "No timer, no limits, no losing. Just you, the cards, and the sound of the pops."],
-	"mode_trail": ["THE TRAIL", "A betting run of 21 tables. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
+	"mode_trail": ["THE TRAIL", "A betting run of 21 tables over 30 stops — two merchants and a campfire wait on the road in every region, and a boss at its end. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
 	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero it goes off: the bomb is gone and the blast costs you 2 HP."],
 	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. The card it will strike next shows SPARKS catching at its bottom edge, like flint on tinder — get it out of the path or douse the fire. If EVERY card on the table catches fire, the table is LOST."],
 	"hazard_wind": ["WIND CARD", "Every hand, the wind BLOWS the first card in its facing direction clean off the board — unscored, gone. The direction turns a quarter every hand — the dust streaming across the card shows which way it blows. Play the wind card to still the air."],

@@ -45,7 +45,7 @@ func _run() -> void:
 	trail.progress.unlock_all = true
 
 	# --- Tin Star pays a blind that climbs with the trail ---------------
-	failures += _check(trail._blind_for(0) == 25 and trail._blind_for(7) > 25 * 6,
+	failures += _check(trail._blind_for(0) == 25 and trail._blind_for(TrailMode.JACK_ROOM + 1) > 25 * 6,
 			"Tin Star's blind starts at 25 and grows past the Jack")
 
 	# --- Second Wind: a lethal blow leaves the rider standing once -------
@@ -343,13 +343,11 @@ func _run() -> void:
 	var clocks := 0
 	for i in 400:
 		var o: Dictionary = trail._make_one_offer(true)
-		if o.kind == "shop":
-			if int(o.merchant) != 0:
-				only_peddler = false
-		else:
-			goals[String(o.get("goal", ""))] = true
-			if String(o.get("limit", "")) == "time":
-				clocks += 1
+		goals[String(o.get("goal", ""))] = true
+		if String(o.get("limit", "")) == "time":
+			clocks += 1
+		if trail._random_merchant_index() != 0:
+			only_peddler = false
 	failures += _check(goals.size() >= 8 and clocks > 0,
 			"a level-1 rider meets every kind of table (%d kinds, %d on the clock)" % [goals.size(), clocks])
 	failures += _check(only_peddler, "merchants are still unlocked one by one: only the Peddler at level 1")
@@ -368,8 +366,46 @@ func _run() -> void:
 			mods_ok = false
 	failures += _check(mods_ok, "only Mult, Chip and Gold cards are dealt at level 1")
 
-	# --- Table rotation: no repeats until every type has been played -----
+	# --- The road: 30 stops, merchants and campfires fixed between tables
+	failures += _check(TrailMode.ROOMS_TOTAL == 30 and TrailMode.BOSS_ROOMS.keys() == [9, 19, 29],
+			"30 stops, a boss closing each 10-stop region")
+	var kinds: Array = []
+	for i in TrailMode.ROOMS_TOTAL:
+		kinds.append(TrailMode.stop_kind(i))
+	failures += _check(kinds.count("table") + kinds.count("boss") == 21
+			and kinds.count("shop") == 6 and kinds.count("camp") == 3,
+			"21 tables, 6 merchants and 3 campfires")
+	failures += _check(TrailMode.table_depth(9) == 6 and TrailMode.table_depth(19) == 13
+			and TrailMode.table_depth(29) == 20 and TrailMode.table_depth(2) == 2
+			and TrailMode.table_depth(3) == 2, "difficulty climbs per table, not per stop")
+	failures += _check(TrailMode.next_table(2) == 3 and TrailMode.next_table(8) == 9,
+			"a stop knows the next table")
+	failures += _check(TrailMode.migrate_room(6) == 9 and TrailMode.migrate_room(7) == 10
+			and TrailMode.migrate_room(20) == 29, "old 21-stop rides re-seat at the same table")
+	var walls_clean := true
+	for n in 50:
+		for o in trail._make_offers():
+			if o.get("kind", "") != "play":
+				walls_clean = false
+		if trail._make_one_offer(true).get("kind", "") != "play":
+			walls_clean = false
+	failures += _check(walls_clean, "the wall and the Fool only ever deal tables")
+	await _enter_room("the_machine")
+	trail.in_room = false
+	trail.chips = 5000  # flush enough that no seat check busts the probe
+	trail.room_index = 2
+	trail._show_tarot_now()
+	failures += _check(trail.shop_layer.visible and not trail.tarot_layer.visible
+			and trail.trail_log[2] == "shop", "stop 3 goes straight to the merchant")
+	trail._hide_all()
 	trail.room_index = 5
+	trail._show_tarot_now()
+	failures += _check(trail.camp_layer.visible and not trail.tarot_layer.visible,
+			"stop 6 goes straight to the campfire")
+	trail._hide_all()
+
+	# --- Table rotation: no repeats until every type has been played -----
+	trail.room_index = 3
 	trail.tables_played = []
 	var all_distinct := true
 	for n in 100:

@@ -684,6 +684,11 @@ func _build_strip(complete: bool) -> void:
 	var stops: Array = _data.get("stops", [])
 	_rail_x0 = float(lay.get("strip_node_x0", 210))
 	_node_dx = float(lay.get("strip_node_dx", 75))
+	# The map was laid out for 21 stops; a longer road squeezes into the
+	# same span.
+	var span := _node_dx * 20.0
+	if total > 1:
+		_node_dx = minf(_node_dx, span / float(total - 1))
 	var ry := float(lay.get("strip_rail_y", 900))
 	_end_node = reached
 	var margins: Array = strip.get("rail_margins", [10, 0, 10, 0])

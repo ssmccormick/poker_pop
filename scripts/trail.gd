@@ -8,12 +8,19 @@ extends Node
 ## v1 scope: risk-tiered Normal rooms + shops. Bosses, room-rule
 ## variety, and card modifiers beyond Cursed come later (TRAIL_MODE.md).
 
-const ROOMS_TOTAL := 21
-const REGION_SIZE := 7
+const ROOMS_TOTAL := 30         # stops on the trail: 21 tables, 6 shops, 3 campfires
+const REGION_SIZE := 10
+# Every region runs the same road: the merchants and the campfire are
+# fixed stops BETWEEN the tables (never a card on the wall that skips
+# one), and the region's boss waits at its end.
+const STOP_LAYOUT := ["table", "table", "shop", "table", "table", "camp",
+		"table", "table", "shop", "boss"]
+const TABLES_PER_REGION := 7
+const STOPS_LAYOUT_VERSION := 2  # run saves before 2 used 7-stop regions
 # Every 7th room is a boss; the tarot deals a single court card.
-const BOSS_ROOMS := {6: "jack", 13: "queen", 20: "cobra"}
-const JACK_ROOM := 6
-const QUEEN_ROOM := 13
+const BOSS_ROOMS := {9: "jack", 19: "queen", 29: "cobra"}
+const JACK_ROOM := 9
+const QUEEN_ROOM := 19
 # Beyond the Jack the trail plays for real money: every cost — antes,
 # bets, shop goods, relics, the forge — runs 6×, and beyond the
 # Queen it jumps 6× again (36× the frontier prices). A won boss
@@ -562,6 +569,7 @@ func _save_run() -> void:
 	cf.set_value("run", "score", main.score)
 	cf.set_value("run", "bosses", run_bosses)
 	cf.set_value("run", "tables_played", PackedStringArray(tables_played))
+	cf.set_value("run", "layout", STOPS_LAYOUT_VERSION)
 	var ranks := PackedInt32Array()
 	var suits := PackedInt32Array()
 	var curses := PackedInt32Array()
@@ -611,6 +619,33 @@ func _save_run() -> void:
 		_room_save = _capture_room_state()
 	cf.set_value("run", "room_state", _room_save)
 	cf.save(main.profile_path("trail_run.cfg"))
+
+
+## A ride saved on the old 21-stop road (7-stop regions, shops and
+## campfires on the wall) is re-seated on the 30-stop road at the same
+## table; the wall it was looking at is dealt fresh.
+const OLD_SLOT_TO_STOP := [0, 1, 3, 4, 6, 7, 9]
+
+
+static func migrate_room(old_room: int) -> int:
+	var region := old_room / 7
+	return region * REGION_SIZE + int(OLD_SLOT_TO_STOP[clampi(old_room % 7, 0, 6)])
+
+
+func _migrate_stops() -> void:
+	room_index = migrate_room(room_index)
+	var moved: Array = []
+	moved.resize(ROOMS_TOTAL)
+	moved.fill("")
+	for i in trail_log.size():
+		var to := migrate_room(i)
+		if to < ROOMS_TOTAL:
+			moved[to] = trail_log[i]
+	while not moved.is_empty() and String(moved[-1]) == "":
+		moved.pop_back()
+	trail_log = moved
+	_offers_room = -1
+	_offers = []
 
 
 func _clear_run_save() -> void:
@@ -692,6 +727,8 @@ func _load_run() -> bool:
 	_fate_offer = cf.get_value("run", "fate", {})
 	_offers_room = int(cf.get_value("run", "offers_room", -1))
 	_room_save = cf.get_value("run", "room_state", {})
+	if int(cf.get_value("run", "layout", 1)) < STOPS_LAYOUT_VERSION:
+		_migrate_stops()
 	_shop_stock_room = -1  # resumed runs sit at a tarot or a retry bet
 	run_active = true
 	return true
@@ -1418,8 +1455,33 @@ func _unowned_relic() -> String:
 	return _relic_pick()
 
 
+## What kind of stop `room` is: "table", "shop", "camp" or "boss".
+static func stop_kind(room: int) -> String:
+	return String(STOP_LAYOUT[posmod(room, REGION_SIZE)])
+
+
+## How many tables lie before `room` on the trail (a shop or campfire
+## counts as the table after it). Targets, blinds and hazards climb on
+## this, so the stops in between don't make the trail harder.
+static func table_depth(room: int) -> int:
+	var slot := posmod(room, REGION_SIZE)
+	var d := (room / REGION_SIZE) * TABLES_PER_REGION
+	for i in slot:
+		if String(STOP_LAYOUT[i]) in ["table", "boss"]:
+			d += 1
+	return d
+
+
+## The first table or boss at or after `room`.
+static func next_table(room: int) -> int:
+	var r := room
+	while r < ROOMS_TOTAL and stop_kind(r) in ["shop", "camp"]:
+		r += 1
+	return mini(r, ROOMS_TOTAL - 1)
+
+
 func _blind_for(room: int) -> int:
-	return int((BLIND_BASE + BLIND_STEP * room) * Ascension.blind_mult(ascension)) \
+	return int((BLIND_BASE + BLIND_STEP * table_depth(room)) * Ascension.blind_mult(ascension)) \
 			* _cost_mult(room)
 
 
@@ -1455,7 +1517,7 @@ func _short_stacked(cost: int) -> bool:
 
 
 func _target_for(room: int, risk: Dictionary) -> int:
-	var base := BASE_TARGET + TARGET_STEP * room
+	var base := BASE_TARGET + TARGET_STEP * table_depth(room)
 	return int(base * risk.target_scale * Ascension.target_mult(ascension))
 
 
@@ -1476,7 +1538,7 @@ func _apply_ascension_to_board() -> void:
 
 ## The chance a refilled card arrives hazarded at this table.
 func _refill_chance() -> float:
-	return clampf((REFILL_HAZARD_BASE + REFILL_HAZARD_STEP * room_index)
+	return clampf((REFILL_HAZARD_BASE + REFILL_HAZARD_STEP * table_depth(room_index))
 			* Ascension.refill_mult(ascension), 0.0, REFILL_HAZARD_MAX * Ascension.refill_mult(ascension))
 
 
@@ -2242,8 +2304,19 @@ func _show_tarot_now() -> void:
 	main.game_started = false
 	main.board.locked = true
 	main.play_music("tarot")
-	# Bankruptcy check against the coming room's cheapest seat.
-	if _short_stacked(_cheapest_seat(room_index)):
+	# Bankruptcy check against the coming table's cheapest seat.
+	if _short_stacked(_cheapest_seat(next_table(room_index))):
+		return
+	# Merchants and campfires are stops on the road, not cards to pick.
+	var fixed := stop_kind(room_index)
+	if fixed in ["shop", "camp"]:
+		if _offers_room != room_index or _offers.is_empty():
+			_offers = [_make_shop_offer() if fixed == "shop"
+					else {"kind": "camp", "tarot": "THE CAMPFIRE"}]
+			_fate_offer = {}
+			_offers_room = room_index
+			_save_run()
+		_choose_offer_now(_offers[0], false)
 		return
 	# Fate deals each room's offers ONCE: peeking at the deck, the
 	# menu, or a saved game never reshuffles the wall.
@@ -2272,18 +2345,10 @@ func _make_offers() -> Array:
 			"boss": kind,
 		}]
 	var offers: Array = []
-	# Shops appear twice per 7-room region; a campfire glows once,
-	# between them.
-	var want_shop := room_index % REGION_SIZE in [2, 5]
-	var want_camp := room_index % REGION_SIZE == 3
 	var risk_pool := RISKS.duplicate()
 	risk_pool.shuffle()
 	for i in 3:
-		if want_shop and i == 1:
-			offers.append(_make_shop_offer())
-		elif want_camp and i == 1:
-			offers.append({"kind": "camp", "tarot": "THE CAMPFIRE"})
-		elif room_index == 0:
+		if room_index == 0:
 			# The first table: three plain seats, one per risk.
 			offers.append(_make_one_offer(false, risk_pool[i % risk_pool.size()]))
 		else:
@@ -2352,8 +2417,6 @@ func _mark_table_played(offer: Dictionary) -> void:
 func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = [],
 		forced_goal := "") -> Dictionary:
 	if random_risk:
-		if randf() < 0.15:
-			return _make_shop_offer()
 		risk = RISKS.pick_random()
 	var region := room_index / REGION_SIZE
 	var offer := {
@@ -3261,10 +3324,10 @@ func _seed_room_specials() -> void:
 	# and get more frequent and more numerous with depth and stakes.
 	# Purge rooms are exempt: their hazards ARE the room.
 	if room_goal != "purge" and storm == 0:
-		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * room_index
+		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * table_depth(room_index)
 				+ Ascension.hazard_bonus(ascension), 0.0, 0.95)
 		if randf() < hz_chance:
-			var count := 1 + room_index / HAZARD_COUNT_ROOMS + Ascension.extra_seed(ascension)
+			var count := 1 + table_depth(room_index) / HAZARD_COUNT_ROOMS + Ascension.extra_seed(ascension)
 			count = mini(count, HAZARD_COUNT_MAX)
 			for i in count:
 				main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
@@ -4328,7 +4391,7 @@ func _trail_complete() -> void:
 	cash += payout
 	_save_meta()
 	_clear_run_save()
-	var body := "You rode all %d rooms and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
+	var body := "You rode all %d stops and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
 	if opened:
 		body += "\n\nASCENSION %d is open for %s." % [ascension + 1, character_name()]
 	if ascension >= Ascension.MAX:
@@ -5187,7 +5250,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"relic_descs": _relic_descs(),
 		"spent": ["second_wind"] if _second_wind_used else [],
 		"contracts": _ride_contracts.duplicate(),
-		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": 3,
+		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": STOP_LAYOUT.find("camp"),
 	}.merged(_last_grant)
 
 
