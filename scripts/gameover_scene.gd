@@ -402,6 +402,18 @@ func _build_title(complete: bool) -> void:
 	l.add_theme_constant_override("outline_size", 6)
 
 
+var _seed_line_label: Label
+
+
+## The online board's answer, once it's back: "#N on this seed's board".
+func add_online_line(text: String) -> void:
+	if _seed_line_label == null or not is_instance_valid(_seed_line_label):
+		return
+	if not _seed_line_label.text.contains(text):
+		_seed_line_label.text = text if _seed_line_label.text == "" \
+				else _seed_line_label.text + "  ·  " + text
+
+
 ## The ride's seed, top right, so it can be shared and replayed.
 func _build_seed() -> void:
 	var seed_text := String(_data.get("seed", ""))
@@ -410,11 +422,10 @@ func _build_seed() -> void:
 	_label(_ui, "SEED  " + SeedRng.pretty(seed_text), _spaced(FontLib.label, 3), 20, LABEL_LIT,
 			Rect2(1180, 60, 620, 30), HORIZONTAL_ALIGNMENT_RIGHT)
 	var line := String(_data.get("seed_line", ""))
-	if line != "":
-		var l := _label(_ui, line, _font(FontLib.label), 18, GOLD, Rect2(1060, 92, 740, 26),
-				HORIZONTAL_ALIGNMENT_RIGHT)
-		l.add_theme_color_override("font_outline_color", Color("1a1008"))
-		l.add_theme_constant_override("outline_size", 4)
+	_seed_line_label = _label(_ui, line, _font(FontLib.label), 18, GOLD, Rect2(1060, 92, 740, 26),
+			HORIZONTAL_ALIGNMENT_RIGHT)
+	_seed_line_label.add_theme_color_override("font_outline_color", Color("1a1008"))
+	_seed_line_label.add_theme_constant_override("outline_size", 4)
 	if host != null:
 		var copy: Button = host._button(_ui, "COPY SEED", Vector2(1390, 126), Vector2(170, 44))
 		copy.add_theme_font_size_override("font_size", 16)

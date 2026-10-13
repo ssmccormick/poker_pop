@@ -221,6 +221,13 @@ func _ready() -> void:
 	_fade_rect.size = VIEW
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(_fade_rect)
+	leaderboard = Leaderboard.new()
+	leaderboard.name = "Leaderboard"
+	add_child(leaderboard)
+	leaderboard.fetched.connect(_on_board_fetched)
+	leaderboard.fetch_failed.connect(_on_board_failed)
+	leaderboard.submitted.connect(_on_board_submitted)
+	leaderboard.ranked.connect(_on_board_ranked)
 	_build_seeds()
 	_build_splash()
 	_build_callout()
@@ -279,6 +286,17 @@ func _ready() -> void:
 					seed_book.boards[rows[i][0]] = {"mode": parts[0], "seed": parts[1],
 							"variant": parts[2], "best": rows[i][1], "attempts": 2, "last": now - i}
 				open_seeds("trail", "K7QX2M9P")
+				if OS.get_environment("POKERPOP_BOARD") != "":
+					# A sample online answer, to picture the top ten.
+					seed_book.player_name = "Steel"
+					var names := ["Calamity", "Doc H", "Steel", "Big Nose", "Sundance", "Lefty",
+							"Belle", "Kid Curry", "Two-Bit", "Ringo"]
+					var sample: Array = []
+					for i in names.size():
+						sample.append({"player_id": seed_book.ensure_player() if names[i] == "Steel" else "x%d" % i,
+								"player_name": names[i], "score": 61400 - i * 3170 - (i * i * 210)})
+					_on_board_fetched(_shown_board_key, sample)
+					_seed_name_edit.text = "Steel"
 			"contracts":
 				_refresh_contracts()
 				contracts_layer.visible = true
@@ -1339,6 +1357,8 @@ func _show_game_over(message: String) -> void:
 		over_label.text += "\n\nSeed  %s" % SeedRng.pretty(mode_seed)
 		if seed_msg != "":
 			over_label.text += "   ·   " + seed_msg
+		if _rank_line != "":
+			over_label.text += "\n" + _rank_line
 	over_layer.modulate = Color(1, 1, 1, 0)
 	over_layer.visible = true
 	create_tween().tween_property(over_layer, "modulate:a", 1.0, 0.4)
@@ -1361,10 +1381,36 @@ func _record_mode_score() -> String:
 	return "NEW SEED BEST!" if pb else "Best on this seed: %d" % seed_book.best(k)
 
 
-## Every finished game's board score passes through here (the online
-## boards hook in, phase 3).
-func seed_score_recorded(_key: String, _score: int, _rider: String, _asc: int, _tables: int) -> void:
-	pass
+## Every finished game's board score passes through here, on its way to
+## the online board (a no-op until SupabaseConfig holds keys).
+func seed_score_recorded(k: String, value: int, rider: String, asc: int, tables: int) -> void:
+	var parts := k.split("|")
+	_rank_key = k
+	_rank_score = value
+	_rank_line = ""
+	leaderboard.submit({"board_key": k, "mode": parts[0], "seed": parts[1],
+			"variant": parts[2] if parts.size() > 2 else "",
+			"player_id": seed_book.ensure_player(), "player_name": seed_book.display_name(),
+			"score": value, "rider": rider, "ascension": asc, "tables": tables})
+
+
+func _on_board_submitted(k: String, ok: bool) -> void:
+	if ok and k == _rank_key:
+		leaderboard.fetch_rank(k, _rank_score)
+
+
+## The posted game's place on its seed's online board, onto its end card.
+func _on_board_ranked(k: String, rank: int, _of: int) -> void:
+	if k != _rank_key:
+		return
+	_rank_line = "#%d on this seed's online board" % rank
+	if trail.end_layer.visible and trail._gameover_scene != null:
+		trail._gameover_scene.add_online_line(_rank_line)
+	elif over_layer.visible:
+		over_label.text += "\n" + _rank_line
+	if seeds_layer.visible and _shown_board_key == k:
+		_shown_board_key = ""
+		_refresh_seeds()
 
 
 func _restart() -> void:
@@ -2482,6 +2528,10 @@ var _upgrades_pip: Label
 var mode_seed := ""
 var seed_book := SeedBook.new()
 var _mode_scored := false   # this game's score is already on its seed's board
+var leaderboard: Leaderboard
+var _rank_key := ""     # the board the last posted game went on
+var _rank_score := 0
+var _rank_line := ""    # "#N on this seed's online board", once it's back
 var next_mode_seed := ""
 var _mode_seed_fixed := false
 var _mode_label_base := ""
@@ -3651,7 +3701,9 @@ var _seed_rules: Label
 var _seed_warn: Label
 var _seed_recent_box: VBoxContainer
 var _seed_start: Button
-var _seed_board_box: VBoxContainer   # the online top ten (phase 3)
+var _seed_board_box: VBoxContainer   # the online top ten
+var _shown_board_key := ""           # the board the top ten is showing (or loading)
+var _seed_name_edit: LineEdit
 
 
 ## Opens SEEDED PLAY, optionally on a given mode and seed (the last
@@ -3726,11 +3778,15 @@ func _refresh_seeds() -> void:
 			_seed_warn.text = "Today's scored daily ride is spent — this one is practice."
 	else:
 		_seed_start.text = "START"
+	if _seed_name_edit != null and not _seed_name_edit.has_focus():
+		_seed_name_edit.text = seed_book.player_name
+		_seed_name_edit.placeholder_text = seed_book.display_name()
+	_show_online_board(_seed_key() if ok else "")
 	for c in _seed_recent_box.get_children():
 		c.queue_free()
-	for e in seed_book.recent(7):
-		var b := _button(_seed_recent_box, "", Vector2.ZERO, Vector2(560, 44))
-		b.custom_minimum_size = Vector2(560, 44)
+	for e in seed_book.recent(4):
+		var b := _button(_seed_recent_box, "", Vector2.ZERO, Vector2(520, 36))
+		b.custom_minimum_size = Vector2(520, 36)
 		b.add_theme_font_size_override("font_size", 15)
 		var mode := String(e.mode)
 		var v := String(e.get("variant", ""))
@@ -3745,6 +3801,60 @@ func _refresh_seeds() -> void:
 		var row: Dictionary = e
 		b.pressed.connect(func() -> void:
 			_load_seed_row(row))
+
+
+## The page's online top ten: loading, the rows, or offline.
+func _show_online_board(k: String) -> void:
+	if k == _shown_board_key:
+		return
+	_shown_board_key = k
+	if k == "":
+		_board_message("")
+	elif not Leaderboard.configured():
+		_board_message("Offline — your bests are kept on this machine.")
+	else:
+		_board_message("Loading the board…")
+		leaderboard.fetch_top(k)
+
+
+func _board_message(text: String) -> void:
+	for c in _seed_board_box.get_children():
+		c.queue_free()
+	if text != "":
+		var head := _label(_seed_board_box, "ONLINE TOP 10", Vector2.ZERO, 22, GOLD)
+		head.custom_minimum_size = Vector2(540, 34)
+		var l := _label(_seed_board_box, text, Vector2.ZERO, 17, DIM)
+		l.custom_minimum_size = Vector2(540, 60)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+
+func _on_board_failed(k: String) -> void:
+	if k == _shown_board_key:
+		_board_message("Can't reach the online board right now — your bests are kept on this machine.")
+
+
+func _on_board_fetched(k: String, rows: Array) -> void:
+	if k != _shown_board_key:
+		return
+	_board_message("")
+	var head := _label(_seed_board_box, "ONLINE TOP 10", Vector2.ZERO, 22, GOLD)
+	head.custom_minimum_size = Vector2(540, 34)
+	if rows.is_empty():
+		var none := _label(_seed_board_box, "No one has posted on this seed yet. Be the first.",
+				Vector2.ZERO, 17, DIM)
+		none.custom_minimum_size = Vector2(540, 30)
+		return
+	for i in rows.size():
+		var r: Dictionary = rows[i]
+		var mine := String(r.get("player_id", "")) == seed_book.player_id and seed_book.player_id != ""
+		var line := HBoxContainer.new()
+		line.custom_minimum_size = Vector2(540, 30)
+		_seed_board_box.add_child(line)
+		var who := _label(line, "%2d.  %s" % [i + 1, String(r.get("player_name", "?"))], Vector2.ZERO,
+				19, GOLD if mine else OFFWHITE)
+		who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var pts := _label(line, "%d" % int(r.get("score", 0)), Vector2.ZERO, 19, GOLD if mine else OFFWHITE)
+		pts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 
 ## Clicking a recent seed loads its board back onto the page.
@@ -3893,20 +4003,37 @@ func _build_seeds() -> void:
 	_seed_rules = _label(seeds_layer, "", Vector2(420, 534), 16, OFFWHITE)
 	_seed_rules.size = Vector2(510, 120)
 	_seed_rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_seed_board_box = VBoxContainer.new()
-	_seed_board_box.position = Vector2(420, 660)
-	_seed_board_box.size = Vector2(510, 210)
-	seeds_layer.add_child(_seed_board_box)
-	UiKit.plate(seeds_layer, Rect2(965, 470, 590, 410))
-	var rl := _label(seeds_layer, "RECENT SEEDS", Vector2(985, 486), 20, GOLD)
+	var rl := _label(seeds_layer, "RECENT SEEDS", Vector2(420, 662), 20, GOLD)
 	rl.size = Vector2(300, 28)
 	_seed_recent_box = VBoxContainer.new()
-	_seed_recent_box.position = Vector2(980, 520)
+	_seed_recent_box.position = Vector2(415, 694)
 	_seed_recent_box.add_theme_constant_override("separation", 6)
 	seeds_layer.add_child(_seed_recent_box)
+	UiKit.plate(seeds_layer, Rect2(965, 470, 590, 410))
+	_seed_board_box = VBoxContainer.new()
+	_seed_board_box.position = Vector2(990, 490)
+	_seed_board_box.size = Vector2(540, 370)
+	_seed_board_box.add_theme_constant_override("separation", 2)
+	seeds_layer.add_child(_seed_board_box)
 	_seed_warn = _label(seeds_layer, "", Vector2(0, 892), 18, RED)
 	_seed_warn.size = Vector2(VIEW.x, 26)
 	_seed_warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var nl := _label(seeds_layer, "NAME", Vector2(1160, 930), 22, GOLD)
+	nl.size = Vector2(90, 56)
+	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_seed_name_edit = LineEdit.new()
+	_seed_name_edit.position = Vector2(1250, 930)
+	_seed_name_edit.size = Vector2(305, 56)
+	_seed_name_edit.max_length = SeedBook.NAME_MAX
+	_seed_name_edit.add_theme_font_size_override("font_size", 22)
+	_seed_name_edit.add_theme_stylebox_override("normal", UiKit.inset_box())
+	_seed_name_edit.add_theme_stylebox_override("focus", UiKit.inset_box())
+	_seed_name_edit.add_theme_color_override("font_color", OFFWHITE)
+	_seed_name_edit.tooltip_text = "The name your scores post under on the online boards (up to 12 letters)."
+	_seed_name_edit.text_changed.connect(func(t: String) -> void:
+		seed_book.player_name = SeedBook.clean_name(t)
+		seed_book.save())
+	seeds_layer.add_child(_seed_name_edit)
 	_seed_start = _button(seeds_layer, "START", Vector2(810, 926), Vector2(300, 64), true)
 	_seed_start.add_theme_font_size_override("font_size", 26)
 	_seed_start.pressed.connect(_start_seeded)

@@ -425,6 +425,23 @@ func _run() -> void:
 	main._seed_edit.text = "NOPE"
 	main._refresh_seeds()
 	failures += _check(main._seed_start.disabled, "a broken seed can't be started")
+	main._seed_edit.text = "MADES234"
+	main._refresh_seeds()
+	await process_frame
+	var board_kids: Array = main._seed_board_box.get_children().filter(func(c): return not c.is_queued_for_deletion())
+	failures += _check(board_kids.size() == 2 and String(board_kids[1].text).contains("Offline"),
+			"with no keys the online board says it's offline")
+	main._on_board_fetched(main._shown_board_key, [
+			{"player_id": "someone-else", "player_name": "Calamity", "score": 900},
+			{"player_id": main.seed_book.ensure_player(), "player_name": "Me", "score": 777}])
+	await process_frame
+	board_kids = main._seed_board_box.get_children().filter(func(c): return not c.is_queued_for_deletion())
+	failures += _check(board_kids.size() == 3, "an online answer lists the top ten under its heading")
+	main._on_board_fetched("time|OTHER234|180", [])
+	await process_frame
+	failures += _check(main._seed_board_box.get_children().filter(
+			func(c): return not c.is_queued_for_deletion()).size() == 3,
+			"a late answer for another board is ignored")
 	main.seeds_layer.visible = false
 	await _enter_room("the_gambler")  # an ordinary ride again for what follows
 

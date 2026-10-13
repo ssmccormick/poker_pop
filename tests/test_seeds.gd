@@ -70,7 +70,22 @@ func _initialize() -> void:
 	var again := SeedBook.new()
 	again.load_file(path)
 	_check(again.best(k) == 900 and again.daily_used("D20261012"), "the book survives a save and load")
+	_check(again.player_id == "" and again.display_name().begins_with("Stranger ")
+			and again.player_id.length() == 32, "a nameless player posts as a Stranger, with a made id")
+	var pid := again.player_id
+	again.player_name = SeedBook.clean_name("  Doc|Holliday The Great ")
+	again.save()
+	var third := SeedBook.new()
+	third.load_file(path)
+	_check(third.player_id == pid and third.display_name() == "DocHolliday",
+			"the player's id and name are kept (%s)" % third.display_name())
 	DirAccess.remove_absolute(path)
+
+	# --- The online boards, with no keys --------------------------------------
+	_check(not Leaderboard.configured(), "with the keys unpasted the online boards stay off")
+	_check(Leaderboard._count_from(PackedStringArray(["Content-Type: x", "Content-Range: 0-0/42"])) == 42
+			and Leaderboard._count_from(PackedStringArray(["content-range: */0"])) == 0,
+			"a board's count reads from Content-Range")
 
 	if failures == 0:
 		print("ALL SEED TESTS PASSED")
