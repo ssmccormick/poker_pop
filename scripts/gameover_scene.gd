@@ -359,6 +359,7 @@ func _build_ui() -> void:
 	var complete := String(_data.get("kind", "")) == "trail_complete"
 	_build_title(complete)
 	_build_epitaph()
+	_build_seed()
 	_build_portrait(complete)
 	_build_ledger()
 	_build_relics()
@@ -398,6 +399,15 @@ func _build_title(complete: bool) -> void:
 	l.add_theme_constant_override("shadow_offset_x", 0)
 	l.add_theme_color_override("font_outline_color", Color("2a1a0e"))
 	l.add_theme_constant_override("outline_size", 6)
+
+
+## The ride's seed, top right, so it can be shared and replayed.
+func _build_seed() -> void:
+	var seed_text := String(_data.get("seed", ""))
+	if seed_text == "":
+		return
+	_label(_ui, "SEED  " + SeedRng.pretty(seed_text), _spaced(FontLib.label, 3), 20, LABEL_LIT,
+			Rect2(1180, 60, 620, 30), HORIZONTAL_ALIGNMENT_RIGHT)
 
 
 func _build_epitaph() -> void:

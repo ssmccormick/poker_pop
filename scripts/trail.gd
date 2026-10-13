@@ -286,6 +286,18 @@ var run_bosses := 0      # boss tables beaten this ride
 # played type isn't dealt again until every type has had its turn —
 # then the rotation starts over.
 var tables_played: Array = []
+# SEEDS: the ride's seed, and the stream every gameplay roll draws from.
+# _rng is re-derived from the seed at each stop (the wall, the table, the
+# shop, the pick, the rewards, the fire), so what a seed deals at a stop
+# never depends on anything but the seed and the stop. rng_room is the
+# table's own stream (saved with the table's photograph).
+var run_seed := ""
+var room_attempt := 0            # retries of this table (a fresh, seeded deal each)
+var _attempt_room := -1
+var next_seed := ""              # the seed the next ride starts on ("" = random)
+var _rng := RandomNumberGenerator.new()
+var rng_room := RandomNumberGenerator.new()
+var _pick_round := 0
 var ascension := 0       # this ride's Ascension (0-20)
 var chips := 0
 var deck: Array = []          # [{rank, suit, cursed}]
@@ -570,6 +582,9 @@ func _save_run() -> void:
 	cf.set_value("run", "bosses", run_bosses)
 	cf.set_value("run", "tables_played", PackedStringArray(tables_played))
 	cf.set_value("run", "layout", STOPS_LAYOUT_VERSION)
+	cf.set_value("run", "seed", run_seed)
+	cf.set_value("run", "attempt", room_attempt)
+	cf.set_value("run", "attempt_room", _attempt_room)
 	var ranks := PackedInt32Array()
 	var suits := PackedInt32Array()
 	var curses := PackedInt32Array()
@@ -670,6 +685,11 @@ func _load_run() -> bool:
 	main.score = int(cf.get_value("run", "score", 0))
 	run_bosses = int(cf.get_value("run", "bosses", 0))
 	tables_played = Array(cf.get_value("run", "tables_played", PackedStringArray()))
+	run_seed = String(cf.get_value("run", "seed", ""))
+	if not SeedRng.is_valid(run_seed):
+		run_seed = SeedRng.random_seed()  # a ride saved before seeds
+	room_attempt = int(cf.get_value("run", "attempt", 0))
+	_attempt_room = int(cf.get_value("run", "attempt_room", -1))
 	var ranks: PackedInt32Array = cf.get_value("run", "ranks", PackedInt32Array())
 	var suits: PackedInt32Array = cf.get_value("run", "suits", PackedInt32Array())
 	var curses: PackedInt32Array = cf.get_value("run", "curses", PackedInt32Array())
@@ -827,7 +847,7 @@ const SUIT_CHARS := ["♠", "♥", "♦", "♣"]
 
 ## A new run's sleeve: the meta-upgraded rank, in a random suit.
 func _fresh_sleeve() -> Dictionary:
-	return {"rank": sleeve_rank, "suit": randi_range(0, 3),
+	return {"rank": sleeve_rank, "suit": _rng.randi_range(0, 3),
 			"mod": "", "finish": "", "joker": false}
 
 
@@ -897,7 +917,7 @@ func _do_sleeve_swap(card: PlayingCard) -> void:
 	card.joker = bool(sleeve_card.get("joker", sleeve_card.get("two_plus", false)))
 	card.chip_level = int(sleeve_card.get("chip_lv", 0))
 	if card.mod in ["plus", "minus", "bumper"]:
-		card.boost_dir = Board.HAZARD_DIRS.pick_random()
+		card.boost_dir = SeedRng.pick(_rng, Board.HAZARD_DIRS)
 	card.queue_redraw()
 	sleeve_card = taken
 	sleeve_used = true
@@ -1056,6 +1076,8 @@ func use_watch() -> void:
 		return
 	room_score = int(_watch_snapshot.room_score)
 	main.score = int(_watch_snapshot.get("run_score", main.score))
+	if _watch_snapshot.has("rng_room"):
+		rng_room.state = int(_watch_snapshot.rng_room)
 	room_hands_left = int(_watch_snapshot.room_hands_left)
 	room_wins = int(_watch_snapshot.room_wins)
 	hp = int(_watch_snapshot.hp)
@@ -1091,6 +1113,7 @@ func _on_hand_committing() -> void:
 	_watch_snapshot = {
 		"room_score": room_score, "room_hands_left": room_hands_left,
 		"run_score": main.score,
+		"rng_room": rng_room.state,
 		"room_wins": room_wins, "hp": hp,
 		"room_outlaw_hp": room_outlaw_hp, "room_outlaw_idx": room_outlaw_idx,
 		"room_stones_broken": room_stones_broken,
@@ -1214,7 +1237,7 @@ func use_provision(slot: int) -> void:
 func _spend_provision(slot: int) -> void:
 	var id: String = provisions[slot]
 	# Upgraded tools sometimes survive the job.
-	if randf() < float(pv(id, "keep", 0.0)):
+	if _rng.randf() < float(pv(id, "keep", 0.0)):
 		main._announce("THE %s HOLDS UP — still in the kit" % String(PROVISIONS[id].name).to_upper())
 	else:
 		provisions.remove_at(slot)
@@ -1394,7 +1417,7 @@ func _random_provision(exclude: Array = []) -> String:
 	var w := {}
 	for id in PROVISIONS:
 		w[id] = 1.0
-	var id := progress.pick("provision", w, exclude)
+	var id := progress.pick("provision", w, exclude, _rng)
 	return id if id != "" else "canteen"
 
 
@@ -1405,7 +1428,7 @@ func _provision_shelf(n: int) -> Array:
 	for id in PROVISIONS:
 		w[id] = 1.0
 	for i in n:
-		var id := progress.pick("provision", w, out)
+		var id := progress.pick("provision", w, out, _rng)
 		if id == "":
 			break
 		out.append(id)
@@ -1419,7 +1442,7 @@ func _relic_pick(exclude: Array = [], common_only := false) -> String:
 		if relics.has(id) or (common_only and int(RELICS[id].rarity) != 0):
 			continue
 		w[id] = 1.0
-	return progress.pick("relic", w, exclude)
+	return progress.pick("relic", w, exclude, _rng)
 
 
 ## `n` different relics for a merchant's shelf.
@@ -1443,7 +1466,7 @@ func _random_merchant_index() -> int:
 	var w := {}
 	for m in MERCHANTS:
 		w[String(m.id)] = 1.0
-	var id := progress.pick("merchant", w)
+	var id := progress.pick("merchant", w, [], _rng)
 	for i in MERCHANTS.size():
 		if String(MERCHANTS[i].id) == id:
 			return i
@@ -1550,7 +1573,7 @@ func _cashout_value(rate_bonus := 1.0) -> int:
 
 ## Weighted enhancement roll over the ones on the trail (MOD_WEIGHTS).
 func _random_mod() -> String:
-	var id := progress.pick("mod", MOD_WEIGHTS)
+	var id := progress.pick("mod", MOD_WEIGHTS, [], _rng)
 	return id if id != "" else "chip"
 
 
@@ -1560,28 +1583,28 @@ const FINISH_CHANCE := 0.2
 
 
 func _roll_finish() -> String:
-	if randf() >= FINISH_CHANCE:
+	if _rng.randf() >= FINISH_CHANCE:
 		return ""
 	var w := {}
 	for id in PlayingCard.FINISHES:
 		w[id] = 1.0
-	return progress.pick("finish", w)
+	return progress.pick("finish", w, [], _rng)
 
 
 func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
 	var mod := ""
 	var finish := ""
-	if randf() < mod_chance:
+	if _rng.randf() < mod_chance:
 		mod = _random_mod()
 		finish = _roll_finish()
 	# Half the time, offer an exact duplicate of a card already owned
 	# (the Five of a Kind / Flushed Five enabler).
-	if randf() < 0.5 and not deck.is_empty():
-		var src: Dictionary = deck.pick_random()
+	if _rng.randf() < 0.5 and not deck.is_empty():
+		var src: Dictionary = SeedRng.pick(_rng, deck)
 		if not src.get("cursed", false):
 			return {"rank": src.rank, "suit": src.suit, "cursed": false,
 					"mod": mod, "finish": finish}
-	return {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+	return {"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3),
 			"cursed": false, "mod": mod, "finish": finish}
 
 
@@ -2225,12 +2248,17 @@ func _start_run(asc: int) -> void:
 	run_uid = _mint_run_uid()
 	run_bosses = 0
 	tables_played = []
+	run_seed = next_seed if SeedRng.is_valid(next_seed) else SeedRng.random_seed()
+	next_seed = ""
+	room_attempt = 0
+	_attempt_room = -1
+	_stream("run", 0)
 	_ride_contracts = []
 	ascension = asc
 	chips = Ascension.start_chips(asc)
 	deck = _fresh_deck()
 	for i in Ascension.cursed_start(asc):
-		deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+		deck.append({"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3), "cursed": true})
 	room_index = 0
 	# The Outfitter's gear rides along: extra chips on the stack, and
 	# provisions already in the kit.
@@ -2311,6 +2339,7 @@ func _show_tarot_now() -> void:
 	var fixed := stop_kind(room_index)
 	if fixed in ["shop", "camp"]:
 		if _offers_room != room_index or _offers.is_empty():
+			_stream("wall")
 			_offers = [_make_shop_offer() if fixed == "shop"
 					else {"kind": "camp", "tarot": "THE CAMPFIRE"}]
 			_fate_offer = {}
@@ -2321,6 +2350,7 @@ func _show_tarot_now() -> void:
 	# Fate deals each room's offers ONCE: peeking at the deck, the
 	# menu, or a saved game never reshuffles the wall.
 	if _offers_room != room_index or _offers.is_empty():
+		_stream("wall")
 		_offers = _make_offers()
 		_fate_offer = _make_one_offer(true, {}, _wall_types(_offers))
 		_offers_room = room_index
@@ -2346,7 +2376,7 @@ func _make_offers() -> Array:
 		}]
 	var offers: Array = []
 	var risk_pool := RISKS.duplicate()
-	risk_pool.shuffle()
+	SeedRng.shuffle(_rng, risk_pool)
 	for i in 3:
 		if room_index == 0:
 			# The first table: three plain seats, one per risk.
@@ -2384,11 +2414,11 @@ func _make_shop_offer() -> Dictionary:
 ## when none are left (the wall deals fewer cards); otherwise a played
 ## type comes back as a last resort (the face-down Fool).
 func _roll_room_goal(on_wall: Array = [], strict := false) -> String:
-	var goal := progress.pick("room", ROOM_TABLE, tables_played + on_wall)
+	var goal := progress.pick("room", ROOM_TABLE, tables_played + on_wall, _rng)
 	if goal == "" and not strict:
-		goal = progress.pick("room", ROOM_TABLE, tables_played)
+		goal = progress.pick("room", ROOM_TABLE, tables_played, _rng)
 		if goal == "":
-			goal = progress.pick("room", ROOM_TABLE)
+			goal = progress.pick("room", ROOM_TABLE, [], _rng)
 	if goal == "" and strict:
 		return ""
 	return goal if goal != "" else "plain"
@@ -2417,7 +2447,7 @@ func _mark_table_played(offer: Dictionary) -> void:
 func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = [],
 		forced_goal := "") -> Dictionary:
 	if random_risk:
-		risk = RISKS.pick_random()
+		risk = SeedRng.pick(_rng, RISKS)
 	var region := room_index / REGION_SIZE
 	var offer := {
 		"kind": "play",
@@ -2457,7 +2487,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 			offer.target = 0
 		elif goal in ["mine", "purge"]:
 			var kind: String = "stone" if goal == "mine" \
-					else ["bomb", "fire", "wind", "water"].pick_random()
+					else String(SeedRng.pick(_rng, ["bomb", "fire", "wind", "water"]))
 			if kind == "stone":
 				# GOLD MINE: a board of solid rock — break stones free
 				# and gold cards turn up in the rubble.
@@ -2486,7 +2516,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 		elif goal == "hands":
 			# Called hands: play exactly what the table demands.
 			offer["goal"] = "hands"
-			if region >= 1 and randf() < ROYAL_CHANCE and _avail("room", "royal"):
+			if region >= 1 and _rng.randf() < ROYAL_CHANCE and _avail("room", "royal"):
 				offer.tarot = "ROYAL HUNT"
 				offer.label = "Royal Hunt"
 				offer.odds = 5.0
@@ -2500,7 +2530,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 				offer.label = "Called Hands"
 				offer.odds = 1.5 if region == 0 else 2.0
 				var pool: Array = REQUIRE_POOLS[mini(region, REQUIRE_POOLS.size() - 1)]
-				offer["require"] = (pool.pick_random() as Array).duplicate(true)
+				offer["require"] = (SeedRng.pick(_rng, pool) as Array).duplicate(true)
 			# ~8-9 called hands on a 10-hand reference: one, maybe two
 			# hands to waste — every other play works toward a demand.
 			offer.hands = 10
@@ -2534,7 +2564,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 			# one head at a time. Clear YOUR bullets to shoot, dodge HIS.
 			# region is 0-based: lone guns in region one, pairs from
 			# region two, full gangs of three in region three.
-			var posse := 1 + randi() % mini(region + 1, 3)
+			var posse := 1 + _rng.randi() % mini(region + 1, 3)
 			offer.tarot = "BOUNTY"
 			offer.label = "Bounty"
 			offer.odds = 2.0 + 0.5 * posse
@@ -2550,13 +2580,13 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 			offer.odds = 1.5
 			offer.target = 0
 			offer.hands = mini(MAX_HANDS_BUY, 10 + region)
-			match randi() % 3:
+			match _rng.randi() % 3:
 				0:
 					# A real drive: most hands must be built around the
 					# called suit to land the count in time.
 					offer.tarot = "THE ROUNDUP"
 					offer.label = "Roundup"
-					offer["collect_suit"] = randi_range(0, 3)
+					offer["collect_suit"] = _rng.randi_range(0, 3)
 					offer["collect_need"] = 12 + 3 * region
 				1:
 					# The rank drive is a ROUNDUP too — WANTED belongs
@@ -2564,7 +2594,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 					offer.tarot = "THE ROUNDUP"
 					offer.label = "Roundup"
 					offer.odds = 2.0
-					offer["collect_rank"] = randi_range(2, 14)
+					offer["collect_rank"] = _rng.randi_range(2, 14)
 					offer["collect_need"] = 5 + region
 				_:
 					offer.tarot = "THE CENSUS"
@@ -2589,7 +2619,7 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 	# always-timed jobs run on one — and those unlock after it.
 	if String(offer.get("goal", "")) in ["safe", "chest", "mine"] \
 			or String(offer.get("tarot", "")) == "ROYAL HUNT" \
-			or (randf() < 0.5 and _avail("room", "clock")):
+			or (_rng.randf() < 0.5 and _avail("room", "clock")):
 		offer["limit"] = "time"
 		if not offer.has("minutes"):
 			offer["minutes"] = clampi(roundi(int(offer.hands) * 0.35), 2,
@@ -3160,6 +3190,12 @@ func _confirm_bet() -> void:
 
 func _start_room() -> void:
 	in_room = true
+	# A retry of a lost table deals fresh — but still from the seed.
+	room_attempt = room_attempt + 1 if _attempt_room == room_index else 0
+	_attempt_room = room_index
+	rng_room = SeedRng.stream(run_seed, "room", room_index, room_attempt)
+	_rng = rng_room
+	main.board.rng = SeedRng.stream(run_seed, "board", room_index, room_attempt)
 	main.stat_max("deepest_table", room_index + 1)
 	sleeve_used = false  # one signature use per table, fresh each sit-down
 	_aiming_sleeve = false
@@ -3240,7 +3276,8 @@ func _start_room() -> void:
 				+ (float(rv("horseshoe", "secs")) if has_relic("horseshoe") else 0.0)
 		room_hands_left = 999
 	main.mode_kind = "trail"
-	main.mode_label_text = "Trail · Ascension %d · %s" % [ascension, character_name()]
+	main.mode_label_text = "Trail · A%d · %s · Seed %s" % [ascension,
+			character_name().trim_prefix("The "), SeedRng.pretty(run_seed)]
 	main.board.custom_deck = deck.duplicate(true)
 	main.game_started = true
 	main.game_over = false
@@ -3287,7 +3324,7 @@ func _seed_room_specials() -> void:
 		main.board.queue_redraw()
 	elif room_goal == "holdem":
 		main.board.deal_community()
-		if randf() < 0.5:
+		if _rng.randf() < 0.5:
 			main.board.spawn_objective("redeal")
 	elif room_goal == "crazy8":
 		main.board.eights_wild = true
@@ -3306,11 +3343,11 @@ func _seed_room_specials() -> void:
 			main.board.spawn_objective("bullet")
 		for i in 2:
 			main.board.spawn_objective("hisbullet")
-	elif randf() < AMBIENT_CHANCE * (float(rv("rabbits_foot", "x")) if has_relic("rabbits_foot") else 1.0) \
+	elif _rng.randf() < AMBIENT_CHANCE * (float(rv("rabbits_foot", "x")) if has_relic("rabbits_foot") else 1.0) \
 			and (_avail("room", "safe") or _avail("room", "chest")):
 		# Surprise loot in a plain room — only jobs the rider has met.
 		var safe_ok := _avail("room", "safe")
-		if safe_ok and (not _avail("room", "chest") or randf() < 0.5):
+		if safe_ok and (not _avail("room", "chest") or _rng.randf() < 0.5):
 			room_combo = _generate_combo()
 			main.board.spawn_safe(room_combo)
 		else:
@@ -3319,18 +3356,18 @@ func _seed_room_specials() -> void:
 	# guaranteed mixed hazard load — the house evening the odds.
 	var storm := _hazard_floor()
 	for i in storm:
-		main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
+		main.board.apply_room_hazards(SeedRng.pick(_rng, HAZARD_KINDS), 1)
 	# Hazards are ambient in EVERY other play room — bosses included —
 	# and get more frequent and more numerous with depth and stakes.
 	# Purge rooms are exempt: their hazards ARE the room.
 	if room_goal != "purge" and storm == 0:
 		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * table_depth(room_index)
 				+ Ascension.hazard_bonus(ascension), 0.0, 0.95)
-		if randf() < hz_chance:
+		if _rng.randf() < hz_chance:
 			var count := 1 + table_depth(room_index) / HAZARD_COUNT_ROOMS + Ascension.extra_seed(ascension)
 			count = mini(count, HAZARD_COUNT_MAX)
 			for i in count:
-				main.board.apply_room_hazards(HAZARD_KINDS.pick_random(), 1)
+				main.board.apply_room_hazards(SeedRng.pick(_rng, HAZARD_KINDS), 1)
 	# And the deck itself turns mean: every refilled card has a chance
 	# to arrive hazarded, climbing the deeper you ride.
 	if room_goal != "purge":
@@ -3421,7 +3458,7 @@ func _generate_combo() -> Array:
 			pool.append(card.rank)
 	var combo: Array = []
 	for i in 4:
-		combo.append(pool.pick_random() if not pool.is_empty() else randi_range(2, max_rank))
+		combo.append(SeedRng.pick(_rng, pool) if not pool.is_empty() else _rng.randi_range(2, max_rank))
 	return combo
 
 
@@ -3495,7 +3532,7 @@ func on_hand_played(result: Dictionary) -> void:
 			if main.board.grid[p].hazard != "":
 				live += 1
 		if live < floor_count:
-			main.board.queue_refill_hazards(HAZARD_KINDS.pick_random(), 1)
+			main.board.queue_refill_hazards(SeedRng.pick(_rng, HAZARD_KINDS), 1)
 	if room_goal == "blackjack" and result.has("blackjack_outcome"):
 		_present_blackjack_round(result)
 	if room_goal == "outlaw" and not _outlaw_dead_pending:
@@ -3607,7 +3644,7 @@ func _consume_hand() -> void:
 		# Clock rooms never run out of hands — only of seconds.
 		_tick_room_hazards()
 		return
-	if has_relic("lucky_chip") and randf() < float(rv("lucky_chip", "p")):
+	if has_relic("lucky_chip") and _rng.randf() < float(rv("lucky_chip", "p")):
 		_announce_after_settle("LUCKY CHIP — free hand!")
 	else:
 		room_hands_left -= 1
@@ -3674,7 +3711,7 @@ func on_safe_cracked() -> void:
 	main.board._play_sound(Board.SFX_BELL, 1.0, -8.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.3)
 	var msg := "SAFE LOOT  +%d CHIPS" % loot
-	if randf() < 0.35 and provisions.size() < kit_size():
+	if _rng.randf() < 0.35 and provisions.size() < kit_size():
 		# Sometimes the safe holds supplies instead of just coin.
 		var pid := _random_provision()
 		gain_provision(pid)
@@ -3686,7 +3723,7 @@ func on_safe_cracked() -> void:
 ## An ambient chest opened mid-room: the reward KIND is rolled now,
 ## the reveal waits for the winnings screen.
 func _defer_chest_reward() -> void:
-	var roll := randf()
+	var roll := _rng.randf()
 	if roll < 0.5:
 		_chest_rewards.append("chips")
 	elif roll < 0.85:
@@ -3707,7 +3744,7 @@ func _unowned_common_relic() -> String:
 ## Chest reward roll (treasure rooms — ambient chests defer instead).
 func _open_chest() -> void:
 	var region := room_index / REGION_SIZE + 1
-	var roll := randf()
+	var roll := _rng.randf()
 	if roll < 0.45:
 		var loot := 30 + 15 * region
 		chips += loot
@@ -3722,7 +3759,7 @@ func _open_chest() -> void:
 		main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
 	elif roll < 0.80:
 		# No loose cash on the trail — the chest holds a GOLD card.
-		var gold := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+		var gold := {"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3),
 				"cursed": false, "mod": "gold", "finish": ""}
 		deck.append(gold)
 		_chest_won_cards.append(gold)
@@ -3736,7 +3773,7 @@ func _open_chest() -> void:
 		_gain_relic(id)
 		_announce_after_settle("CHEST  RELIC: %s!" % RELICS[id].name)
 	else:
-		var enhanced := {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+		var enhanced := {"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3),
 				"cursed": false, "mod": _random_mod(),
 				"finish": _roll_finish()}
 		deck.append(enhanced)
@@ -3871,21 +3908,21 @@ func _roll_posse(n: int) -> Array:
 		if String(CharacterKit.preset(id).get("sub", "")) == "":
 			leader_ids.append(id)
 	if not leader_ids.is_empty():
-		leader = CharacterKit.preset(leader_ids.pick_random())
+		leader = CharacterKit.preset(SeedRng.pick(_rng, leader_ids))
 	if leader.is_empty():
-		leader = CharacterKit.random_spec(randi())
+		leader = CharacterKit.random_spec(_rng.randi())
 	if String(leader.get("name", "")) == "THE OUTLAW":
 		# No generic names on the wanted wall: the old face rides on
 		# under a name of his own.
-		leader["name"] = "%s %s" % [CharacterKit.FIRST.pick_random(),
-				CharacterKit.LAST.pick_random()]
+		leader["name"] = "%s %s" % [SeedRng.pick(_rng, CharacterKit.FIRST),
+				SeedRng.pick(_rng, CharacterKit.LAST)]
 	out.append(leader)
 	for i in n - 1:
-		var member: Dictionary = CharacterKit.random_spec(randi(),
+		var member: Dictionary = CharacterKit.random_spec(_rng.randi(),
 				"RIDES WITH " + String(leader.name))
 		var guard := 0
 		while String(member.name) == String(leader.name) and guard < 8:
-			member = CharacterKit.random_spec(randi(),
+			member = CharacterKit.random_spec(_rng.randi(),
 					"RIDES WITH " + String(leader.name))
 			guard += 1
 		out.append(member)
@@ -3950,7 +3987,7 @@ func _holdem_upkeep() -> void:
 		await get_tree().process_frame
 	if not in_room or room_goal != "holdem":
 		return
-	if not main.board.has_objective("redeal") and randf() < 0.35:
+	if not main.board.has_objective("redeal") and _rng.randf() < 0.35:
 		main.board.spawn_objective("redeal")
 
 
@@ -4091,6 +4128,8 @@ func _tick_room_hazards() -> void:
 
 func _room_cleared() -> void:
 	in_room = false
+	_stream("reward")
+	_pick_round = 0
 	_room_save = {}  # the photograph is stale the moment the table ends
 	_aiming_slot = -1
 	_aiming_sleeve = false
@@ -4211,7 +4250,7 @@ func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
 	main.board.locked = true
 	# The stake is gone and a curse joins the deck — and the room does
 	# NOT clear: the same table must be beaten before the trail continues.
-	deck.append({"rank": randi_range(2, 14), "suit": randi_range(0, 3), "cursed": true})
+	deck.append({"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3), "cursed": true})
 	main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
 	# Losing a table leaves a mark on the rider too.
 	if not take_damage(Ascension.lost_table_hp(ascension), "", "One lost table too many."):
@@ -4264,6 +4303,8 @@ func _capture_room_state() -> Dictionary:
 		"sleeve_used": sleeve_used, "laser_used": laser_used,
 		"sleight_uses_left": sleight_uses_left,
 		"watch_uses_left": watch_uses_left,
+		"rng_room": rng_room.state,
+		"room_attempt": room_attempt,
 	}
 
 
@@ -4309,6 +4350,12 @@ func _restore_room_state() -> void:
 	room_combo = rs.room_combo.duplicate()
 	sleeve_used = bool(rs.sleeve_used)
 	laser_used = bool(rs.laser_used)
+	room_attempt = int(rs.get("room_attempt", room_attempt))
+	_attempt_room = room_index
+	rng_room = SeedRng.stream(run_seed, "room", room_index, room_attempt)
+	if rs.has("rng_room"):
+		rng_room.state = int(rs.rng_room)
+	_rng = rng_room
 	sleight_uses_left = int(rs.get("sleight_uses_left",
 			0 if bool(rs.get("sleight_used", false)) else 1 + sleight_level))
 	watch_uses_left = int(rs.watch_uses_left)
@@ -4321,7 +4368,8 @@ func _restore_room_state() -> void:
 	_swap_first = null
 	in_room = true
 	main.mode_kind = "trail"
-	main.mode_label_text = "Trail · Ascension %d · %s" % [ascension, character_name()]
+	main.mode_label_text = "Trail · A%d · %s · Seed %s" % [ascension,
+			character_name().trim_prefix("The "), SeedRng.pretty(run_seed)]
 	main.game_started = true
 	main.game_over = false
 	main.play_music("boss" if current_offer.has("boss") else "room")
@@ -4426,6 +4474,8 @@ func _show_pick() -> void:
 
 func _show_pick_now() -> void:
 	_hide_all()
+	_stream("pick", room_index, _pick_round)
+	_pick_round += 1
 	main.game_started = false
 	main.play_music("tarot")
 	if _in_chest_pick:
@@ -4566,17 +4616,17 @@ func _render_win_ledger() -> void:
 ## stored raw — `_price` runs at render time, so a Snake Oil bought
 ## mid-shop discounts the rest of the shelf immediately.
 func _shop_card_offer() -> Dictionary:
-	if randf() < SHOP_MOD_CHANCE:
-		return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+	if _rng.randf() < SHOP_MOD_CHANCE:
+		return {"data": {"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3),
 				"cursed": false, "mod": _random_mod(),
 				"finish": _roll_finish()},
 				"base": SHOP_MOD_PRICE}
-	if randf() < 0.5 and not deck.is_empty():
-		var src: Dictionary = deck.pick_random()
+	if _rng.randf() < 0.5 and not deck.is_empty():
+		var src: Dictionary = SeedRng.pick(_rng, deck)
 		if not src.get("cursed", false):
 			return {"data": {"rank": src.rank, "suit": src.suit,
 					"cursed": false, "mod": ""}, "base": SHOP_DUP_PRICE}
-	return {"data": {"rank": randi_range(2, 14), "suit": randi_range(0, 3),
+	return {"data": {"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3),
 			"cursed": false, "mod": ""}, "base": SHOP_CARD_PRICE}
 
 
@@ -4630,6 +4680,7 @@ func _show_shop() -> void:
 	# The merchant and their stock are fixed per shop room: no
 	# restocking by leaving/burning, no re-rolling the trader.
 	if _shop_stock_room != room_index:
+		_stream("shop")
 		# The tarot card already introduced the merchant — same trader.
 		_shop_merchant = MERCHANTS[int(current_offer.get("merchant",
 				_random_merchant_index()))]
@@ -4898,6 +4949,7 @@ func _leave_shop() -> void:
 
 func _show_camp() -> void:
 	_hide_all()
+	_stream("camp")
 	_camp_mode = ""
 	main.tutor_show("campfire")
 	_camp_hp_label.text = "HP  %d / %d" % [hp, max_hp()]
@@ -5104,8 +5156,8 @@ func _end_run(title: String, body: String, payout: int, cause := "") -> void:
 		_clear_run_save()
 	var best := "—" if best_hand_score <= 0 \
 			else "%s  (%d)" % [best_hand_name.to_upper(), best_hand_score]
-	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nBest hand: %s\nOutlaws caught: %d\nCash: $%d" \
-			% [title, body, main.score, best, outlaws_caught, cash]
+	_end_label.text = "%s\n\n%s\n\nTotal run score: %d\nBest hand: %s\nOutlaws caught: %d\nCash: $%d\nSeed: %s" \
+			% [title, body, main.score, best, outlaws_caught, cash, SeedRng.pretty(run_seed)]
 	if not _last_grant.is_empty():
 		_end_label.text += "\n+%d EXP  ·  Level %d" % [int(_last_grant.exp_gain),
 				int(_last_grant.level_after)]
@@ -5156,6 +5208,12 @@ func claim_contract(id: String) -> int:
 
 
 ## A fresh id for a ride — the guard against paying its EXP twice.
+## Points _rng at the stream for `purpose` at this stop.
+func _stream(purpose: String, a := -1, b := 0) -> RandomNumberGenerator:
+	_rng = SeedRng.stream(run_seed, purpose, room_index if a < 0 else a, b)
+	return _rng
+
+
 func _mint_run_uid() -> String:
 	return "%d-%d" % [int(Time.get_unix_time_from_system() * 1000.0), randi()]
 
@@ -5245,7 +5303,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"rider": character, "score": main.score,
 		"best_name": best_hand_name, "best_score": best_hand_score,
 		"outlaws": outlaws_caught, "reached": reached, "total": ROOMS_TOTAL,
-		"cash": cash, "stake": "Ascension %d" % ascension,
+		"cash": cash, "stake": "Ascension %d" % ascension, "seed": run_seed,
 		"relics": relics.duplicate(), "stops": stops,
 		"relic_descs": _relic_descs(),
 		"spent": ["second_wind"] if _second_wind_used else [],

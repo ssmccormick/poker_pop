@@ -91,6 +91,9 @@ var landrush_active := false
 # Trail rooms: each freshly dealt refill card may arrive already
 # hazarded (set per room by trail; 0 everywhere else).
 var refill_hazard_chance := 0.0
+# Every gameplay roll on the board draws from this seeded stream (the
+# mode or the trail hands one in per table); cosmetics use the global RNG.
+var rng := RandomNumberGenerator.new()
 # Mid-room hazards (storm replenishes, purge trickles) queue here and
 # ride in ON the next refill's dealt cards — never appearing out of
 # nowhere on cards already sitting at the table.
@@ -137,8 +140,8 @@ func _select_cap() -> int:
 func deal_community() -> void:
 	holdem_community.clear()
 	for i in 5:
-		holdem_community.append({"rank": randi_range(2, 14),
-				"suit": randi_range(0, 3)})
+		holdem_community.append({"rank": rng.randi_range(2, 14),
+				"suit": rng.randi_range(0, 3)})
 	community_changed.emit()
 
 
@@ -151,8 +154,8 @@ func holdem_result() -> Dictionary:
 ## the hole card face-down until the player commits a hand.
 func deal_blackjack_dealer() -> void:
 	blackjack_dealer_cards = [
-		{"rank": randi_range(2, 14), "suit": randi_range(0, 3)},
-		{"rank": randi_range(2, 14), "suit": randi_range(0, 3)}]
+		{"rank": rng.randi_range(2, 14), "suit": rng.randi_range(0, 3)},
+		{"rank": rng.randi_range(2, 14), "suit": rng.randi_range(0, 3)}]
 	blackjack_hole_hidden = true
 	blackjack_presenting = false
 	blackjack_revealed = 2
@@ -204,7 +207,7 @@ func reveal_random_card() -> void:
 			hidden.append(grid[p])
 	if hidden.is_empty():
 		return
-	var card: PlayingCard = hidden.pick_random()
+	var card: PlayingCard = SeedRng.pick(rng, hidden)
 	card.face_down = false
 	_play_sound(SFX_FLIP, 1.2, -10.0)
 	_fx(card.position, "sparks")
@@ -364,7 +367,7 @@ func _refill_deck() -> void:
 				deck.append({"rank": r, "suit": s})
 	else:
 		deck = custom_deck.duplicate(true)
-	deck.shuffle()
+	SeedRng.shuffle(rng, deck)
 
 
 var _fuse_player: AudioStreamPlayer
@@ -730,7 +733,7 @@ func play_hand() -> void:
 			# presentation (flip_hole / reveal_dealer_card).
 			while Poker.blackjack_sum(blackjack_dealer_cards) < total:
 				blackjack_dealer_cards.append(
-						{"rank": randi_range(2, 14), "suit": randi_range(0, 3)})
+						{"rank": rng.randi_range(2, 14), "suit": rng.randi_range(0, 3)})
 			var dealer := Poker.blackjack_sum(blackjack_dealer_cards)
 			if dealer > 21:
 				outcome = "win"
@@ -1030,7 +1033,7 @@ func play_hand() -> void:
 						and c.hazard != "stone":
 					c.mod = bdata.mod
 					if c.mod in ["plus", "minus", "bumper"]:
-						c.boost_dir = HAZARD_DIRS.pick_random()
+						c.boost_dir = SeedRng.pick(rng, HAZARD_DIRS)
 					spread = true
 		if spread:
 			_play_sound(SFX_POPS.pick_random(), 1.5, -6.0)
@@ -1070,7 +1073,7 @@ func play_hand() -> void:
 	# Every stone ground to dust may leave gold behind — mining pays.
 	if breaking > 0:
 		for i in breaking:
-			if randf() >= gold_find_chance:
+			if rng.randf() >= gold_find_chance:
 				continue
 			var plain: Array = []
 			for p in grid:
@@ -1079,7 +1082,7 @@ func play_hand() -> void:
 						and not c.is_safe and c.boss == "" and not c.snake_tail:
 					plain.append(c)
 			if not plain.is_empty():
-				var lucky: PlayingCard = plain.pick_random()
+				var lucky: PlayingCard = SeedRng.pick(rng, plain)
 				lucky.mod = "gold"
 				_spawn_float_text("GOLD!", lucky.position)
 				_play_sound(SFX_COINS.pick_random(), 1.2, -8.0)
@@ -1135,7 +1138,7 @@ func spawn_safe(combo: Array) -> void:
 			candidates.append(p)
 	if candidates.is_empty():
 		return
-	var cell: Vector2i = candidates.pick_random()
+	var cell: Vector2i = SeedRng.pick(rng, candidates)
 	var old: PlayingCard = grid[cell]
 	var safe := PlayingCard.new()
 	safe.is_safe = true
@@ -1198,7 +1201,7 @@ func spawn_key_and_chest() -> void:
 			candidates.append(card)
 	if candidates.size() < 2:
 		return
-	candidates.shuffle()
+	SeedRng.shuffle(rng, candidates)
 	candidates[0].objective = "key"
 	candidates[1].objective = "chest"
 
@@ -1213,7 +1216,7 @@ func spawn_objective(kind: String) -> void:
 				and card.boss == "" and not card.snake_tail:
 			candidates.append(card)
 	if not candidates.is_empty():
-		var chosen: PlayingCard = candidates.pick_random()
+		var chosen: PlayingCard = SeedRng.pick(rng, candidates)
 		chosen.objective = kind
 
 
@@ -1375,15 +1378,15 @@ func _fall_and_fill(initial_deal: bool) -> void:
 			card.chip_level = int(data.get("chip_lv", 0))
 			card.finish = PlayingCard.finish_of(data)
 			if card.mod in ["plus", "minus", "bumper"]:
-				card.boost_dir = HAZARD_DIRS.pick_random()
+				card.boost_dir = SeedRng.pick(rng, HAZARD_DIRS)
 			# Danger off the deck: queued room hazards ride the deal
 			# first, then the ambient per-card roll.
 			if not initial_deal and not card.cursed and not card.hazard_proof() \
 					and not _pending_refill_hazards.is_empty():
 				_init_hazard(card, _pending_refill_hazards.pop_front())
 			elif not initial_deal and not card.cursed and not card.hazard_proof() \
-					and randf() < refill_hazard_chance:
-				_init_hazard(card, HAZARD_KINDS.pick_random())
+					and rng.randf() < refill_hazard_chance:
+				_init_hazard(card, SeedRng.pick(rng, HAZARD_KINDS))
 			# Blackjack tables deal their refills face-down.
 			if blackjack_facedown and card.hazard == "":
 				card.face_down = true
@@ -1694,7 +1697,7 @@ func shuffle_board() -> void:
 	var cards: Array = grid.values()
 	var cells: Array = grid.keys()
 	for attempt in 100:
-		cells.shuffle()
+		SeedRng.shuffle(rng, cells)
 		grid.clear()
 		for i in cards.size():
 			grid[cells[i]] = cards[i]
@@ -1836,6 +1839,9 @@ func build_state_snapshot() -> Dictionary:
 		"landrush": landrush_marks.duplicate(true),
 		"jack_bar": jack_bar,
 		"community": holdem_community.duplicate(true),
+		# The seeded stream rewinds with the table, so the same hand
+		# replays the same refill.
+		"rng_state": rng.state,
 	}
 
 
@@ -1885,6 +1891,8 @@ func restore_state() -> bool:
 	landrush_marks = undo_state.landrush.duplicate(true)
 	jack_bar = undo_state.jack_bar
 	holdem_community = undo_state.community.duplicate(true)
+	if undo_state.has("rng_state"):
+		rng.state = int(undo_state.rng_state)
 	community_changed.emit()
 	undo_state = {}
 	queue_redraw()
@@ -1992,7 +2000,7 @@ func provision_destroy(card: PlayingCard) -> void:
 func provision_enhance(card: PlayingCard, mod: String) -> void:
 	card.mod = mod
 	if mod in ["plus", "minus", "bumper"]:
-		card.boost_dir = HAZARD_DIRS.pick_random()
+		card.boost_dir = SeedRng.pick(rng, HAZARD_DIRS)
 	card.queue_redraw()
 	_play_sound(SFX_MATCHES.pick_random(), 1.2, -8.0)
 	_fx(card.position, "sparks", Color("e8c547") if mod == "gold" else Color.WHITE)
@@ -2000,8 +2008,8 @@ func provision_enhance(card: PlayingCard, mod: String) -> void:
 
 ## Barber's Razor: a fresh face on the same card (mods survive the cut).
 func provision_reroll(card: PlayingCard, min_rank := 2) -> void:
-	card.rank = randi_range(clampi(min_rank, 2, 14), 14)
-	card.suit = randi_range(0, 3)
+	card.rank = rng.randi_range(clampi(min_rank, 2, 14), 14)
+	card.suit = rng.randi_range(0, 3)
 	card.queue_redraw()
 	_play_sound(SFX_FLIP, 1.3, -8.0)
 	_fx(card.position, "pop", card.suit_color())
@@ -2092,23 +2100,23 @@ func spawn_boss(kind: String) -> void:
 			candidates.append(p)
 	if candidates.is_empty():
 		return
-	var cell: Vector2i = candidates.pick_random()
+	var cell: Vector2i = SeedRng.pick(rng, candidates)
 	var card: PlayingCard = grid[cell]
 	card.boss = kind
 	match kind:
 		"jack":
 			card.boss_hp = boss_max_hp("jack")
 			jack_bar = JACK_BAR_BASE
-			card.rank = randi_range(2, 14)
-			card.suit = randi_range(0, 3)
+			card.rank = rng.randi_range(2, 14)
+			card.suit = rng.randi_range(0, 3)
 		"queen":
 			card.boss_hp = boss_max_hp("queen")
 			card.rank = 12  # she IS a queen — pair her to sting her
-			card.suit = randi_range(0, 3)
+			card.suit = rng.randi_range(0, 3)
 		"cobra":
 			card.boss_hp = boss_max_hp("cobra")
-			card.rank = randi_range(2, 14)
-			card.suit = randi_range(0, 3)
+			card.rank = rng.randi_range(2, 14)
+			card.suit = rng.randi_range(0, 3)
 			_play_sound(SFX_SNAKES.pick_random(), 1.0, -6.0)
 			card.cobra_stack = []
 			card.cobra_body = []
@@ -2140,7 +2148,7 @@ func _grow_cobra_chain(path: Array, want: int) -> Array:
 	if want == 0:
 		return path.slice(1)
 	var dirs := HAZARD_DIRS.duplicate()
-	dirs.shuffle()
+	SeedRng.shuffle(rng, dirs)
 	for d in dirs:
 		var q: Vector2i = path[-1] + d
 		if path.has(q) or not grid.has(q):
@@ -2189,7 +2197,7 @@ func _cobra_eat(head: PlayingCard, instant: bool) -> bool:
 		candidates.append({"cell": q, "openness": openness})
 	if candidates.is_empty():
 		return false
-	candidates.shuffle()
+	SeedRng.shuffle(rng, candidates)
 	candidates.sort_custom(func(a, b) -> bool:
 		return a.openness > b.openness)
 	var target: Vector2i = candidates[0].cell
@@ -2297,7 +2305,7 @@ func tick_boss() -> void:
 						and not card.is_safe:
 					candidates.append(p)
 			if not candidates.is_empty():
-				var cell: Vector2i = candidates.pick_random()
+				var cell: Vector2i = SeedRng.pick(rng, candidates)
 				var other: PlayingCard = grid[cell]
 				var b_cell := b.grid_pos
 				grid[cell] = b
@@ -2310,15 +2318,15 @@ func tick_boss() -> void:
 				tw.tween_property(other, "position", cell_center(b_cell), 0.35) \
 						.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 				await tw.finished
-			b.rank = randi_range(2, 14)
-			b.suit = randi_range(0, 3)
+			b.rank = rng.randi_range(2, 14)
+			b.suit = rng.randi_range(0, 3)
 			_play_sound(SFX_SHUFFLES.pick_random(), 1.4, -10.0)
 		"queen":
 			# She never sits still: EVERY turn she flits to a new cell
 			# and leaves HONEY on the card that takes her old perch.
 			# Cornered with nowhere to fly, she coats a neighbor instead.
 			var dirs := HAZARD_DIRS.duplicate()
-			dirs.shuffle()
+			SeedRng.shuffle(rng, dirs)
 			var flew := false
 			for d in dirs:
 				var q: Vector2i = b.grid_pos + d
@@ -2406,9 +2414,9 @@ func _init_hazard(card: PlayingCard, kind: String) -> void:
 		"stone":
 			card.stone_hits = STONE_HITS_START
 		"wind":
-			card.wind_dir = HAZARD_DIRS.pick_random()
+			card.wind_dir = SeedRng.pick(rng, HAZARD_DIRS)
 		"fire", "water":
-			card.next_dir = HAZARD_DIRS.pick_random()
+			card.next_dir = SeedRng.pick(rng, HAZARD_DIRS)
 
 
 ## Direction priority for a spreading hazard: the telegraphed intent
@@ -2417,7 +2425,7 @@ func _init_hazard(card: PlayingCard, kind: String) -> void:
 func _intent_dirs(card: PlayingCard) -> Array:
 	var rest := HAZARD_DIRS.duplicate()
 	rest.erase(card.next_dir)
-	rest.shuffle()
+	SeedRng.shuffle(rng, rest)
 	return [card.next_dir] + rest
 
 
@@ -2432,7 +2440,7 @@ func apply_room_hazards(kind: String, count: int) -> void:
 				and not card.snake_tail and card.objective == "" \
 				and not card.hazard_proof():
 			candidates.append(card)
-	candidates.shuffle()
+	SeedRng.shuffle(rng, candidates)
 	for i in mini(count, candidates.size()):
 		_init_hazard(candidates[i], kind)
 	_aim_spreaders()
@@ -2652,7 +2660,7 @@ func _aim_spreaders() -> void:
 		if card.hazard == "fire":
 			if not _victim_ok(p + card.next_dir):
 				var dirs := HAZARD_DIRS.duplicate()
-				dirs.shuffle()
+				SeedRng.shuffle(rng, dirs)
 				for d in dirs:
 					if _victim_ok(p + d):
 						card.next_dir = d

@@ -533,7 +533,15 @@ func _update_labels() -> void:
 				maxf((score - _shown_score) * 8.0, 90.0) * get_process_delta_time())
 	score_label.text = "SCORE  %d" % int(_shown_score)
 	deck_label.text = "DECK  %d" % board.deck.size()
-	meta_label.text = "%s  ·  Theme: %s (T)" % [mode_label_text, Themes.current().name]
+	var meta := "%s  ·  Theme: %s (T)" % [mode_label_text, Themes.current().name]
+	if meta != meta_label.text:
+		meta_label.text = meta
+		# Long lines (the seed rides here now) shrink to stay on the panel.
+		var mfont: Font = meta_label.get_theme_font("font")
+		var fs := 16
+		while fs > 11 and mfont.get_string_size(meta, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > 318.0:
+			fs -= 1
+		meta_label.add_theme_font_size_override("font_size", fs)
 	match mode_kind:
 		"time":
 			var secs := ceili(time_left)
@@ -1273,6 +1281,7 @@ func _level_up() -> void:
 		level_transition = false
 		return
 	level += 1
+	board.rng = SeedRng.stream(mode_seed, "board", level)
 	level_score = 0
 	meter = 100.0
 	parallax.set_scene("plains", level)
@@ -1314,6 +1323,10 @@ func _show_game_over(message: String) -> void:
 	if not game_over or menu_open:
 		return
 	over_label.text = message
+	if mode_seed != "":
+		over_label.text += "
+
+Seed  %s" % SeedRng.pretty(mode_seed)
 	over_layer.modulate = Color(1, 1, 1, 0)
 	over_layer.visible = true
 	create_tween().tween_property(over_layer, "modulate:a", 1.0, 0.4)
@@ -1332,6 +1345,10 @@ func _restart() -> void:
 	meter = 100.0
 	game_over = false
 	over_layer.visible = false
+	if not _mode_seed_fixed or mode_seed == "":
+		mode_seed = SeedRng.random_seed()
+	board.rng = SeedRng.stream(mode_seed, "board", 1)
+	mode_label_text = "%s · Seed %s" % [_mode_label_base, SeedRng.pretty(mode_seed)]
 	match mode_kind:
 		"arcade":
 			parallax.set_scene("plains", level)
@@ -2419,6 +2436,11 @@ var _level_label: Label
 var _level_sub: Label
 var _level_fill: Panel
 var _upgrades_pip: Label
+# SEEDS for the arcade-style modes (the trail keeps its own).
+var mode_seed := ""
+var next_mode_seed := ""
+var _mode_seed_fixed := false
+var _mode_label_base := ""
 var _contracts_pip: Label
 
 
@@ -2511,6 +2533,12 @@ func _start_mode_now(kind: String, seconds: float = 0.0) -> void:
 			mode_label_text = "Arcade"
 		"zen":
 			mode_label_text = "Zen"
+	_mode_label_base = mode_label_text
+	# A chosen seed (SEEDED PLAY) sticks for this sitting; otherwise
+	# every game deals from a fresh random one.
+	_mode_seed_fixed = SeedRng.is_valid(next_mode_seed)
+	mode_seed = next_mode_seed if _mode_seed_fixed else ""
+	next_mode_seed = ""
 	board.single_deck = kind == "single"
 	board.custom_deck.clear()
 	menu_open = false

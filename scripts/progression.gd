@@ -362,7 +362,8 @@ func power_level(kind: String, id: String) -> int:
 
 ## A weighted pick among the AVAILABLE ids in `weights` ({id: base}),
 ## each scaled by its FIND level. "" when nothing is left.
-func pick(kind: String, weights: Dictionary, exclude: Array = []) -> String:
+func pick(kind: String, weights: Dictionary, exclude: Array = [],
+		rng: RandomNumberGenerator = null) -> String:
 	var ids: Array = []
 	var ws: Array = []
 	var total := 0.0
@@ -378,7 +379,7 @@ func pick(kind: String, weights: Dictionary, exclude: Array = []) -> String:
 		total += w
 	if ids.is_empty():
 		return ""
-	var roll := randf() * total
+	var roll := (rng.randf() if rng != null else randf()) * total
 	for i in ids.size():
 		roll -= float(ws[i])
 		if roll < 0.0:

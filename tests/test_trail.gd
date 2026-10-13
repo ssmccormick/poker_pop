@@ -262,6 +262,58 @@ func _run() -> void:
 			"a finished table is announced on a plaque at the top of the screen")
 	trail._hide_all()
 
+	# --- Seeds: the same seed deals the same ride -------------------------
+	var rec1: Dictionary = await _seeded_probe("K7QX2M9P")
+	for n in randi_range(50, 400):
+		randf()  # churn the global RNG: gameplay must not care
+	main.board.confetti()
+	var rec2: Dictionary = await _seeded_probe("K7QX2M9P")
+	failures += _check(rec1.wall == rec2.wall and not rec1.wall.is_empty(),
+			"the same seed deals the same first wall")
+	failures += _check(rec1.deal == rec2.deal and not rec1.deal.is_empty(),
+			"and the same opening table")
+	failures += _check(rec1.hands == rec2.hands and rec1.hands.size() == 3,
+			"and the same refills after the same three hands")
+	failures += _check(rec1.score == rec2.score, "for the same score (%d)" % rec1.score)
+	failures += _check(rec1.wall2 == rec2.wall2, "and the same second wall")
+	failures += _check(rec1.shop == rec2.shop and not rec1.shop.is_empty(),
+			"and the same merchant's shelves")
+	var rec3: Dictionary = await _seeded_probe("ABCDEFGH")
+	failures += _check(rec3.deal != rec1.deal, "a different seed deals a different table")
+	# The other modes deal from seeds too.
+	trail._hide_all()
+	var time_deals: Array = []
+	for n in 2:
+		main.next_mode_seed = "QWERTY23"
+		await main._start_mode_now("time", 60.0)
+		await _settle()
+		for k in randi_range(5, 90):
+			randf()
+		time_deals.append(_grid_sig())
+		failures += _check(main.mode_seed == "QWERTY23", "a chosen seed sticks to the mode")
+	failures += _check(time_deals[0] == time_deals[1] and not time_deals[0].is_empty(),
+			"a Time Trial on the same seed deals the same table")
+	await main._start_mode_now("time", 60.0)
+	await _settle()
+	failures += _check(SeedRng.is_valid(main.mode_seed) and main.mode_seed != "QWERTY23"
+			and main.mode_label_text.contains("Seed"), "an unchosen game gets a random seed, on the HUD")
+	main.mode_kind = ""
+	main.game_started = false
+	# The pocket watch: the same hand after a rewind refills the same way.
+	await _enter_room("the_doctor")
+	var pair_a := _plain_neighbors()
+	if not pair_a.is_empty():
+		var cells := [pair_a[0].grid_pos, pair_a[1].grid_pos]
+		await _play_pair_of(pair_a, true)
+		var after1 := _grid_sig()
+		trail.use_watch()
+		await _settle()
+		for n in 37:
+			randf()
+		await _play_pair_of([main.board.grid[cells[0]], main.board.grid[cells[1]]], true)
+		failures += _check(_grid_sig() == after1,
+				"the watch rewinds the seed too: the same hand refills the same way")
+
 	# --- With a ride saved, THE TRAIL puts RESUME first ------------------
 	trail._save_run()
 	main.tutor_seen["core"] = true
@@ -557,14 +609,17 @@ func _run() -> void:
 	var uid0: String = trail.run_uid
 	trail._start_run(19)
 	failures += _check(trail.run_uid == uid0, "the buy-in refuses an Ascension above the rider's highest")
+	# The same seed both times, so both rides sit at the same table.
+	trail.next_seed = "HANDS234"
 	await _enter_room_at("the_gambler", 0)
 	var base_hands: int = trail.room_hands_left
 	var base_hp: int = trail.hp
+	trail.next_seed = "HANDS234"
 	await _enter_room_at("the_gambler", 18)
 	failures += _check(trail.ascension == 18 and trail.hp == 8 and trail.max_hp() == 8 and base_hp == 10,
 			"Ascension 18 starts the rider at 8 HP")
-	failures += _check(trail.room_limit == "time" or trail.room_hands_left <= base_hands,
-			"higher Ascensions deal fewer hands")
+	failures += _check(trail.room_limit == "time" or trail.room_hands_left == base_hands - 2,
+			"Ascension 18 deals two fewer hands at the same table (%d vs %d)" % [trail.room_hands_left, base_hands])
 	var cursed: Array = trail.deck.filter(func(d): return bool(d.get("cursed", false)))
 	failures += _check(cursed.size() >= 1, "Ascension 16+ rides with a cursed card")
 	failures += _check(trail._target_for(3, TrailMode.RISKS[0]) > int((TrailMode.BASE_TARGET + TrailMode.TARGET_STEP * 3) * 0.85),
@@ -665,6 +720,81 @@ func _settle() -> void:
 		await create_timer(0.1).timeout
 		waited += 0.1
 	await process_frame
+
+
+## One seeded ride's fingerprint: the first wall, the opening table,
+## three hands of refills, the second wall and the first merchant.
+func _seeded_probe(seed_text: String) -> Dictionary:
+	var rec := {}
+	trail._hide_all()
+	trail.character = "the_gambler"
+	trail.gambler_ability = "sleeve"
+	trail.next_seed = seed_text
+	trail._start_run(0)
+	await _wait(0.5)
+	rec["wall"] = _wall_sig(trail._offers) + [_offer_sig(trail._fate_offer)]
+	trail._choose_offer(trail._offers[0], false)
+	await _wait(0.5)
+	trail._bet_amount = int(trail.current_offer.get("min_bet", 25))
+	trail._confirm_bet()
+	await _wait(0.5)
+	await _settle()
+	rec["deal"] = _grid_sig()
+	var hands: Array = []
+	for h in 3:
+		for n in randi_range(1, 40):
+			randf()
+		var pair := _plain_neighbors()
+		if pair.is_empty():
+			break
+		await _play_pair_of(pair, true)
+		hands.append(_grid_sig())
+	rec["hands"] = hands
+	rec["score"] = main.score
+	# The next stops, by the seed alone.
+	trail.in_room = false
+	main.board.locked = true
+	trail.chips = 5000
+	trail.room_index = 1
+	trail._offers_room = -1
+	trail._show_tarot_now()
+	rec["wall2"] = _wall_sig(trail._offers)
+	trail._hide_all()
+	trail.room_index = 2
+	trail._offers_room = -1
+	trail._shop_stock_room = -1
+	trail._show_tarot_now()
+	var shop: Array = []
+	for o in trail._shop_stock:
+		shop.append([o.data.rank, o.data.suit, o.data.get("mod", "")])
+	for o in trail._shop_stock_relics:
+		shop.append(o.id)
+	for o in trail._shop_stock_provisions:
+		shop.append(o.id)
+	rec["shop"] = shop
+	trail._hide_all()
+	return rec
+
+
+func _grid_sig() -> Array:
+	var out: Array = []
+	for y in 5:
+		for x in 5:
+			var c: PlayingCard = main.board.grid.get(Vector2i(x, y))
+			out.append([c.rank, c.suit, c.hazard, c.mod, c.finish] if c != null else [])
+	return out
+
+
+func _offer_sig(o: Dictionary) -> Array:
+	return [String(o.get("kind", "")), String(o.get("tarot", "")), String(o.get("goal", "")),
+			int(o.get("target", 0)), String(o.get("limit", "")), int(o.get("merchant", -1))]
+
+
+func _wall_sig(offers: Array) -> Array:
+	var out: Array = []
+	for o in offers:
+		out.append(_offer_sig(o))
+	return out
 
 
 ## Plays a pair of two plain neighbors; false if none could be made.
