@@ -217,6 +217,12 @@ var stone_hits := 0:  # stone: scoring uses left
 		_stone_max = maxi(_stone_max, value)
 		queue_redraw()
 var _stone_max := 0  # heaviest the rock has been; cracks scale off it
+# stone: the covered card comes out GOLD when the stone breaks (the vein
+# shows in the last crack).
+var stone_gold := false:
+	set(value):
+		stone_gold = value
+		queue_redraw()
 var wind_dir := Vector2i.RIGHT:
 	set(value):
 		wind_dir = value
@@ -1056,8 +1062,8 @@ func _draw() -> void:
 			_draw_suit(Vector2(-W / 2.0 + 16, -H / 2.0 + 40), 2.0)
 	else:
 		if hazard == "stone":
-			# A slab of rock: no rank, no suit â€” just a blocker. Clear
-			# cards beside it to chip it away.
+			# Rock covering the card: no rank or suit shows, and it can't
+			# be played. Clear cards beside it to chip it away.
 			_draw_rock(rect)
 			for i in stone_hits:
 				draw_rect(Rect2(-13.0 + i * 10.0, H / 2.0 - 16.0, 7, 7),
@@ -1386,7 +1392,8 @@ func _draw_art(rect: Rect2) -> void:
 		_art(rect, "base", "stone")
 		if stone_hits <= 1:
 			_art(rect, "hazard", "stone_cracks_2")
-			_art(rect, "hazard", "stone_gold_vein")
+			if stone_gold:
+				_art(rect, "hazard", "stone_gold_vein")
 		elif stone_hits == 2:
 			_art(rect, "hazard", "stone_cracks_1")
 		_draw_art_rings(rect)
@@ -1907,6 +1914,10 @@ func _draw_rock(rect: Rect2) -> void:
 					cos(_phase + c * 1.3 + s * 2.7) * 5.0)
 			pts.append(p)
 		draw_polyline(pts, Color(0.12, 0.12, 0.15, 0.8), 2.0)
+	if stone_gold and stone_hits <= 1:
+		# Gold glints through the last crack.
+		draw_polyline(PackedVector2Array([Vector2(-14, 18), Vector2(-4, 6),
+				Vector2(3, 9), Vector2(13, -6)]), Color(0.95, 0.78, 0.25, 0.9), 3.0)
 
 
 ## The Weathervane tell on the TARGET: a whisper of the hazard that

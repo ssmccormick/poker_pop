@@ -445,6 +445,46 @@ func _run() -> void:
 	main.seeds_layer.visible = false
 	await _enter_room("the_gambler")  # an ordinary ride again for what follows
 
+	# --- Stones cover cards: a hand next to one breaks it off ------------
+	var spair := _plain_neighbors()
+	var rock: PlayingCard = null
+	if not spair.is_empty():
+		for d in Board.HAZARD_DIRS:
+			var q: Vector2i = spair[0].grid_pos + d
+			var n: PlayingCard = main.board.grid.get(q)
+			if n != null and n != spair[1] and n.hazard == "" and n.mod == "" \
+					and not n.cursed and n.boss == "" and not n.is_safe:
+				rock = n
+				break
+	failures += _check(rock != null, "the stone test found a card beside a playable pair")
+	if rock != null:
+		main.board.gold_find_chance = 1.0
+		main.board._init_hazard(rock, "stone")
+		rock.stone_hits = 1
+		var rock_rank := rock.rank
+		await _play_pair_of(spair, true)
+		await _settle()
+		failures += _check(is_instance_valid(rock) and main.board.grid.values().has(rock)
+				and rock.hazard == "" and rock.rank == rock_rank,
+				"a stone chipped to nothing breaks off, and its card stays on the table")
+		failures += _check(is_instance_valid(rock) and rock.mod == "gold",
+				"the card under a gold-veined stone comes out GOLD")
+	# Dynamite blasts the stone off rather than the card.
+	var blast: PlayingCard = null
+	for p in main.board.grid:
+		var bc: PlayingCard = main.board.grid[p]
+		if bc.hazard == "" and bc.boss == "" and not bc.is_safe and not bc.cursed:
+			blast = bc
+			break
+	failures += _check(blast != null, "the dynamite test found a card to bury")
+	if blast != null:
+		main.board._init_hazard(blast, "stone")
+		await trail._apply_target_provision("dynamite", blast)
+		await _settle()
+		failures += _check(is_instance_valid(blast) and main.board.grid.values().has(blast)
+				and blast.hazard == "", "dynamite on a stone blasts the stone off and leaves the card")
+	main.board.gold_find_chance = Board.GOLD_FIND_CHANCE
+
 	# --- With a ride saved, THE TRAIL puts RESUME first ------------------
 	trail._save_run()
 	main.tutor_seen["core"] = true

@@ -116,6 +116,28 @@ func _init() -> void:
 	b.selected.clear()
 	_free_board(b)
 
+	# --- a stone covers a card; breaking it uncovers that card ---------------
+	b = _board([[9, 2, 0, 0], [5, 1, 1, 0]])
+	b.gold_find_chance = 1.0
+	b._init_hazard(b.grid[Vector2i(0, 0)], "stone")
+	var covered: PlayingCard = b.grid[Vector2i(0, 0)]
+	failures += _check(covered.stone_hits == Board.STONE_HITS_START and covered.stone_gold,
+			"a stone lands on a card, and whether that card is gold is settled then")
+	b.break_stone(covered)
+	failures += _check(b.grid.get(Vector2i(0, 0)) == covered and covered.hazard == ""
+			and covered.rank == 9 and covered.suit == 2,
+			"breaking the stone leaves the card it covered in place, same rank and suit")
+	failures += _check(covered.mod == "gold" and not covered.stone_gold,
+			"a gold-veined stone uncovers a GOLD card")
+	b.gold_find_chance = 0.0
+	var modded: PlayingCard = b.grid[Vector2i(1, 0)]
+	modded.mod = "mult"
+	b._init_hazard(modded, "stone")
+	b.break_stone(modded)
+	failures += _check(not modded.stone_gold and modded.mod == "mult" and modded.hazard == "",
+			"a stone over an enhanced card gives it back with its enhancement")
+	_free_board(b)
+
 	# --- wind blows the first card downwind every round ---------------------
 	# The blow uses the DISPLAYED direction; the vane turns after.
 	b = _board([[5, 0, 0, 0], [7, 1, 2, 0], [9, 2, 4, 0]])

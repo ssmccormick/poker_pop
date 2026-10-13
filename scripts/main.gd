@@ -821,6 +821,7 @@ func _open_cardgrid() -> void:
 		["Bomb, fuse 1", func(c: PlayingCard) -> void: c.hazard = "bomb"; c.fuse = 1],
 		["Stone, fresh", func(c: PlayingCard) -> void: c.hazard = "stone"; c.stone_hits = 3],
 		["Stone, 1 left", func(c: PlayingCard) -> void: c.hazard = "stone"; c.stone_hits = 1],
+		["Stone, gold under", func(c: PlayingCard) -> void: c.hazard = "stone"; c.stone_hits = 1; c.stone_gold = true],
 		["Fire incoming", func(c: PlayingCard) -> void: c.incoming = "fire"],
 		["Water incoming", func(c: PlayingCard) -> void: c.incoming = "water"],
 		["The Key", func(c: PlayingCard) -> void: c.objective = "key"],
@@ -1832,8 +1833,11 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.is_safe:
 		return "THE SAFE\nPick its combination in order, then the safe."
 	if card.hazard == "stone":
-		return "STONE\nCan't be played. Clear cards next to it.\n%d more chip%s and it breaks." \
+		var tip := "STONE\nThere's a card buried under this rock.\nClear cards next to it to chip it.\n%d more chip%s breaks it off." \
 				% [card.stone_hits, "" if card.stone_hits == 1 else "s"]
+		if card.stone_gold and card.stone_hits <= 1:
+			tip += "\nThere's gold showing in the crack!"
+		return tip
 	if card.snake_tail:
 		return "COBRA TAIL\nA wall you have to chain around.\nEach hit on his head crumbles one piece."
 	if card.face_down:
@@ -1927,12 +1931,12 @@ const TUTOR := {
 	"hazard_bomb": ["BOMB CARD", "The number on the fuse drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse reaches zero, it goes off. The bomb is gone and the blast costs you 2 HP."],
 	"hazard_fire": ["FIRE CARD", "After every hand, the fire spreads to one card next to it, and the fire card's own rank burns down. The card it'll catch next shows SPARKS along its bottom edge, so clear that card out of the way or play the fire card to douse it. If EVERY card on the table catches fire, you LOSE the table."],
 	"hazard_wind": ["WIND CARD", "After every hand, the wind BLOWS the first card in the direction it's facing right off the board. That card doesn't score; it's just gone. The wind turns a quarter turn every hand, and the dust streaming across the card shows which way it's blowing. Play the wind card to make it stop."],
-	"hazard_stone": ["STONE CARD", "A chunk of solid rock taking up a space. It has no rank or suit, and you can't play it or chain through it. Every card you clear NEXT TO it chips it, and after three chips it crumbles. Breaking one sometimes turns up a GOLD card."],
+	"hazard_stone": ["STONE CARD", "A card buried under solid rock. While it's covered, you can't play it or chain through it. Every card you clear NEXT TO it chips the rock, and after three chips the stone breaks off and the card underneath is back in play. Sometimes that card is GOLD. When it is, you'll see a gold vein in the last crack."],
 	"hazard_water": ["WATER CARD", "The leak FILLS its card a quarter of the way every hand. Once it's full, it POURS, turning the four cards around it into WATER CARDS that fill up and pour in turn. A full card hides its face completely, but it's still the same card underneath, if you can remember what it was. Play any water card, however full, to clear it."],
 	"goal_safe": ["THE SAFE", "A locked safe sits on the board showing a 4-digit combination. Pick cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it open."],
 	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: you get unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open the chest. Each time you open one, a new key and chest appear, until you've opened enough. If you clear one piece WITHOUT the other, it just turns up again on a different card, and that hand is wasted. It's the hardest job on the trail, but the strongbox holds a RELIC."],
 	"goal_purge": ["PURGE TABLE", "There's no score target here. The board is overrun with hazards, and they KEEP COMING. A few are dealt in at the start and more show up as you play. Clear the full quota to finish the job, any way you like: play them, let the wind blow them off, or let them burn out."],
-	"goal_mine": ["GOLD MINE", "The board is packed with stone, and the seam runs 20 stones deep. Chip the stones by clearing cards NEXT TO them (three chips breaks one). A broken stone might leave GOLD cards behind, and more stones drop in with the deal until the whole seam is on the table. Mine it DRY: the table only clears once every last stone is broken."],
+	"goal_mine": ["GOLD MINE", "The board is packed with stone, and the seam runs 16 stones deep. Chip a stone by clearing cards NEXT TO it, and three chips breaks it off. Every stone has a card underneath, and some of those cards are GOLD. More stones drop in with the deal until the whole seam is on the table. Mine it DRY: the table only clears once every last stone is broken."],
 	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you have to play, and nothing else counts toward the goal. It has to be an exact match: a Full House doesn't count as three Pairs."],
 	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands. Play as many hands as you like, but get the job done before the countdown runs out. The clock is in the side panel, and when it turns red, hurry."],
 	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand. Whenever cards are scored, he turns into a different card and jumps to a new spot. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE comes off his total, but the bar goes up with every hit. Deal 2,000 in all to put him away (more on higher Ascensions)."],

@@ -81,7 +81,7 @@ var dragging := false
 # Set by main when a level-up is pending: the post-hand refill is
 # pointless (the board resets immediately), so skip dealing it.
 var suppress_refill := false
-# Broken stones can uncover gold cards in the rubble — everywhere.
+# How often the card under a stone turns out to be gold (everywhere).
 const GOLD_FIND_CHANCE := 0.35
 var gold_find_chance := GOLD_FIND_CHANCE  # the Chisel's POWER lifts it
 # LAND RUSH rooms: cells a scored card has been cleared from (drawn
@@ -899,8 +899,9 @@ func play_hand() -> void:
 		else:
 			_play_sound(SFX_CLICK, 2.0, -9.0)  # a pin pings out
 
-	# Stones are blockers now: every cleared card chips each stone
-	# beside it, and a stone out of chips crumbles with the pops.
+	# Stones cover a card: every cleared card chips each stone beside
+	# it, and a stone out of chips breaks off with the pops, leaving
+	# the card it covered in place.
 	var breaking := 0
 	var broke: Array = []
 	for card in poppers:
@@ -918,8 +919,6 @@ func play_hand() -> void:
 				breaking += 1
 				broke.append(st)
 	result["stones_broken"] = breaking
-	for st in broke:
-		poppers.append(st)
 
 	hand_played.emit(result)
 
@@ -1010,6 +1009,9 @@ func play_hand() -> void:
 		await tw.finished
 		for card in poppers:
 			card.queue_free()
+	for st in broke:
+		if is_instance_valid(st) and grid.get(st.grid_pos) == st:
+			break_stone(st)
 	if defeated_boss:
 		boss_defeated.emit()
 	if result.get("redeal", false):
@@ -1070,23 +1072,6 @@ func play_hand() -> void:
 		busy = false
 		return
 	await _fall_and_fill(false)
-	# Every stone ground to dust may leave gold behind — mining pays.
-	if breaking > 0:
-		for i in breaking:
-			if rng.randf() >= gold_find_chance:
-				continue
-			var plain: Array = []
-			for p in grid:
-				var c: PlayingCard = grid[p]
-				if c.hazard == "" and c.mod == "" and not c.cursed \
-						and not c.is_safe and c.boss == "" and not c.snake_tail:
-					plain.append(c)
-			if not plain.is_empty():
-				var lucky: PlayingCard = SeedRng.pick(rng, plain)
-				lucky.mod = "gold"
-				_spawn_float_text("GOLD!", lucky.position)
-				_play_sound(SFX_COINS.pick_random(), 1.2, -8.0)
-				_fx(lucky.position, "gold")
 	busy = false
 	if not has_playable_hand():
 		dead_board.emit()
@@ -1782,7 +1767,7 @@ func provision_clean(card: PlayingCard) -> void:
 ## Every card property the watch must carry back. `hazard` sits
 ## before `fuse` so the fuse setter can place its ambient spark.
 const UNDO_CARD_PROPS := ["rank", "suit", "mod", "finish", "metal_wear", "joker", "chip_level",
-		"cursed", "washed", "hazard", "hazard_fresh", "fuse", "stone_hits",
+		"cursed", "washed", "hazard", "hazard_fresh", "fuse", "stone_hits", "stone_gold",
 		"water_level", "wind_dir", "next_dir", "boost_dir", "objective",
 		"bullet_timer", "is_safe", "combo_progress", "boss", "boss_hp",
 		"honey", "snake_tail", "stunned", "face_down"]
@@ -1907,6 +1892,11 @@ func laser_destroy(origin: Vector2, cards: Array) -> void:
 		return
 	busy = true
 	clear_selection()
+	# A stone in the beam is burned off its card; the card stays.
+	var stones := cards.filter(func(c: PlayingCard) -> bool: return c.hazard == "stone")
+	cards = cards.filter(func(c: PlayingCard) -> bool: return c.hazard != "stone")
+	for st in stones:
+		break_stone(st)
 	_play_sound(SFX_POPS.pick_random(), 1.7, -6.0)
 	_play_sound(SFX_DYNAMITES.pick_random(), 2.2, -16.0, 0.05)
 	# Beam flashes from the strike point out to each burned cell.
@@ -1980,6 +1970,14 @@ func provision_swap(a: PlayingCard, b: PlayingCard) -> void:
 func provision_destroy(card: PlayingCard) -> void:
 	if busy or locked or not grid.has(card.grid_pos):
 		return
+	if card.hazard == "stone":
+		# Dynamite blasts the stone off and leaves the card it covered.
+		clear_selection()
+		shake_requested.emit(7.0)
+		_play_sound(SFX_POPS.pick_random(), 0.6, -4.0)
+		_fx(card.position, "smoke")
+		break_stone(card)
+		return
 	busy = true
 	clear_selection()
 	grid.erase(card.grid_pos)
@@ -1994,6 +1992,34 @@ func provision_destroy(card: PlayingCard) -> void:
 	card.queue_free()
 	await _fall_and_fill(false)
 	busy = false
+
+
+## A stone breaks off, and the card it covered is back in play. If the
+## stone was hiding gold, that card comes out a GOLD card.
+func break_stone(card: PlayingCard) -> void:
+	if card.hazard != "stone":
+		return
+	var shown := is_inside_tree()  # headless rule tests skip the show
+	if shown:
+		_fx(card.position, "rock", Color.WHITE)
+		_play_sound(SFX_KNIVES.pick_random(), 0.8, -6.0)
+	card.stone_hits = 0
+	card.hazard = ""
+	card.hazard_fresh = false
+	var gold := card.stone_gold and card.mod == "" and not card.cursed
+	if gold:
+		card.mod = "gold"
+	card.stone_gold = false
+	if not shown:
+		return
+	if gold:
+		_spawn_float_text("GOLD!", card.position)
+		_play_sound(SFX_COINS.pick_random(), 1.2, -8.0)
+		_fx(card.position, "gold")
+	card.scale = Vector2.ONE * 0.92
+	var tw := create_tween()
+	tw.tween_property(card, "scale", Vector2.ONE, 0.25) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## Branding Iron / Gold Pan: burns an enhancement onto a plain card.
@@ -2413,6 +2439,10 @@ func _init_hazard(card: PlayingCard, kind: String) -> void:
 			card.fuse = BOMB_FUSE
 		"stone":
 			card.stone_hits = STONE_HITS_START
+			# Whether the covered card is gold is settled when the stone
+			# lands, so the vein in its last crack is an honest tell.
+			card.stone_gold = card.mod == "" and not card.cursed \
+					and rng.randf() < gold_find_chance
 		"wind":
 			card.wind_dir = SeedRng.pick(rng, HAZARD_DIRS)
 		"fire", "water":

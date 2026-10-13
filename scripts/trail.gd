@@ -194,7 +194,7 @@ const CATALOG_DESCS := {
 	"room:hands": "Dealer's Call: play exactly the hands the table calls for.",
 	"room:chest": "Stagecoach Haul: match keys to chests. The strongbox holds a relic.",
 	"room:purge": "Powder Keg, Wildfire, Dust Storm and Flash Flood: clear a set number of one kind of hazard.",
-	"room:mine": "Gold Mine: break up the stones. There's gold in some of them.",
+	"room:mine": "Gold Mine: break the stones off the cards. Some of those cards are gold.",
 	"room:collect": "The Roundup and The Census: clear the suit or rank the table calls, or one of every rank.",
 	"room:crazy8": "Every 8 on the board is wild.",
 	"room:landrush": "Stake a claim on every plot by clearing a card from all 25 spaces.",
@@ -229,7 +229,7 @@ const PROVISIONS := {
 	"canteen": {"name": "Canteen", "kind": "target", "price": 45,
 		"desc": "Douse one card to wash off any hazard or water"},
 	"dynamite": {"name": "Dynamite Stick", "kind": "target", "price": 60,
-		"desc": "Destroy any card, even a stone or a curse (it doesn't score)"},
+		"desc": "Blow up any card, even a curse. On a stone, it blasts the stone off"},
 	"branding_iron": {"name": "Branding Iron", "kind": "target", "price": 70,
 		"desc": "Brand a plain card with a random enhancement"},
 	"razor": {"name": "Barber's Razor", "kind": "target", "price": 50,
@@ -2528,16 +2528,16 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 			var kind: String = "stone" if goal == "mine" \
 					else String(SeedRng.pick(_rng, ["bomb", "fire", "wind", "water"]))
 			if kind == "stone":
-				# GOLD MINE: a board of solid rock — break stones free
-				# and gold cards turn up in the rubble.
+				# GOLD MINE: a board of stones. Break them off, and some of
+				# the cards underneath are gold.
 				offer.tarot = "GOLD MINE"
 				offer.label = "Gold Mine"
 				offer.odds = 2.0
 				offer["goal"] = "mine"
 				offer["stones"] = GOLD_MINE_QUOTA
 				offer.hands = MAX_HANDS_BUY
-				# The seam always runs on the clock (set below), and a
-				# full twenty stones earns a longer fuse than the formula.
+				# The seam always runs on the clock (set below), and the
+				# full seam earns a longer clock than the formula.
 				offer["minutes"] = 5
 				offer.target = 0
 			else:
@@ -2754,7 +2754,7 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					int(offer.get("purge_quota", PURGE_QUOTA_BASE)),
 					String(offer.purge_kind).to_upper(), offer.purge_count]
 		elif offer.get("goal", "") == "mine":
-			goal_line = "Break all %d stones. Some have gold inside" % offer.stones
+			goal_line = "Break all %d stones. Some have gold cards under them" % offer.stones
 		elif offer.get("goal", "") == "holdem":
 			goal_line = "Target %d — HOLD'EM rules" % offer.target
 		elif offer.get("goal", "") == "crazy8":
@@ -3170,7 +3170,7 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Clear %d %s cards. %d to start, and more arrive as you play" \
 					% [int(o.get("purge_quota", PURGE_QUOTA_BASE)), o.purge_kind, o.purge_count]
 		"mine":
-			return "Break all %d stones. There's gold in some of them, and more stones drop in as you dig" % o.stones
+			return "Break all %d stones. Some have gold cards under them, and more stones drop in as you dig" % o.stones
 		"holdem":
 			return "Target %d. Pick 2 hole cards and score the best 5 of 7 with the community" % o.target
 		"crazy8":
