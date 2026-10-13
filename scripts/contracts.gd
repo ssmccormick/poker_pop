@@ -10,7 +10,7 @@ extends RefCounted
 
 ## {id, name, desc, stat, target, reward, requires: [kind, id] or []}
 const LIST := [
-	{"id": "first_ride", "name": "First Ride", "desc": "Finish a ride on the trail, any way it ends.", "stat": "rides_ended", "target": 1, "reward": 25, "requires": []},
+	{"id": "first_ride", "name": "First Ride", "desc": "Finish one ride on the trail, however it ends.", "stat": "rides_ended", "target": 1, "reward": 25, "requires": []},
 	{"id": "table_talk", "name": "Table Talk", "desc": "Clear 10 tables.", "stat": "tables_cleared", "target": 10, "reward": 40, "requires": []},
 	{"id": "road_worn", "name": "Road Worn", "desc": "Clear 100 tables.", "stat": "tables_cleared", "target": 100, "reward": 200, "requires": []},
 	{"id": "jack_be_nimble", "name": "Jack Be Nimble", "desc": "Beat the Jack of All Trades.", "stat": "beat_jack", "target": 1, "reward": 75, "requires": []},
@@ -25,7 +25,7 @@ const LIST := [
 	{"id": "big_hand", "name": "Big Hand", "desc": "Score 2,000 or more with a single hand.", "stat": "best_hand", "target": 2000, "reward": 100, "requires": []},
 	{"id": "score_keeper", "name": "Score Keeper", "desc": "Score 50,000 in a single ride.", "stat": "trail_score_best", "target": 50000, "reward": 150, "requires": []},
 	{"id": "royal_treatment", "name": "Royal Treatment", "desc": "Play a Royal Flush.", "stat": "hand:Royal Flush", "target": 1, "reward": 150, "requires": []},
-	{"id": "flushed_five", "name": "Flushed Five", "desc": "Play a Flushed Five: five of a kind, all one suit.", "stat": "hand:Flushed Five", "target": 1, "reward": 300, "requires": []},
+	{"id": "flushed_five", "name": "Flushed Five", "desc": "Play a Flushed Five (five of a kind, all in one suit).", "stat": "hand:Flushed Five", "target": 1, "reward": 300, "requires": []},
 	{"id": "safecracker", "name": "Safecracker", "desc": "Crack 5 Bank Jobs.", "stat": "cleared_safe", "target": 5, "reward": 80, "requires": []},
 	{"id": "wanted", "name": "Wanted", "desc": "Win 5 bounties.", "stat": "duels_won", "target": 5, "reward": 100, "requires": []},
 	{"id": "dealers_choice", "name": "Dealer's Choice", "desc": "Clear 5 Dealer's Calls.", "stat": "cleared_hands", "target": 5, "reward": 100, "requires": []},
@@ -36,10 +36,10 @@ const LIST := [
 	{"id": "crazy_eights", "name": "Crazy Eights", "desc": "Clear a Crazy 8s table.", "stat": "cleared_crazy8", "target": 1, "reward": 80, "requires": []},
 	{"id": "card_counter", "name": "Card Counter", "desc": "Win 10 blackjack rounds.", "stat": "blackjack_rounds", "target": 10, "reward": 120, "requires": []},
 	{"id": "river_rat", "name": "River Rat", "desc": "Clear a Texas Hold'em table.", "stat": "cleared_holdem", "target": 1, "reward": 100, "requires": []},
-	{"id": "up_the_sleeve", "name": "Up the Sleeve", "desc": "Swap 25 cards up the sleeve.", "stat": "sleeve_swaps", "target": 25, "reward": 60, "requires": []},
-	{"id": "sleight_master", "name": "Sleight Master", "desc": "Pull 25 sleights of hand.", "stat": "sleights", "target": 25, "reward": 80, "requires": ["trick", "sleight"]},
+	{"id": "up_the_sleeve", "name": "Up the Sleeve", "desc": "Swap in 25 cards with your Ace up the Sleeve.", "stat": "sleeve_swaps", "target": 25, "reward": 60, "requires": []},
+	{"id": "sleight_master", "name": "Sleight Master", "desc": "Use Sleight of Hand 25 times.", "stat": "sleights", "target": 25, "reward": 80, "requires": ["trick", "sleight"]},
 	{"id": "sharpshooter", "name": "Sharpshooter", "desc": "Fire the Laser 25 times.", "stat": "laser_shots", "target": 25, "reward": 80, "requires": ["rider", "the_machine"]},
-	{"id": "time_keeper", "name": "Time Keeper", "desc": "Turn back 25 hands with the pocket watch.", "stat": "hands_unwound", "target": 25, "reward": 80, "requires": ["rider", "the_doctor"]},
+	{"id": "time_keeper", "name": "Time Keeper", "desc": "Rewind 25 hands with the pocket watch.", "stat": "hands_unwound", "target": 25, "reward": 80, "requires": ["rider", "the_doctor"]},
 	{"id": "gamblers_luck", "name": "Gambler's Luck", "desc": "Complete the trail as the Gambler.", "stat": "trail_wins_the_gambler", "target": 1, "reward": 200, "requires": []},
 	{"id": "machine_learning", "name": "Machine Learning", "desc": "Complete the trail as the Machine.", "stat": "trail_wins_the_machine", "target": 1, "reward": 300, "requires": ["rider", "the_machine"]},
 	{"id": "doctors_orders", "name": "Doctor's Orders", "desc": "Complete the trail as the Doctor.", "stat": "trail_wins_the_doctor", "target": 1, "reward": 300, "requires": ["rider", "the_doctor"]},
@@ -117,6 +117,6 @@ static func lock_text(c: Dictionary, prog: Progression) -> String:
 	if not prog.is_unlocked(String(req[0]), String(req[1])):
 		if r.has("after_win"):
 			var by: Dictionary = Progression.row("rider", String(r.after_win))
-			return "Unlocks with %s · win a ride as %s" % [String(r.name), String(by.get("name", ""))]
-		return "Unlocks with %s · Level %d" % [String(r.name), int(r.level)]
-	return "Needs %s · buy it at the Outfitter" % String(r.name)
+			return "Needs %s: win a ride as %s first." % [String(r.name), String(by.get("name", ""))]
+		return "Needs %s, which unlocks at level %d." % [String(r.name), int(r.level)]
+	return "Needs %s. Buy it at the Outfitter." % String(r.name)

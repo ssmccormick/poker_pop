@@ -874,7 +874,7 @@ func _open_deck_peek() -> void:
 		c.queue_free()
 	var pool: Array = board.deck.duplicate()
 	pool.shuffle()
-	_deck_peek_count.text = "%d cards still to come — in no particular order" % pool.size()
+	_deck_peek_count.text = "%d cards left to deal, shown in no particular order" % pool.size()
 	for i in pool.size():
 		var d: Dictionary = pool[i]
 		var pc := PlayingCard.new()
@@ -928,58 +928,58 @@ func _update_kit() -> void:
 			if trail._aiming_laser:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "AIMING…"
-				_sleeve_btn.tooltip_text = "Pick a card on the table to burn — right-click or press again to power down."
+				_sleeve_btn.tooltip_text = "Pick a card on the table to burn. Right-click or press again to cancel."
 			elif trail.laser_used:
 				_sleeve_btn.disabled = true
 				_sleeve_btn.text = "LASER — SPENT"
-				_sleeve_btn.tooltip_text = "One shot per table. It recharges at the next sit-down."
+				_sleeve_btn.tooltip_text = "One shot per table. It recharges when you sit down at the next one."
 			else:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "LASER  ×%d" % (1 + trail.ride_lv("laser"))
-				_sleeve_btn.tooltip_text = "THE LASER — once per table, burn a card clean off the felt%s. Extend the beam at the Outfitter." \
+				_sleeve_btn.tooltip_text = "The Laser: once per table, burn a card right off the table%s. You can widen the beam at the Outfitter." \
 						% ("" if trail.ride_lv("laser") == 0
-						else " (plus %d more in a cross)" % trail.ride_lv("laser"))
+						else ", plus %d more around it in a cross" % trail.ride_lv("laser"))
 		"the_doctor":
 			if trail.watch_uses_left <= 0:
 				_sleeve_btn.disabled = true
 				_sleeve_btn.text = "WATCH — WOUND DOWN"
-				_sleeve_btn.tooltip_text = "No more turns this table. It rewinds at the next sit-down."
+				_sleeve_btn.tooltip_text = "No rewinds left at this table. The watch is wound again at the next one."
 			elif not board.has_undo():
 				_sleeve_btn.disabled = true
 				_sleeve_btn.text = "POCKET WATCH  ×%d" % trail.watch_uses_left
-				_sleeve_btn.tooltip_text = "THE POCKET WATCH — turns the last hand back. Play a hand first."
+				_sleeve_btn.tooltip_text = "The Pocket Watch: takes back your last hand. Play a hand first."
 			else:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "POCKET WATCH  ×%d" % trail.watch_uses_left
-				_sleeve_btn.tooltip_text = "THE POCKET WATCH — press to turn the last hand back: cards, score, the spent hand, all of it. Wind in extra turns at the Outfitter."
+				_sleeve_btn.tooltip_text = "The Pocket Watch: press to take back your last hand. The cards, the score and the hand you used all come back. You can buy extra rewinds at the Outfitter."
 		_ when trail.gambler_ability == "sleight":
 			if trail._aiming_sleight:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "AIMING…"
-				_sleeve_btn.tooltip_text = "Pick a card, then the card beside it — right-click or press again to pocket the trick."
+				_sleeve_btn.tooltip_text = "Pick a card, then the card next to it. Right-click or press again to cancel."
 			elif trail.sleight_uses_left <= 0:
 				_sleeve_btn.disabled = true
 				_sleeve_btn.text = "SLEIGHT — PLAYED"
-				_sleeve_btn.tooltip_text = "No tricks left at this table. They're ready again at the next sit-down."
+				_sleeve_btn.tooltip_text = "No swaps left at this table. They're ready again at the next one."
 			else:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "SLEIGHT OF HAND" if trail.ride_lv("sleight") == 0 \
 						else "SLEIGHT  ×%d" % trail.sleight_uses_left
-				_sleeve_btn.tooltip_text = "SLEIGHT OF HAND — swap two cards that sit side by side. %d trick%s left at this table; palm in more at the Outfitter. Free action." \
+				_sleeve_btn.tooltip_text = "Sleight of Hand: swap two cards that sit side by side. It doesn't cost a hand. You have %d swap%s left at this table, and the Outfitter can add more." \
 						% [trail.sleight_uses_left, "" if trail.sleight_uses_left == 1 else "s"]
 		_:
 			if trail._aiming_sleeve:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "AIMING…"
-				_sleeve_btn.tooltip_text = "Pick a card on the table to swap — right-click or press again to holster."
+				_sleeve_btn.tooltip_text = "Pick a card on the table to swap with. Right-click or press again to cancel."
 			elif trail.sleeve_used:
 				_sleeve_btn.disabled = true
 				_sleeve_btn.text = "SLEEVE — SPENT"
-				_sleeve_btn.tooltip_text = "One swap per table. It comes back at the next sit-down."
+				_sleeve_btn.tooltip_text = "One swap per table. It's back when you sit down at the next one."
 			else:
 				_sleeve_btn.disabled = false
 				_sleeve_btn.text = "SLEEVE  %s" % trail.sleeve_label()
-				_sleeve_btn.tooltip_text = "ACE UP THE SLEEVE — once per table, trade this card for any plain card on the table; what you take rides up the sleeve to another table. Upgrade its starting rank at the trail buy-in."
+				_sleeve_btn.tooltip_text = "Ace Up the Sleeve: once per table, trade this card for any plain card on the table. The card you take stays up your sleeve for a later table. You can raise its starting rank at the Outfitter."
 	var sig_icon := "laser" if trail.character == "the_machine" \
 			else "watch" if trail.character == "the_doctor" \
 			else trail.gambler_ability
@@ -1005,16 +1005,16 @@ func _update_kit() -> void:
 			btn.disabled = false
 			if trail._aiming_slot == i:
 				btn.text = "AIMING…"
-				btn.tooltip_text = "Pick a card on the table — right-click or press again to holster."
+				btn.tooltip_text = "Pick a card on the table. Right-click or press again to cancel."
 			else:
 				btn.text = p.name
 				btn.tooltip_text = trail.provision_desc(String(trail.provisions[i])) + (
-						"\nClick, then pick a card on the table. Free action."
-						if p.kind == "target" else "\nFires on the spot. Free action.")
+						"\nClick it, then pick a card on the table. It doesn't cost a hand."
+						if p.kind == "target" else "\nWorks the moment you click it. It doesn't cost a hand.")
 		else:
 			btn.disabled = true
 			btn.text = "—"
-			btn.tooltip_text = "An empty kit slot. Provisions turn up in shops, safes, and chests."
+			btn.tooltip_text = "An empty kit slot. You'll find provisions in shops, safes and chests."
 		# Centered text keeps clear of the icon on the left edge.
 		UiKit.fit_button_text(btn, 19, 13, 2.0 * (icon.position.x + icon.size.x + 6.0))
 
@@ -1192,25 +1192,25 @@ func _update_preview() -> void:
 			if board.blackjack_presenting or not board.blackjack_hole_hidden:
 				preview_label.text = "The dealer plays out his hand…"
 			else:
-				preview_label.text = "Dealer shows %d. Start from a face-up card and hit one card at a time — flip past 21 and you bust on the spot." % board.blackjack_target
+				preview_label.text = "Dealer shows %d. Start from a face-up card and hit one card at a time. Go over 21 and you bust right away." % board.blackjack_target
 			preview_label.add_theme_color_override("font_color", DIM)
 		else:
 			var total := Poker.blackjack_sum(data)
 			if total == 21:
-				preview_label.text = "TWENTY-ONE — play it!"
+				preview_label.text = "TWENTY-ONE! Play it!"
 				preview_label.add_theme_color_override("font_color", GOLD)
 			else:
-				preview_label.text = "SUM %d vs the dealer's %d showing — hit on (no take-backs), or play to stand." % [total, board.blackjack_target]
+				preview_label.text = "You have %d against the dealer's %d. Hit again (no take-backs) or play the hand to stand." % [total, board.blackjack_target]
 				preview_label.add_theme_color_override("font_color", GOLD)
 		return
 	if not board.holdem_community.is_empty():
 		if data.size() != 2:
-			preview_label.text = "Pick exactly TWO adjacent hole cards — best 5 of 7 with the community."
+			preview_label.text = "Pick exactly TWO touching hole cards. With the community, your best 5 of 7 count."
 			preview_label.add_theme_color_override("font_color", DIM)
 		else:
 			var best := board.holdem_result()
 			if best.is_empty():
-				preview_label.text = "No hand in those seven — try different hole cards."
+				preview_label.text = "There's no hand in those seven. Try different hole cards."
 				preview_label.add_theme_color_override("font_color", RED)
 			else:
 				var shown: Dictionary = best.duplicate()
@@ -1225,12 +1225,12 @@ func _update_preview() -> void:
 	else:
 		for card in board.selected:
 			if card.is_safe:
-				preview_label.text = "COMBINATION SET  —  play the hand to crack the safe!"
+				preview_label.text = "COMBINATION SET! Play the hand to crack the safe."
 				preview_label.add_theme_color_override("font_color", GOLD)
 				return
 		for card in board.selected:
 			if card.washed:
-				preview_label.text = "???  —  a filled card hides this hand's value."
+				preview_label.text = "???  A filled card is hiding what this hand is worth."
 				preview_label.add_theme_color_override("font_color", GOLD)
 				return
 		var result := Poker.evaluate(data)
@@ -1241,10 +1241,10 @@ func _update_preview() -> void:
 					_preview_mod_text(result)]
 			preview_label.add_theme_color_override("font_color", GOLD)
 		elif result.name == "High Card":
-			preview_label.text = "High Card — not playable, you need at least a Pair."
+			preview_label.text = "High Card won't play. You need at least a Pair."
 			preview_label.add_theme_color_override("font_color", RED)
 		else:
-			preview_label.text = "Not a hand — every card must be part of the hand."
+			preview_label.text = "Not a hand. Every card you pick has to be part of it."
 			preview_label.add_theme_color_override("font_color", RED)
 
 
@@ -1339,9 +1339,9 @@ func _on_dead_board() -> void:
 			stat_bump("perfect_clears")
 			msg = "PERFECT CLEAR\n\nYou played out the entire deck!\nFinal score: %d" % score
 		else:
-			msg = "OUT OF HANDS\n\nThe deck is spent — that's the run.\nFinal score: %d" % score
+			msg = "OUT OF HANDS\n\nThe deck's used up, so that's the game.\nFinal score: %d" % score
 	else:
-		msg = "DEAD BOARD\n\nNo playable hands left — that's a loss.\nFinal score: %d" % score
+		msg = "DEAD BOARD\n\nThere are no playable hands left, so the game's over.\nFinal score: %d" % score
 	_show_game_over(msg + "\n\nR — play again    M — menu")
 
 
@@ -1679,7 +1679,7 @@ func _profile_summary(n: int) -> String:
 	var riding: bool = run.load("user://p%d_trail_run.cfg" % n) == OK \
 			and run.get_value("run", "active", false)
 	if not has_meta and not FileAccess.file_exists("user://p%d_tutorial.cfg" % n):
-		return "PROFILE %d\n\nfresh saddle" % n
+		return "PROFILE %d\n\nnot started yet" % n
 	var lv := Progression.level_for_exp(int(cf.get_value("progress", "exp", 0))) \
 			if has_meta else 1
 	return "PROFILE %d\n\nLevel %d  ·  $%d banked%s" % [n, lv, cash,
@@ -1830,18 +1830,18 @@ func _fit_ui_tip() -> void:
 ## live in the first-time tutorials and the Almanac.
 func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.is_safe:
-		return "THE SAFE\nPlay its combo in order, then the safe."
+		return "THE SAFE\nPick its combination in order, then the safe."
 	if card.hazard == "stone":
-		return "STONE\nUnplayable. Clear cards beside it: %d chip%s left." \
+		return "STONE\nCan't be played. Clear cards next to it.\n%d more chip%s and it breaks." \
 				% [card.stone_hits, "" if card.stone_hits == 1 else "s"]
 	if card.snake_tail:
-		return "COBRA TAIL\nA wall. Every hit on his head crumbles one."
+		return "COBRA TAIL\nA wall you have to chain around.\nEach hit on his head crumbles one piece."
 	if card.face_down:
-		return "FACE DOWN\nSelect to hit. Past 21 busts the round."
+		return "FACE DOWN\nSelect it to hit. Go over 21 and you bust."
 	var rank_names := {11: "Jack", 12: "Queen", 13: "King", 14: "Ace"}
 	var lines: Array[String] = []
 	if card.washed:
-		lines.append("FILLED — face hidden · pours every hand")
+		lines.append("FILLED: its face is hidden. Pours every hand.")
 	elif card.joker:
 		lines.append("The Joker")
 	else:
@@ -1849,110 +1849,110 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 				PlayingCard.SUIT_NAMES[card.suit]])
 	match card.boss:
 		"jack":
-			lines.append("JACK — %d left · beat %d to wound him" % [card.boss_hp, board.jack_bar])
+			lines.append("JACK: %d left. Hands that beat %d wound him." % [card.boss_hp, board.jack_bar])
 		"queen":
-			lines.append("QUEEN — %d left · moves and honeys each turn" % card.boss_hp)
+			lines.append("QUEEN: %d left. Moves each turn, leaving honey." % card.boss_hp)
 		"cobra":
-			lines.append("COBRA — %d left · score hands with his head" % card.boss_hp)
+			lines.append("COBRA: %d left. Score hands that use his head." % card.boss_hp)
 	match card.hazard:
 		"bomb":
-			lines.append("BOMB — %d hand%s left · play to defuse" % [card.fuse,
+			lines.append("BOMB: goes off in %d hand%s. Play it to defuse." % [card.fuse,
 					"" if card.fuse == 1 else "s"])
 		"fire":
-			lines.append("FIRE — spreads, burns rank down · play to douse")
+			lines.append("FIRE: spreads and lowers its rank. Play to douse.")
 		"wind":
-			lines.append("WIND — blows a card off each hand · play to still")
+			lines.append("WIND: blows off a card each hand. Play to stop it.")
 		"water":
-			lines.append("WATER — %d/4 full · pours when full · play to clear" % card.water_level)
+			lines.append("WATER: %d/4 full. Pours when full. Play to clear." % card.water_level)
 	if card.incoming != "":
-		lines.append("NEXT IN LINE — the %s strikes here" % card.incoming.to_lower())
+		lines.append("NEXT IN LINE: the %s hits this card next." % card.incoming.to_lower())
 	if card.honey:
-		lines.append("HONEY — only 1 card can follow it")
+		lines.append("HONEY: only 1 card can follow it in a chain.")
 	if card.cursed:
-		lines.append("CURSED — unplayable · burn it at a forge")
+		lines.append("CURSED: can't be played. Burn it at a forge.")
 	if card.joker:
-		lines.append("JOKER — wild · ×2 hand score")
+		lines.append("JOKER: wild, and doubles the hand's score.")
 	match card.mod:
 		"chip":
-			lines.append("CHIP — +%d chips · grows each score" % (board.chip_bonus * (1 + card.chip_level)))
+			lines.append("CHIP: +%d chips. Grows each time it scores." % (board.chip_bonus * (1 + card.chip_level)))
 		"mult":
-			lines.append("MULT — ×%.1f hand score" % board.mult_factor)
+			lines.append("MULT: ×%.1f to the hand's score." % board.mult_factor)
 		"gold":
-			lines.append("GOLD — +$%d cash when played" % board.gold_pay)
+			lines.append("GOLD: +$%d cash when you play it." % board.gold_pay)
 		"plus":
-			lines.append("PLUS — +1 rank to the card it aims at")
+			lines.append("PLUS: +1 rank to the card it points at.")
 		"minus":
-			lines.append("MINUS — −1 rank to its target · 2s break")
+			lines.append("MINUS: −1 rank to its target. A 2 breaks.")
 		"bumper":
-			lines.append("BUMPER — shoves the line it aims at")
+			lines.append("BUMPER: shoves the line it points at.")
 		"wild":
 			if not card.joker:
-				lines.append("WILD — any rank, any suit")
+				lines.append("WILD: counts as any rank and any suit.")
 	if PlayingCard.eights_wild and card.rank == 8 and not card.washed:
-		lines.append("CRAZY 8 — wild at this table")
+		lines.append("CRAZY 8: wild at this table.")
 	match card.finish:
 		"holo":
-			lines.append("HOLO — +%d to the hand, before multipliers" % board.holo_bonus)
+			lines.append("HOLO: +%d to the hand, before multipliers." % board.holo_bonus)
 		"negative":
-			lines.append("NEGATIVE — scoring it gives the hand back")
+			lines.append("NEGATIVE: score it and you get the hand back.")
 		"prism":
-			lines.append("PRISM — spreads its enhancement when cleared")
+			lines.append("PRISM: spreads its enhancement when cleared.")
 		"metal":
 			if card.metal_covered():
-				lines.append("METAL — stays when scored · hazard-proof · %d/%d pins" \
+				lines.append("METAL: stays when scored. Hazard-proof. %d/%d pins." \
 						% [PlayingCard.METAL_PINS - card.metal_wear, PlayingCard.METAL_PINS])
 			else:
-				lines.append("METAL — cover off · clears on its next play")
+				lines.append("METAL: cover's off, so it clears on its next play.")
 	match card.objective:
 		"key":
-			lines.append("KEY — score it with the chest")
+			lines.append("KEY: score it in the same hand as the chest.")
 		"chest":
-			lines.append("CHEST — score it with the key")
+			lines.append("CHEST: score it in the same hand as the key.")
 		"bullet":
-			lines.append("YOUR BULLET — score it to shoot")
+			lines.append("YOUR BULLET: score it to take a shot.")
 		"hisbullet":
-			lines.append("HIS BULLET — clear it and he shoots you (−1 HP)")
+			lines.append("HIS BULLET: clear it and he shoots you (−1 HP).")
 	return "\n".join(lines)
 
 
 # --- First-time tutorials (per profile) ------------------------------------
 
 const TUTOR := {
-	"levels": ["LEVELS & UNLOCKS", "Every ride's score turns into EXP, win or bust, and every level unlocks ONE new thing for the trail: a relic, a provision, a card, a trick or a merchant. Merchants go straight onto the trail; the rest must be BOUGHT at the Outfitter (UPGRADES) before they turn up. New RIDERS are won, not bought: complete the trail as the Gambler to unlock the Machine, and as the Machine to unlock the Doctor. Beat the trail with a rider to open the next ASCENSION for them, up to 20. Owned items can be upgraded too: FIND makes them turn up more often, POWER makes them hit harder. Each level-up also pays a little purse — and CONTRACTS on the menu pay cash for goals met."],
-	"mode_time": ["TIME TRIAL", "Score as much as you can before the clock runs out. Hands are unlimited and the deck reshuffles forever — speed is everything."],
-	"mode_single": ["SINGLE DECK", "One 52-card deck, no timer. When the deck runs dry the run is over — squeeze every point from every card."],
-	"mode_arcade": ["ARCADE", "The bar at the top is always draining. Scoring refills it; hit the level target to move up. When the bar empties, the run ends."],
+	"levels": ["LEVELS & UNLOCKS", "Every ride's score turns into EXP, win or bust, and each level unlocks ONE new thing for the trail: a relic, a provision, a card, a trick or a merchant. Merchants show up on the trail right away. Everything else has to be BOUGHT at the Outfitter (UPGRADES) before it starts turning up. New RIDERS can't be bought, only won: finish the trail as the Gambler to unlock the Machine, and as the Machine to unlock the Doctor. Beat the trail with a rider to open the next ASCENSION level for them, up to 20. You can upgrade the things you own, too. FIND makes them turn up more often, and POWER makes them stronger. Every level-up also pays a small purse, and the CONTRACTS on the menu pay cash when you meet their goals."],
+	"mode_time": ["TIME TRIAL", "Score as much as you can before the clock runs out. Hands are unlimited and the deck keeps reshuffling, so speed is everything."],
+	"mode_single": ["SINGLE DECK", "One 52-card deck and no timer. When the deck runs out, the game's over, so get every point you can out of every card."],
+	"mode_arcade": ["ARCADE", "The bar on the right is always draining. Scoring fills it back up, and reaching the level target moves you up a level. When the bar runs empty, the game ends."],
 	"mode_zen": ["ZEN", "No timer, no limits, no losing. Just you, the cards, and the sound of the pops."],
-	"mode_trail": ["THE TRAIL", "A betting run of 21 tables over 30 stops — two merchants and a campfire wait on the road in every region, and a boss at its end. Buy in for a chip stack — chips are your LIFE and your WAGER. Every table costs an ante plus a bet; clear it to win the pot, fail and it's gone. Chips only become permanent $cash if you RIDE TO THE END — no cashing out early. GOLD cards pay real cash along the way."],
-	"hazard_bomb": ["BOMB CARD", "The fuse number drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse hits zero it goes off: the bomb is gone and the blast costs you 2 HP."],
-	"hazard_fire": ["FIRE CARD", "Every hand, fire spreads to one adjacent card and burns its own rank down. The card it will strike next shows SPARKS catching at its bottom edge, like flint on tinder — get it out of the path or douse the fire. If EVERY card on the table catches fire, the table is LOST."],
-	"hazard_wind": ["WIND CARD", "Every hand, the wind BLOWS the first card in its facing direction clean off the board — unscored, gone. The direction turns a quarter every hand — the dust streaming across the card shows which way it blows. Play the wind card to still the air."],
-	"hazard_stone": ["STONE CARD", "Solid rock squatting on a cell — no rank, no suit, and it can't be played or chained through. Every card you clear BESIDE it chips it; three chips and it crumbles. Broken rock sometimes bares a GOLD card in the rubble."],
-	"hazard_water": ["WATER CARD", "The leak FILLS its card 1/4 per hand. Full to the brim, it POURS — turning all four neighbors into WATER CARDS that fill and pour in turn. A card at the brim hides its face completely; it still IS what it was... if you remember. Play any water card, at any level, to clear it."],
-	"goal_safe": ["THE SAFE", "A locked safe squats on the board showing a 4-digit combination. Select cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it."],
-	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open it — each opened pair respawns a fresh one until the count is met. Clear a piece WITHOUT its partner and it turns up again on a new card — the hand spent finding it is the price. The hardest job on the trail — the strongbox holds a RELIC."],
-	"goal_purge": ["PURGE TABLE", "No score target here — the board is infested, and the infestation KEEPS COMING. A few hazards are seeded at the deal and more arrive as you play; clear the full quota (however you like: play them, gust them, let them burn out) to finish the job."],
-	"goal_mine": ["GOLD MINE", "The board is choked with stone, and the seam runs 20 stones deep. Chip the rocks by clearing cards BESIDE them (three chips each) — broken rock has a chance of leaving GOLD cards in the rubble, and fresh rock rides in on the deal until the whole seam is on the table. Mine it DRY: the table clears only when every last stone is rubble."],
-	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you must play — nothing else counts toward the goal. Composition is exact: a Full House is not three Pairs."],
-	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands: play as many hands as you like, but the job must be done before the countdown dies. The clock ticks in the side panel — red means hurry."],
-	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand — he re-rolls and teleports whenever cards are scored. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE bleeds off him — the bar rises with every hit. Deal 2,000 total to put him away (more on higher Ascensions)."],
-	"boss_queen": ["QUEEN BEE", "The Queen carries a 2,400 SCORE pool (deeper on higher Ascensions) — every hand she's in deals its score as damage. But she never sits still: each turn she flits to a new cell and leaves HONEY where she walked. Honey plays in any hand, but once a honeyed card joins your chain, only ONE more card can follow it — her hive slows your biggest hands."],
-	"boss_cobra": ["KING COBRA", "King Cobra carries a 5,000 SCORE pool (deeper on higher Ascensions) — every hand his head is in deals its score as damage. Each hit stuns him and crumbles the tip of his tail. He EATS an adjacent card every hand, taking its face, and his tail is a wall you must chain around."],
-	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel and stay all room. Each hand, chain exactly TWO adjacent hole cards — your hand is the best five of those seven. Score the target to clear. A RE-DEAL card sometimes appears: play it to refresh the community."],
-	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD — it counts as any rank and suit. The catch: the board CRAWLS with hazards. Let the eights do the dirty work, but mind the fires, fuses, and floods while you do."],
-	"goal_blackjack": ["BLACKJACK", "Poker's off — you're playing the house at a FACE-DOWN table, corners showing. Start a chain from a face-up card, then HIT one card at a time: each face-down card you select flips ON THE SPOT and its pips join your sum (faces 10, aces 11 or 1). Hits are binding — no clearing, no take-backs — and if a flip carries you past 21 you BUST right there. PLAY HAND to stand: the dealer flips his hole card and draws to beat you or bust. Every hand turns another random card face-up. Win enough rounds to clear."],
-	"goal_outlaw": ["THE BOUNTY", "A wanted gun holds this table. Clear YOUR bullets (gold) in scoring hands to shoot. HIS bullets (red) are waiting slugs: clear a card carrying one and he SHOOTS you for it — build your hands AROUND them. Weak hands under the posted score give him a free shot too. Some bounties ride with a gang: drop one and the next steps up fresh. Every shot he lands costs HP — run dry and the ride is over."],
-	"campfire": ["THE CAMPFIRE", "A rest stop on the trail — pick ONE comfort. REST sleeps off the road and recovers HP. TEND A CARD brands a plain deck card with a random enhancement. CAST ONE OFF burns a card from the deck for good. Then the fire dies down and the trail calls."],
-	"hp": ["YOUR HIDE", "The trail hurts now: a flame card burning all the way down sears you, dynamite going off blasts you, every outlaw bullet costs you, and losing a table leaves a mark. The red pips under your score are all that stands between you and a shallow grave — campfires along the trail patch you up."],
-	"goal_collect": ["THE ROUNDUP", "The table calls for particular cardboard: a count of one SUIT, a stack of one RANK, or cards of many DIFFERENT ranks. Only cards actually cleared in scoring hands count — the banner tracks the tally."],
-	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot: clear a card from each of the 25 cells. A claimed plot wears a gold ring — fill the whole homestead to take the table."],
-	"loot_chest": ["KEY & CHEST", "Surprise loot: get the key and the chest into one valid scoring hand to claim it. The chest cracks open once you CLEAR THE TABLE — coin, a card of your choosing, or even a charm. Purely optional — the room's real goal still rules."],
-	"relics": ["RELICS", "Run-wide charms — carry as many as you can afford. Each one quietly bends the rules in your favor for the rest of the ride."],
-	"provisions": ["PROVISIONS", "One-shot supplies in the KIT on the right — three slots (good SADDLEBAGS add a fourth). Some are AIMED: click the provision, then a card on the table. Some fire on the spot. Using one is FREE — it never costs a hand. Restock at shops, or crack safes and chests."],
-	"sleeve": ["ACE UP THE SLEEVE", "You ride with a hidden card — the SLEEVE row atop your kit. Once per table, click it and pick a plain card on the table: they trade places, and the card you take waits up your sleeve for another table. Raise its starting rank with $cash at the Outfitter (UPGRADES on the main menu)."],
-	"sleight": ["SLEIGHT OF HAND", "The Gambler palms a trick — the SLEIGHT row atop your kit. Once per table (the Outfitter palms in more), click it, pick a card, then pick the card right beside it: the two trade places. A free action, no hand spent. Bosses and safes are too heavy to shuffle."],
-	"laser": ["THE LASER", "The Machine carries a beam — the LASER row atop your kit. Once per table, click it and pick a card: the beam burns it clean off the felt, unscored. Safes, bosses and coils deflect it. Each Outfitter upgrade extends the beam one more card into a cross."],
-	"watch": ["THE POCKET WATCH", "The Doctor carries his watch — the row atop your kit. After any hand, press it and the hand UN-HAPPENS: the cards return, the score and the spent hand come back, your HP and the bosses rewind. The clock, if one runs, keeps ticking. More turns per table await at the Outfitter."],
+	"mode_trail": ["THE TRAIL", "A betting run of 21 tables over 30 stops. Every region has two merchants and a campfire along the road, and a boss at the end. You buy in for a stack of chips, and those chips are both your LIFE and your WAGER. Every table costs an ante plus a bet. Clear the table and you win the pot; fail and the bet is gone. Chips only turn into permanent $cash if you RIDE TO THE END, and there's no cashing out early. GOLD cards pay real cash along the way."],
+	"hazard_bomb": ["BOMB CARD", "The number on the fuse drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse reaches zero, it goes off. The bomb is gone and the blast costs you 2 HP."],
+	"hazard_fire": ["FIRE CARD", "After every hand, the fire spreads to one card next to it, and the fire card's own rank burns down. The card it'll catch next shows SPARKS along its bottom edge, so clear that card out of the way or play the fire card to douse it. If EVERY card on the table catches fire, you LOSE the table."],
+	"hazard_wind": ["WIND CARD", "After every hand, the wind BLOWS the first card in the direction it's facing right off the board. That card doesn't score; it's just gone. The wind turns a quarter turn every hand, and the dust streaming across the card shows which way it's blowing. Play the wind card to make it stop."],
+	"hazard_stone": ["STONE CARD", "A chunk of solid rock taking up a space. It has no rank or suit, and you can't play it or chain through it. Every card you clear NEXT TO it chips it, and after three chips it crumbles. Breaking one sometimes turns up a GOLD card."],
+	"hazard_water": ["WATER CARD", "The leak FILLS its card a quarter of the way every hand. Once it's full, it POURS, turning the four cards around it into WATER CARDS that fill up and pour in turn. A full card hides its face completely, but it's still the same card underneath, if you can remember what it was. Play any water card, however full, to clear it."],
+	"goal_safe": ["THE SAFE", "A locked safe sits on the board showing a 4-digit combination. Pick cards with those exact ranks IN ORDER, then the safe itself, and play the hand to crack it open."],
+	"goal_chest": ["KEY & CHEST", "The stage runs on a SCHEDULE: you get unlimited hands, but the clock is ticking. Get the key and the chest into one valid scoring hand to open the chest. Each time you open one, a new key and chest appear, until you've opened enough. If you clear one piece WITHOUT the other, it just turns up again on a different card, and that hand is wasted. It's the hardest job on the trail, but the strongbox holds a RELIC."],
+	"goal_purge": ["PURGE TABLE", "There's no score target here. The board is overrun with hazards, and they KEEP COMING. A few are dealt in at the start and more show up as you play. Clear the full quota to finish the job, any way you like: play them, let the wind blow them off, or let them burn out."],
+	"goal_mine": ["GOLD MINE", "The board is packed with stone, and the seam runs 20 stones deep. Chip the stones by clearing cards NEXT TO them (three chips breaks one). A broken stone might leave GOLD cards behind, and more stones drop in with the deal until the whole seam is on the table. Mine it DRY: the table only clears once every last stone is broken."],
+	"goal_hands": ["DEALER'S CALL", "The dealer names the exact hands you have to play, and nothing else counts toward the goal. It has to be an exact match: a Full House doesn't count as three Pairs."],
+	"goal_timed": ["ON THE CLOCK", "This table runs on TIME, not hands. Play as many hands as you like, but get the job done before the countdown runs out. The clock is in the side panel, and when it turns red, hurry."],
+	"boss_jack": ["JACK OF ALL TRADES", "The Jack wears a new face every hand. Whenever cards are scored, he turns into a different card and jumps to a new spot. Catch him in a scoring hand that BEATS HIS BAR and the hand's WHOLE SCORE comes off his total, but the bar goes up with every hit. Deal 2,000 in all to put him away (more on higher Ascensions)."],
+	"boss_queen": ["QUEEN BEE", "The Queen has a 2,400 SCORE pool (bigger on higher Ascensions), and every hand she's in takes its score out of it. She never sits still, though. Each turn she moves to a new space and leaves HONEY where she walked. A honeyed card can go in any hand, but once one joins your chain, only ONE more card can follow it, so big hands get harder to build."],
+	"boss_cobra": ["KING COBRA", "King Cobra has a 5,000 SCORE pool (bigger on higher Ascensions), and every hand that includes his head takes its score out of it. Each hit stuns him and breaks off the tip of his tail. Every hand, he EATS a card next to him and takes its face. His tail is a wall you have to chain around."],
+	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel for the whole table. Each hand, chain exactly TWO touching hole cards, and your hand is the best five of those seven. Reach the score target to clear the table. Sometimes a RE-DEAL card shows up: play it to get a fresh set of community cards."],
+	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD and counts as any rank and suit. The catch is that the board is CRAWLING with hazards. Let the eights do the dirty work, but watch out for fires, fuses and floods while they do."],
+	"goal_blackjack": ["BLACKJACK", "Poker's off tonight. You're playing the house at a table dealt FACE DOWN, with only the four corners showing. Start a chain from a face-up card, then HIT one card at a time. Each face-down card you select flips over ON THE SPOT and its pips add to your total (face cards count 10, aces 11 or 1). Hits are final, with no clearing and no take-backs, and if a flip takes you over 21 you BUST right there. Press PLAY HAND to stand: the dealer flips his hole card and draws until he beats you or busts. Every hand turns another random card face up. Win enough rounds to clear the table."],
+	"goal_outlaw": ["THE BOUNTY", "A wanted gunman has taken over this table. Clear YOUR bullets (gold) in scoring hands to shoot at him. HIS bullets (red) are trouble waiting to happen: clear a card carrying one and he SHOOTS you, so build your hands AROUND them. A hand that scores under the posted number gives him a free shot too. Some outlaws ride with a gang, and when you drop one, the next steps up fresh. Every shot he lands costs HP, and if you run out, the ride is over."],
+	"campfire": ["THE CAMPFIRE", "A rest stop on the trail. Pick ONE of three things. REST lets you sleep off the road and get HP back. TEND A CARD gives a plain card in your deck a random enhancement. CAST ONE OFF burns a card out of your deck for good. Then the fire dies down and it's back to the trail."],
+	"hp": ["YOUR HIDE", "The trail can hurt you now. A fire card that burns all the way down burns you, a bomb going off blasts you, every outlaw bullet costs you, and losing a table leaves a mark. The red pips under your score are all that stand between you and a shallow grave. Campfires along the trail patch you up."],
+	"goal_collect": ["THE ROUNDUP", "This table wants particular cards: a number of one SUIT, a stack of one RANK, or cards of many DIFFERENT ranks. Only cards you actually clear in scoring hands count, and the banner keeps the tally."],
+	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot by clearing a card from each of the 25 spaces. A claimed plot gets a gold ring. Claim the whole homestead to win the table."],
+	"loot_chest": ["KEY & CHEST", "Surprise loot! Get the key and the chest into one valid scoring hand to claim it. The chest opens once you CLEAR THE TABLE, and it might hold coin, a card of your choice, or even a charm. It's completely optional; the table's real goal still comes first."],
+	"relics": ["RELICS", "Charms that last the whole ride. Carry as many as you can afford. Each one quietly bends the rules in your favor until the ride is over."],
+	"provisions": ["PROVISIONS", "Single-use supplies that sit in the KIT on the right. You have three slots, and good SADDLEBAGS add a fourth. Some are AIMED: click the provision, then a card on the table. Others work the moment you click them. Using one is FREE and never costs a hand. Restock at shops, or find more by cracking safes and chests."],
+	"sleeve": ["ACE UP THE SLEEVE", "You ride with a card hidden up your sleeve: the SLEEVE row at the top of your kit. Once per table, click it and pick a plain card on the table. The two swap places, and the card you took waits up your sleeve for a later table. You can raise its starting rank with $cash at the Outfitter (UPGRADES on the main menu)."],
+	"sleight": ["SLEIGHT OF HAND", "The Gambler has a trick ready: the SLEIGHT row at the top of your kit. Once per table (the Outfitter can add more uses), click it, pick a card, then pick the card right next to it, and the two swap places. It's free and doesn't cost a hand. Bosses and safes are too heavy to move."],
+	"laser": ["THE LASER", "The Machine carries a laser: the LASER row at the top of your kit. Once per table, click it and pick a card, and the beam burns that card right off the table without scoring it. Safes, bosses and the cobra's coils block it. Each Outfitter upgrade adds one more card to the beam, spreading it out into a cross."],
+	"watch": ["THE POCKET WATCH", "The Doctor carries a pocket watch: the row at the top of your kit. After any hand, press it and the hand UN-HAPPENS. The cards return, the score goes back to what it was, you get the hand back, and your HP and the bosses rewind too. If the table has a clock, it keeps ticking. You can buy more rewinds per table at the Outfitter."],
 }
 # (Modifier cards get no popup — hovering any board card shows a
 # tooltip with its full story instead.)
@@ -2017,27 +2017,27 @@ const TUT_STEPS := [
 	{"want": "Pair", "cells": [[1, 2, 7, 0], [2, 2, 7, 1]],
 		"text": "Welcome to the table! Hands are chains of cards that TOUCH. Two cards of the same rank make a PAIR. Click the glowing card 1, then card 2, then press SPACE or PLAY HAND."},
 	{"want": "Two Pair", "cells": [[3, 0, 5, 3], [3, 1, 5, 2], [3, 2, 9, 0], [3, 3, 9, 1]],
-		"text": "Chains run in ANY direction. Two pairs in one chain is TWO PAIR — this one runs straight DOWN a column. Take them 1, 2, 3, 4."},
+		"text": "Chains can run in ANY direction. Two pairs in one chain make TWO PAIR, and this one runs straight DOWN a column. Pick them in order: 1, 2, 3, 4."},
 	{"want": "Three of a Kind", "cells": [[0, 0, 9, 0], [1, 1, 9, 1], [2, 2, 9, 2]],
-		"text": "DIAGONALS count too: every card touches all 8 around it. THREE OF A KIND runs corner to corner here."},
+		"text": "DIAGONALS count too: every card touches all 8 cards around it. Here, THREE OF A KIND runs from corner to corner."},
 	{"want": "Straight", "cells": [[0, 4, 5, 0], [1, 4, 6, 1], [2, 4, 7, 2], [3, 3, 8, 3], [3, 2, 9, 0]],
-		"text": "A chain can TURN. Each card only has to touch the one picked before it. This STRAIGHT (five ranks in a row, any suits) runs along the bottom, up a diagonal, then up."},
+		"text": "A chain can TURN. Each card only has to touch the one you picked before it. This STRAIGHT (five ranks in a row, any suits) runs along the bottom, up a diagonal, then straight up."},
 	{"want": "Flush", "cells": [[0, 1, 2, 1], [1, 0, 6, 1], [2, 1, 9, 1], [3, 0, 11, 1], [4, 1, 13, 1]],
 		"text": "A FLUSH is five cards of ONE suit, any ranks. This one zig-zags up and down along the top two rows."},
 	{"want": "Full House", "cells": [[2, 1, 4, 0], [1, 2, 4, 1], [2, 3, 4, 2], [3, 2, 11, 0], [2, 2, 11, 1]],
-		"text": "ORDER MATTERS: each pick must touch the LAST card picked, so the chain is a path. Go round the diamond 1 → 4, then finish in the middle on 5 — jumping from 1 to 3 won't take, they don't touch. Misclick? Click a picked card to cut the chain back to it. This is a FULL HOUSE: three of a kind plus a pair."},
+		"text": "ORDER MATTERS: each pick has to touch the LAST card you picked, so the chain is a path. Go around the diamond 1 to 4, then finish on 5 in the middle. Jumping from 1 to 3 won't work: they don't touch. Misclicked? Click a picked card to cut the chain back to it. This is a FULL HOUSE: three of a kind plus a pair."},
 	{"want": "Four of a Kind", "cells": [[3, 3, 13, 0], [4, 3, 13, 1], [4, 4, 13, 2], [3, 4, 13, 3]],
-		"text": "FOUR OF A KIND: four of one rank. A tight square works — walk round the block 1 → 4. Every card in the chain must be part of the hand: no spare cards, ever."},
+		"text": "FOUR OF A KIND is four cards of one rank. A tight square works: just go around the block from 1 to 4. Every card in the chain has to be part of the hand. No spare cards, ever."},
 	{"want": "Straight Flush", "cells": [[0, 3, 5, 3], [1, 4, 6, 3], [2, 3, 7, 3], [3, 4, 8, 3], [4, 3, 9, 3]],
 		"text": "A STRAIGHT FLUSH is a straight all in one suit. Diagonal zig-zags are still one chain: down, up, down, up."},
 	{"want": "Five of a Kind", "cells": [[2, 1, 12, 0], [2, 2, 12, 1], [1, 2, 12, 2], [2, 3, 12, 3], [3, 2, 12, 0]],
-		"text": "FIVE OF A KIND: five of one rank — on the trail it takes duplicate cards or wilds. Around the cross: top, the middle, left, bottom, right."},
+		"text": "FIVE OF A KIND is five cards of one rank. On the trail, you'll need duplicate cards or wilds to make one. Go around the cross: top, middle, left, bottom, right."},
 	{"want": "Royal Flush", "cells": [[0, 0, 10, 2], [0, 1, 11, 2], [1, 2, 12, 2], [1, 3, 13, 2], [0, 4, 14, 2]],
-		"text": "A ROYAL FLUSH: 10, J, Q, K, A of one suit, the best straight there is. This one snakes down the left side."},
+		"text": "A ROYAL FLUSH is 10, J, Q, K, A of one suit, the best straight there is. This one snakes down the left side."},
 	{"want": "Flushed Five", "cells": [[0, 1, 8, 1], [1, 2, 8, 1], [2, 3, 8, 1], [3, 2, 8, 1], [4, 1, 8, 1]],
-		"text": "And the best hand of all: the FLUSHED FIVE, five of the very same card. Down the V and back up."},
+		"text": "And the best hand of all: the FLUSHED FIVE, five copies of the exact same card. Go down the V and back up."},
 	{"want": "", "cells": [],
-		"text": "Last one's on you: find ANY hand — a pair or better — and play it. Click or drag across touching cards in any direction. The PAYOUTS list on the right shows what every hand is worth."},
+		"text": "This last one's up to you: find ANY hand, a pair or better, and play it. Click or drag across touching cards in any direction. The PAYOUTS list on the right shows what every hand is worth."},
 ]
 
 
@@ -2377,12 +2377,12 @@ func _tut_on_hand(result: Dictionary) -> void:
 	var hand_name := String(result.name)
 	var step: Dictionary = TUT_STEPS[tut_step]
 	if String(step.want) != "" and hand_name != String(step.want):
-		_announce("THAT'S A %s — WE NEED A %s" % [hand_name.to_upper(),
+		_announce("THAT'S A %s, NOT A %s" % [hand_name.to_upper(),
 				String(step.want).to_upper()], RED)
 		_tut_apply_step()  # re-stamp in case the formation was eaten
 		return
 	if String(step.want) != "" and not _tut_played_marked(result, step):
-		_announce("RIGHT HAND — NOW PLAY THE NUMBERED CARDS", RED)
+		_announce("RIGHT HAND, BUT PLAY THE NUMBERED CARDS", RED)
 		_tut_apply_step()
 		return
 	tut_step += 1
@@ -2407,7 +2407,7 @@ func _tut_played_marked(result: Dictionary, step: Dictionary) -> bool:
 
 
 func _finish_tutorial() -> void:
-	_announce("YOU'RE READY — WELCOME TO THE TABLE")
+	_announce("YOU'RE READY! WELCOME TO THE TABLE")
 	_tut_label.text = "Tutorial complete! Pick a mode from the menu."
 	while board.busy:
 		await get_tree().process_frame
@@ -2952,7 +2952,7 @@ func _build_ui() -> void:
 		pl.add_theme_constant_override("line_spacing",
 				int(row_pitch - f.get_height(20)))
 
-	_label(hud_root, "Click or drag to chain\nadjacent cards — every card\nmust be part of the hand\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
+	_label(hud_root, "Click or drag to chain\ntouching cards. Every card\nmust be part of the hand.\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
 			Vector2(PANEL_R, 860), 16, DIM)
 
 	# The KIT: the sleeve on top, then three provision slots (four with
@@ -3016,7 +3016,7 @@ func _build_ui() -> void:
 	_deck_btn.focus_mode = Control.FOCUS_NONE  # Space stays PLAY HAND's
 	_deck_btn.position = Vector2(PANEL_X - 10, 752)
 	_deck_btn.size = Vector2(310, 276)
-	_deck_btn.tooltip_text = "The cards still to be dealt. Click to riffle through them — no peeking at the order. When the stack runs dry, a fresh copy of your deck shuffles in."
+	_deck_btn.tooltip_text = "The cards still to be dealt. Click to look through them, though you won't see the order they come in. When the stack runs out, a fresh copy of your deck gets shuffled in."
 	_deck_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_deck_btn.pressed.connect(_open_deck_peek)
 	hud_root.add_child(_deck_btn)
@@ -3115,7 +3115,7 @@ func _build_pause() -> void:
 	to_menu.pressed.connect(func() -> void:
 		_toggle_pause()
 		_open_menu())
-	_center_on(pause_layer, "Leaving a trail table is safe — your stake comes back\nand the table waits for your return.", 712, 16, DIM)
+	_center_on(pause_layer, "It's safe to leave a trail table. It'll be waiting for you\njust the way you left it when you come back.", 712, 16, DIM)
 
 	# Sound, right here — no need to leave the table to turn it down.
 	_label(pause_layer, "MUSIC", Vector2(660, 790), 22, OFFWHITE)
@@ -3204,7 +3204,7 @@ func _build_menu() -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	ttw.tween_property(title_logo, "position:y", 50.0, 2.2) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_menu_center("Chain adjacent cards into poker hands", 280, 26, DIM)
+	_menu_center("Chain touching cards into poker hands", 280, 26, DIM)
 
 	_profile_menu_btn = _button(menu_layer, "PROFILE %d" % profile, Vector2(60, 60), Vector2(240, 54))
 	_profile_menu_btn.add_theme_font_size_override("font_size", 20)
@@ -3223,7 +3223,7 @@ func _build_menu() -> void:
 	contracts_btn.pressed.connect(_open_contracts)
 	var seeds_btn := _button(menu_layer, "SEEDED PLAY", Vector2(1620, 188), Vector2(240, 54))
 	seeds_btn.add_theme_font_size_override("font_size", 20)
-	seeds_btn.tooltip_text = "Play a seed — the same game for everyone who plays it — and chase its highscore. Includes the DAILY RIDE."
+	seeds_btn.tooltip_text = "Play a seed, which deals the same game for everyone, and chase its high score. The DAILY RIDE is in here too."
 	seeds_btn.pressed.connect(func() -> void:
 		open_seeds())
 	_contracts_pip = _gold_pip(Vector2(1836, 112))
@@ -3241,7 +3241,7 @@ func _build_menu() -> void:
 	# A gold pip: how many unlocks the Outfitter hasn't shown yet.
 	_upgrades_pip = _gold_pip(Vector2(1440, 322))
 	_refresh_level_plate()
-	_menu_center("Buy in · bet at every table · sculpt your deck · ride to the end or bust", 408, 20, DIM)
+	_menu_center("Buy in, bet on every table, build your deck, and ride to the end or bust.", 408, 20, DIM)
 
 	_menu_center("TIME TRIAL", 456, 24, GOLD)
 	var times := [60.0, 180.0, 300.0]
@@ -3252,25 +3252,25 @@ func _build_menu() -> void:
 		var secs: float = times[i]
 		b.pressed.connect(func() -> void:
 			_start_mode("time", secs))
-	_menu_center("Unlimited hands · reshuffling deck · beat the clock", 558, 18, DIM)
+	_menu_center("Unlimited hands and a deck that reshuffles. Just beat the clock.", 558, 18, DIM)
 
 	var single_btn := _button(menu_layer, "SINGLE DECK", Vector2(700, 604), Vector2(520, 60))
 	single_btn.add_theme_font_size_override("font_size", 24)
 	single_btn.pressed.connect(func() -> void:
 		_start_mode("single"))
-	_menu_center("One 52-card deck · no timer · play until no hands remain", 672, 18, DIM)
+	_menu_center("One 52-card deck and no timer. Play until no hands are left.", 672, 18, DIM)
 
 	var arcade_btn := _button(menu_layer, "ARCADE", Vector2(700, 712), Vector2(520, 60))
 	arcade_btn.add_theme_font_size_override("font_size", 24)
 	arcade_btn.pressed.connect(func() -> void:
 		_start_mode("arcade"))
-	_menu_center("Rising score targets · an always-draining bar · keep scoring or lose", 780, 18, DIM)
+	_menu_center("Rising targets and an always-draining bar. Keep scoring or lose.", 780, 18, DIM)
 
 	var zen_btn := _button(menu_layer, "ZEN", Vector2(700, 820), Vector2(520, 60))
 	zen_btn.add_theme_font_size_override("font_size", 24)
 	zen_btn.pressed.connect(func() -> void:
 		_start_mode("zen"))
-	_menu_center("No timer · no hand limit · deck reshuffles forever", 888, 18, DIM)
+	_menu_center("No timer and no hand limit, and the deck never runs out.", 888, 18, DIM)
 
 	if OS.has_feature("web"):
 		var opt_btn := _button(menu_layer, "OPTIONS", Vector2(835, 972), Vector2(250, 54))
@@ -3347,7 +3347,7 @@ func _build_profiles_and_tutor() -> void:
 	var st := _label(stats_layer, "THE LEDGER", Vector2(0, 110), 64, UiKit.BRASS_HI)
 	st.size = Vector2(VIEW.x, 90)
 	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var headers := ["AT THE TABLES", "ON THE TRAIL", "OTHER SADDLES"]
+	var headers := ["AT THE TABLES", "ON THE TRAIL", "OTHER MODES"]
 	for i in 3:
 		var hx := 150.0 + i * 580.0
 		# Each column on its own leather plate.
@@ -3647,7 +3647,7 @@ func _open_stats_now() -> void:
 	]
 	var the_trail: Array = [
 		["Rider level", "%d" % trail.progress.level()],
-		["Runs saddled up", str(s.call("trail_runs"))],
+		["Rides started",str(s.call("trail_runs"))],
 		["Trails completed", str(s.call("trail_wins"))],
 		["Best ride score", str(s.call("trail_score_best"))],
 		["Busted out", str(s.call("trail_busts"))],
@@ -3663,7 +3663,7 @@ func _open_stats_now() -> void:
 		["Arcade runs", str(s.call("arcade_games"))],
 		["Best arcade level", str(s.call("arcade_best_level"))],
 		["Best arcade score", str(s.call("arcade_best"))],
-		["Time trials ridden", str(s.call("time_games"))],
+		["Time trials played",str(s.call("time_games"))],
 		["Best time-trial score", str(s.call("time_best"))],
 		["Single decks played", str(s.call("single_games"))],
 		["Best single-deck score", str(s.call("single_best"))],
@@ -3765,17 +3765,17 @@ func _refresh_seeds() -> void:
 	_seed_best.text = ("YOUR BEST ON THIS SEED:  %d" % best) if best > 0 \
 			else ("NO SCORE ON THIS SEED YET" if ok else "A SEED IS 8 LETTERS AND NUMBERS")
 	if is_trail:
-		_seed_rules.text = "A seeded ride plays the STANDARD LOADOUT: every relic, provision and card on the trail at base power, no Outfitter gear, any rider. It earns EXP, but banks no cash, opens no Ascension and doesn't count toward the next rider. Everyone on this seed plays the very same trail."
+		_seed_rules.text = "A seeded ride uses the STANDARD LOADOUT: every relic, provision and card on the trail at base power, no Outfitter gear, and any rider you like. You'll earn EXP, but not cash, Ascension levels or progress toward the next rider. Everyone on this seed rides the exact same trail."
 	else:
 		_seed_rules.text = "The same seed deals the same table, in the same order, for everyone who plays it."
 	_seed_warn.text = ""
 	if is_trail and trail._has_saved_run():
-		_seed_warn.text = "Starting a seeded ride ends your saved ride (its EXP is kept)."
+		_seed_warn.text = "Starting a seeded ride ends your saved ride, but you keep its EXP."
 	if _seed_daily:
 		var used := seed_book.daily_used(st)
 		_seed_start.text = "PRACTICE THE DAILY" if used else "RIDE THE DAILY"
 		if used:
-			_seed_warn.text = "Today's scored daily ride is spent — this one is practice."
+			_seed_warn.text = "You've used today's scored daily ride, so this one is just practice."
 	else:
 		_seed_start.text = "START"
 	if _seed_name_edit != null and not _seed_name_edit.has_focus():
@@ -3811,7 +3811,7 @@ func _show_online_board(k: String) -> void:
 	if k == "":
 		_board_message("")
 	elif not Leaderboard.live():
-		_board_message("Offline — your bests are kept on this machine.")
+		_board_message("You're offline. Your best scores are still saved on this machine.")
 	else:
 		_board_message("Loading the board…")
 		leaderboard.fetch_top(k)
@@ -3830,7 +3830,7 @@ func _board_message(text: String) -> void:
 
 func _on_board_failed(k: String) -> void:
 	if k == _shown_board_key:
-		_board_message("Can't reach the online board right now — your bests are kept on this machine.")
+		_board_message("Can't reach the online board right now. Your best scores are still saved on this machine.")
 
 
 func _on_board_fetched(k: String, rows: Array) -> void:
@@ -3914,7 +3914,7 @@ func _build_seeds() -> void:
 	var title := _label(seeds_layer, "SEEDED PLAY", Vector2(0, 70), 64, UiKit.BRASS_HI)
 	title.size = Vector2(VIEW.x, 90)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var sub := _label(seeds_layer, "One seed, one game — the same deal for everyone. Share it, beat it.",
+	var sub := _label(seeds_layer, "One seed deals the same game for everyone. Share it and beat it.",
 			Vector2(0, 160), 22, DIM)
 	sub.size = Vector2(VIEW.x, 30)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3962,7 +3962,7 @@ func _build_seeds() -> void:
 		DisplayServer.clipboard_set(SeedRng.pretty(_seed_text()))
 		_announce("SEED COPIED"))
 	var daily := _button(seeds_layer, "DAILY RIDE", Vector2(1375, 300), Vector2(180, 56), true)
-	daily.tooltip_text = "Today's seed — the same trail for everyone, Ascension 0. One scored ride a day."
+	daily.tooltip_text = "Today's seed: the same trail for everyone, at Ascension 0. You get one scored ride a day."
 	daily.pressed.connect(func() -> void:
 		_seed_daily = true
 		_seed_mode = "trail"

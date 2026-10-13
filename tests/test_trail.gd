@@ -429,7 +429,7 @@ func _run() -> void:
 	main._refresh_seeds()
 	await process_frame
 	var board_kids: Array = main._seed_board_box.get_children().filter(func(c): return not c.is_queued_for_deletion())
-	failures += _check(board_kids.size() == 2 and String(board_kids[1].text).contains("Offline"),
+	failures += _check(board_kids.size() == 2 and String(board_kids[1].text).to_lower().contains("offline"),
 			"with no keys the online board says it's offline")
 	main._on_board_fetched(main._shown_board_key, [
 			{"player_id": "someone-else", "player_name": "Calamity", "score": 900},

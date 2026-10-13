@@ -432,7 +432,7 @@ func _build_seed() -> void:
 		copy.pressed.connect(func() -> void: seed_action.emit("copy"))
 		var play: Button = host._button(_ui, "PLAY THIS SEED", Vector2(1570, 126), Vector2(230, 44))
 		play.add_theme_font_size_override("font_size", 16)
-		play.tooltip_text = "Open SEEDED PLAY on this seed — the same trail, on the standard loadout, for its board."
+		play.tooltip_text = "Opens SEEDED PLAY on this seed: the same trail with the standard loadout, and your score goes on its board."
 		play.pressed.connect(func() -> void: seed_action.emit("play"))
 
 
@@ -863,7 +863,7 @@ func _build_banner() -> void:
 	var names: Array = _data.get("contracts", [])
 	if names.size() > 0:
 		var shown := names.slice(0, 2)
-		var text := "CONTRACT%s DONE: %s%s — claim from the menu" % [
+		var text := "CONTRACT%s DONE: %s%s. Claim the cash from the menu." % [
 				"S" if names.size() > 1 else "", ", ".join(shown),
 				" +%d more" % (names.size() - 2) if names.size() > 2 else ""]
 		_contracts_l = _label(_ui, text, _font(FontLib.label), 20, GOLD,
@@ -900,7 +900,7 @@ func _build_banner() -> void:
 		fs -= 1
 	_label(_banner, body, serif, fs, BONE, Rect2(40, 98, 540, 40), HORIZONTAL_ALIGNMENT_CENTER)
 	var purse := int(_data.get("purse", 0))
-	_label(_banner, "Level purse  +$%s  ·  see the Outfitter" % _commas(purse), serif, 22,
+	_label(_banner, "Level purse: +$%s to spend at the Outfitter" % _commas(purse), serif, 22,
 			GOLD, Rect2(40, 150, 540, 40), HORIZONTAL_ALIGNMENT_CENTER)
 
 

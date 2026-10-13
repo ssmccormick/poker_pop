@@ -153,22 +153,22 @@ const TAB_KINDS := {"riders": ["rider", "trick"], "relics": ["relic"],
 # [ladder id, title, blurb, owner kind, owner id]
 const LADDERS := [
 	["sleeve", "ACE UP THE SLEEVE — THE GAMBLER",
-		"His hidden swap card — once per table, trade it for any plain card on the felt. Raising it raises its starting rank, all the way to an Ace.",
+		"Once per table, he can trade the card up his sleeve for any plain card on the felt. Each upgrade raises its starting rank, up to an Ace.",
 		"rider", "the_gambler"],
 	["sleight", "SLEIGHT OF HAND — THE GAMBLER",
-		"His other trick: swap two cards that sit side by side. Each upgrade palms another trick per table.",
+		"His other trick lets him swap two cards that sit side by side. Each upgrade adds one more swap per table.",
 		"trick", "sleight"],
 	["laser", "THE LASER — THE MACHINE",
-		"One shot per table burns a card clean off the felt. Each upgrade extends the beam one more card into a full cross.",
+		"Once per table, the laser burns a card clean off the felt. Each upgrade adds one more card to the beam, until it hits a full cross.",
 		"rider", "the_machine"],
 	["watch", "THE POCKET WATCH — THE DOCTOR",
-		"Turns the last hand back: cards, score, the spent hand, all of it. Each upgrade winds in another turn per table.",
+		"Undoes your last hand: the cards, the score, the hand you spent, all of it. Each upgrade gives you one more undo per table.",
 		"rider", "the_doctor"],
 	["bankroll", "BANKROLL",
-		"Ride out heavier: +20 starting chips on every buy-in, per level, at every stake.",
+		"Each level adds 20 chips to your starting stack on every buy-in, whatever the stakes.",
 		"gear", "bankroll"],
 	["provisions", "PACKED KIT",
-		"Never leave town empty-handed: a random provision already in the kit at every run's start, per level.",
+		"Each level puts one random provision in your kit at the start of every ride.",
 		"gear", "provisions"],
 ]
 const ROOM_EMBLEMS := {"room:plain": "limit_table", "room:clock": "high_noon",
@@ -180,28 +180,28 @@ const ROOM_EMBLEMS := {"room:plain": "limit_table", "room:clock": "high_noon",
 		"merchant:collector": "traveling_merchant", "merchant:sharp": "traveling_merchant",
 		"stake:0": "limit_table", "stake:1": "pot_limit", "stake:2": "no_limit"}
 const CATALOG_DESCS := {
-	"mod:mult": "×1.5 to the hand's score.",
-	"mod:chip": "Extra chips on every score, growing each time it's played.",
-	"mod:gold": "+$1 cash every time it's played.",
-	"mod:plus": "+1 rank to the card it aims at. Lifts an Ace into THE JOKER: wild, ×2.",
-	"mod:minus": "−1 rank to the card it aims at; a 2 breaks.",
-	"mod:bumper": "Cleared, it shoves the line it aims at one step.",
+	"mod:mult": "Multiplies the hand's score by ×1.5.",
+	"mod:chip": "Adds extra chips to every score, and the bonus grows each time you play it.",
+	"mod:gold": "Pays $1 cash every time you play it.",
+	"mod:plus": "Raises the card it points at by one rank. An Ace becomes THE JOKER, which is wild and doubles the hand.",
+	"mod:minus": "Lowers the card it points at by one rank. A 2 breaks.",
+	"mod:bumper": "When you clear it, it shoves the line it points at one step.",
 	"mod:wild": "Any rank, any suit. The rarest card on the trail.",
-	"room:plain": "Score the target before the hands run out.",
-	"room:clock": "HIGH NOON: tables against a countdown instead of a hand budget.",
-	"room:safe": "BANK JOB: play the safe's combo in order, then crack it.",
-	"room:outlaw": "BOUNTY: clear your bullets, dodge his — outdraw a wanted gun or his posse.",
-	"room:hands": "DEALER'S CALL: play exactly the hands the table demands.",
-	"room:chest": "STAGECOACH HAUL: pair keys with chests. The strongbox holds a relic.",
-	"room:purge": "Powder Keg, Wildfire, Dust Storm, Flash Flood: clear a quota of one hazard.",
-	"room:mine": "GOLD MINE: break the seam of stones. Gold turns up in the rubble.",
-	"room:collect": "THE ROUNDUP & THE CENSUS: clear the called suit, rank, or every rank.",
+	"room:plain": "Hit the target score before you run out of hands.",
+	"room:clock": "High Noon: you play against a countdown clock instead of a set number of hands.",
+	"room:safe": "Bank Job: play the safe's combination in order, then crack it open.",
+	"room:outlaw": "Bounty: clear your bullets and dodge his. Outdraw a wanted outlaw, or his whole posse.",
+	"room:hands": "Dealer's Call: play exactly the hands the table calls for.",
+	"room:chest": "Stagecoach Haul: match keys to chests. The strongbox holds a relic.",
+	"room:purge": "Powder Keg, Wildfire, Dust Storm and Flash Flood: clear a set number of one kind of hazard.",
+	"room:mine": "Gold Mine: break up the stones. There's gold in some of them.",
+	"room:collect": "The Roundup and The Census: clear the suit or rank the table calls, or one of every rank.",
 	"room:crazy8": "Every 8 on the board is wild.",
-	"room:landrush": "Stake a claim on every plot: clear a card from all 25 cells.",
-	"room:blackjack": "Chains count to 21. Beat the dealer, round after round.",
-	"room:holdem": "Five community cards, two in the hole.",
-	"room:royal": "One Royal Flush. On the clock.",
-	"room:dealer": "Past the last saloon, THE DEALER shuffles a perfect deck and waits.",
+	"room:landrush": "Stake a claim on every plot by clearing a card from all 25 spaces.",
+	"room:blackjack": "Make chains that add up to 21 and beat the dealer, round after round.",
+	"room:holdem": "Five community cards everyone shares, plus two hole cards of your own.",
+	"room:royal": "Make one Royal Flush before the clock runs out.",
+	"room:dealer": "Past the last saloon, THE DEALER is waiting with a perfect deck.",
 }
 
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
@@ -212,13 +212,13 @@ const RELIC_PRICES := [150, 300, 600, 1000]  # by rarity C/R/EPIC/L — carry is
 # per room, with their own stock — some deal only in relics.
 const MERCHANTS := [
 	{"id": "peddler", "name": "THE PEDDLER'S WAGON",
-		"line": "A little of everything, friend — cards, trinkets, and a hot forge.",
+		"line": "A little of everything, friend. Cards, trinkets, and a hot forge.",
 		"cards": 8, "relics": 2, "provisions": 2, "forge": true},
 	{"id": "collector", "name": "THE COLLECTOR",
-		"line": "No cardboard here. Only trinkets of real power.",
+		"line": "I don't deal in cards. Just trinkets with real power in them.",
 		"cards": 0, "relics": 4, "provisions": 2, "forge": false},
 	{"id": "sharp", "name": "THE CARD SHARP",
-		"line": "Finest cardboard on the trail — and a forge for your regrets.",
+		"line": "Finest cards on the trail, and a forge to burn the ones you regret.",
 		"cards": 10, "relics": 0, "provisions": 1, "forge": true},
 ]
 
@@ -227,43 +227,43 @@ const MERCHANTS := [
 # one is a free action — the provision itself is the price.
 const PROVISIONS := {
 	"canteen": {"name": "Canteen", "kind": "target", "price": 45,
-		"desc": "Douse one card: removes any hazard or soak"},
+		"desc": "Douse one card to wash off any hazard or water"},
 	"dynamite": {"name": "Dynamite Stick", "kind": "target", "price": 60,
-		"desc": "Destroy one card outright, unscored - stones and curses included"},
+		"desc": "Destroy any card, even a stone or a curse (it doesn't score)"},
 	"branding_iron": {"name": "Branding Iron", "kind": "target", "price": 70,
 		"desc": "Brand a plain card with a random enhancement"},
 	"razor": {"name": "Barber's Razor", "kind": "target", "price": 50,
-		"desc": "Re-roll one card's rank and suit"},
+		"desc": "Give one card a new random rank and suit"},
 	"gold_pan": {"name": "Gold Pan", "kind": "target", "price": 65,
 		"desc": "Turn one plain card solid GOLD"},
 	"shell_game": {"name": "Shell Game", "kind": "target", "price": 50,
-		"desc": "Swap two neighboring cards - pick one, then its neighbor"},
+		"desc": "Swap two cards that sit side by side: pick one, then its neighbor"},
 	"fresh_deck": {"name": "Fresh Deck", "kind": "instant", "price": 55,
 		"desc": "Re-deal every plain and enhanced card on the table"},
 	"pocket_flask": {"name": "Pocket Flask", "kind": "instant", "price": 60,
-		"desc": "+2 hands at this table (+20s on a timed one)"},
+		"desc": "+2 hands at this table, or +20 seconds on a timed one"},
 	"tonic": {"name": "Rattlesnake Tonic", "kind": "instant", "price": 70,
 		"desc": "Your next scored hand counts DOUBLE"},
 }
 const MAX_PROVISIONS := 3
 const RELICS := {
-	"horseshoe": {"name": "Horseshoe", "rarity": 0, "desc": "+1 hand in every room"},
-	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks offer 4 choices"},
-	"snake_oil": {"name": "Snake Oil", "rarity": 0, "desc": "Shop prices -25%"},
-	"tin_star": {"name": "Tin Star", "rarity": 0, "desc": "Every cleared table pays an extra blind"},
+	"horseshoe": {"name": "Horseshoe", "rarity": 0, "desc": "+1 hand at every table"},
+	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks give you 4 choices"},
+	"snake_oil": {"name": "Snake Oil", "rarity": 0, "desc": "Shop prices are 25% lower"},
+	"tin_star": {"name": "Tin Star", "rarity": 0, "desc": "Every table you clear pays one extra blind"},
 	"rabbits_foot": {"name": "Rabbit's Foot", "rarity": 0, "desc": "Surprise safes and chests turn up twice as often on plain tables"},
-	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with +2 fuse"},
-	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones need one fewer use"},
-	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks every 2nd hand"},
-	"swimming_goggles": {"name": "Swimming Goggles", "rarity": 1, "desc": "Filled cards still show their suit"},
+	"bomb_badge": {"name": "Bomb Squad Badge", "rarity": 0, "desc": "Bombs start with 2 more turns on the fuse"},
+	"chisel": {"name": "Chisel", "rarity": 0, "desc": "Stones take one fewer play to break"},
+	"fire_blanket": {"name": "Fire Blanket", "rarity": 1, "desc": "Fire only ticks down every 2nd hand"},
+	"swimming_goggles": {"name": "Swimming Goggles", "rarity": 1, "desc": "Water-filled cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
-	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards x2 instead of x1.5"},
-	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "One free life: when the trail would end you, rise with 5 HP and chips for the table. Then it's spent"},
-	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Trail completion pays +0.25x"},
-	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combos use only ranks 2-6"},
+	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards multiply by 0.5 more (x1.5 becomes x2)"},
+	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "One free life: when the trail would finish you off, you get back up with 5 HP and enough chips for the table. Works once"},
+	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Finishing the trail pays +0.25x"},
+	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combinations only use ranks 2-6"},
 	"saddlebags": {"name": "Saddlebags", "rarity": 1, "desc": "A 4th slot in your provision kit"},
-	"lucky_chip": {"name": "Lucky Chip", "rarity": 3, "desc": "10% chance a hand costs no hand"},
-	"chuck_wagon": {"name": "Chuck Wagon", "rarity": 2, "desc": "A random provision at every table's start"},
+	"lucky_chip": {"name": "Lucky Chip", "rarity": 3, "desc": "10% chance a hand you play doesn't use up a hand"},
+	"chuck_wagon": {"name": "Chuck Wagon", "rarity": 2, "desc": "A random provision at the start of every table"},
 }
 
 var main: Node2D  # set by main.gd before build()
@@ -351,16 +351,16 @@ const CHARACTERS := {
 	"the_gambler": {"name": "The Gambler", "ability": "ACE UP THE SLEEVE",
 			"line": "Once per table, trade the card up his sleeve for any plain card on the felt."},
 	"the_machine": {"name": "The Machine", "ability": "THE LASER",
-			"line": "Once per table, burn a card clean off the felt. Upgrades extend the beam into a cross."},
+			"line": "Once per table, burn a card clean off the felt. Upgrades widen the beam into a cross."},
 	"the_doctor": {"name": "The Doctor", "ability": "THE POCKET WATCH",
-			"line": "Turn the last hand back as if it never happened. Upgrades wind in extra uses."},
+			"line": "Undo your last hand as if it never happened. Upgrades give you extra uses."},
 }
 ## The Gambler picks one signature when he saddles up.
 const GAMBLER_ABILITIES := {
 	"sleeve": {"ability": "ACE UP THE SLEEVE", "short": "SLEEVE",
 			"line": "Once per table, trade the card up his sleeve for any plain card on the felt."},
 	"sleight": {"ability": "SLEIGHT OF HAND", "short": "SLEIGHT",
-			"line": "Swap two cards that sit side by side, once per table. Upgrades palm in more tricks."},
+			"line": "Once per table, swap two cards that sit side by side. Upgrades give you more swaps."},
 }
 const LASER_DIRS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 var character := "the_gambler"   # the rider this run
@@ -899,25 +899,25 @@ func use_sleeve() -> void:
 		return
 	if sleeve_used:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-		main._announce("THE SLEEVE IS SPENT — one swap per table", main.RED)
+		main._announce("SLEEVE ALREADY USED — one swap per table", main.RED)
 		return
 	_aiming_slot = -1  # only one thing aims at a time
 	_aiming_sleeve = true
 	main.board.pending_provision = "sleeve"
-	main._announce("PICK A CARD TO SWAP FOR THE %s — right-click to holster"
+	main._announce("PICK A CARD TO SWAP FOR THE %s — right-click to cancel"
 			% sleeve_label(), main.GOLD)
 
 
 ## Why this card can't be traded up the sleeve — "" when it can.
 func _sleeve_refusal(card: PlayingCard) -> String:
 	if card.face_down:
-		return "IT'S FACE DOWN — no blind trades"
+		return "IT'S FACE DOWN — you can't trade blind"
 	if card.boss != "" or card.is_safe or card.snake_tail:
 		return "THAT WON'T FIT UP A SLEEVE"
 	if card.cursed or card.hazard != "" or card.washed or card.water_level > 0:
-		return "NOTHING CURSED, BURNING, TICKING, OR DRIPPING GOES UP THE SLEEVE"
+		return "NO CURSED, WET OR HAZARD CARDS UP THE SLEEVE"
 	if card.objective != "":
-		return "THE JOB PIECE STAYS ON THE TABLE"
+		return "PIECES OF THE JOB STAY ON THE TABLE"
 	return ""
 
 
@@ -985,7 +985,7 @@ func use_sleight() -> void:
 	_aiming_sleight = true
 	_swap_first = null
 	main.board.pending_provision = "sleight"
-	main._announce("PICK A CARD, THEN ITS NEIGHBOR — right-click to pocket", main.GOLD)
+	main._announce("PICK A CARD, THEN ONE BESIDE IT — right-click to cancel", main.GOLD)
 
 
 ## Two picks for a side-by-side swap: returns the first card once
@@ -997,17 +997,17 @@ func _swap_pair_pick(card: PlayingCard, anywhere := false) -> PlayingCard:
 		_swap_first = card
 		main.board._play_sound(Board.SFX_FLIP, 1.3, -10.0)
 		main.board._fx(card.position, "pop", main.GOLD)
-		main._announce("NOW PICK %s — right-click to holster"
-				% ("ANY OTHER CARD" if anywhere else "THE CARD BESIDE IT"), main.GOLD)
+		main._announce("NOW PICK %s — right-click to cancel"
+				% ("ANY OTHER CARD" if anywhere else "A CARD BESIDE IT"), main.GOLD)
 		return null
 	if card == _swap_first:
 		_swap_first = null
-		main._announce("UNPICKED — choose the first card again", main.DIM)
+		main._announce("DESELECTED — pick your first card again", main.DIM)
 		return null
 	var dp: Vector2i = card.grid_pos - _swap_first.grid_pos
 	if absi(dp.x) + absi(dp.y) != 1 and not anywhere:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-		main._announce("THEY MUST SIT SIDE BY SIDE", main.RED)
+		main._announce("THE CARDS HAVE TO BE SIDE BY SIDE", main.RED)
 		return null
 	var first := _swap_first
 	_swap_first = null
@@ -1027,14 +1027,14 @@ func use_laser() -> void:
 		return
 	if laser_used:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-		main._announce("THE LASER IS SPENT — one shot per table", main.RED)
+		main._announce("LASER ALREADY FIRED — one shot per table", main.RED)
 		return
 	_aiming_slot = -1  # only one thing aims at a time
 	_aiming_sleeve = false
 	_aiming_sleight = false
 	_aiming_laser = true
 	main.board.pending_provision = "laser"
-	main._announce("TARGET A CARD — right-click to power down", main.GOLD)
+	main._announce("PICK A TARGET — right-click to cancel", main.GOLD)
 
 
 ## The beam: the target plus one more card per unlocked arm (up,
@@ -1064,7 +1064,7 @@ func _do_laser(target: PlayingCard) -> void:
 	for piece in pieces:
 		if room_goal == "chest" and in_room:
 			main.board.spawn_objective(String(piece))
-			main._announce("THE %s TURNS UP ELSEWHERE" % String(piece).to_upper())
+			main._announce("THE %s TURNS UP SOMEWHERE ELSE" % String(piece).to_upper())
 
 
 ## THE DOCTOR's pocket watch: the last hand un-happens — cards,
@@ -1078,15 +1078,15 @@ func use_watch() -> void:
 		return
 	if watch_uses_left <= 0:
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-		main._announce("THE WATCH IS WOUND DOWN — no more turns this table", main.RED)
+		main._announce("THE WATCH HAS RUN DOWN — no more undos at this table", main.RED)
 		return
 	if room_goal == "blackjack":
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-		main._announce("THE DEALER GUARDS HIS DEAL — no rewinds at blackjack", main.RED)
+		main._announce("NO UNDOING AT BLACKJACK — the dealer won't allow it", main.RED)
 		return
 	if _watch_snapshot.is_empty() or not main.board.has_undo():
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-		main._announce("NOTHING TO TURN BACK — play a hand first", main.RED)
+		main._announce("NOTHING TO UNDO — play a hand first", main.RED)
 		return
 	if not main.board.restore_state():
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
@@ -1196,9 +1196,9 @@ func take_damage(amount: int, why := "", cause := "") -> bool:
 	main.stat_bump("trail_deaths")
 	_clear_run_save()
 	_end_run("LAID LOW",
-			"%s\nThe trail took its last pound of flesh.\n%s won't finish this ride." \
-			% [why if why != "" else "The last blow landed.", character_name()], 0,
-			cause if cause != "" else "The last blow landed.")
+			"%s\nThe trail finally got the better of you.\n%s won't finish this ride." \
+			% [why if why != "" else "That last hit was too much.", character_name()], 0,
+			cause if cause != "" else "That last hit was too much.")
 	return false
 
 
@@ -1247,7 +1247,7 @@ func use_provision(slot: int) -> void:
 	_aiming_slot = slot
 	_swap_first = null
 	main.board.pending_provision = id
-	main._announce("PICK A CARD FOR THE %s — right-click to holster"
+	main._announce("PICK A CARD FOR THE %s — right-click to cancel"
 			% String(p.name).to_upper(), main.GOLD)
 
 
@@ -1255,7 +1255,7 @@ func _spend_provision(slot: int) -> void:
 	var id: String = provisions[slot]
 	# Upgraded tools sometimes survive the job.
 	if _rng.randf() < float(pv(id, "keep", 0.0)):
-		main._announce("THE %s HOLDS UP — still in the kit" % String(PROVISIONS[id].name).to_upper())
+		main._announce("THE %s HELD UP — it's still in your kit" % String(PROVISIONS[id].name).to_upper())
 	else:
 		provisions.remove_at(slot)
 	_aiming_slot = -1
@@ -1267,7 +1267,7 @@ func _spend_provision(slot: int) -> void:
 func _apply_instant_provision(id: String) -> void:
 	match id:
 		"fresh_deck":
-			main._announce("FRESH DECK — THE TABLE TURNS OVER")
+			main._announce("FRESH DECK — NEW CARDS ON THE TABLE")
 			main.board.provision_redeal()
 		"pocket_flask":
 			if room_limit == "time":
@@ -1295,7 +1295,7 @@ func _on_provision_target(card) -> void:
 			return
 		if card.is_safe or card.boss != "" or card.snake_tail:
 			main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
-			main._announce("THE BEAM GLANCES OFF — pick a softer target", main.RED)
+			main._announce("THE BEAM BOUNCES OFF — pick another card", main.RED)
 			return  # still aiming
 		_aiming_laser = false
 		main.board.pending_provision = ""
@@ -1379,19 +1379,19 @@ func _provision_refusal(id: String, card: PlayingCard) -> String:
 				return "WATER WON'T MOVE STONE — try dynamite"
 		"dynamite":
 			if card.boss != "" or card.is_safe or card.snake_tail:
-				return "TOO BIG TO BLOW — pick something smaller"
+				return "TOO BIG TO BLOW UP — pick something smaller"
 		"branding_iron", "gold_pan":
 			if card.boss != "" or card.is_safe or card.snake_tail \
 					or card.cursed or card.hazard != "" or card.washed \
 					or card.mod != "" or card.water_level > 0:
-				return "THE BRAND NEEDS A PLAIN, DRY CARD"
+				return "THIS NEEDS A PLAIN, DRY CARD"
 		"razor":
 			if card.boss != "" or card.is_safe or card.snake_tail \
 					or card.cursed or card.hazard == "stone":
-				return "NOTHING THERE TO SHAVE"
+				return "THE RAZOR CAN'T WORK ON THAT"
 		"shell_game":
 			if card.is_safe or card.boss != "" or card.snake_tail:
-				return "TOO HEAVY TO SHUFFLE — pick an ordinary card"
+				return "TOO HEAVY TO MOVE — pick an ordinary card"
 	return ""
 
 
@@ -1415,7 +1415,7 @@ func _apply_target_provision(id: String, card: PlayingCard) -> void:
 			await main.board.provision_destroy(card)
 			if piece != "" and room_goal == "chest" and in_room:
 				main.board.spawn_objective(piece)
-				main._announce("THE %s TURNS UP ELSEWHERE" % piece.to_upper())
+				main._announce("THE %s TURNS UP SOMEWHERE ELSE" % piece.to_upper())
 		"branding_iron":
 			var mod := _random_mod()
 			main._announce("BRANDED: %s" % mod.to_upper())
@@ -1551,8 +1551,8 @@ func _short_stacked(cost: int) -> bool:
 		return true
 	_clear_run_save()
 	_end_run("BLINDED OUT",
-			"A seat at this table costs at least %d chips — you're down to %d.\nOnly riders who reach the end cash out. The house keeps the rest." % [cost, chips],
-			0, "Needed %d chips, held %d." % [cost, chips])
+			"A seat at this table costs at least %d chips, and you're down to %d.\nOnly riders who make it to the end cash out. The house keeps the rest." % [cost, chips],
+			0, "Needed %d chips but only had %d." % [cost, chips])
 	return true
 
 
@@ -1805,18 +1805,18 @@ func _render_ascension() -> void:
 	_asc_prev.disabled = _asc_pick <= 0
 	_asc_next.disabled = _asc_pick >= top
 	_asc_label.text = "ASCENSION %d" % _asc_pick
-	_asc_sub.text = "%s  ·  highest open: %d" % [character_name().to_upper(), top] \
-			if top < Ascension.MAX else "%s  ·  every level open" % character_name().to_upper()
+	_asc_sub.text = "%s  ·  highest unlocked: %d" % [character_name().to_upper(), top] \
+			if top < Ascension.MAX else "%s  ·  every level unlocked" % character_name().to_upper()
 	if _asc_pick == 0:
-		_asc_rule.text = "The plain trail. A good first ride."
-		_asc_rest.text = "Beat the trail to open Ascension 1 for this rider."
+		_asc_rule.text = "The trail with no extra rules. A good first ride."
+		_asc_rest.text = "Beat the trail to unlock Ascension 1 for this rider."
 	else:
 		var row: Dictionary = Ascension.LEVELS[_asc_pick - 1]
 		_asc_rule.text = "%d · %s — %s" % [_asc_pick, String(row.name).to_upper(), String(row.desc)]
 		var below := PackedStringArray()
 		for pair in Ascension.active(_asc_pick - 1):
 			below.append(String(pair[1].name))
-		_asc_rest.text = "Also in force: " + ", ".join(below) + "." if not below.is_empty() \
+		_asc_rest.text = "Also in effect: " + ", ".join(below) + "." if not below.is_empty() \
 				else "The first rung of the ladder."
 	_asc_reward.text = "EXP ×%s   ·   cash-out ×%s   ·   finish purse $%d" % [
 			String.num(Ascension.exp_mult(_asc_pick), 2),
@@ -1959,9 +1959,9 @@ func _ladder_texts(id: String, cost: int) -> Array:
 	var bt := ""
 	match id:
 		"sleeve":
-			st = "Starts every run as a %s of a random suit" \
+			st = "Starts every ride as a %s in a random suit" \
 					% String(RANK_CHARS.get(sleeve_rank, str(sleeve_rank)))
-			bt = "FULLY SHARPENED — AN ACE" if cost <= 0 \
+			bt = "FULLY UPGRADED — AN ACE" if cost <= 0 \
 					else "RAISE TO %s — $%d" % [String(RANK_CHARS.get(
 							sleeve_rank + 1, str(sleeve_rank + 1))), cost]
 		"laser":
@@ -1971,28 +1971,28 @@ func _ladder_texts(id: String, cost: int) -> Array:
 			bt = "EXTEND THE BEAM — $%d" % cost if cost > 0 \
 					else "A FULL CROSS"
 		"watch":
-			st = "Level %d / 2  ·  %d turn%s back per table" \
+			st = "Level %d / 2  ·  %d undo%s per table" \
 					% [watch_level, 1 + watch_level,
 					"" if watch_level == 0 else "s"]
-			bt = "WIND ANOTHER TURN — $%d" % cost if cost > 0 \
-					else "WOUND TO THE LIMIT"
+			bt = "ONE MORE UNDO — $%d" % cost if cost > 0 \
+					else "FULLY UPGRADED"
 		"sleight":
-			st = "Level %d / 2  ·  %d trick%s per table" \
+			st = "Level %d / 2  ·  %d swap%s per table" \
 					% [sleight_level, 1 + sleight_level,
 					"" if sleight_level == 0 else "s"]
-			bt = "PALM ANOTHER TRICK — $%d" % cost if cost > 0 \
+			bt = "ONE MORE SWAP — $%d" % cost if cost > 0 \
 					else "QUICKEST HANDS ON THE TRAIL"
 		"bankroll":
 			st = "Level %d / 5  ·  +%d chips at every buy-in" \
 					% [meta_bankroll, 20 * meta_bankroll]
-			bt = "SADDLE HEAVIER — $%d" % cost if cost > 0 \
-					else "AS HEAVY AS IT GETS"
+			bt = "MORE CHIPS — $%d" % cost if cost > 0 \
+					else "FULLY UPGRADED"
 		"provisions":
 			st = "Level %d / 2  ·  %d provision%s at the start" \
 					% [meta_provisions, meta_provisions,
 					"" if meta_provisions == 1 else "s"]
 			bt = "PACK ANOTHER — $%d" % cost if cost > 0 \
-					else "THE KIT RIDES FULL"
+					else "FULLY UPGRADED"
 	return [st, bt]
 
 
@@ -2684,7 +2684,7 @@ func _render_tarot() -> void:
 		for id in relics:
 			var relic_name := String(RELICS[id].name)
 			if id == "second_wind" and _second_wind_used:
-				relic_name += " (spent)"
+				relic_name += " (used)"
 			names.append(relic_name)
 		_tarot_relics.text = "RELICS:  " + "  ·  ".join(names)
 	var slot_count := _offers.size() + (0 if is_boss else 1)
@@ -2704,10 +2704,10 @@ func _render_tarot() -> void:
 				Vector2(start_x + _offers.size() * 330, 0), Vector2(300, 380))
 		var fool_tier := _apply_poster(fool, "luck_of_the_draw")
 		if fool_tier != "":
-			_poster_face(fool, "LUCK OF THE DRAW", fool_tier, "Face-down fate",
+			_poster_face(fool, "LUCK OF THE DRAW", fool_tier, "A blind pick",
 					"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)))
 		else:
-			_tarot_face(fool, "LUCK OF THE DRAW", "Face-down fate", "?",
+			_tarot_face(fool, "LUCK OF THE DRAW", "A blind pick", "?",
 					"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)),
 					false, 64)
 		fool.pressed.connect(func() -> void:
@@ -2728,19 +2728,19 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		var shop_tier := _apply_poster(b, "traveling_merchant")
 		if shop_tier != "":
 			_poster_face(b, String(m.name), shop_tier, String(m.line),
-					"%s\nNo bet — browse free" % "  ·  ".join(wares))
+					"%s\nNo bet, free to browse" % "  ·  ".join(wares))
 		else:
 			_tarot_face(b, String(m.name), "Safe haven", String(m.line),
-					"%s\nNo bet — browse free" % "  ·  ".join(wares))
+					"%s\nNo bet, free to browse" % "  ·  ".join(wares))
 	elif offer.kind == "camp":
 		if _apply_camp_poster(b):
 			_poster_face(b, "CAMPFIRE", "rest stop",
-					"Rest your bones, tend a card, or cast one to the flames",
-					"No bet — one comfort\nHP %d / %d" % [hp, max_hp()])
+					"Rest up, enhance a card, or throw one in the fire",
+					"No bet. Pick one comfort\nHP %d / %d" % [hp, max_hp()])
 		else:
 			_tarot_face(b, "THE CAMPFIRE", "Rest stop",
-					"Rest, tend a card, or cast one to the flames",
-					"No bet — one comfort\nHP %d / %d" % [hp, max_hp()])
+					"Rest, enhance a card, or burn one",
+					"No bet. Pick one comfort\nHP %d / %d" % [hp, max_hp()])
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
@@ -2748,23 +2748,23 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "safe":
 			goal_line = "Crack the safe"
 		elif offer.get("goal", "") == "chest":
-			goal_line = "Open %d chests — win a RELIC" % int(offer.get("chest_count", 1))
+			goal_line = "Open %d chests to win a RELIC" % int(offer.get("chest_count", 1))
 		elif offer.get("goal", "") == "purge":
-			goal_line = "Clear %d %s cards — %d seeded, more keep coming" % [
+			goal_line = "Clear %d %s cards. %d to start, and more keep coming" % [
 					int(offer.get("purge_quota", PURGE_QUOTA_BASE)),
 					String(offer.purge_kind).to_upper(), offer.purge_count]
 		elif offer.get("goal", "") == "mine":
-			goal_line = "Clear the whole seam: %d stones — gold in the rubble" % offer.stones
+			goal_line = "Break all %d stones. Some have gold inside" % offer.stones
 		elif offer.get("goal", "") == "holdem":
 			goal_line = "Target %d — HOLD'EM rules" % offer.target
 		elif offer.get("goal", "") == "crazy8":
-			goal_line = "Target %d — 8s WILD, hazards everywhere" % offer.target
+			goal_line = "Target %d. 8s are WILD, and hazards are everywhere" % offer.target
 		elif offer.get("goal", "") == "blackjack":
-			goal_line = "Beat the dealer %d times — hazards in play" % offer.wins
+			goal_line = "Beat the dealer %d times, with hazards in play" % offer.wins
 		elif offer.get("goal", "") == "outlaw":
 			var gang: Array = offer.get("outlaws", [])
 			if gang.size() > 1:
-				goal_line = "Hunt down a gang of %d — %d HP a head" % [
+				goal_line = "Hunt down a gang of %d, %d HP each" % [
 						gang.size(), offer.outlaw_hp]
 			else:
 				goal_line = "Gun down %s (%d HP)" % [
@@ -2773,7 +2773,7 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		elif offer.get("goal", "") == "collect":
 			goal_line = _collect_goal_text(offer)
 		elif offer.get("goal", "") == "landrush":
-			goal_line = "Claim all 25 plots — clear a card from every cell"
+			goal_line = "Claim all 25 plots by clearing a card from every space"
 		elif offer.get("goal", "") == "hands":
 			goal_line = "Play " + _require_text(offer.require)
 		elif offer.get("goal", "") == "timed":
@@ -3161,38 +3161,38 @@ func _bet_goal_text(o: Dictionary) -> String:
 		"safe":
 			return "Crack the safe"
 		"chest":
-			return "Open %d chests — a RELIC rides in the strongbox" \
+			return "Open %d chests. The strongbox holds a RELIC" \
 					% int(o.get("chest_count", 1))
 		"purge":
 			if o.purge_kind == "fire":
-				return "Clear %d fire cards — %d to start, it spreads, and more keep catching" \
+				return "Clear %d fire cards. %d to start, it spreads, and more keep catching" \
 						% [int(o.get("purge_quota", PURGE_QUOTA_BASE)), o.purge_count]
-			return "Clear %d %s cards — %d seeded, more arrive as you play" \
+			return "Clear %d %s cards. %d to start, and more arrive as you play" \
 					% [int(o.get("purge_quota", PURGE_QUOTA_BASE)), o.purge_kind, o.purge_count]
 		"mine":
-			return "Mine the seam dry: break all %d stones (gold in the rubble, more rock rides in as you dig)" % o.stones
+			return "Break all %d stones. There's gold in some of them, and more stones drop in as you dig" % o.stones
 		"holdem":
-			return "Target %d — pick 2 hole cards, best 5 of 7 with the community" % o.target
+			return "Target %d. Pick 2 hole cards and score the best 5 of 7 with the community" % o.target
 		"crazy8":
-			return "Target %d — every 8 is WILD, but the board crawls with hazards" % o.target
+			return "Target %d. Every 8 is WILD, but the board is crawling with hazards" % o.target
 		"blackjack":
-			return "Beat the dealer %d times — a face-down table, blind hits, and a real dealer playing out his hand" % o.wins
+			return "Beat the dealer %d times. The table's face down, you hit blind, and the dealer plays his hand" % o.wins
 		"outlaw":
 			var gang: Array = o.get("outlaws", [])
 			var who := String(gang[0].name) if not gang.is_empty() else "the wanted man"
 			if gang.size() > 1:
-				return "Bounty: gun down %s and the gang riding behind — %d heads at %d HP each, one at a time" \
+				return "Bounty: gun down %s and his gang, %d outlaws at %d HP each, one at a time" \
 						% [who, gang.size(), o.outlaw_hp]
-			return "Bounty: shoot %s %d times — and step around the waiting slugs" \
+			return "Bounty: shoot %s %d times, and don't clear any of his bullets" \
 					% [who, o.outlaw_hp]
 		"collect":
 			return _collect_goal_text(o)
 		"landrush":
-			return "Stake a claim on all 25 plots — clear a card from every cell of the grid"
+			return "Stake a claim on all 25 plots by clearing a card from every space"
 		"hands":
 			return "Play " + _require_text(o.require)
 		"timed":
-			return "Target %d before the clock dies" % o.target
+			return "Target %d before the clock runs out" % o.target
 	return "Target %d" % o.target
 
 
@@ -3200,17 +3200,17 @@ func _refresh_bet_labels() -> void:
 	var o := current_offer
 	var retry_line := ""
 	if not pending_retry.is_empty():
-		retry_line = "\nTHE TABLE STILL BARS THE WAY — beat it or bust." \
+		retry_line = "\nThis table still blocks the way. Beat it or bust." \
 				if pending_is_retry else "\nBack to the table you stepped away from."
 	var blind := int(o.min_bet)
 	var unit := "min" if _is_timed(o) else "hands"
 	var reference := int(o.get("minutes", 4)) if _is_timed(o) else int(o.hands)
 	_bet_amount = clampi(_bet_amount, blind, _max_bet())
-	_bet_info.text = "%s — %s table\n%s   ·   odds %s   ·   %d %s to do it\nAnte %d — the house keeps it\nYour chips: %d%s" % [
+	_bet_info.text = "%s — %s table\n%s   ·   odds %s   ·   %d %s to do it\nAnte %d (the house keeps it, win or lose)\nYour chips: %d%s" % [
 		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), reference,
 		unit, blind, chips, retry_line]
 	_bet_amount_label.text = "BET  %d" % _bet_amount
-	_bet_stake_label.text = "Odds ×%.2f      clearing pays back %d" % [
+	_bet_stake_label.text = "Odds ×%.2f      a win pays back %d" % [
 		float(o.odds), _bet_amount + int(_bet_amount * float(o.odds))]
 
 
@@ -3256,7 +3256,7 @@ func _start_room() -> void:
 	if has_relic("chuck_wagon") and provisions.size() < kit_size():
 		var ration := _random_provision()
 		if gain_provision(ration):
-			main._announce("THE CHUCK WAGON PROVIDES — %s"
+			main._announce("CHUCK WAGON DELIVERY — %s"
 					% String(PROVISIONS[ration].name).to_upper())
 	elif has_relic("chuck_wagon") and int(rv("chuck_wagon", "chips")) > 0:
 		# A full kit takes its rations in chips instead.
@@ -3533,7 +3533,7 @@ func on_hand_played(result: Dictionary) -> void:
 				break
 	var earned := int(result.get("cash_earned", 0))
 	if earned > 0 and standard_loadout:
-		_announce_after_settle("GOLD — a seeded ride banks no cash")
+		_announce_after_settle("GOLD — seeded rides don't bank cash")
 	elif earned > 0:
 		# Cash cards pay real money, banked on the spot.
 		cash += earned
@@ -3543,7 +3543,7 @@ func on_hand_played(result: Dictionary) -> void:
 		_room_cleared()
 		return
 	if result.get("jack_shrugged", false):
-		_announce_after_settle("THE JACK SCOFFS — BEAT %d TO WOUND HIM"
+		_announce_after_settle("THE JACK SHRUGS IT OFF — SCORE %d TO HURT HIM"
 				% main.board.jack_bar)
 	if result.get("chest_opened", false):
 		if room_goal == "chest":
@@ -3738,7 +3738,7 @@ func _replace_lost_treasure() -> void:
 		main._announce("ANOTHER KEY, ANOTHER CHEST  (%d / %d)"
 				% [room_chests_opened, room_chests_needed])
 	else:
-		main._announce("A NEW LEAD ON THE LOOT")
+		main._announce("A NEW KEY OR CHEST TURNS UP")
 
 
 func on_safe_cracked() -> void:
@@ -3774,7 +3774,7 @@ func _defer_chest_reward() -> void:
 	else:
 		_chest_rewards.append("chips")
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 0.8, -8.0)
-	_announce_after_settle("CHEST CLAIMED — IT CRACKS OPEN AFTER THE TABLE")
+	_announce_after_settle("CHEST CLAIMED — YOU'LL OPEN IT AFTER THE TABLE")
 
 
 ## A random COMMON relic the player doesn't own yet, or "".
@@ -4145,8 +4145,8 @@ func _tick_room_hazards() -> void:
 	var burns: int = main.board.last_tick_burned
 	var blasts: int = main.board.last_tick_detonated
 	if burns > 0 and not take_damage(burns,
-			"THE FIRE BURNS DOWN TO YOU" if burns == 1
-			else "%d FIRES BURN DOWN TO YOU" % burns,
+			"THE FIRE REACHED YOU" if burns == 1
+			else "%d FIRES REACHED YOU" % burns,
 			"Burned at the table."):
 		return
 	if blasts > 0 and not take_damage(Ascension.bomb_hp(ascension) * blasts, "CAUGHT IN THE BLAST",
@@ -4198,7 +4198,7 @@ func _room_cleared() -> void:
 	# breakdown waits on the pick screen, where the eye has time.
 	var pot := stake + int(stake * stake_odds)
 	var winnings := pot
-	_win_rows = [["THE POT — %d staked at %s : 1" % [stake,
+	_win_rows = [["THE POT — %d bet at %s : 1" % [stake,
 			String.num(stake_odds, 1)], pot]]
 	if has_relic("tin_star"):
 		# The badge pays a blind, so it keeps pace with the trail.
@@ -4221,9 +4221,9 @@ func _room_cleared() -> void:
 	main.table_banner("TABLE CLEARED")
 	main.board.confetti()
 	if current_offer.has("boss") and room_index == JACK_ROOM:
-		_announce_after_settle("BIG LEAGUE NOW — EVERYTHING COSTS 10× FROM HERE")
+		_announce_after_settle("BIG LEAGUE NOW: EVERYTHING COSTS %d× FROM HERE" % POST_BOSS_COST_MULT)
 	elif current_offer.has("boss") and room_index == QUEEN_ROOM:
-		_announce_after_settle("HIGH SOCIETY — PRICES JUMP ANOTHER 10×")
+		_announce_after_settle("HIGH SOCIETY: PRICES GO UP ANOTHER %d×" % POST_BOSS_COST_MULT)
 	if room_goal == "chest":
 		# The stagecoach strongbox: a relic for the hardest job around,
 		# unveiled on its own reward screen after the settle.
@@ -4234,7 +4234,7 @@ func _room_cleared() -> void:
 			_relic_ambient = false
 		else:
 			chips += 60
-			_win_rows.append(["STRONGBOX (no relic room)", 60])
+			_win_rows.append(["STRONGBOX (no new relics)", 60])
 	# Ambient chests crack open with the winnings: chips join the
 	# ledger, a card owes an extra pick round, a relic takes the
 	# strongbox screen.
@@ -4245,7 +4245,7 @@ func _room_cleared() -> void:
 				var region := room_index / REGION_SIZE + 1
 				var loot := 30 + 15 * region
 				chips += loot
-				_win_rows.append(["THE CHEST — coin inside", loot])
+				_win_rows.append(["THE CHEST — it held coins", loot])
 			"card":
 				_chest_card_rounds += 1
 			"relic":
@@ -4279,11 +4279,11 @@ func _room_cleared() -> void:
 func on_time_up() -> void:
 	if not in_room or not room_on_clock():
 		return
-	_room_failed("TIME'S UP — THE STAGE ROLLED ON" if room_goal == "chest"
+	_room_failed("TIME'S UP — THE STAGECOACH LEFT" if room_goal == "chest"
 			else "TIME'S UP — THE TABLE WINS")
 
 
-func _room_failed(reason := "BUSTED — CURSED CARD") -> void:
+func _room_failed(reason := "BUSTED — CURSE ADDED TO DECK") -> void:
 	in_room = false
 	_room_save = {}
 	_chest_rewards.clear()  # the chest went down with the table
@@ -4483,13 +4483,13 @@ func _trail_complete() -> void:
 	cash += payout
 	_save_meta()
 	_clear_run_save()
-	var body := "You rode all %d stops and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
+	var body := "You rode all %d stops and beat the trail.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
 	if standard_loadout:
-		body = "You rode all %d stops on a seeded ride.\nThe score goes on the seed's board — no cash is banked." % ROOMS_TOTAL
+		body = "You rode all %d stops on a seeded ride.\nYour score goes on the seed's board. Seeded rides don't bank cash." % ROOMS_TOTAL
 	if opened:
-		body += "\n\nASCENSION %d is open for %s." % [ascension + 1, character_name()]
+		body += "\n\nASCENSION %d is now unlocked for %s." % [ascension + 1, character_name()]
 	if ascension >= Ascension.MAX:
-		body += "\n\nSomewhere past the last saloon, THE DEALER shuffles\na perfect deck and waits. (His table opens soon.)"
+		body += "\n\nSomewhere past the last saloon, THE DEALER is waiting\nwith a perfect deck. (His table opens soon.)"
 	_end_run("TRAIL COMPLETE", body, payout)
 
 
@@ -4502,7 +4502,7 @@ func _show_relic_reward_now() -> void:
 	_hide_all()
 	main.game_started = false
 	main.play_music("tarot")
-	_relic_sub.text = ("The chest you cracked along the way held a charm."
+	_relic_sub.text = ("The chest you opened along the way held a relic."
 			if _relic_ambient else "The stagecoach job pays in more than chips.")
 	var r: Dictionary = RELICS.get(_pending_relic_reward, {})
 	_relic_icon.relic_id = _pending_relic_reward
@@ -4526,12 +4526,12 @@ func _show_pick_now() -> void:
 	main.play_music("tarot")
 	if _in_chest_pick:
 		_pick_title.text = "FROM THE CHEST"
-		_pick_sub.text = "The chest held a card — take it, or leave it in the dust."
+		_pick_sub.text = "The chest held a card. Take it, or leave it behind."
 		for child in _win_box.get_children():
 			child.queue_free()  # the ledger already had its moment
 	else:
 		_pick_title.text = "TABLE CLEARED"
-		_pick_sub.text = "Take a card — one joins your deck, or take none."
+		_pick_sub.text = "Pick a card to add to your deck, or take none."
 		_render_win_ledger()
 	for child in _pick_box.get_children():
 		child.queue_free()
@@ -4712,7 +4712,7 @@ func _would_bust(price: int) -> bool:
 func _shop_chips_line() -> String:
 	if _shop_reserve() <= 0:
 		return "CHIPS  %d" % chips
-	return "CHIPS  %d      (the next table's seat costs %d — spend the rest)" \
+	return "CHIPS  %d      (keep %d for the next table's seat)" \
 			% [chips, _shop_reserve()]
 
 
@@ -4753,7 +4753,7 @@ func _show_shop() -> void:
 	_shop_burn_btn.disabled = _shop_burned_here
 	if _shop_burned_here:
 		_shop_burn_btn.text = "THE FORGE IS COLD"
-		_shop_burn_btn.tooltip_text = "One burn per shop — the next merchant's forge is hot."
+		_shop_burn_btn.tooltip_text = "One burn per shop. Try the next merchant's forge."
 	UiKit.fit_button_text(_shop_burn_btn, 20)
 	_render_shop_relics()
 	_render_shop_provisions()
@@ -4859,7 +4859,7 @@ func _render_shop_relics() -> void:
 			price_l.text = "SOLD"
 		elif relics.has(slot.id):
 			btn.disabled = true
-			price_l.text = "ALREADY CARRIED"
+			price_l.text = "ALREADY OWNED"
 		var pressed_slot := slot
 		btn.pressed.connect(func() -> void:
 			if pressed_slot.bought:
@@ -4930,7 +4930,7 @@ func _render_shop_provisions() -> void:
 			if pressed_slot.bought:
 				return
 			if provisions.size() >= kit_size():
-				_shop_refuse("YOUR KIT IS FULL — %d provisions is the limit" % kit_size())
+				_shop_refuse("YOUR KIT IS FULL — it holds %d provisions" % kit_size())
 				return
 			var c := _price(int(PROVISIONS[pressed_slot.id].price))
 			if chips < c:
@@ -5032,8 +5032,8 @@ func _camp_open_deck(mode: String) -> void:
 	camp_layer.visible = false
 	_camp_mode = mode
 	_deck_view_burn = false
-	_remove_info.text = "Pick a plain card — the fire brands it with a random enhancement." \
-			if mode == "tend" else "Pick a card to cast into the flames — gone for good."
+	_remove_info.text = "Pick a plain card. The fire will brand it with a random enhancement." \
+			if mode == "tend" else "Pick a card to throw in the fire. It's gone for good."
 	_remove_info.add_theme_color_override("font_color", main.OFFWHITE)
 	_populate_deck_view()
 
@@ -5044,17 +5044,17 @@ func _camp_pick(idx: int) -> void:
 	var d: Dictionary = deck[idx]
 	if _camp_mode == "tend":
 		if d.get("cursed", false):
-			_remove_info.text = "THE FIRE WON'T TAKE A CURSE — cast it off instead."
+			_remove_info.text = "CURSED CARDS CAN'T BE TENDED — cast it off instead."
 			_remove_info.add_theme_color_override("font_color", main.RED)
 			return
 		if String(d.get("mod", "")) != "" or PlayingCard.finish_of(d) != "":
-			_remove_info.text = "ALREADY ENHANCED — pick an honest card."
+			_remove_info.text = "ALREADY ENHANCED — pick a plain card."
 			_remove_info.add_theme_color_override("font_color", main.RED)
 			return
 		var mod := _random_mod()
 		d["mod"] = mod
 		main.stat_bump("campfire_tends")
-		main._announce("TENDED BY FIRELIGHT — %s" % mod.to_upper())
+		main._announce("BRANDED BY THE FIRE — %s" % mod.to_upper())
 		main.board._play_sound(Board.SFX_MATCHES.pick_random(), 1.1, -6.0)
 	else:
 		deck.remove_at(idx)
@@ -5083,7 +5083,7 @@ func _show_deck() -> void:
 func _show_deck_now() -> void:
 	_hide_all()
 	_deck_view_burn = false
-	_remove_info.text = "Your deck — %d cards. Hover a card for its story." % deck.size()
+	_remove_info.text = "Your deck: %d cards. Hover over a card to see what it does." % deck.size()
 	_populate_deck_view()
 
 
@@ -5156,24 +5156,24 @@ func _deck_stat_text(d: Dictionary) -> String:
 	match String(d.get("mod", "")):
 		"chip":
 			var lv := int(d.get("chip_lv", 0))
-			text += "CHIP\nPays +%d bonus chips when played — and it SEASONS: every score grows the payout +%d for the rest of the run.%s" % [
+			text += "CHIP\nPays +%d bonus chips when played. It gets better with use: every time it scores, the payout grows by +%d for the rest of the run.%s" % [
 					main.board.chip_bonus * (1 + lv), main.board.chip_bonus,
 					"" if lv == 0 else "\nScored %d time%s so far." % [lv,
 					"" if lv == 1 else "s"]]
 		"mult":
 			text += "MULT\nMultiplies the whole hand's score ×%.1f. Stacks with other mult cards." % main.board.mult_factor
 		"gold":
-			text += "GOLD\nPays $1 of real, bankable cash when played."
+			text += "GOLD\nPays $%d in real cash when played, banked right away." % main.board.gold_pay
 		"plus":
-			text += "PLUS\nWhen cleared, the card its arrow points at gains +1 rank. The arrow turns a quarter every hand — time it. Boosting an ACE lifts it into THE JOKER — wild for good, doubling every hand he scores in."
+			text += "PLUS\nWhen you clear it, the card its arrow points at goes up one rank. The arrow turns a quarter turn every hand, so time it right. Raising an ACE turns it into THE JOKER: wild for good, and it doubles every hand it scores in."
 		"minus":
-			text += "MINUS\nWhen cleared, the card its arrow points at drops -1 rank — and a 2 ground lower is DESTROYED, unscored. The arrow turns a quarter every hand — time it."
+			text += "MINUS\nWhen you clear it, the card its arrow points at drops one rank. A 2 that drops is DESTROYED without scoring. The arrow turns a quarter turn every hand, so time it right."
 		"bumper":
-			text += "BUMPER\nWhen cleared, it shoves the whole line of cards beside it one step in the arrow's direction — a card pushed past the edge is gone. The arrow turns every hand."
+			text += "BUMPER\nWhen you clear this card, the whole line of cards beside it slides one step the way the arrow points. A card pushed off the edge is lost. The arrow turns after every hand."
 		"wild":
-			text += "WILD\nCounts as ANY rank and suit — the best possible hand wins. The rarest card on the trail."
+			text += "WILD\nCounts as ANY rank and suit, whichever makes the best hand. The rarest card on the trail."
 		_:
-			text += "No enhancement.\nHonest cardboard."
+			text += "No enhancement.\nJust a plain card."
 	var fin := PlayingCard.finish_of(d)
 	if fin != "":
 		text += "\n\n%s\n%s" % [PlayingCard.FINISHES[fin].name, PlayingCard.FINISHES[fin].desc]
@@ -5286,9 +5286,9 @@ func _record_seed_score(title: String) -> void:
 ## The seed line on the last page.
 func seed_line() -> String:
 	if _seed_result.is_empty():
-		return "" if standard_loadout else "Your own loadout — replay it as a SEEDED RIDE to go on its board."
+		return "" if standard_loadout else "Played on your own gear. Replay as a SEEDED RIDE to get on the board."
 	if bool(_seed_result.get("practice", false)):
-		return "Practice — today's scored daily ride is already spent."
+		return "Practice — you've already played today's scored daily ride."
 	if bool(_seed_result.get("pb", false)):
 		return "NEW BEST ON THIS SEED!"
 	return "Your best on this seed: %d" % int(_seed_result.get("best", 0))
@@ -5378,7 +5378,7 @@ func _credit_abandoned_ride() -> void:
 			int(cf.get_value("run", "bosses", 0)), int(cf.get_value("run", "ascension", 0)),
 			false, uid if uid != "" else _mint_run_uid())
 	_clear_run_save()
-	var text := "LAST RIDE LEFT BEHIND  ·  +%d EXP" % int(grant.exp_gain)
+	var text := "UNFINISHED RIDE CREDITED  ·  +%d EXP" % int(grant.exp_gain)
 	if int(grant.level_after) > int(grant.level_before):
 		text += "  ·  LEVEL %d" % int(grant.level_after)
 	main._announce(text)
@@ -5404,7 +5404,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		_:
 			epitaph = "King Cobra folds. The Dealer's table is yours — for now." \
 					if ascension >= Ascension.MAX \
-					else "King Cobra folds. The trail pays $%d in tribute." % payout
+					else "King Cobra folds. The trail pays out $%d." % payout
 	var stops: Array = []
 	for i in ROOMS_TOTAL:
 		stops.append(String(trail_log[i]) if i < trail_log.size() else "")
@@ -5609,7 +5609,7 @@ func build_ui() -> void:
 	_camp_scene = CampScene.new()
 	camp_layer.add_child(_camp_scene)
 	_screen_title(camp_layer, "THE CAMPFIRE")
-	_center(camp_layer, "The fire crackles low. One comfort before the trail calls again.", 200, 22, main.DIM)
+	_center(camp_layer, "The fire's burning low. There's time for one thing before you ride on.", 200, 22, main.DIM)
 	_camp_hp_label = _center(camp_layer, "", 246, 30, main.GOLD)
 	var camp_art := ResourceLoader.exists(
 			"res://assets/art/campfire/choices/full_rest_normal.png")
@@ -5650,8 +5650,8 @@ func build_ui() -> void:
 	else:
 		var camp_opts := [
 			["REST", "Sleep off the road.\nRecover %d HP." % Ascension.camp_rest(0)],
-			["TEND A CARD", "Hold a plain card to the light —\nit takes a random enhancement."],
-			["CAST ONE OFF", "Feed a card to the flames.\nGone from the deck for good."],
+			["TEND A CARD", "Hold a plain card to the fire\nto give it a random enhancement."],
+			["CAST ONE OFF", "Throw a card in the fire.\nIt's gone from your deck for good."],
 		]
 		for i in camp_opts.size():
 			var opt: Array = camp_opts[i]
@@ -5692,7 +5692,7 @@ func build_ui() -> void:
 	_tarot_relics.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tarot_relics.size = Vector2(1500, 76)
 	_tarot_relics.position.x = 210
-	_center(tarot_layer, "No cashing out mid-ride: reach the end of the trail, or play GOLD cards for $cash along the way.", 850, 18, main.DIM)
+	_center(tarot_layer, "You can't cash out partway. Reach the end of the trail, or play GOLD cards to earn cash along the way.", 850, 18, main.DIM)
 	_back_button(tarot_layer, back_to_menu, "MENU")
 	var deck_btn: Button = main._button(tarot_layer, "VIEW DECK", Vector2(1660, 970), Vector2(200, 54))
 	deck_btn.add_theme_font_size_override("font_size", 20)
@@ -5732,7 +5732,7 @@ func build_ui() -> void:
 
 	pick_layer = _layer()
 	_pick_title = _center(pick_layer, "TABLE CLEARED", 100, 64, main.GOLD)
-	_pick_sub = _center(pick_layer, "Take a card — one joins your deck, or take none.", 240, 22, main.DIM)
+	_pick_sub = _center(pick_layer, "Pick a card to add to your deck, or take none.", 240, 22, main.DIM)
 	# The winnings ledger sits at the left; the card offers keep the floor.
 	_win_box = Control.new()
 	_win_box.position = Vector2(120, 330)

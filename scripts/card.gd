@@ -264,13 +264,13 @@ var mod := "":
 ## 1 holo, 2 negative, 3 the foil shimmer over the Prism art.
 const FINISHES := {
 	"prism": {"name": "PRISM", "fx": 3,
-			"desc": "Clearing it spreads its enhancement to every neighbor."},
+			"desc": "When you clear it, its enhancement spreads to every card around it, diagonals too."},
 	"holo": {"name": "HOLO", "fx": 1,
 			"desc": "Adds a flat +50 to the hand's score before any multipliers."},
 	"negative": {"name": "NEGATIVE", "fx": 2,
-			"desc": "Scoring it gives the hand back: +1 hand, or +10 seconds on a clock table."},
+			"desc": "When it scores, you get the hand back. On a clock table you get +10 seconds instead."},
 	"metal": {"name": "METAL",
-			"desc": "Pinned under steel: it stays on the table when scored and no hazard can touch it. Each play pops a pin; with the last one the cover comes off and it plays as a normal card."},
+			"desc": "Pinned under a steel cover. It stays on the table when it scores, and hazards can't touch it. Each play knocks out a pin, and once the last one goes, the cover comes off and it plays like a normal card."},
 }
 ## Scoring plays a METAL card survives at one table; the last one
 ## clears it like any card.

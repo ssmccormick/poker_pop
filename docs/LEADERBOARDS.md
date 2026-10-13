@@ -1,12 +1,14 @@
 # Online seed boards (Supabase)
 
-Poker Pop keeps a highscore board for every seed. Local bests always
-work (they live in each profile's `pN_seeds.cfg`). The **online** boards
-are a free [Supabase](https://supabase.com) project that the game talks
-to over plain REST, so it works on desktop and in the web build alike.
+Poker Pop keeps a high-score board for every seed. Local bests always
+work, since they're stored in each profile's `pN_seeds.cfg`. The
+**online** boards run on a free [Supabase](https://supabase.com) project
+that the game talks to over plain REST, so they work the same on desktop
+and in the web build.
 
-Until the keys below are filled in, every online call is skipped and the
-SEEDED PLAY page's board reads "Offline", so nothing breaks.
+Until you fill in the keys below, the game skips every online call and
+the board on the SEEDED PLAY page just reads "Offline", so nothing
+breaks.
 
 ## One-time setup
 
@@ -19,9 +21,10 @@ SEEDED PLAY page's board reads "Offline", so nothing breaks.
 4. Paste them into `scripts/supabase_config.gd` in place of `PASTE_ME`.
 5. Re-export the game.
 
-The publishable/anon key is meant to ship inside the game. The table's
-row-level security only lets it **read** scores and **add** new ones. It
-can never edit or delete a score.
+The publishable/anon key is meant to ship inside the game, so it's fine
+for players to have it. The table's row-level security only lets that
+key **read** scores and **add** new ones. It can't edit or delete a
+score.
 
 ```sql
 -- Every score posted from the game.
@@ -64,42 +67,47 @@ grant select on public.best_scores to anon, authenticated;
 
 ## How the game uses it
 
-- **Posting:** when a game ends, `POST /rest/v1/scores` with that
-  game's board key, score, rider, Ascension and tables. Seeded trail
-  rides, Time Trial, Single, Arcade and Zen all post. A daily-practice
-  ride does not, and neither does a trail ride on your own loadout.
-- **Reading:** the SEEDED PLAY page and the game-over pages read
+- **Posting:** when a game ends, the game sends `POST /rest/v1/scores`
+  with that game's board key, score, rider, Ascension and tables. Seeded
+  trail rides, Time Trial, Single, Arcade and Zen all post scores. A
+  daily ride played as practice doesn't, and neither does a trail ride
+  on your own loadout.
+- **Reading:** the SEEDED PLAY page and the game-over pages load the
+  top ten with
   `GET /rest/v1/best_scores?board_key=eq.<key>&order=score.desc&limit=10`.
-- **Board keys:** `mode|seed|variant`, for example:
-  - `trail|K7QX2M9P|the_gambler-a3` (rider and Ascension);
+- **Board keys:** these look like `mode|seed|variant`. For example:
+  - `trail|K7QX2M9P|the_gambler-a3` (the rider and Ascension);
   - `daily|D20261012|the_doctor` (the daily seed is the UTC date);
-  - `time|ABCDEFGH|180` (seconds on the clock);
+  - `time|ABCDEFGH|180` (the seconds on the clock);
   - `arcade|QWERTY23|`.
-- **Who's who:** each profile makes a random `player_id` once and keeps
-  it. The name is the **NAME** field on the SEEDED PLAY page (up to 12
-  characters; blank posts as "Stranger" and a short tag). Two players can share a name and still have separate
-  rows.
+- **Who's who:** each profile makes up a random `player_id` once and
+  keeps it. The name comes from the **NAME** field on the SEEDED PLAY
+  page (up to 12 characters). If it's blank, the score posts as
+  "Stranger" plus a short tag. Two players can have the same name and
+  still get separate rows.
 
 ## Troubleshooting
 
 - **Check the board from a terminal:**
   `godot --headless --path . --script res://tests/live_leaderboard.gd`
-  posts to the hidden `test|SETUP|` board, reads it back and ranks it.
-  Delete its rows afterwards in the Table Editor.
-- **"TLS handshake error -9984" on a desktop build** means antivirus
-  HTTPS scanning (Avast or AVG Web Shield, and some others) is re-signing
-  the connection with its own certificate, and Godot's TLS rejects it.
-  The board then just reads Offline. Turn off the antivirus's HTTPS
-  scanning, or add an exception for the game. The web build is
-  unaffected because the browser handles HTTPS. To test the rest of the
-  client anyway, set `POKERPOP_TLS_UNSAFE=1` for the live script only;
-  it never applies in play.
+  posts a score to the hidden `test|SETUP|` board, reads it back and
+  checks its rank. Delete those rows in the Table Editor afterward.
+- **"TLS handshake error -9984" on a desktop build** means your
+  antivirus is scanning HTTPS traffic (Avast or AVG Web Shield do this,
+  and so do some others). It re-signs the connection with its own
+  certificate, Godot's TLS rejects it, and the board just reads Offline.
+  Turn off the antivirus's HTTPS scanning, or add an exception for the
+  game. The web build isn't affected, because the browser handles HTTPS.
+  If you want to test the rest of the client anyway, set
+  `POKERPOP_TLS_UNSAFE=1` for the live script only. It never applies
+  during play.
 
 ## Honest limits
 
-Scores come from the player's own game, and nothing checks them on the
-server. A determined cheater can post a fake one. If that ever matters:
+Scores come from the player's own copy of the game, and nothing on the
+server checks them, so a determined cheater can post a fake one. If that
+ever becomes a problem, you can:
 
-- delete rows from the **Table Editor** (the dashboard login can do
-  that; the game's key can't);
+- delete rows in the **Table Editor** (your dashboard login can do that,
+  but the game's key can't);
 - or add a check such as `score < 5000000`.
