@@ -3810,7 +3810,7 @@ func _show_online_board(k: String) -> void:
 	_shown_board_key = k
 	if k == "":
 		_board_message("")
-	elif not Leaderboard.configured():
+	elif not Leaderboard.live():
 		_board_message("Offline — your bests are kept on this machine.")
 	else:
 		_board_message("Loading the board…")

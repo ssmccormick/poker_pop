@@ -82,7 +82,12 @@ func _initialize() -> void:
 	DirAccess.remove_absolute(path)
 
 	# --- The online boards, with no keys --------------------------------------
-	_check(not Leaderboard.configured(), "with the keys unpasted the online boards stay off")
+	OS.set_environment("POKERPOP_PROFILE", "97")
+	_check(not Leaderboard.live(), "a test run never posts to the real boards, keys or not")
+	OS.unset_environment("POKERPOP_PROFILE")
+	OS.set_environment("POKERPOP_SHOT", "x.png")
+	_check(not Leaderboard.live(), "and neither does a screenshot run")
+	OS.unset_environment("POKERPOP_SHOT")
 	_check(Leaderboard._count_from(PackedStringArray(["Content-Type: x", "Content-Range: 0-0/42"])) == 42
 			and Leaderboard._count_from(PackedStringArray(["content-range: */0"])) == 0,
 			"a board's count reads from Content-Range")

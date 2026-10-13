@@ -5,5 +5,5 @@ extends RefCounted
 ## Project URL and the publishable (or legacy anon) key here. Until then
 ## every online call is skipped and the boards read "offline".
 
-const URL := "PASTE_ME"   # https://xxxx.supabase.co
-const KEY := "PASTE_ME"   # sb_publishable_… or eyJ…
+const URL := "https://ydtzbzetvtttylogfjgu.supabase.co"
+const KEY := "sb_publishable_9GgYnocuRD9xNcSennaLSw_-JG2X06M"

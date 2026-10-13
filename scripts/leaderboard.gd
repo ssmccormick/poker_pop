@@ -39,8 +39,35 @@ func _headers(extra: Array = []) -> PackedStringArray:
 func _request() -> HTTPRequest:
 	var req := HTTPRequest.new()
 	req.timeout = TIMEOUT
+	var tls := tls_override if tls_override != null else _tls()
+	if tls != null:
+		req.set_tls_options(tls)
 	add_child(req)
 	return req
+
+
+var _tls_options: TLSOptions
+var _tls_tried := false
+var tls_override: TLSOptions   # diagnostics only (tests/live_leaderboard.gd); never set in play
+
+
+## Desktop builds trust the OS's certificates, as a browser does, so
+## antivirus HTTPS scanning (which re-signs every site with its own
+## root) doesn't cut the boards off. The web build rides the browser.
+func _tls() -> TLSOptions:
+	if _tls_tried:
+		return _tls_options
+	_tls_tried = true
+	if OS.has_feature("web"):
+		return null
+	var pem := OS.get_system_ca_certificates()
+	if pem == "":
+		return null
+	var cas := X509Certificate.new()
+	if cas.load_from_string(pem) != OK:
+		return null
+	_tls_options = TLSOptions.client(cas)
+	return _tls_options
 
 
 func _base() -> String:

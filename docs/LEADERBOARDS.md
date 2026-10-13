@@ -80,6 +80,21 @@ grant select on public.best_scores to anon, authenticated;
   characters; blank posts as "Stranger" and a short tag). Two players can share a name and still have separate
   rows.
 
+## Troubleshooting
+
+- **Check the board from a terminal:**
+  `godot --headless --path . --script res://tests/live_leaderboard.gd`
+  posts to the hidden `test|SETUP|` board, reads it back and ranks it.
+  Delete its rows afterwards in the Table Editor.
+- **"TLS handshake error -9984" on a desktop build** means antivirus
+  HTTPS scanning (Avast or AVG Web Shield, and some others) is re-signing
+  the connection with its own certificate, and Godot's TLS rejects it.
+  The board then just reads Offline. Turn off the antivirus's HTTPS
+  scanning, or add an exception for the game. The web build is
+  unaffected because the browser handles HTTPS. To test the rest of the
+  client anyway, set `POKERPOP_TLS_UNSAFE=1` for the live script only;
+  it never applies in play.
+
 ## Honest limits
 
 Scores come from the player's own game, and nothing checks them on the
