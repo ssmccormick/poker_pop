@@ -190,6 +190,9 @@ var contracts_claimed := {}  # contract id -> true
 var contracts_seen := {}     # contract id -> true (completion announced)
 var contracts_init := false  # contracts met before they existed are marked seen
 var unlock_all := false      # screenshots / tests: everything on the trail
+# A seeded ride's STANDARD LOADOUT: everything on the trail, at base
+# FIND and POWER (set by the trail for the ride; not saved).
+var standard := false
 var ascension_max := {}      # rider id -> highest Ascension open (0-20)
 var catalog_version := CATALOG_VERSION
 # The profile's lifetime stats (main.stats), for rows unlocked by wins.
@@ -310,7 +313,7 @@ func add_exp(n: int) -> Dictionary:
 # --- Gates ------------------------------------------------------------------
 
 func is_unlocked(kind: String, id: String) -> bool:
-	if unlock_all:
+	if unlock_all or standard:
 		return true
 	var r := row(kind, id)
 	if r.is_empty() or owned.has(key(kind, id)):
@@ -327,7 +330,7 @@ func won_as(rider: String) -> bool:
 
 ## The one gate every pool asks: unlocked, and owned if it has a price.
 func is_available(kind: String, id: String) -> bool:
-	if unlock_all:
+	if unlock_all or standard:
 		return true
 	var r := row(kind, id)
 	if r.is_empty():
@@ -353,11 +356,11 @@ func open_ascension(rider: String, n: int) -> bool:
 
 
 func find_level(kind: String, id: String) -> int:
-	return int(find.get(key(kind, id), 0))
+	return 0 if standard else int(find.get(key(kind, id), 0))
 
 
 func power_level(kind: String, id: String) -> int:
-	return int(power.get(key(kind, id), 0))
+	return 0 if standard else int(power.get(key(kind, id), 0))
 
 
 ## A weighted pick among the AVAILABLE ids in `weights` ({id: base}),

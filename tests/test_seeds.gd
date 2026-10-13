@@ -51,6 +51,27 @@ func _initialize() -> void:
 			"a seeded shuffle is a real, repeatable permutation")
 	_check(SeedRng.pick(SeedRng.stream("ABCDEFGH", "p"), []) == null, "picking from nothing is null")
 
+	# --- The seed book ---------------------------------------------------------
+	var path := "user://test_seedbook.cfg"
+	DirAccess.remove_absolute(path)
+	var book := SeedBook.new()
+	book.load_file(path)
+	var k := SeedBook.key("trail", "K7QX2M9P", SeedBook.trail_variant("the_gambler", 3))
+	_check(k == "trail|K7QX2M9P|the_gambler-a3", "a board key is mode, seed and variant")
+	_check(book.record(k, 500, {"tables": 12}), "a first score is a best")
+	_check(not book.record(k, 300), "a lower one isn't")
+	_check(book.record(k, 900, {"tables": 20}) and book.best(k) == 900, "a higher one is")
+	_check(int(book.boards[k].attempts) == 3 and int(book.boards[k].tables) == 20,
+			"attempts count, and the best ride's summary is kept")
+	book.record(SeedBook.key("single", "ABCDEFGH"), 50)
+	_check(book.recent(1).size() == 1 and book.recent(8).size() == 2, "recent seeds list the boards played")
+	_check(not book.daily_used("D20261012"), "the day's daily starts unspent")
+	book.mark_daily("D20261012")
+	var again := SeedBook.new()
+	again.load_file(path)
+	_check(again.best(k) == 900 and again.daily_used("D20261012"), "the book survives a save and load")
+	DirAccess.remove_absolute(path)
+
 	if failures == 0:
 		print("ALL SEED TESTS PASSED")
 	else:

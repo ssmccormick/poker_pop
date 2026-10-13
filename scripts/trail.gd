@@ -295,6 +295,17 @@ var run_seed := ""
 var room_attempt := 0            # retries of this table (a fresh, seeded deal each)
 var _attempt_room := -1
 var next_seed := ""              # the seed the next ride starts on ("" = random)
+# A SEEDED RIDE (chosen from SEEDED PLAY, or the daily) plays the
+# STANDARD LOADOUT — every item on the trail at base power, no Outfitter
+# gear — so everyone on a seed plays the same game. It banks no cash
+# and opens no Ascension; its score goes on that seed's board.
+var standard_loadout := false
+var run_daily := false
+var run_practice := false        # a daily ride after the day's scored one
+var next_standard := false
+var next_daily := false
+var _seed_result := {}           # {key, pb, best, practice} for the last page
+var _seed_recorded_uid := ""
 var _rng := RandomNumberGenerator.new()
 var rng_room := RandomNumberGenerator.new()
 var _pick_round := 0
@@ -583,6 +594,9 @@ func _save_run() -> void:
 	cf.set_value("run", "tables_played", PackedStringArray(tables_played))
 	cf.set_value("run", "layout", STOPS_LAYOUT_VERSION)
 	cf.set_value("run", "seed", run_seed)
+	cf.set_value("run", "standard", standard_loadout)
+	cf.set_value("run", "daily", run_daily)
+	cf.set_value("run", "practice", run_practice)
 	cf.set_value("run", "attempt", room_attempt)
 	cf.set_value("run", "attempt_room", _attempt_room)
 	var ranks := PackedInt32Array()
@@ -688,6 +702,9 @@ func _load_run() -> bool:
 	run_seed = String(cf.get_value("run", "seed", ""))
 	if not SeedRng.is_valid(run_seed):
 		run_seed = SeedRng.random_seed()  # a ride saved before seeds
+	standard_loadout = bool(cf.get_value("run", "standard", false))
+	run_daily = bool(cf.get_value("run", "daily", false))
+	run_practice = bool(cf.get_value("run", "practice", false))
 	room_attempt = int(cf.get_value("run", "attempt", 0))
 	_attempt_room = int(cf.get_value("run", "attempt_room", -1))
 	var ranks: PackedInt32Array = cf.get_value("run", "ranks", PackedInt32Array())
@@ -847,7 +864,7 @@ const SUIT_CHARS := ["♠", "♥", "♦", "♣"]
 
 ## A new run's sleeve: the meta-upgraded rank, in a random suit.
 func _fresh_sleeve() -> Dictionary:
-	return {"rank": sleeve_rank, "suit": _rng.randi_range(0, 3),
+	return {"rank": ride_lv("sleeve"), "suit": _rng.randi_range(0, 3),
 			"mod": "", "finish": "", "joker": false}
 
 
@@ -1026,7 +1043,7 @@ func use_laser() -> void:
 func _do_laser(target: PlayingCard) -> void:
 	laser_used = true
 	var cells: Array = [target.grid_pos]
-	for i in mini(laser_level, LASER_DIRS.size()):
+	for i in mini(ride_lv("laser"), LASER_DIRS.size()):
 		cells.append(target.grid_pos + (LASER_DIRS[i] as Vector2i))
 	var cards: Array = []
 	var pieces: Array = []
@@ -2233,6 +2250,17 @@ func _has_saved_run() -> bool:
 
 
 func _start_run(asc: int) -> void:
+	# The seeded-ride flags land first: the standard loadout opens every
+	# rider for the checks just below.
+	standard_loadout = next_standard
+	run_daily = next_daily and standard_loadout
+	next_standard = false
+	next_daily = false
+	run_active = true
+	_apply_loadout()
+	run_active = false
+	if run_daily:
+		asc = 0  # everyone rides the daily at Ascension 0
 	if not _avail("rider", character):
 		character = "the_gambler"
 	if not _avail("trick", gambler_ability):
@@ -2250,6 +2278,15 @@ func _start_run(asc: int) -> void:
 	tables_played = []
 	run_seed = next_seed if SeedRng.is_valid(next_seed) else SeedRng.random_seed()
 	next_seed = ""
+	if run_daily:
+		run_seed = SeedRng.daily_seed()
+		# The day's first daily ride is the scored one; later ones practice.
+		run_practice = main.seed_book.daily_used(run_seed)
+		if not run_practice:
+			main.seed_book.mark_daily(run_seed)
+	else:
+		run_practice = false
+	_seed_result = {}
 	room_attempt = 0
 	_attempt_room = -1
 	_stream("run", 0)
@@ -2262,10 +2299,10 @@ func _start_run(asc: int) -> void:
 	room_index = 0
 	# The Outfitter's gear rides along: extra chips on the stack, and
 	# provisions already in the kit.
-	chips += 20 * meta_bankroll
+	chips += 20 * ride_lv("bankroll")
 	relics.clear()
 	provisions.clear()
-	for i in (meta_provisions if _avail("gear", "provisions") else 0):
+	for i in (ride_lv("provisions") if _avail("gear", "provisions") else 0):
 		provisions.append(_random_provision())
 	_aiming_slot = -1
 	sleeve_card = _fresh_sleeve()
@@ -2285,6 +2322,7 @@ func _start_run(asc: int) -> void:
 	_room_save = {}
 	pending_retry = {}
 	run_active = true
+	_apply_loadout()
 	main.score = 0
 	_apply_relic_effects()
 	_save_run()
@@ -2293,6 +2331,7 @@ func _start_run(asc: int) -> void:
 
 func _resume_run() -> void:
 	if _load_run():
+		_apply_loadout()
 		_apply_relic_effects()
 		if not _room_save.is_empty():
 			# The photographed table: back to the exact stage you
@@ -3200,12 +3239,12 @@ func _start_room() -> void:
 	sleeve_used = false  # one signature use per table, fresh each sit-down
 	_aiming_sleeve = false
 	_aiming_sleight = false
-	sleight_uses_left = 1 + sleight_level
+	sleight_uses_left = 1 + ride_lv("sleight")
 	_aiming_sleight = false
 	laser_used = false
 	_aiming_laser = false
 	_swap_first = null
-	watch_uses_left = 1 + watch_level
+	watch_uses_left = 1 + ride_lv("watch")
 	_watch_snapshot = {}
 	main.board.undo_state = {}
 	main.board.undo_enabled = character == "the_doctor"
@@ -3493,7 +3532,9 @@ func on_hand_played(result: Dictionary) -> void:
 				d["chip_lv"] = int(d.get("chip_lv", 0)) + 1
 				break
 	var earned := int(result.get("cash_earned", 0))
-	if earned > 0:
+	if earned > 0 and standard_loadout:
+		_announce_after_settle("GOLD — a seeded ride banks no cash")
+	elif earned > 0:
 		# Cash cards pay real money, banked on the spot.
 		cash += earned
 		_save_meta()
@@ -4357,7 +4398,7 @@ func _restore_room_state() -> void:
 		rng_room.state = int(rs.rng_room)
 	_rng = rng_room
 	sleight_uses_left = int(rs.get("sleight_uses_left",
-			0 if bool(rs.get("sleight_used", false)) else 1 + sleight_level))
+			0 if bool(rs.get("sleight_used", false)) else 1 + ride_lv("sleight")))
 	watch_uses_left = int(rs.watch_uses_left)
 	_outlaw_dead_pending = false
 	_watch_snapshot = {}
@@ -4427,19 +4468,24 @@ func on_abandon_room() -> void:
 
 func _trail_complete() -> void:
 	main.stat_bump("trail_wins")
-	main.stat_bump("trail_wins_" + character)
-	if ascension >= 1:
-		main.stat_max("ascension_best", ascension)
-	var opened := progress.open_ascension(character, ascension + 1)
+	# A seeded ride can saddle any rider, so its win doesn't open the
+	# next one (or count as an Ascension record).
+	if not standard_loadout:
+		main.stat_bump("trail_wins_" + character)
+		if ascension >= 1:
+			main.stat_max("ascension_best", ascension)
+	var opened := false if standard_loadout else progress.open_ascension(character, ascension + 1)
 	main._stats_save()
 	main.board._play_sound(Board.SFX_STING_COMPLETE, 1.0, -5.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.5)
-	var payout := _cashout_value(COMPLETE_RATE_BONUS) \
+	var payout := 0 if standard_loadout else _cashout_value(COMPLETE_RATE_BONUS) \
 			+ roundi(COMPLETE_PURSE * Ascension.purse_mult(ascension))
 	cash += payout
 	_save_meta()
 	_clear_run_save()
 	var body := "You rode all %d stops and the table pays tribute.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
+	if standard_loadout:
+		body = "You rode all %d stops on a seeded ride.\nThe score goes on the seed's board — no cash is banked." % ROOMS_TOTAL
 	if opened:
 		body += "\n\nASCENSION %d is open for %s." % [ascension + 1, character_name()]
 	if ascension >= Ascension.MAX:
@@ -5139,11 +5185,13 @@ func _deck_stat_text(d: Dictionary) -> String:
 func _end_run(title: String, body: String, payout: int, cause := "") -> void:
 	_hide_all()
 	run_active = false
+	_apply_loadout()  # unlocks and EXP read the real profile again
 	_room_save = {}
 	main.game_started = false
 	if title in ["BUSTED OUT", "BLINDED OUT"]:
 		main.stat_bump("trail_busts")
 	_grant_run_exp(title == "TRAIL COMPLETE")
+	_record_seed_score(title)
 	_check_contracts(false)  # the last page lists them
 	if title != "TRAIL COMPLETE":
 		main.play_music("lost")
@@ -5207,13 +5255,75 @@ func claim_contract(id: String) -> int:
 	return int(c.reward)
 
 
-## A fresh id for a ride — the guard against paying its EXP twice.
+## The board this ride's score belongs to (seeded rides only).
+func seed_board_key() -> String:
+	if run_daily:
+		return SeedBook.key("daily", run_seed, character)
+	return SeedBook.key("trail", run_seed, SeedBook.trail_variant(character, ascension))
+
+
+## A seeded ride's score goes on its seed's board (a daily practice
+## ride doesn't count).
+func _record_seed_score(title: String) -> void:
+	if _seed_recorded_uid == run_uid and run_uid != "":
+		return  # this ride's score is already on the board
+	_seed_result = {}
+	if not standard_loadout:
+		return
+	_seed_recorded_uid = run_uid
+	var k := seed_board_key()
+	if run_practice:
+		_seed_result = {"key": k, "practice": true, "best": main.seed_book.best(k)}
+		return
+	var reached := ROOMS_TOTAL if title == "TRAIL COMPLETE" else mini(room_index + 1, ROOMS_TOTAL)
+	var pb: bool = main.seed_book.record(k, main.score,
+			{"outcome": title, "tables": reached, "rider": character, "ascension": ascension})
+	_seed_result = {"key": k, "pb": pb, "best": main.seed_book.best(k), "practice": false,
+			"tables": reached}
+	main.seed_score_recorded(k, main.score, character, ascension, reached)
+
+
+## The seed line on the last page.
+func seed_line() -> String:
+	if _seed_result.is_empty():
+		return "" if standard_loadout else "Your own loadout — replay it as a SEEDED RIDE to go on its board."
+	if bool(_seed_result.get("practice", false)):
+		return "Practice — today's scored daily ride is already spent."
+	if bool(_seed_result.get("pb", false)):
+		return "NEW BEST ON THIS SEED!"
+	return "Your best on this seed: %d" % int(_seed_result.get("best", 0))
+
+
+## An Outfitter level as this ride sees it: the base on a seeded ride.
+func ride_lv(which: String) -> int:
+	match which:
+		"sleeve":
+			return 2 if standard_loadout else sleeve_rank
+		"laser":
+			return 0 if standard_loadout else laser_level
+		"watch":
+			return 0 if standard_loadout else watch_level
+		"sleight":
+			return 0 if standard_loadout else sleight_level
+		"bankroll":
+			return 0 if standard_loadout else meta_bankroll
+		"provisions":
+			return 0 if standard_loadout else meta_provisions
+	return 0
+
+
+## Tells Progression whether this ride plays the standard loadout.
+func _apply_loadout() -> void:
+	progress.standard = standard_loadout and run_active
+
+
 ## Points _rng at the stream for `purpose` at this stop.
 func _stream(purpose: String, a := -1, b := 0) -> RandomNumberGenerator:
 	_rng = SeedRng.stream(run_seed, purpose, room_index if a < 0 else a, b)
 	return _rng
 
 
+## A fresh id for a ride — the guard against paying its EXP twice.
 func _mint_run_uid() -> String:
 	return "%d-%d" % [int(Time.get_unix_time_from_system() * 1000.0), randi()]
 
@@ -5304,6 +5414,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"best_name": best_hand_name, "best_score": best_hand_score,
 		"outlaws": outlaws_caught, "reached": reached, "total": ROOMS_TOTAL,
 		"cash": cash, "stake": "Ascension %d" % ascension, "seed": run_seed,
+		"seed_line": seed_line(), "seeded": standard_loadout,
 		"relics": relics.duplicate(), "stops": stops,
 		"relic_descs": _relic_descs(),
 		"spent": ["second_wind"] if _second_wind_used else [],
@@ -5739,6 +5850,13 @@ func build_ui() -> void:
 	end_layer.add_child(_gameover_scene)
 	_gameover_scene.ride_again.connect(open_select)
 	_gameover_scene.to_menu.connect(back_to_menu)
+	_gameover_scene.seed_action.connect(func(kind: String) -> void:
+		if kind == "copy":
+			DisplayServer.clipboard_set(SeedRng.pretty(run_seed))
+			main._announce("SEED COPIED")
+		else:
+			_hide_all()
+			main.open_seeds("trail", run_seed, character, ascension))
 
 
 func _layer() -> ColorRect:

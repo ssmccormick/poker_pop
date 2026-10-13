@@ -314,6 +314,120 @@ func _run() -> void:
 		failures += _check(_grid_sig() == after1,
 				"the watch rewinds the seed too: the same hand refills the same way")
 
+	# --- Seeded rides: the standard loadout, the seed's board, the daily --
+	trail._hide_all()
+	var std1: Dictionary = await _seeded_probe("STANDRD2", true)
+	failures += _check(trail.standard_loadout and trail.progress.standard,
+			"a seeded ride rides on the standard loadout")
+	# Max out the profile: a seeded ride mustn't notice.
+	var keep_lv := [trail.sleeve_rank, trail.laser_level, trail.meta_bankroll, trail.meta_provisions,
+			trail.watch_level, trail.sleight_level]
+	var keep_find: Dictionary = trail.progress.find.duplicate()
+	var keep_power: Dictionary = trail.progress.power.duplicate()
+	trail.sleeve_rank = 12
+	trail.laser_level = 3
+	trail.meta_bankroll = 5
+	trail.meta_provisions = 3
+	trail.watch_level = 2
+	trail.sleight_level = 2
+	for k in ["finish:holo", "finish:negative", "finish:prism", "relic:horseshoe", "mod:bomb"]:
+		trail.progress.find[k] = 5
+		trail.progress.power[k] = 3
+	var std2: Dictionary = await _seeded_probe("STANDRD2", true)
+	failures += _check(std1.kit == std2.kit and std1.kit[1] == 2 and std1.kit[2] == 0,
+			"the standard loadout ignores the Outfitter (%s vs %s)" % [str(std1.kit), str(std2.kit)])
+	failures += _check(std1.wall == std2.wall and std1.deal == std2.deal and std1.shop == std2.shop,
+			"so a maxed profile and a fresh one get the very same seeded ride")
+	var own: Dictionary = await _seeded_probe("STANDRD2", false)
+	failures += _check(own.kit != std1.kit and not trail.standard_loadout and not trail.progress.standard,
+			"the same seed on your own loadout plays your own gear")
+	trail.sleeve_rank = keep_lv[0]
+	trail.laser_level = keep_lv[1]
+	trail.meta_bankroll = keep_lv[2]
+	trail.meta_provisions = keep_lv[3]
+	trail.watch_level = keep_lv[4]
+	trail.sleight_level = keep_lv[5]
+	trail.progress.find = keep_find
+	trail.progress.power = keep_power
+	failures += _check(trail.seed_line().contains("SEEDED RIDE"),
+			"an own-loadout ride's last page offers the seeded replay")
+	# A seeded ride's score goes on the seed's board, and banks no cash.
+	await _seeded_probe("BARDSK23", true)
+	trail.ascension = 0
+	main.score = 4321
+	var cash_s: int = trail.cash
+	var asc_s: int = trail.progress.asc_max("the_gambler")
+	var wins_s := int(main.stats.get("trail_wins_the_gambler", 0))
+	trail.run_active = true
+	trail._trail_complete()
+	var bkey := SeedBook.key("trail", "BARDSK23", "the_gambler-a0")
+	failures += _check(main.seed_book.best(bkey) == 4321, "a seeded ride's score lands on its board")
+	failures += _check(trail.cash == cash_s + int(trail._last_grant.get("purse", 0))
+			and trail.progress.asc_max("the_gambler") == asc_s,
+			"a seeded ride banks no cash (beyond a level purse) and opens no Ascension")
+	failures += _check(int(main.stats.get("trail_wins_the_gambler", 0)) == wins_s,
+			"and its win doesn't count toward the next rider")
+	failures += _check(not trail.progress.standard, "the ride's end lifts the standard loadout")
+	failures += _check(trail.seed_line() == "NEW BEST ON THIS SEED!"
+			and trail._ending_data("TRAIL COMPLETE", 0, "").get("seeded", false),
+			"the last page calls it a new best on the seed")
+	trail._end_run("TRAIL COMPLETE", "Again.", 0)
+	failures += _check(int(main.seed_book.boards[bkey].attempts) == 1,
+			"ending the same ride twice logs one attempt")
+	var book2 := SeedBook.new()
+	book2.load_file(main.profile_path("seeds.cfg"))
+	failures += _check(book2.best(bkey) == 4321, "the seed book is saved with the profile")
+	# The daily: one scored ride a day, practice after that.
+	main.seed_book.dailies = {}
+	trail._hide_all()
+	trail.character = "the_machine"
+	trail.next_standard = true
+	trail.next_daily = true
+	trail._start_run(5)
+	await _wait(0.5)
+	failures += _check(trail.run_seed == SeedRng.daily_seed() and trail.ascension == 0
+			and trail.run_daily and not trail.run_practice,
+			"the daily ride is today's seed at Ascension 0, scored")
+	failures += _check(main.seed_book.daily_used(SeedRng.daily_seed()), "and spends the day's scored ride")
+	trail._hide_all()
+	trail.next_standard = true
+	trail.next_daily = true
+	trail._start_run(0)
+	await _wait(0.5)
+	main.score = 999999
+	trail._end_run("LAID LOW", "Test.", 0, "Test.")
+	failures += _check(trail.run_practice and trail.seed_line().begins_with("Practice")
+			and main.seed_book.best(SeedBook.key("daily", SeedRng.daily_seed(), "the_machine")) == 0,
+			"a second daily ride the same day is practice, off the board")
+	trail.character = "the_gambler"
+	trail._hide_all()
+	# The other modes keep their seed's best, once a game.
+	main.next_mode_seed = "MADES234"
+	await main._start_mode_now("time", 180.0)
+	await _settle()
+	main.score = 777
+	failures += _check(main._record_mode_score() == "NEW SEED BEST!"
+			and main.seed_book.best(SeedBook.key("time", "MADES234", "180")) == 777,
+			"a Time Trial's score goes on its seed's board, by length")
+	failures += _check(main._record_mode_score() == "", "and only once a game")
+	main.mode_kind = ""
+	main.game_started = false
+	main.open_seeds("trail", "BARDSK23", "the_gambler", 0)
+	await _wait(0.5)
+	failures += _check(main.seeds_layer.visible and main._seed_best.text.contains("4321")
+			and main._seed_recent_box.get_child_count() >= 2,
+			"SEEDED PLAY shows the seed's best and the recent seeds")
+	main._seed_mode = "time180"
+	main._seed_edit.text = "MADES234"
+	main._refresh_seeds()
+	failures += _check(main._seed_best.text.contains("777") and not main._seed_trail_box.visible,
+			"and each mode's own board")
+	main._seed_edit.text = "NOPE"
+	main._refresh_seeds()
+	failures += _check(main._seed_start.disabled, "a broken seed can't be started")
+	main.seeds_layer.visible = false
+	await _enter_room("the_gambler")  # an ordinary ride again for what follows
+
 	# --- With a ride saved, THE TRAIL puts RESUME first ------------------
 	trail._save_run()
 	main.tutor_seen["core"] = true
@@ -355,7 +469,8 @@ func _run() -> void:
 	failures += _check(main.score == 4321, "the run score survives a save and resume")
 
 	# --- The pocket watch turns the run score back too ------------------
-	await _enter_room("the_doctor")
+	trail.next_seed = "HANDS234"  # a fixed plain table, so the check never rides on luck
+	await _enter_room_at("the_doctor", 0)
 	var before_hand: int = main.score
 	if await _play_pair():
 		failures += _check(main.score > before_hand, "the Doctor's pair scored")
@@ -724,14 +839,17 @@ func _settle() -> void:
 
 ## One seeded ride's fingerprint: the first wall, the opening table,
 ## three hands of refills, the second wall and the first merchant.
-func _seeded_probe(seed_text: String) -> Dictionary:
+func _seeded_probe(seed_text: String, standard := false) -> Dictionary:
 	var rec := {}
 	trail._hide_all()
 	trail.character = "the_gambler"
 	trail.gambler_ability = "sleeve"
 	trail.next_seed = seed_text
+	trail.next_standard = standard
 	trail._start_run(0)
 	await _wait(0.5)
+	rec["kit"] = [trail.chips, trail.sleeve_card.rank, trail.provisions.size(),
+			trail.ride_lv("laser")]
 	rec["wall"] = _wall_sig(trail._offers) + [_offer_sig(trail._fate_offer)]
 	trail._choose_offer(trail._offers[0], false)
 	await _wait(0.5)
@@ -740,6 +858,7 @@ func _seeded_probe(seed_text: String) -> Dictionary:
 	await _wait(0.5)
 	await _settle()
 	rec["deal"] = _grid_sig()
+	rec["kit"].append(trail.watch_uses_left)
 	var hands: Array = []
 	for h in 3:
 		for n in randi_range(1, 40):

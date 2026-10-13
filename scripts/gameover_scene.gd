@@ -9,6 +9,7 @@ extends Control
 ## straight to its last frame.
 
 signal ride_again
+signal seed_action(kind: String)   # "copy" or "play"
 signal to_menu
 
 const DIR := "res://assets/art/gameover/"
@@ -408,6 +409,20 @@ func _build_seed() -> void:
 		return
 	_label(_ui, "SEED  " + SeedRng.pretty(seed_text), _spaced(FontLib.label, 3), 20, LABEL_LIT,
 			Rect2(1180, 60, 620, 30), HORIZONTAL_ALIGNMENT_RIGHT)
+	var line := String(_data.get("seed_line", ""))
+	if line != "":
+		var l := _label(_ui, line, _font(FontLib.label), 18, GOLD, Rect2(1060, 92, 740, 26),
+				HORIZONTAL_ALIGNMENT_RIGHT)
+		l.add_theme_color_override("font_outline_color", Color("1a1008"))
+		l.add_theme_constant_override("outline_size", 4)
+	if host != null:
+		var copy: Button = host._button(_ui, "COPY SEED", Vector2(1390, 126), Vector2(170, 44))
+		copy.add_theme_font_size_override("font_size", 16)
+		copy.pressed.connect(func() -> void: seed_action.emit("copy"))
+		var play: Button = host._button(_ui, "PLAY THIS SEED", Vector2(1570, 126), Vector2(230, 44))
+		play.add_theme_font_size_override("font_size", 16)
+		play.tooltip_text = "Open SEEDED PLAY on this seed — the same trail, on the standard loadout, for its board."
+		play.pressed.connect(func() -> void: seed_action.emit("play"))
 
 
 func _build_epitaph() -> void:

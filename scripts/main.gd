@@ -221,6 +221,7 @@ func _ready() -> void:
 	_fade_rect.size = VIEW
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(_fade_rect)
+	_build_seeds()
 	_build_splash()
 	_build_callout()
 	_build_plaque()
@@ -268,6 +269,16 @@ func _ready() -> void:
 				_open_stats()
 			"trail":
 				trail.open_buyin()
+			"seeds":
+				# Sample boards for the picture (shot mode never saves them).
+				var now := int(Time.get_unix_time_from_system())
+				var rows := [["trail|K7QX2M9P|the_gambler-a0", 48210], ["time|ABCDEFGH|180", 12750],
+						["daily|%s|the_doctor" % SeedRng.daily_seed(), 30115], ["arcade|QWERTY23|", 9420]]
+				for i in rows.size():
+					var parts := String(rows[i][0]).split("|")
+					seed_book.boards[rows[i][0]] = {"mode": parts[0], "seed": parts[1],
+							"variant": parts[2], "best": rows[i][1], "attempts": 2, "last": now - i}
+				open_seeds("trail", "K7QX2M9P")
 			"contracts":
 				_refresh_contracts()
 				contracts_layer.visible = true
@@ -881,7 +892,7 @@ func _update_kit() -> void:
 	var sig := str(trail.provisions) + str(trail._aiming_slot) + str(trail.kit_size()) \
 			+ str(trail.sleeve_card) + str(trail.sleeve_used) + str(trail._aiming_sleeve) \
 			+ trail.character + str(trail.laser_used) + str(trail._aiming_laser) \
-			+ str(trail.laser_level) + str(trail.watch_uses_left) + str(board.has_undo()) \
+			+ str(trail.ride_lv("laser")) + str(trail.watch_uses_left) + str(board.has_undo()) \
 			+ trail.gambler_ability + str(trail.sleight_uses_left) + str(trail._aiming_sleight)
 	if sig == _kit_sig:
 		return
@@ -906,10 +917,10 @@ func _update_kit() -> void:
 				_sleeve_btn.tooltip_text = "One shot per table. It recharges at the next sit-down."
 			else:
 				_sleeve_btn.disabled = false
-				_sleeve_btn.text = "LASER  ×%d" % (1 + trail.laser_level)
+				_sleeve_btn.text = "LASER  ×%d" % (1 + trail.ride_lv("laser"))
 				_sleeve_btn.tooltip_text = "THE LASER — once per table, burn a card clean off the felt%s. Extend the beam at the Outfitter." \
-						% ("" if trail.laser_level == 0
-						else " (plus %d more in a cross)" % trail.laser_level)
+						% ("" if trail.ride_lv("laser") == 0
+						else " (plus %d more in a cross)" % trail.ride_lv("laser"))
 		"the_doctor":
 			if trail.watch_uses_left <= 0:
 				_sleeve_btn.disabled = true
@@ -934,7 +945,7 @@ func _update_kit() -> void:
 				_sleeve_btn.tooltip_text = "No tricks left at this table. They're ready again at the next sit-down."
 			else:
 				_sleeve_btn.disabled = false
-				_sleeve_btn.text = "SLEIGHT OF HAND" if trail.sleight_level == 0 \
+				_sleeve_btn.text = "SLEIGHT OF HAND" if trail.ride_lv("sleight") == 0 \
 						else "SLEIGHT  ×%d" % trail.sleight_uses_left
 				_sleeve_btn.tooltip_text = "SLEIGHT OF HAND — swap two cards that sit side by side. %d trick%s left at this table; palm in more at the Outfitter. Free action." \
 						% [trail.sleight_uses_left, "" if trail.sleight_uses_left == 1 else "s"]
@@ -1318,18 +1329,42 @@ func _on_dead_board() -> void:
 
 func _show_game_over(message: String) -> void:
 	_stats_save()
+	var seed_msg := _record_mode_score()
 	# Let the last pop/refill animation play out before covering the board.
 	await get_tree().create_timer(1.4, false).timeout
 	if not game_over or menu_open:
 		return
 	over_label.text = message
 	if mode_seed != "":
-		over_label.text += "
-
-Seed  %s" % SeedRng.pretty(mode_seed)
+		over_label.text += "\n\nSeed  %s" % SeedRng.pretty(mode_seed)
+		if seed_msg != "":
+			over_label.text += "   ·   " + seed_msg
 	over_layer.modulate = Color(1, 1, 1, 0)
 	over_layer.visible = true
 	create_tween().tween_property(over_layer, "modulate:a", 1.0, 0.4)
+
+
+## The board this mode game's score belongs to.
+func mode_board_key() -> String:
+	var variant := str(int(mode_time)) if mode_kind == "time" else ""
+	return SeedBook.key(mode_kind, mode_seed, variant)
+
+
+## Logs this game on its seed's board; returns the line for the end card.
+func _record_mode_score() -> String:
+	if mode_seed == "" or mode_kind in ["trail", "tutorial", ""] or score <= 0 or _mode_scored:
+		return ""
+	_mode_scored = true  # once a game, however it ends
+	var k := mode_board_key()
+	var pb := seed_book.record(k, score, {"level": level})
+	seed_score_recorded(k, score, "", 0, 0)
+	return "NEW SEED BEST!" if pb else "Best on this seed: %d" % seed_book.best(k)
+
+
+## Every finished game's board score passes through here (the online
+## boards hook in, phase 3).
+func seed_score_recorded(_key: String, _score: int, _rider: String, _asc: int, _tables: int) -> void:
+	pass
 
 
 func _restart() -> void:
@@ -1338,6 +1373,7 @@ func _restart() -> void:
 	if not game_started or board.busy or level_transition:
 		return
 	score = 0
+	_mode_scored = false
 	hands_played = 0
 	time_left = mode_time
 	level = 1
@@ -1482,6 +1518,7 @@ func _load_settings() -> void:
 	_migrate_legacy_saves()
 	_tutor_load()
 	_stats_load()
+	seed_book.load_file(profile_path("seeds.cfg"))
 	fullscreen_on = cf.get_value("video", "fullscreen", true)
 	res_index = clampi(cf.get_value("video", "resolution", 2), 0, RESOLUTIONS.size() - 1)
 	music_vol = clampf(cf.get_value("audio", "music", 0.8), 0.0, 1.0)
@@ -1564,6 +1601,7 @@ func _select_profile(n: int) -> void:
 	_save_settings()
 	_tutor_load()
 	_stats_load()
+	seed_book.load_file(profile_path("seeds.cfg"))
 	trail.run_active = false
 	trail.pending_retry = {}
 	trail._load_meta()
@@ -1573,11 +1611,12 @@ func _select_profile(n: int) -> void:
 
 
 func _erase_profile(n: int) -> void:
-	for base in ["trail_meta.cfg", "trail_run.cfg", "tutorial.cfg", "stats.cfg"]:
+	for base in ["trail_meta.cfg", "trail_run.cfg", "tutorial.cfg", "stats.cfg", "seeds.cfg"]:
 		DirAccess.remove_absolute("user://p%d_%s" % [n, base])
 	if n == profile:
 		_tutor_load()
 		_stats_load()
+		seed_book.load_file(profile_path("seeds.cfg"))
 		trail.run_active = false
 		trail.pending_retry = {}
 		trail._load_meta()
@@ -2405,9 +2444,12 @@ func _open_menu() -> void:
 
 func _open_menu_now() -> void:
 	_stats_save()
+	if mode_kind == "zen" and score > 0:
+		_record_mode_score()  # Zen ends whenever you walk away
 	if mode_kind == "trail":
 		trail.on_abandon_room()  # mid-room exit counts as a fail
 		trail._hide_all()
+	trail.progress.standard = false  # a seeded ride's hold lifts off the menu
 	countdown_id += 1  # cancel any running countdown
 	countdown_active = false
 	countdown_overlay.visible = false
@@ -2438,6 +2480,8 @@ var _level_fill: Panel
 var _upgrades_pip: Label
 # SEEDS for the arcade-style modes (the trail keeps its own).
 var mode_seed := ""
+var seed_book := SeedBook.new()
+var _mode_scored := false   # this game's score is already on its seed's board
 var next_mode_seed := ""
 var _mode_seed_fixed := false
 var _mode_label_base := ""
@@ -3127,6 +3171,11 @@ func _build_menu() -> void:
 	var contracts_btn := _button(menu_layer, "CONTRACTS", Vector2(1620, 124), Vector2(240, 54))
 	contracts_btn.add_theme_font_size_override("font_size", 20)
 	contracts_btn.pressed.connect(_open_contracts)
+	var seeds_btn := _button(menu_layer, "SEEDED PLAY", Vector2(1620, 188), Vector2(240, 54))
+	seeds_btn.add_theme_font_size_override("font_size", 20)
+	seeds_btn.tooltip_text = "Play a seed — the same game for everyone who plays it — and chase its highscore. Includes the DAILY RIDE."
+	seeds_btn.pressed.connect(func() -> void:
+		open_seeds())
 	_contracts_pip = _gold_pip(Vector2(1836, 112))
 	_build_level_plate()
 
@@ -3580,6 +3629,293 @@ func _open_stats_now() -> void:
 		(_stats_cols[i][0] as Label).text = "\n".join(names)
 		(_stats_cols[i][1] as Label).text = "\n".join(values)
 	stats_layer.visible = true
+
+
+# --- SEEDED PLAY: pick a mode and a seed, chase its board ----------------
+
+const SEED_MODES := [["trail", "TRAIL", 0.0], ["time60", "1:00", 60.0], ["time180", "3:00", 180.0],
+		["time300", "5:00", 300.0], ["single", "SINGLE", 0.0], ["arcade", "ARCADE", 0.0],
+		["zen", "ZEN", 0.0]]
+var seeds_layer: ColorRect
+var _seed_mode := "trail"
+var _seed_rider := "the_gambler"
+var _seed_asc := 0
+var _seed_daily := false
+var _seed_edit: LineEdit
+var _seed_mode_btns := {}
+var _seed_rider_btns := {}
+var _seed_trail_box: Control
+var _seed_asc_label: Label
+var _seed_best: Label
+var _seed_rules: Label
+var _seed_warn: Label
+var _seed_recent_box: VBoxContainer
+var _seed_start: Button
+var _seed_board_box: VBoxContainer   # the online top ten (phase 3)
+
+
+## Opens SEEDED PLAY, optionally on a given mode and seed (the last
+## page's PLAY THIS SEED lands here).
+func open_seeds(mode := "", seed_text := "", rider := "", asc := -1) -> void:
+	if mode != "":
+		_seed_mode = mode
+	if seed_text != "":
+		_seed_edit.text = SeedRng.pretty(seed_text)
+	elif _seed_edit.text == "":
+		_seed_edit.text = SeedRng.pretty(SeedRng.random_seed())
+	if rider != "":
+		_seed_rider = rider
+	if asc >= 0:
+		_seed_asc = asc
+	_seed_daily = SeedRng.is_daily(seed_text)
+	transition(func() -> void:
+		trail._hide_all()
+		menu_layer.visible = false
+		over_layer.visible = false
+		_refresh_seeds()
+		seeds_layer.visible = true)
+
+
+func _seed_text() -> String:
+	return SeedRng.daily_seed() if _seed_daily else SeedRng.normalize(_seed_edit.text)
+
+
+## The board the page is showing.
+func _seed_key() -> String:
+	var st := _seed_text()
+	match _seed_mode:
+		"trail":
+			if _seed_daily:
+				return SeedBook.key("daily", st, _seed_rider)
+			return SeedBook.key("trail", st, SeedBook.trail_variant(_seed_rider, _seed_asc))
+		"time60", "time180", "time300":
+			return SeedBook.key("time", st, _seed_mode.substr(4))
+	return SeedBook.key(_seed_mode, st, "")
+
+
+func _refresh_seeds() -> void:
+	for k in _seed_mode_btns:
+		trail._style_signature_toggle(_seed_mode_btns[k], k == _seed_mode)
+	var is_trail := _seed_mode == "trail"
+	_seed_trail_box.visible = is_trail
+	var top: int = 0 if _seed_daily else trail.progress.asc_max(_seed_rider)
+	_seed_asc = clampi(_seed_asc, 0, top)
+	_seed_asc_label.text = "ASCENSION %d" % _seed_asc
+	for r in _seed_rider_btns:
+		trail._style_signature_toggle(_seed_rider_btns[r], r == _seed_rider)
+	var st := _seed_text()
+	var ok := SeedRng.is_valid(st)
+	_seed_start.disabled = not ok
+	_seed_edit.editable = not _seed_daily
+	if _seed_daily:
+		_seed_edit.text = SeedRng.pretty(st)
+	var best := seed_book.best(_seed_key()) if ok else 0
+	_seed_best.text = ("YOUR BEST ON THIS SEED:  %d" % best) if best > 0 \
+			else ("NO SCORE ON THIS SEED YET" if ok else "A SEED IS 8 LETTERS AND NUMBERS")
+	if is_trail:
+		_seed_rules.text = "A seeded ride plays the STANDARD LOADOUT: every relic, provision and card on the trail at base power, no Outfitter gear, any rider. It earns EXP, but banks no cash, opens no Ascension and doesn't count toward the next rider. Everyone on this seed plays the very same trail."
+	else:
+		_seed_rules.text = "The same seed deals the same table, in the same order, for everyone who plays it."
+	_seed_warn.text = ""
+	if is_trail and trail._has_saved_run():
+		_seed_warn.text = "Starting a seeded ride ends your saved ride (its EXP is kept)."
+	if _seed_daily:
+		var used := seed_book.daily_used(st)
+		_seed_start.text = "PRACTICE THE DAILY" if used else "RIDE THE DAILY"
+		if used:
+			_seed_warn.text = "Today's scored daily ride is spent — this one is practice."
+	else:
+		_seed_start.text = "START"
+	for c in _seed_recent_box.get_children():
+		c.queue_free()
+	for e in seed_book.recent(7):
+		var b := _button(_seed_recent_box, "", Vector2.ZERO, Vector2(560, 44))
+		b.custom_minimum_size = Vector2(560, 44)
+		b.add_theme_font_size_override("font_size", 15)
+		var mode := String(e.mode)
+		var v := String(e.get("variant", ""))
+		var label := SeedRng.pretty(String(e.seed))
+		if mode == "time":
+			label = "TIME %d:%02d  ·  %s" % [int(v) / 60, int(v) % 60, label]
+		elif mode != "daily":
+			label = "%s  ·  %s" % [mode.to_upper(), label]
+		if v != "" and mode != "time":
+			label += "  ·  " + v.replace("the_", "").replace("-a", " A")
+		b.text = "%s   —   %d" % [label, int(e.get("best", 0))]
+		var row: Dictionary = e
+		b.pressed.connect(func() -> void:
+			_load_seed_row(row))
+
+
+## Clicking a recent seed loads its board back onto the page.
+func _load_seed_row(e: Dictionary) -> void:
+	_seed_daily = String(e.mode) == "daily"
+	match String(e.mode):
+		"trail", "daily":
+			_seed_mode = "trail"
+			var v := String(e.get("variant", ""))
+			if v.contains("-a"):
+				_seed_rider = v.get_slice("-a", 0)
+				_seed_asc = int(v.get_slice("-a", 1))
+			elif v != "":
+				_seed_rider = v
+		"time":
+			_seed_mode = "time" + String(e.get("variant", "60"))
+		_:
+			_seed_mode = String(e.mode)
+	if not _seed_daily:
+		_seed_edit.text = SeedRng.pretty(String(e.seed))
+	board._play_sound(Board.SFX_CLICK, 1.1, -10.0)
+	_refresh_seeds()
+
+
+func _start_seeded() -> void:
+	var st := _seed_text()
+	if not SeedRng.is_valid(st):
+		board._play_sound(Board.SFX_ERROR, 1.0, -8.0)
+		return
+	seeds_layer.visible = false
+	if _seed_mode == "trail":
+		trail.character = _seed_rider
+		trail.next_seed = st
+		trail.next_standard = true
+		trail.next_daily = _seed_daily
+		menu_open = false
+		trail._start_run(0 if _seed_daily else _seed_asc)
+		return
+	next_mode_seed = st
+	match _seed_mode:
+		"time60":
+			_start_mode("time", 60.0)
+		"time180":
+			_start_mode("time", 180.0)
+		"time300":
+			_start_mode("time", 300.0)
+		_:
+			_start_mode(_seed_mode)
+
+
+func _build_seeds() -> void:
+	seeds_layer = ColorRect.new()
+	seeds_layer.color = BG
+	seeds_layer.size = VIEW
+	seeds_layer.visible = false
+	ui_root.add_child(seeds_layer)
+	var title := _label(seeds_layer, "SEEDED PLAY", Vector2(0, 70), 64, UiKit.BRASS_HI)
+	title.size = Vector2(VIEW.x, 90)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var sub := _label(seeds_layer, "One seed, one game — the same deal for everyone. Share it, beat it.",
+			Vector2(0, 160), 22, DIM)
+	sub.size = Vector2(VIEW.x, 30)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for i in SEED_MODES.size():
+		var key := String(SEED_MODES[i][0])
+		var mb := _button(seeds_layer, String(SEED_MODES[i][1]), Vector2(395 + i * 165, 212), Vector2(155, 50))
+		mb.focus_mode = Control.FOCUS_NONE
+		mb.pressed.connect(func() -> void:
+			_seed_mode = key
+			if key != "trail":
+				_seed_daily = false
+			board._play_sound(Board.SFX_FLIP, 1.2, -10.0)
+			_refresh_seeds())
+		_seed_mode_btns[key] = mb
+	# The seed itself.
+	var sl := _label(seeds_layer, "SEED", Vector2(395, 300), 26, GOLD)
+	sl.size = Vector2(100, 56)
+	sl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_seed_edit = LineEdit.new()
+	_seed_edit.position = Vector2(500, 300)
+	_seed_edit.size = Vector2(360, 56)
+	_seed_edit.max_length = 16
+	_seed_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_seed_edit.add_theme_font_size_override("font_size", 28)
+	_seed_edit.add_theme_stylebox_override("normal", UiKit.inset_box())
+	_seed_edit.add_theme_stylebox_override("focus", UiKit.inset_box())
+	_seed_edit.add_theme_color_override("font_color", GOLD)
+	if FontLib.display != null:
+		_seed_edit.add_theme_font_override("font", FontLib.display)
+	_seed_edit.text_changed.connect(func(_t: String) -> void:
+		_refresh_seeds())
+	seeds_layer.add_child(_seed_edit)
+	var rnd := _button(seeds_layer, "RANDOM", Vector2(880, 300), Vector2(170, 56))
+	rnd.pressed.connect(func() -> void:
+		_seed_daily = false
+		_seed_edit.text = SeedRng.pretty(SeedRng.random_seed())
+		_refresh_seeds())
+	var paste := _button(seeds_layer, "PASTE", Vector2(1065, 300), Vector2(150, 56))
+	paste.pressed.connect(func() -> void:
+		_seed_daily = false
+		_seed_edit.text = SeedRng.pretty(SeedRng.normalize(DisplayServer.clipboard_get()))
+		_refresh_seeds())
+	var copy := _button(seeds_layer, "COPY", Vector2(1230, 300), Vector2(130, 56))
+	copy.pressed.connect(func() -> void:
+		DisplayServer.clipboard_set(SeedRng.pretty(_seed_text()))
+		_announce("SEED COPIED"))
+	var daily := _button(seeds_layer, "DAILY RIDE", Vector2(1375, 300), Vector2(180, 56), true)
+	daily.tooltip_text = "Today's seed — the same trail for everyone, Ascension 0. One scored ride a day."
+	daily.pressed.connect(func() -> void:
+		_seed_daily = true
+		_seed_mode = "trail"
+		_seed_asc = 0
+		board._play_sound(Board.SFX_FLIP, 1.0, -8.0)
+		_refresh_seeds())
+	# Trail: the rider and the Ascension.
+	_seed_trail_box = Control.new()
+	_seed_trail_box.size = VIEW
+	_seed_trail_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	seeds_layer.add_child(_seed_trail_box)
+	var riders := ["the_gambler", "the_machine", "the_doctor"]
+	for i in riders.size():
+		var rid: String = riders[i]
+		var rb := _button(_seed_trail_box, String(TrailMode.CHARACTERS[rid].name).to_upper(),
+				Vector2(395 + i * 210, 390), Vector2(200, 50))
+		rb.focus_mode = Control.FOCUS_NONE
+		rb.pressed.connect(func() -> void:
+			_seed_rider = rid
+			_refresh_seeds())
+		_seed_rider_btns[rid] = rb
+	var prev := _button(_seed_trail_box, "◀", Vector2(1075, 390), Vector2(60, 50))
+	prev.pressed.connect(func() -> void:
+		_seed_asc -= 1
+		_refresh_seeds())
+	_seed_asc_label = _label(_seed_trail_box, "", Vector2(1140, 390), 26, GOLD)
+	_seed_asc_label.size = Vector2(250, 50)
+	_seed_asc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_seed_asc_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var nxt := _button(_seed_trail_box, "▶", Vector2(1395, 390), Vector2(60, 50))
+	nxt.pressed.connect(func() -> void:
+		_seed_asc += 1
+		_refresh_seeds())
+	# Your best, the rules, the warning; recent seeds; the online board.
+	UiKit.plate(seeds_layer, Rect2(395, 470, 560, 410))
+	_seed_best = _label(seeds_layer, "", Vector2(420, 490), 24, GOLD)
+	_seed_best.size = Vector2(510, 34)
+	_seed_rules = _label(seeds_layer, "", Vector2(420, 534), 16, OFFWHITE)
+	_seed_rules.size = Vector2(510, 120)
+	_seed_rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_seed_board_box = VBoxContainer.new()
+	_seed_board_box.position = Vector2(420, 660)
+	_seed_board_box.size = Vector2(510, 210)
+	seeds_layer.add_child(_seed_board_box)
+	UiKit.plate(seeds_layer, Rect2(965, 470, 590, 410))
+	var rl := _label(seeds_layer, "RECENT SEEDS", Vector2(985, 486), 20, GOLD)
+	rl.size = Vector2(300, 28)
+	_seed_recent_box = VBoxContainer.new()
+	_seed_recent_box.position = Vector2(980, 520)
+	_seed_recent_box.add_theme_constant_override("separation", 6)
+	seeds_layer.add_child(_seed_recent_box)
+	_seed_warn = _label(seeds_layer, "", Vector2(0, 892), 18, RED)
+	_seed_warn.size = Vector2(VIEW.x, 26)
+	_seed_warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_seed_start = _button(seeds_layer, "START", Vector2(810, 926), Vector2(300, 64), true)
+	_seed_start.add_theme_font_size_override("font_size", 26)
+	_seed_start.pressed.connect(_start_seeded)
+	var back := _button(seeds_layer, "BACK", Vector2(60, 970), Vector2(200, 54))
+	back.add_theme_font_size_override("font_size", 20)
+	back.pressed.connect(func() -> void:
+		transition(func() -> void:
+			seeds_layer.visible = false
+			_open_menu_now()))
 
 
 func _open_contracts() -> void:
