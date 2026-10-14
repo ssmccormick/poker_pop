@@ -113,7 +113,20 @@
   "rider": {
    "explosive": "cards/rider/explosive.png",
    "wild8_badge": "cards/rider/wild8_badge.png",
-   "joker_x2": "cards/rider/joker_x2.png"
+   "joker_x2": "cards/rider/joker_x2.png",
+   "wild_badge": "cards/rider/wild_badge.png",
+   "wild2_badge": "cards/rider/wild2_badge.png",
+   "wild3_badge": "cards/rider/wild3_badge.png",
+   "wild4_badge": "cards/rider/wild4_badge.png",
+   "wild5_badge": "cards/rider/wild5_badge.png",
+   "wild6_badge": "cards/rider/wild6_badge.png",
+   "wild7_badge": "cards/rider/wild7_badge.png",
+   "wild9_badge": "cards/rider/wild9_badge.png",
+   "wild10_badge": "cards/rider/wild10_badge.png",
+   "wildJ_badge": "cards/rider/wildJ_badge.png",
+   "wildQ_badge": "cards/rider/wildQ_badge.png",
+   "wildK_badge": "cards/rider/wildK_badge.png",
+   "wildA_badge": "cards/rider/wildA_badge.png"
   },
   "hazard": {
    "water_1": "cards/hazard/water_1.png",
@@ -179,7 +192,17 @@
    "signature_toggle_unselected_hover": "ui/signature_toggle_unselected_hover.png",
    "signature_toggle_selected@2x": "ui/signature_toggle_selected@2x.png",
    "signature_toggle_unselected@2x": "ui/signature_toggle_unselected@2x.png",
-   "signature_toggle_unselected_hover@2x": "ui/signature_toggle_unselected_hover@2x.png"
+   "signature_toggle_unselected_hover@2x": "ui/signature_toggle_unselected_hover@2x.png",
+   "ability_socket_empty": "ui/ability_socket_empty.png",
+   "ability_tile_common": "ui/ability_tile_common.png",
+   "ability_tile_rare": "ui/ability_tile_rare.png",
+   "ability_tile_epic": "ui/ability_tile_epic.png",
+   "ability_tile_legendary": "ui/ability_tile_legendary.png",
+   "ability_row": "ui/ability_row.png",
+   "ability_held": "ui/ability_held.png",
+   "twist_chip": "ui/twist_chip.png",
+   "marker_shop": "ui/marker_shop.png",
+   "marker_shop_ahead": "ui/marker_shop_ahead.png"
   },
   "relic_glyph": {
    "horseshoe": "relics/glyph/horseshoe.png",
@@ -272,7 +295,63 @@
   },
   "fx": {
    "card_glare": "cards/fx/card_glare.png",
-   "card_shadow_soft": "cards/fx/card_shadow_soft.png"
+   "card_shadow_soft": "cards/fx/card_shadow_soft.png",
+   "ability_reveal_rays": "cards/fx/ability_reveal_rays.png",
+   "ability_reveal_glow": "cards/fx/ability_reveal_glow.png"
+  },
+  "ability_frame": {
+   "common": "cards/ability_frame/common.png",
+   "rare": "cards/ability_frame/rare.png",
+   "epic": "cards/ability_frame/epic.png",
+   "legendary": "cards/ability_frame/legendary.png",
+   "back": "cards/ability_frame/back.png"
+  },
+  "ability_pip": {
+   "common": "cards/ability_pip/common.png",
+   "rare": "cards/ability_pip/rare.png",
+   "epic": "cards/ability_pip/epic.png",
+   "legendary": "cards/ability_pip/legendary.png",
+   "empty": "cards/ability_pip/empty.png"
+  },
+  "ability_glyph": {
+   "spurs": "cards/ability_glyph/spurs.png",
+   "side_bet": "cards/ability_glyph/side_bet.png",
+   "matched_pair": "cards/ability_glyph/matched_pair.png",
+   "triple_threat": "cards/ability_glyph/triple_threat.png",
+   "hot_brand": "cards/ability_glyph/hot_brand.png",
+   "push_broom": "cards/ability_glyph/push_broom.png",
+   "borrowed_time": "cards/ability_glyph/borrowed_time.png",
+   "lookout": "cards/ability_glyph/lookout.png",
+   "scattergun": "cards/ability_glyph/scattergun.png",
+   "deputy_badge": "cards/ability_glyph/deputy_badge.png",
+   "fan_the_hammer": "cards/ability_glyph/fan_the_hammer.png",
+   "cool_head": "cards/ability_glyph/cool_head.png",
+   "rain_barrel": "cards/ability_glyph/rain_barrel.png",
+   "hired_gun": "cards/ability_glyph/hired_gun.png",
+   "saddle_horn": "cards/ability_glyph/saddle_horn.png",
+   "marked_card": "cards/ability_glyph/marked_card.png",
+   "double_down": "cards/ability_glyph/double_down.png",
+   "on_the_house": "cards/ability_glyph/on_the_house.png",
+   "big_iron": "cards/ability_glyph/big_iron.png",
+   "dead_mans_hand": "cards/ability_glyph/dead_mans_hand.png",
+   "clean_sweep": "cards/ability_glyph/clean_sweep.png",
+   "fastest_gun": "cards/ability_glyph/fastest_gun.png",
+   "branded_for_life": "cards/ability_glyph/branded_for_life.png",
+   "house_money": "cards/ability_glyph/house_money.png"
+  },
+  "twist_icon": {
+   "wild": "cards/twist_icon/wild.png",
+   "hz_bomb": "cards/twist_icon/hz_bomb.png",
+   "hz_fire": "cards/twist_icon/hz_fire.png",
+   "hz_wind": "cards/twist_icon/hz_wind.png",
+   "hz_stone": "cards/twist_icon/hz_stone.png",
+   "hz_water": "cards/twist_icon/hz_water.png",
+   "clock": "cards/twist_icon/clock.png",
+   "short": "cards/twist_icon/short.png",
+   "tough": "cards/twist_icon/tough.png",
+   "play_only": "cards/twist_icon/play_only.png",
+   "score_only": "cards/twist_icon/score_only.png",
+   "storm": "cards/twist_icon/storm.png"
   }
  },
  "how_to_stack": {
@@ -459,5 +538,331 @@
    ],
    "note": "Two-option rider signature selector under the Gambler card (Ace up the Sleeve / Sleight of Hand). 1:1 at 142x44 like the ui/ button kit; @2x files have doubled margins. Labels render live (Rye 18-20, bone; unselected #b8a888). Selected = oxblood face, hot-brass rim, filled gold end ticks."
   }
+ },
+ "abilities_twists_abilities": {
+  "spurs": {
+   "name": "Spurs",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/spurs.png"
+  },
+  "side_bet": {
+   "name": "Side Bet",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/side_bet.png"
+  },
+  "matched_pair": {
+   "name": "Matched Pair",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/matched_pair.png"
+  },
+  "triple_threat": {
+   "name": "Triple Threat",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/triple_threat.png"
+  },
+  "hot_brand": {
+   "name": "Hot Brand",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/hot_brand.png"
+  },
+  "push_broom": {
+   "name": "Push Broom",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/push_broom.png"
+  },
+  "borrowed_time": {
+   "name": "Borrowed Time",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/borrowed_time.png"
+  },
+  "lookout": {
+   "name": "Lookout",
+   "rarity": "common",
+   "glyph": "cards/ability_glyph/lookout.png"
+  },
+  "scattergun": {
+   "name": "Scattergun",
+   "rarity": "rare",
+   "glyph": "cards/ability_glyph/scattergun.png"
+  },
+  "deputy_badge": {
+   "name": "Deputy's Badge",
+   "rarity": "rare",
+   "glyph": "cards/ability_glyph/deputy_badge.png"
+  },
+  "fan_the_hammer": {
+   "name": "Fan the Hammer",
+   "rarity": "rare",
+   "glyph": "cards/ability_glyph/fan_the_hammer.png"
+  },
+  "cool_head": {
+   "name": "Cool Head",
+   "rarity": "rare",
+   "glyph": "cards/ability_glyph/cool_head.png"
+  },
+  "rain_barrel": {
+   "name": "Rain Barrel",
+   "rarity": "rare",
+   "glyph": "cards/ability_glyph/rain_barrel.png"
+  },
+  "hired_gun": {
+   "name": "Hired Gun",
+   "rarity": "rare",
+   "glyph": "cards/ability_glyph/hired_gun.png"
+  },
+  "saddle_horn": {
+   "name": "Saddle Horn",
+   "rarity": "rare",
+   "glyph": "cards/ability_glyph/saddle_horn.png"
+  },
+  "marked_card": {
+   "name": "Marked Card",
+   "rarity": "epic",
+   "glyph": "cards/ability_glyph/marked_card.png"
+  },
+  "double_down": {
+   "name": "Double Down",
+   "rarity": "epic",
+   "glyph": "cards/ability_glyph/double_down.png"
+  },
+  "on_the_house": {
+   "name": "On the House",
+   "rarity": "epic",
+   "glyph": "cards/ability_glyph/on_the_house.png"
+  },
+  "big_iron": {
+   "name": "Big Iron",
+   "rarity": "epic",
+   "glyph": "cards/ability_glyph/big_iron.png"
+  },
+  "dead_mans_hand": {
+   "name": "Dead Man's Hand",
+   "rarity": "epic",
+   "glyph": "cards/ability_glyph/dead_mans_hand.png"
+  },
+  "clean_sweep": {
+   "name": "Clean Sweep",
+   "rarity": "epic",
+   "glyph": "cards/ability_glyph/clean_sweep.png"
+  },
+  "fastest_gun": {
+   "name": "Fastest Gun",
+   "rarity": "legendary",
+   "glyph": "cards/ability_glyph/fastest_gun.png"
+  },
+  "branded_for_life": {
+   "name": "Branded for Life",
+   "rarity": "legendary",
+   "glyph": "cards/ability_glyph/branded_for_life.png"
+  },
+  "house_money": {
+   "name": "House Money",
+   "rarity": "legendary",
+   "glyph": "cards/ability_glyph/house_money.png"
+  }
+ },
+ "abilities_twists_twists": {
+  "wild": {
+   "name": "Wild",
+   "icon": "cards/twist_icon/wild.png"
+  },
+  "hz_bomb": {
+   "name": "Lit Fuses",
+   "icon": "cards/twist_icon/hz_bomb.png"
+  },
+  "hz_fire": {
+   "name": "Brushfire",
+   "icon": "cards/twist_icon/hz_fire.png"
+  },
+  "hz_wind": {
+   "name": "High Winds",
+   "icon": "cards/twist_icon/hz_wind.png"
+  },
+  "hz_stone": {
+   "name": "Rockslide",
+   "icon": "cards/twist_icon/hz_stone.png"
+  },
+  "hz_water": {
+   "name": "Rising Water",
+   "icon": "cards/twist_icon/hz_water.png"
+  },
+  "clock": {
+   "name": "On the Clock",
+   "icon": "cards/twist_icon/clock.png"
+  },
+  "short": {
+   "name": "Short Stack",
+   "icon": "cards/twist_icon/short.png"
+  },
+  "tough": {
+   "name": "Tough Crowd",
+   "icon": "cards/twist_icon/tough.png"
+  },
+  "play_only": {
+   "name": "House Rules",
+   "icon": "cards/twist_icon/play_only.png"
+  },
+  "score_only": {
+   "name": "Picky Crowd",
+   "icon": "cards/twist_icon/score_only.png"
+  },
+  "storm": {
+   "name": "Stormy",
+   "icon": "cards/twist_icon/storm.png"
+  }
+ },
+ "abilities_twists_ability_card": {
+  "stack": [
+   "ability_frame/<rarity>",
+   "ability_glyph/<id> centred in the emblem",
+   "live text: name, restriction",
+   "ability_pip/<rarity|empty> x slots"
+  ],
+  "zones_px": {
+   "emblem_circle": {
+    "center": [
+     250,
+     200
+    ],
+    "radius": 120,
+    "glyph_box": [
+     140,
+     90,
+     220,
+     220
+    ]
+   },
+   "name_band": [
+    36,
+    366,
+    428,
+    88
+   ],
+   "slot_row": [
+    80,
+    482,
+    340,
+    76
+   ],
+   "footer": [
+    60,
+    588,
+    380,
+    62
+   ]
+  },
+  "text": {
+   "name": "Rye, 2 lines max, ink #2a1c12 on the parchment band",
+   "footer": "Oswald or Zilla Slab, #cdb88b",
+   "slot_row": "pips centred, 44 px apart at card scale (draw pips ~40 px on the 500x700 canvas)"
+  },
+  "rarity_colors": {
+   "common": "#cdb88b",
+   "rare": "#6f8ea0",
+   "epic": "#7a5a9a",
+   "legendary": "#c9a24e"
+  },
+  "back": "ability_frame/back is the face-down side for the reward flip"
+ },
+ "abilities_twists_nine_slice": {
+  "ui/ability_socket_empty": {
+   "in_game": [
+    112,
+    46
+   ],
+   "file_px": [
+    224,
+    92
+   ],
+   "note": "one socket cell, not stretched"
+  },
+  "ui/ability_tile_<rarity>": {
+   "in_game_h": 46,
+   "in_game_w": "112-592",
+   "file_px": [
+    224,
+    92
+   ],
+   "margins_file_px": [
+    28,
+    22,
+    28,
+    22
+   ],
+   "margins_in_game": [
+    14,
+    11,
+    14,
+    11
+   ]
+  },
+  "ui/ability_row": {
+   "in_game": [
+    1008,
+    56
+   ],
+   "file_px": [
+    480,
+    112
+   ],
+   "margins_file_px": [
+    24,
+    20,
+    24,
+    20
+   ],
+   "margins_in_game": [
+    12,
+    10,
+    12,
+    10
+   ]
+  },
+  "ui/ability_held": {
+   "file_px": [
+    256,
+    124
+   ],
+   "margins_file_px": [
+    32,
+    32,
+    32,
+    32
+   ],
+   "margins_in_game": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "note": "draw 8 px (in-game) larger than the tile on every side"
+  },
+  "ui/twist_chip": {
+   "file_px": [
+    160,
+    64
+   ],
+   "margins_file_px": [
+    32,
+    16,
+    24,
+    16
+   ],
+   "margins_in_game": [
+    16,
+    8,
+    12,
+    8
+   ],
+   "note": "icon sits in the left circle (in-game 32x32 chip height); name to the right"
+  }
+ },
+ "abilities_twists_wild_badges": "rider/wild<rank>_badge for 2-10, J, Q, K, A (same placement as the old wild8_badge, top-right). rider/wild_badge is a generic W with no rank.",
+ "abilities_twists_map_marker": "ui/marker_shop (passed/current) and ui/marker_shop_ahead, 80x80 files for 40x40 in-game, matching the Game Over strip markers.",
+ "abilities_twists_reveal": {
+  "ability_frame/back": "face-down card",
+  "fx/ability_reveal_rays": "700x900, card centred at offset (100,100); rotate slowly (20°/s), fade in 0->0.8, tint by rarity",
+  "fx/ability_reveal_glow": "700x900 soft glow behind the card; tint by rarity, pulse 0.6->1",
+  "flip": "scaleX 1 -> 0 on the back (120 ms), swap to the face, 0 -> 1 (120 ms), then rays + glow, 60 ms stagger per card"
  }
 }

@@ -65,7 +65,7 @@ const DEFS := {
 		"desc": "Every time you play this hand, the next plain card off the deck gets a Plus enhancement."},
 	"push_broom": {"name": "Push Broom", "rarity": 0, "slots": 2, "hands": [],
 		"fx": {"clear": 1}, "glyph": ["provision_glyph", "canteen"],
-		"desc": "Every time you play this hand, it clears a random hazard off the table (never a stone)."},
+		"desc": "Every time you play this hand, it clears a random hazard (never a stone)."},
 	"borrowed_time": {"name": "Borrowed Time", "rarity": 0, "slots": 1, "hands": [],
 		"fx": {"time": 5, "hand_every": 4}, "glyph": ["icon", "watch"],
 		"desc": "On a clock table, this hand gives you 5 more seconds. On a hands table, every fourth time you play it you get a hand back."},

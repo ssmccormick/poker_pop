@@ -716,6 +716,7 @@ func _build_strip(complete: bool) -> void:
 	var reached := int(_data.get("reached", 1))
 	var rsize := int(_data.get("region_size", 7))
 	var camp_slot := int(_data.get("camp_slot", 3))
+	var shop_slots: Array = _data.get("shop_slots", [])
 	var bosses: Dictionary = _data.get("bosses", {})
 	var stops: Array = _data.get("stops", [])
 	_rail_x0 = float(lay.get("strip_node_x0", 210))
@@ -776,8 +777,12 @@ func _build_strip(complete: bool) -> void:
 			var kind := String(stops[room]) if room < stops.size() else ""
 			if room % rsize == camp_slot:
 				ahead_key = "campfire_ahead"
+			elif shop_slots.has(room % rsize):
+				ahead_key = "shop_ahead"
 			if kind == "camp":
 				lit_key = "campfire"
+			elif kind == "shop":
+				lit_key = "shop"
 			elif kind == "outlaw":
 				lit_key = "outlaw"
 			elif t == reached and not complete:
@@ -1210,7 +1215,16 @@ func _tex(rel: String) -> Texture2D:
 	if rel == "":
 		return null
 	var p := DIR + rel
-	return load(p) if ResourceLoader.exists(p) else null
+	if ResourceLoader.exists(p):
+		return load(p)
+	# Markers added with the card kit (the shop) live beside its UI art,
+	# drawn at 2×: halve them to sit with the strip's own markers.
+	if rel.begins_with("ui/"):
+		var half := CardArt.half_tex("ui", rel.get_file().get_basename())
+		if half != null:
+			return half
+	var kit := "res://assets/art/cards/" + rel
+	return load(kit) if ResourceLoader.exists(kit) else null
 
 
 func _full_rect(t: Texture2D) -> TextureRect:

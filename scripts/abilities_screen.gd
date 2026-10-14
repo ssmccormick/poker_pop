@@ -133,9 +133,20 @@ func _build_rows() -> void:
 	for i in hands.size():
 		var hand: String = hands[i]
 		var y := ROW_Y + i * ROW_H
+		var plate := CardArt.nine_half("ui", "ability_row", [24, 20, 24, 20])
+		if plate != null:
+			var bg := Panel.new()
+			bg.position = Vector2(106, y)
+			bg.size = Vector2(1008, ROW_H - 6)
+			bg.add_theme_stylebox_override("panel", plate)
+			bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_row_box.add_child(bg)
 		var row: Button = main._button(_row_box, "", Vector2(106, y), Vector2(1008, ROW_H - 6))
 		row.flat = true
 		row.focus_mode = Control.FOCUS_NONE
+		if plate != null:
+			for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+				row.add_theme_stylebox_override(st, StyleBoxEmpty.new())
 		var reason := ""
 		if _sel >= 0:
 			reason = trail.can_equip(_sel, hand)
@@ -158,13 +169,27 @@ func _build_rows() -> void:
 		for idx in trail.loadout.get(hand, []):
 			var id := String(trail.abilities[int(idx)])
 			var n := Abilities.slots(id)
-			var tile: Button = main._button(_row_box, Abilities.ability_name(id).to_upper(),
+			var tile: Button = main._button(_row_box, Abilities.ability_name(id),
 					Vector2(CELLS_X + at * (CELL_W + CELL_GAP), y + 4),
 					Vector2(n * CELL_W + (n - 1) * CELL_GAP, CELL_H))
-			tile.add_theme_font_size_override("font_size", 14 if n > 1 else 11)
+			tile.add_theme_font_size_override("font_size", 15 if n > 1 else 11)
 			tile.tooltip_text = "%s\n%s\nClick to take it off." % [Abilities.ability_name(id),
 					String(Abilities.def(id).desc)]
-			tile.modulate = Color(AbilityCard.RARITY_COLORS[Abilities.rarity(id)]).lightened(0.45)
+			var tile_sb := CardArt.nine_half("ui", "ability_tile_" + Abilities.RARITY_IDS[Abilities.rarity(id)],
+					[28, 22, 28, 22])
+			if tile_sb != null:
+				for st in ["normal", "hover", "pressed", "focus"]:
+					tile.add_theme_stylebox_override(st, tile_sb)
+				tile.add_theme_color_override("font_color", main.OFFWHITE)
+				tile.add_theme_color_override("font_hover_color", main.GOLD)
+				tile.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				var glyph := CardArt.tex("ability_glyph", id)
+				if glyph != null and n > 1:
+					tile.icon = glyph
+					tile.expand_icon = true
+					tile.add_theme_constant_override("icon_max_width", 30)
+			else:
+				tile.modulate = Color(AbilityCard.RARITY_COLORS[Abilities.rarity(id)]).lightened(0.45)
 			var copy: int = int(idx)
 			tile.pressed.connect(func() -> void:
 				trail.unequip(copy)
@@ -173,9 +198,20 @@ func _build_rows() -> void:
 				trail._save_run()
 				refresh())
 			at += n
+		var socket := CardArt.half_tex("ui", "ability_socket_empty")
 		for k in range(at, cells):
+			var pos := Vector2(CELLS_X + k * (CELL_W + CELL_GAP), y + 4)
+			if socket != null:
+				var sr := TextureRect.new()
+				sr.texture = socket
+				sr.position = pos
+				sr.size = Vector2(CELL_W, CELL_H)
+				sr.stretch_mode = TextureRect.STRETCH_SCALE
+				sr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				_row_box.add_child(sr)
+				continue
 			var cell := Panel.new()
-			cell.position = Vector2(CELLS_X + k * (CELL_W + CELL_GAP), y + 4)
+			cell.position = pos
 			cell.size = Vector2(CELL_W, CELL_H)
 			cell.add_theme_stylebox_override("panel", UiKit.inset_box())
 			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -203,7 +239,18 @@ func _build_collection() -> void:
 		face.faded = on != "" and _sel != i
 		holder.add_child(face)
 		if _sel == i:
-			holder.modulate = Color(1.25, 1.15, 0.8)
+			# Picked up: the kit's held glow, a little larger than the card.
+			var held := CardArt.nine_half("ui", "ability_held", [32, 32, 32, 32])
+			if held != null:
+				var glow := Panel.new()
+				glow.add_theme_stylebox_override("panel", held)
+				glow.position = Vector2(-8, -8)
+				glow.size = Vector2(220, 212)
+				glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				glow.show_behind_parent = true
+				holder.add_child(glow)
+			else:
+				holder.modulate = Color(1.25, 1.15, 0.8)
 		var tag: Label = main._label(holder, ("ON " + on.to_upper()) if on != "" else "",
 				Vector2(0, 172), 13, main.GOLD)
 		tag.size = Vector2(204, 20)

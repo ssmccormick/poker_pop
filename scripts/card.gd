@@ -1558,8 +1558,11 @@ func _draw_art(rect: Rect2) -> void:
 	if honey:
 		_art(rect, "special", "honey")
 	if wild_rank > 0 and rank == wild_rank:
-		if wild_rank == 8:
-			_art(rect, "rider", "wild8_badge")
+		var badge := "wild%s_badge" % CardArt.rank_name(wild_rank)
+		if CardArt.tex("rider", badge) == null:
+			badge = "wild_badge"
+		if CardArt.tex("rider", badge) != null:
+			_art(rect, "rider", badge)
 		else:
 			# No badge art for other ranks: a purple W in the corner.
 			var wf: Font = FontLib.display if FontLib.display != null else ThemeDB.fallback_font

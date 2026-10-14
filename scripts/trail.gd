@@ -484,6 +484,7 @@ var _bet_deal_btn: Button
 var _deck_view_burn := true   # deck viewer doubles as the shop's burn picker
 var abilities_screen: AbilitiesScreen
 var _bet_twists: Label    # the table's twists, spelled out under the bet
+var _bet_chips: CenterContainer   # and as chips above that
 var _shop_stock_abilities: Array = []   # [{id, bought}] on the merchant's shelf
 var _shop_saved := {}    # what a saved ride already bought at this stop's merchant
 var _tarot_ab_btn: Button
@@ -3105,6 +3106,15 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 	return b
 
 
+## Where in each region a kind of stop sits (STOP_LAYOUT indices).
+static func _layout_slots(kind: String) -> Array:
+	var out: Array = []
+	for i in STOP_LAYOUT.size():
+		if String(STOP_LAYOUT[i]) == kind:
+			out.append(i)
+	return out
+
+
 ## The wanted poster has no room for the goal line, so its twists ride
 ## on a little strip under it.
 func _add_twist_strip(b: Button, offer: Dictionary) -> void:
@@ -3531,7 +3541,11 @@ func _refresh_bet_labels() -> void:
 		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), reference,
 		unit, blind, chips, retry_line]
 	var twist_line := twist_sentences(o)
-	_bet_twists.text = ("TWISTS:  " + twist_badges(o) + "\n" + twist_line) if twist_line != "" else ""
+	_bet_twists.text = twist_line
+	for ch in _bet_chips.get_children():
+		ch.queue_free()
+	if twist_line != "":
+		_bet_chips.add_child(main.twist_chips(o))
 	_bet_amount_label.text = "BET  %d" % _bet_amount
 	_bet_stake_label.text = "Odds ×%.2f      a win pays back %d" % [
 		float(o.odds), _bet_amount + int(_bet_amount * float(o.odds))]
@@ -5112,6 +5126,9 @@ func _show_pick_now() -> void:
 		face.position = Vector2(85, 120)
 		face.scale = Vector2(1.08, 1.08)
 		holder.add_child(face)
+		if (OS.get_environment("POKERPOP_SHOT") == "" or OS.get_environment("POKERPOP_REVEAL") != "") \
+				and CardArt.tex("ability_frame", "back") != null:
+			face.reveal(0.25 + 0.06 * i)  # each card flips over a beat after the last
 		# What it does, in words, right under the card.
 		var what := Label.new()
 		what.text = String(Abilities.def(id).desc)
@@ -6084,6 +6101,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"spent": ["second_wind"] if _second_wind_used else [],
 		"contracts": _ride_contracts.duplicate(),
 		"bosses": BOSS_ROOMS, "region_size": REGION_SIZE, "camp_slot": STOP_LAYOUT.find("camp"),
+		"shop_slots": _layout_slots("shop"),
 	}.merged(_last_grant)
 
 
@@ -6368,7 +6386,12 @@ func build_ui() -> void:
 
 	bet_layer = _layer()
 	_screen_title(bet_layer, "THE STAKES")
-	_bet_twists = main._label(bet_layer, "", Vector2(310, 820), 19, main.GOLD)
+	_bet_chips = CenterContainer.new()
+	_bet_chips.position = Vector2(0, 812)
+	_bet_chips.size = Vector2(main.VIEW.x, 36)
+	_bet_chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bet_layer.add_child(_bet_chips)
+	_bet_twists = main._label(bet_layer, "", Vector2(310, 856), 19, main.GOLD)
 	_bet_twists.size = Vector2(1300, 120)
 	_bet_twists.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_bet_twists.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

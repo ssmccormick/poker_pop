@@ -89,6 +89,44 @@ static func provision_icon(id: String) -> Texture2D:
 	return tex("provision_framed", PROVISION_ART.get(id, id))
 
 
+static var _half := {}  # "group/name" -> half-size ImageTexture
+
+
+## A 2× UI file (the Abilities screen kit) at its in-game size, so its
+## 9-slice margins halve along with it. Null when the kit lacks it.
+static func half_tex(group: String, name: String) -> Texture2D:
+	var key := group + "/" + name
+	if _half.has(key):
+		return _half[key]
+	var t := tex(group, name)
+	var out: Texture2D = null
+	if t != null:
+		var img := t.get_image()
+		if img != null:
+			if img.is_compressed():
+				img.decompress()
+			img.resize(maxi(1, img.get_width() / 2), maxi(1, img.get_height() / 2),
+					Image.INTERPOLATE_LANCZOS)
+			out = ImageTexture.create_from_image(img)
+	_half[key] = out
+	return out
+
+
+## A 9-slice style from a 2× kit file; `margins` are the README's file-px
+## margins (left, top, right, bottom), halved here.
+static func nine_half(group: String, name: String, margins: Array) -> StyleBoxTexture:
+	var t := half_tex(group, name)
+	if t == null:
+		return null
+	var sb := StyleBoxTexture.new()
+	sb.texture = t
+	sb.texture_margin_left = float(margins[0]) / 2.0
+	sb.texture_margin_top = float(margins[1]) / 2.0
+	sb.texture_margin_right = float(margins[2]) / 2.0
+	sb.texture_margin_bottom = float(margins[3]) / 2.0
+	return sb
+
+
 ## Startup validation: prints every index entry whose file is missing.
 static func validate() -> int:
 	_ensure()

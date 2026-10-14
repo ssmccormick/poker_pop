@@ -62,7 +62,8 @@ var meta_label: Label
 var meter_back: ColorRect
 var meter_fill: ColorRect
 var target_label: Label
-var _twist_label: Label   # the table's twists, under the score bar
+var _twist_strip: CenterContainer   # the table's twists as chips, under the score bar
+var _twist_key := ""
 var target_bar_back: Panel
 var _boss_ticks: Control  # HP segment marks over the banner bar
 var _kit_plate: Panel
@@ -779,13 +780,16 @@ func _update_labels() -> void:
 			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_kit()
-	if _twist_label != null:
+	if _twist_strip != null:
 		var in_table: bool = mode_kind == "trail" and game_started and not menu_open and trail.in_room
-		var strip: String = trail.twist_badges(trail.current_offer) if in_table else ""
-		_twist_label.visible = strip != ""
-		if strip != "" and _twist_label.text != strip:
-			_twist_label.text = strip
-			_twist_label.tooltip_text = trail.twist_sentences(trail.current_offer)
+		var key: String = trail.twist_badges(trail.current_offer) if in_table else ""
+		_twist_strip.visible = key != ""
+		if key != _twist_key:
+			_twist_key = key
+			for ch in _twist_strip.get_children():
+				ch.queue_free()
+			if key != "":
+				_twist_strip.add_child(twist_chips(trail.current_offer))
 	if _deck_btn != null:
 		var show_deck := game_started and not menu_open and not game_over
 		_deck_btn.visible = show_deck
@@ -1433,6 +1437,52 @@ func _record_mode_score() -> String:
 	var pb := seed_book.record(k, score, {"level": level})
 	seed_score_recorded(k, score, "", 0, 0)
 	return "NEW SEED BEST!" if pb else "Best on this seed: %d" % seed_book.best(k)
+
+
+## A row of twist chips for a table: the kit's pill with the twist's icon
+## and name, its rule as the tooltip. Plain text pills without the kit.
+func twist_chips(offer: Dictionary) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pill := CardArt.nine_half("ui", "twist_chip", [32, 16, 24, 16])
+	for tw in offer.get("twists", []):
+		var chip := PanelContainer.new()
+		if pill != null:
+			var sb: StyleBoxTexture = pill.duplicate()
+			sb.content_margin_left = 4
+			sb.content_margin_right = 12
+			chip.add_theme_stylebox_override("panel", sb)
+		else:
+			chip.add_theme_stylebox_override("panel", UiKit.inset_box())
+		chip.tooltip_text = TableMods.twist_desc(tw)
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
+		var inner := HBoxContainer.new()
+		inner.add_theme_constant_override("separation", 6)
+		inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(inner)
+		var icon := CardArt.tex("twist_icon", String(tw.get("id", "")))
+		if icon != null:
+			var ir := TextureRect.new()
+			ir.texture = icon
+			ir.custom_minimum_size = Vector2(26, 26)
+			ir.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			ir.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			ir.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			inner.add_child(ir)
+		var name := TableMods.twist_name(tw).to_upper()
+		if String(tw.get("id", "")) == "wild" and int(tw.get("rank", 0)) <= 10:
+			name = "WILD %ds" % int(tw.rank)
+		var l := Label.new()
+		l.text = name
+		l.add_theme_font_size_override("font_size", 15)
+		l.add_theme_color_override("font_color", GOLD)
+		if FontLib.label != null:
+			l.add_theme_font_override("font", FontLib.label)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		inner.add_child(l)
+		row.add_child(chip)
+	return row
 
 
 ## Every finished game's board score passes through here, on its way to
@@ -2890,11 +2940,12 @@ func _build_ui() -> void:
 	target_label.visible = false
 	target_bar_back.visible = false
 	target_bar_fill.visible = false
-	_twist_label = _label(hud_root, "", Vector2(380, 94), 17, GOLD)
-	_twist_label.size = Vector2(1160, 26)
-	_twist_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_twist_label.mouse_filter = Control.MOUSE_FILTER_STOP
-	_twist_label.visible = false
+	_twist_strip = CenterContainer.new()
+	_twist_strip.position = Vector2(380, 90)
+	_twist_strip.size = Vector2(1160, 34)
+	_twist_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_twist_strip.visible = false
+	hud_root.add_child(_twist_strip)
 	_boss_ticks = Control.new()
 	_boss_ticks.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	target_bar_fill.add_child(_boss_ticks)
