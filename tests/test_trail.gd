@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## Integration tests for trail rules that need the whole game running:
-## Second Wind's free life (HP and chips), Tin Star's scaling pay, and
+## Second Wind's free life, the cash economy (table pay, the bet, selling), and
 ## the Gambler's Sleight of Hand. Boots the real main scene, then moves
 ## to a throwaway profile so no real save is touched.
 ## Run: godot --headless --path . --script res://tests/test_trail.gd
@@ -44,9 +44,12 @@ func _run() -> void:
 	# section at the end.
 	trail.progress.unlock_all = true
 
-	# --- Tin Star pays a blind that climbs with the trail ---------------
-	failures += _check(trail._blind_for(0) == 25 and trail._blind_for(TrailMode.JACK_ROOM + 1) > 25 * 6,
-			"Tin Star's blind starts at 25 and grows past the Jack")
+	# --- Tables pay trail cash: more for higher odds and deeper regions ----
+	failures += _check(trail._table_pay({"odds": 1.0}, 0) == 3
+			and trail._table_pay({"odds": 2.0}, 0) == 6
+			and trail._table_pay({"odds": 1.0}, TrailMode.QUEEN_ROOM + 1)
+					> trail._table_pay({"odds": 1.0}, TrailMode.JACK_ROOM + 1),
+			"a first table pays $3, doubled odds double it, and the regions climb")
 
 	# --- Second Wind: a lethal blow leaves the rider standing once -------
 	await _enter_room("the_machine")
@@ -61,19 +64,50 @@ func _run() -> void:
 	failures += _check(not alive and not trail.run_active,
 			"with the wind spent, the next killing blow ends the ride")
 
-	# --- Second Wind: short on chips buys the seat once -----------------
-	await _enter_room("the_machine")
-	trail.relics.append("second_wind")
-	trail.in_room = false
-	trail.chips = 7
-	var ended: bool = trail._short_stacked(120)
-	failures += _check(not ended and trail.chips == 120 and trail.run_active,
-			"Second Wind covers the seat when the stack falls short")
-	failures += _check(trail.hp >= 5, "and leaves the rider at least 5 HP")
-	trail.chips = 0
-	ended = trail._short_stacked(120)
-	failures += _check(ended and not trail.run_active,
-			"spent, a short stack busts out as before")
+	# --- The bet and brought cash come out of the bank at the start ------
+	trail.cash = 500
+	trail.buyin_bring = 30
+	trail.buyin_target = "queen"
+	trail.buyin_stake = 20
+	trail.character = "the_machine"
+	trail._start_run(0)
+	await _wait(0.3)
+	var free_cash: int = TrailMode.BANKROLL_CASH * trail.ride_lv("bankroll")
+	failures += _check(trail.cash == 450 and trail.trail_cash == 30 + free_cash
+			and trail.cash_brought == 30 and int(trail.bet.stake) == 20
+			and is_equal_approx(float(trail.bet.odds), 3.0),
+			"saddling up takes the stake and the brought cash out of the bank")
+	failures += _check(trail.hud_cash_line().contains("BET: QUEEN"),
+			"the HUD shows the bet")
+	trail._settle_bet(TrailMode.JACK_ROOM)
+	failures += _check(trail.cash == 450 and not bool(trail.bet.paid),
+			"a Queen bet doesn't pay at the Jack")
+	trail._settle_bet(TrailMode.QUEEN_ROOM)
+	failures += _check(trail.cash == 530 and bool(trail.bet.paid),
+			"beating the Queen banks the stake plus 3:1 right away")
+	trail._settle_bet(TrailMode.QUEEN_ROOM)
+	failures += _check(trail.cash == 530, "and it only pays once")
+	# Selling a provision pays half its price here.
+	trail.provisions = ["canteen"]
+	var before: int = trail.trail_cash
+	var sale: int = trail.sell_price("canteen")
+	trail.sell_provision(0)
+	failures += _check(trail.provisions.is_empty() and trail.trail_cash == before + sale
+			and sale >= 1 and sale <= trail._price(int(TrailMode.PROVISIONS.canteen.price)),
+			"selling a provision frees the slot and pays half its price")
+	# Dying loses the trail cash; the bank keeps what the bet paid.
+	trail.take_damage(99, "", "Test blow.")
+	await _wait(0.3)
+	failures += _check(not trail.run_active and trail.cash == 530,
+			"a lost ride takes the trail cash with it, and the bank keeps the bet")
+	# A bet with nothing staked is no bet; a free ride costs nothing.
+	trail.buyin_bring = 0
+	trail.buyin_target = ""
+	trail.buyin_stake = 0
+	trail._start_run(0)
+	await _wait(0.3)
+	failures += _check(trail.cash == 530 and trail.bet.is_empty() and trail.cash_brought == 0,
+			"a free ride takes nothing from the bank")
 
 	# --- The Gambler's choice is remembered -----------------------------
 	trail._pick_gambler_ability("sleight")
@@ -872,7 +906,7 @@ func _run() -> void:
 	failures += _check(walls_clean, "the wall and the Fool only ever deal tables")
 	await _enter_room("the_machine")
 	trail.in_room = false
-	trail.chips = 5000  # flush enough that no seat check busts the probe
+	trail.trail_cash = 5000  # flush enough to buy anything on the probe
 	trail.room_index = 2
 	trail._show_tarot_now()
 	failures += _check(trail.shop_layer.visible and not trail.tarot_layer.visible
@@ -1124,13 +1158,12 @@ func _seeded_probe(seed_text: String, standard := false) -> Dictionary:
 	trail.next_standard = standard
 	trail._start_run(0)
 	await _wait(0.5)
-	rec["kit"] = [trail.chips, trail.sleeve_card.rank, trail.provisions.size(),
+	rec["kit"] = [trail.trail_cash, trail.sleeve_card.rank, trail.provisions.size(),
 			trail.ride_lv("laser")]
 	rec["abilities"] = trail._roll_ability_offer(0, 0, "table")
 	rec["wall"] = _wall_sig(trail._offers) + [_offer_sig(trail._fate_offer)]
 	trail._choose_offer(trail._offers[0], false)
 	await _wait(0.5)
-	trail._bet_amount = int(trail.current_offer.get("min_bet", 25))
 	trail._confirm_bet()
 	await _wait(0.5)
 	await _settle()
@@ -1150,7 +1183,7 @@ func _seeded_probe(seed_text: String, standard := false) -> Dictionary:
 	# The next stops, by the seed alone.
 	trail.in_room = false
 	main.board.locked = true
-	trail.chips = 5000
+	trail.trail_cash = 5000
 	trail.room_index = 1
 	trail._offers_room = -1
 	trail._show_tarot_now()

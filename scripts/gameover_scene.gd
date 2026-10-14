@@ -511,6 +511,16 @@ func _build_ledger() -> void:
 	var left := start.x - r.position.x
 	var right := r.size.x - 40.0
 	var line_h := float(_m.get("layout", {}).get("ledger_line_h", 62))
+	var keys := ["score", "best", "outlaws", "reached", "trail_cash"]
+	if not _data.get("bet", {}).is_empty():
+		keys.append("bet")
+	keys.append_array(["cash", "stake"])
+	var names := {"score": "Run score", "best": "Best hand", "outlaws": "Outlaws caught",
+			"reached": "Tables reached", "trail_cash": "Trail cash", "bet": "The bet",
+			"cash": "Cash banked", "stake": "Ascension"}
+	# Extra rows squeeze the spacing so the ledger still fits its page.
+	var room := r.size.y - (start.y - r.position.y + 23.0) - 24.0
+	line_h = minf(line_h, room / keys.size())
 	_label(_ledger, "Trail Ledger", _font(FontLib.display), 36, INK,
 			Rect2(left, 16, 420, 50), HORIZONTAL_ALIGNMENT_LEFT)
 	var underline := ColorRect.new()
@@ -521,20 +531,18 @@ func _build_ledger() -> void:
 	_ledger.add_child(underline)
 	var serif: Font = _font(FontLib.card)
 	var top := start.y - r.position.y + 23.0
-	var rows := ["Run score", "Best hand", "Outlaws caught", "Tables reached",
-			"Cash banked", "Ascension"]
-	for i in rows.size():
+	for i in keys.size():
 		var row := Control.new()
 		row.position = Vector2(0, top + i * line_h)
 		row.size = Vector2(r.size.x, line_h)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_ledger.add_child(row)
-		var name_l := _label(row, String(rows[i]), serif, 26, INK,
+		var name_l := _label(row, String(names[keys[i]]), serif, 26, INK,
 				Rect2(left, 0, 280, line_h - 8), HORIZONTAL_ALIGNMENT_LEFT)
 		var rule := _tile("ledger_rule", Rect2(left - 8, line_h - 10, right - left + 16, 6))
 		row.add_child(rule)
 		var line := {"node": row, "start": T_LEDGER + 0.1 + LINE_STAGGER * i}
-		var value_w := _build_value(row, i, line, serif, right, line_h - 8)
+		var value_w := _build_value(row, String(keys[i]), line, serif, right, line_h - 8)
 		var name_w := serif.get_string_size(name_l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
 		var lead_from := left + name_w + 12.0
 		var lead_to := right - value_w - 12.0
@@ -546,10 +554,10 @@ func _build_ledger() -> void:
 
 ## One ledger value, right-aligned to `right`. Returns its width so
 ## the dot leader can stop short of it.
-func _build_value(row: Control, i: int, line: Dictionary, serif: Font,
+func _build_value(row: Control, key: String, line: Dictionary, serif: Font,
 		right: float, h: float) -> float:
-	match i:
-		0:
+	match key:
+		"score":
 			var score := int(_data.get("score", 0))
 			var l := _label(row, _commas(score), serif, 32, INK,
 					Rect2(right - 300, 0, 300, h), HORIZONTAL_ALIGNMENT_RIGHT)
@@ -557,7 +565,7 @@ func _build_value(row: Control, i: int, line: Dictionary, serif: Font,
 			line["value"] = score
 			line["fmt"] = "%s"
 			return serif.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 32).x
-		1:
+		"best":
 			var best := int(_data.get("best_score", 0))
 			if best <= 0:
 				_label(row, "—", serif, 26, INK_DIM, Rect2(right - 100, 0, 100, h),
@@ -573,9 +581,15 @@ func _build_value(row: Control, i: int, line: Dictionary, serif: Font,
 					Rect2(right - pts_w - name_w - 4, 0, name_w + 4, h),
 					HORIZONTAL_ALIGNMENT_RIGHT)
 			return pts_w + name_w
-		2:
+		"outlaws":
 			return _build_tallies(row, line, serif, right, h)
-		3:
+		"trail_cash", "bet":
+			var text := _money_line(key)
+			var lost := text.contains("lost")
+			_label(row, text, serif, 24, INK_RED if lost else INK,
+					Rect2(right - 340, 0, 340, h), HORIZONTAL_ALIGNMENT_RIGHT)
+			return serif.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+		"reached":
 			var total := " / %d" % int(_data.get("total", 21))
 			var tw := serif.get_string_size(total, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 			_label(row, total, serif, 22, INK_DIM, Rect2(right - tw - 2, 2, tw + 4, h),
@@ -585,7 +599,7 @@ func _build_value(row: Control, i: int, line: Dictionary, serif: Font,
 			_label(row, reached, serif, 28, INK, Rect2(right - tw - rw - 4, 0, rw + 4, h),
 					HORIZONTAL_ALIGNMENT_RIGHT)
 			return tw + rw
-		4:
+		"cash":
 			var cash := int(_data.get("cash", 0))
 			var l := _label(row, "$" + _commas(cash), serif, 28, INK,
 					Rect2(right - 300, 0, 300, h), HORIZONTAL_ALIGNMENT_RIGHT)
@@ -598,6 +612,23 @@ func _build_value(row: Control, i: int, line: Dictionary, serif: Font,
 			_label(row, stake, serif, 26, INK, Rect2(right - 300, 0, 300, h),
 					HORIZONTAL_ALIGNMENT_RIGHT)
 			return serif.get_string_size(stake, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
+
+
+## The trail cash and bet rows, in words: what came home, what was lost.
+func _money_line(key: String) -> String:
+	if key == "bet":
+		var bet: Dictionary = _data.get("bet", {})
+		var target := String({"jack": "the Jack", "queen": "the Queen",
+				"king": "King Cobra"}.get(String(bet.get("target", "")), "a boss"))
+		if bool(bet.get("paid", false)):
+			return "won $%s on %s" % [_commas(int(bet.get("won", 0))), target]
+		return "lost $%s on %s" % [_commas(int(bet.get("stake", 0))), target]
+	var amount := int(_data.get("trail_cash", 0))
+	if bool(_data.get("seeded", false)):
+		return "$%s (seeded, not banked)" % _commas(amount)
+	if String(_data.get("kind", "")) == "trail_complete":
+		return "$%s carried home" % _commas(amount)
+	return "$%s lost" % _commas(amount) if amount > 0 else "none"
 
 
 ## Outlaws as tally marks, five to a gate with the red slash. Past

@@ -332,9 +332,19 @@ func _ready() -> void:
 				else:
 					trail._asc_pick = 0
 				trail._render_ascension()
+				# POKERPOP_BET shows a wager set: $25 brought, $20 on the Queen.
+				if OS.get_environment("POKERPOP_BET") != "":
+					trail.cash = 240
+					trail.buyin_bring = 25
+					trail.buyin_target = "queen"
+					trail.buyin_stake = 20
+				trail._render_wager()
 			"trailshop":
 				menu_layer.visible = false
 				trail._start_run(0)
+				# A couple of provisions in the kit, for the SELL row.
+				trail.trail_cash = 42
+				trail.provisions = ["canteen", "tonic"]
 				# POKERPOP_MERCHANT picks the trader (0 peddler, 1 collector,
 				# 2 card sharp); POKERPOP_BURNED shows the forge spent.
 				var shop_offer := {"kind": "shop", "tarot": "GENERAL STORE"}
@@ -375,14 +385,12 @@ func _ready() -> void:
 							else {"kind": "shop"} if log_kinds[i] == "shop"
 							else {"kind": "play", "boss": "x"} if log_kinds[i] == "boss"
 							else {"kind": "play", "goal": log_kinds[i]})
+				trail.trail_cash = 37
+				trail.bet = {"target": "queen", "stake": 20, "odds": 3.0, "paid": false}
 				match ending:
-					"busted_out":
-						trail.chips = 0
-						trail._short_stacked(1)
-					"blinded_out":
-						trail.chips = 40
-						trail._short_stacked(120)
 					"trail_complete":
+						trail.bet = {"target": "queen", "stake": 20, "odds": 3.0,
+								"paid": true, "won": 80}
 						trail.room_index = TrailMode.ROOMS_TOTAL
 						trail._trail_complete()
 					_:
@@ -397,7 +405,7 @@ func _ready() -> void:
 				if shot_room != "":
 					trail.room_index = clampi(int(shot_room), 0,
 							TrailMode.ROOMS_TOTAL - 1)
-					trail.chips = 5000
+					trail.trail_cash = 60
 					trail._show_tarot()
 				# Showcase the wanted poster: force a bounty into the rack.
 				for offer in trail._offers:
@@ -429,8 +437,10 @@ func _ready() -> void:
 				if m != "trailbet":
 					trail._confirm_bet()
 				if m == "trailroom":
-					# Show the KIT stocked in the room screenshot.
+					# Show the KIT stocked in the room screenshot, and a bet riding.
 					trail.provisions = ["canteen", "tonic", "dynamite"]
+					trail.trail_cash = 18
+					trail.bet = {"target": "queen", "stake": 20, "odds": 3.0, "paid": false}
 				if m == "trailhazard":
 					_debug_seed_hazards()
 			"trailtwist":
@@ -438,7 +448,7 @@ func _ready() -> void:
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail._choose_offer({"kind": "play", "tarot": "FAT POT", "label": "Risky",
-						"target": 1400, "hands": 9, "odds": 2.4, "min_bet": 25, "limit": "hands",
+						"target": 1400, "hands": 9, "odds": 2.4, "limit": "hands",
 						"goal": "", "objective": "plain", "twists": [{"id": "wild", "rank": 5},
 						{"id": "hz_fire"}, {"id": "play_only", "hands": ["Pair", "Straight", "Flush"]}]}, false)
 				if OS.get_environment("POKERPOP_STAGE") != "bet":
@@ -448,7 +458,7 @@ func _ready() -> void:
 				trail._start_run(0)
 				trail._choose_offer({"kind": "play", "tarot": "THE MOON",
 						"label": "Heist", "target": 0, "hands": 8, "odds": 2.0,
-						"min_bet": 10, "goal": "safe"}, false)
+						"goal": "safe"}, false)
 				trail._confirm_bet()
 			"cardgrid":
 				_dismiss_splash()
@@ -471,9 +481,9 @@ func _ready() -> void:
 			"trailpick":
 				menu_layer.visible = false
 				trail._start_run(0)
-				trail.chips = 372
-				trail._win_rows = [["THE POT — 50 staked at 1.5 : 1", 125],
-						["TIN STAR", 10], ["3 HANDS TO SPARE", 36]]
+				trail.trail_cash = 23
+				trail._win_rows = [["THE TABLE PAYS", 6],
+						["TIN STAR", 2], ["3 HANDS TO SPARE", 1]]
 				trail.pending_reward = {"room": 0, "source": "table", "round": 0,
 						"offers": ["hot_brand", "scattergun", "big_iron"], "chest_rounds": 0,
 						"relic": "", "ledger": trail._win_rows.duplicate(true)}
@@ -491,30 +501,29 @@ func _ready() -> void:
 				trail._start_run(0)
 				trail._choose_offer({"kind": "play", "tarot": "BLACKJACK",
 						"label": "Twenty-One", "target": 0, "hands": 8, "odds": 1.5,
-						"min_bet": 10, "goal": "blackjack", "wins": 3}, false)
+						"goal": "blackjack", "wins": 3}, false)
 				trail._confirm_bet()
 			"trailholdem":
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail._choose_offer({"kind": "play", "tarot": "TEXAS HOLD'EM",
 						"label": "Hold'em", "target": 1200, "hands": 9, "odds": 1.5,
-						"min_bet": 10, "goal": "holdem"}, false)
+						"goal": "holdem"}, false)
 				trail._confirm_bet()
 			"trailoutlaw":
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail._choose_offer({"kind": "play", "tarot": "BOUNTY",
 						"label": "Bounty", "target": 0, "hands": 13, "odds": 3.0,
-						"min_bet": 10, "goal": "outlaw", "outlaw_hp": 6,
+						"goal": "outlaw", "outlaw_hp": 6,
 						"posse": 2}, false)
 				trail._confirm_bet()
 			"trailboss":
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail.room_index = TrailMode.ROOMS_TOTAL - 1  # King Cobra's table
-				trail.chips = 500000  # rich enough for the late-trail seat
 				trail._show_tarot()
-				trail._choose_offer(trail._offers[0], false)  # bosses auto all-in
+				trail._choose_offer(trail._offers[0], false)  # bosses sit straight down
 			"tutorial":
 				menu_layer.visible = false
 				_start_tutorial()
@@ -619,7 +628,7 @@ func _update_labels() -> void:
 				status_label.text = "HANDS LEFT  %d" % trail.room_hands_left
 				status_label.add_theme_color_override("font_color",
 						RED if trail.room_hands_left <= 2 else OFFWHITE)
-			deck_label.text = "CHIPS %d    STAKE %d" % [trail.chips, trail.stake]
+			deck_label.text = trail.hud_cash_line()
 		_:
 			status_label.text = "HANDS PLAYED  %d" % hands_played
 			status_label.add_theme_color_override("font_color", OFFWHITE)
@@ -1202,7 +1211,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## The tail of the score preview: what the selected mod cards add —
-## the stacked multiplier, bonus chips, and gold cash.
+## the stacked multiplier and the cash it pays.
 func _preview_mod_text(result: Dictionary) -> String:
 	var parts := ""
 	var mults := 0
@@ -1211,8 +1220,6 @@ func _preview_mod_text(result: Dictionary) -> String:
 			mults += 1
 	if mults > 0:
 		parts += "  ×%s MULT" % String.num(pow(board.mult_factor, mults), 2)
-	if result.has("bonus_chips"):
-		parts += "  +%d chips" % int(result.bonus_chips)
 	if result.has("cash_earned"):
 		parts += "  +$%d" % int(result.cash_earned)
 	if mode_kind == "trail":
@@ -1981,11 +1988,11 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		lines.append("JOKER: wild, and doubles the hand's score.")
 	match card.mod:
 		"chip":
-			lines.append("CHIP: +%d chips. Grows each time it scores." % (board.chip_bonus * (1 + card.chip_level)))
+			lines.append("CASH: +$%d trail cash when you play it. Pays more each time it scores." % (board.chip_bonus * (1 + card.chip_level)))
 		"mult":
 			lines.append("MULT: ×%.1f to the hand's score." % board.mult_factor)
 		"gold":
-			lines.append("GOLD: +$%d cash when you play it." % board.gold_pay)
+			lines.append("GOLD: +$%d trail cash when you play it." % board.gold_pay)
 		"plus":
 			lines.append("PLUS: +1 rank to the card it points at.")
 		"minus":
@@ -2030,7 +2037,8 @@ const TUTOR := {
 	"mode_single": ["SINGLE DECK", "One 52-card deck and no timer. When the deck runs out, the game's over, so get every point you can out of every card."],
 	"mode_arcade": ["ARCADE", "The bar on the right is always draining. Scoring fills it back up, and reaching the level target moves you up a level. When the bar runs empty, the game ends."],
 	"mode_zen": ["ZEN", "No timer, no limits, no losing. Just you, the cards, and the sound of the pops."],
-	"mode_trail": ["THE TRAIL", "A betting run of 21 tables over 30 stops. Every region has two merchants and a campfire along the road, and a boss at the end. You buy in for a stack of chips, and those chips are both your LIFE and your WAGER. Every table costs an ante plus a bet. Clear the table and you win the pot; fail and the bet is gone. Chips only turn into permanent $cash if you RIDE TO THE END, and there's no cashing out early. GOLD cards pay real cash along the way."],
+	"mode_trail": ["THE TRAIL", "A ride of 21 tables over 30 stops. Every region has two merchants and a campfire along the road, and a boss at the end. Tables are free to sit, and each one you clear pays TRAIL CASH. Safes, chests and bounties pay more, and so do Cash and Gold cards. Spend it at the merchants. Whatever trail cash you're holding only comes home if you RIDE TO THE END. Lose your HP and it's gone. Before you set out, you can also bring cash from the bank and bet on how far you'll get."],
+	"the_bet": ["THE BET", "You can ride for free, or put some of your bank on the line. BRING CASH to spend at the merchants: it's yours again only if you finish the trail. Or BET on how far you'll get. Pick the Jack, the Queen, or King Cobra, and the further you go, the better the odds. A winning bet goes straight to the bank the moment that boss falls, so it's safe even if the trail gets you later."],
 	"hazard_bomb": ["BOMB CARD", "The number on the fuse drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse reaches zero, it goes off. The bomb is gone and the blast costs you 2 HP."],
 	"hazard_fire": ["FIRE CARD", "After every hand, the fire spreads to one card next to it, and the fire card's own rank burns down. The card it'll catch next shows SPARKS along its bottom edge, so clear that card out of the way or play the fire card to douse it. If EVERY card on the table catches fire, you LOSE the table."],
 	"hazard_wind": ["WIND CARD", "After every hand, the wind BLOWS the first card in the direction it's facing right off the board. That card doesn't score; it's just gone. The wind turns a quarter turn every hand, and the dust streaming across the card shows which way it's blowing. Play the wind card to make it stop."],
@@ -2048,7 +2056,7 @@ const TUTOR := {
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel for the whole table. Each hand, chain exactly TWO touching hole cards, and your hand is the best five of those seven. Reach the score target to clear the table. Sometimes a RE-DEAL card shows up: play it to get a fresh set of community cards."],
 	"goal_crazy8": ["A WILD RANK", "One rank is WILD at this table, and every card of that rank counts as any rank and suit. The wild cards wear a purple W. Score tables ask a quarter more to make up for it, so lean on the wild cards to build big hands."],
 	"twists": ["TWISTS", "Some tables come with TWISTS: extra rules stacked on top of the table's job, listed under its goal. A twist might put hazards on the table, make a rank wild, shorten your hands, or limit which hands count. Every twist makes the table harder, and every one raises the odds it pays. Hover over a table on the trail to read its twists."],
-	"twist_hands": ["HAND RULES", "This table limits your hands. With HOUSE RULES, only the listed hands can be played at all. With a PICKY CROWD, any hand plays, but only the listed ones add to your score. Chips and gold from the others still pay. The list is under the score bar at the top."],
+	"twist_hands": ["HAND RULES", "This table limits your hands. With HOUSE RULES, only the listed hands can be played at all. With a PICKY CROWD, any hand plays, but only the listed ones add to your score. Cash and Gold cards in the others still pay. The list is under the score bar at the top."],
 	"goal_blackjack": ["BLACKJACK", "Poker's off tonight. You're playing the house at a table dealt FACE DOWN, with only the four corners showing. Start a chain from a face-up card, then HIT one card at a time. Each face-down card you select flips over ON THE SPOT and its pips add to your total (face cards count 10, aces 11 or 1). Hits are final, with no clearing and no take-backs, and if a flip takes you over 21 you BUST right there. Press PLAY HAND to stand: the dealer flips his hole card and draws until he beats you or busts. Every hand turns another random card face up. Win enough rounds to clear the table."],
 	"goal_outlaw": ["THE BOUNTY", "A wanted gunman has taken over this table. Clear YOUR bullets (gold) in scoring hands to shoot at him. HIS bullets (red) are trouble waiting to happen: clear a card carrying one and he SHOOTS you, so build your hands AROUND them. A hand that scores under the posted number gives him a free shot too. Some outlaws ride with a gang, and when you drop one, the next steps up fresh. Every shot he lands costs HP, and if you run out, the ride is over."],
 	"campfire": ["THE CAMPFIRE", "A rest stop on the trail. Pick ONE of three things. REST lets you sleep off the road and get HP back. TEND A CARD gives a plain card in your deck a random enhancement. CAST ONE OFF burns a card out of your deck for good. Then the fire dies down and it's back to the trail."],
@@ -3357,7 +3365,7 @@ func _build_menu() -> void:
 	# A gold pip: how many unlocks the Outfitter hasn't shown yet.
 	_upgrades_pip = _gold_pip(Vector2(1440, 322))
 	_refresh_level_plate()
-	_menu_center("Buy in, bet on every table, build your deck, and ride to the end or bust.", 408, 20, DIM)
+	_menu_center("Bet on how far you'll ride, build your deck, and bring your trail cash home.", 408, 20, DIM)
 
 	_menu_center("TIME TRIAL", 456, 24, GOLD)
 	var times := [60.0, 180.0, 300.0]

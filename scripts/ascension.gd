@@ -13,8 +13,8 @@ const MAX := 20
 const LEVELS := [
 	{"name": "Tougher Tables", "desc": "Tables need 10% more score to clear."},
 	{"name": "Restless Trail", "desc": "Hazards show up 10% more often."},
-	{"name": "Light Purse", "desc": "You start the ride with 30 fewer chips."},
-	{"name": "Steeper Blinds", "desc": "Antes and minimum bets cost 25% more."},
+	{"name": "Lean Pickings", "desc": "Tables pay 20% less cash."},
+	{"name": "Dear Supplies", "desc": "Merchants charge 15% more."},
 	{"name": "Hardened Bosses", "desc": "Bosses take 20% more score to beat."},
 	{"name": "Sore Losers", "desc": "Losing a table costs 2 HP instead of 1."},
 	{"name": "Short-Handed", "desc": "You get one fewer hand at every table, or 30 seconds less on a clock table."},
@@ -33,7 +33,6 @@ const LEVELS := [
 	{"name": "The Long Snake", "desc": "King Cobra's tail starts two segments longer."},
 ]
 
-const BASE_CHIPS := 180
 const BASE_MAX_HP := 10
 
 
@@ -52,13 +51,9 @@ static func hazard_bonus(a: int) -> float:
 	return 0.10 if a >= 2 else 0.0
 
 
-static func start_chips(a: int) -> int:
-	return BASE_CHIPS - (30 if a >= 3 else 0)
-
-
-## Antes and minimum bets.
-static func blind_mult(a: int) -> float:
-	return 1.25 if a >= 4 else 1.0
+## What tables pay in cash.
+static func pay_mult(a: int) -> float:
+	return 0.8 if a >= 3 else 1.0
 
 
 ## Boss score pools.
@@ -85,8 +80,9 @@ static func clock_minus_secs(a: int) -> float:
 	return 30.0 * hands_minus(a)
 
 
+## Merchant prices: Dear Supplies, then Price Gouging on top.
 static func shop_mult(a: int) -> float:
-	return 1.2 if a >= 8 else 1.0
+	return (1.15 if a >= 4 else 1.0) * (1.2 if a >= 8 else 1.0)
 
 
 ## Scales the chance a refilled card arrives hazarded.
@@ -134,9 +130,9 @@ static func exp_mult(a: int) -> float:
 	return 1.0 + 0.05 * clamp_a(a)
 
 
-## Added to the cash-out rate (1.0 at Ascension 0; 2.5 at 20).
-static func rate_bonus(a: int) -> float:
-	return 0.075 * clamp_a(a)
+## Scales the odds on the starting bet (×1.0 at Ascension 0, ×2.0 at 20).
+static func bet_mult(a: int) -> float:
+	return 1.0 + 0.05 * clamp_a(a)
 
 
 ## Scales the trail-completion purse.

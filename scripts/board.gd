@@ -62,12 +62,12 @@ var custom_deck: Array = []
 # --- Trail hazards --------------------------------------------------------
 const BOMB_FUSE := 5
 const STONE_HITS_START := 3
-const CHIP_BONUS := 8      # chips per played chip-mod card (trail)
+const CHIP_BONUS := 1      # $ a Cash card ("chip" mod) pays per level (trail)
 const MULT_FACTOR := 1.5   # per played mult-mod card, stacking
 # Relic-tunable copies (Gold Tooth / Mirror Shades adjust these).
 var chip_bonus := CHIP_BONUS
 var mult_factor := MULT_FACTOR
-var gold_pay := 1               # $ per played gold card (POWER upgrades)
+var gold_pay := 3               # $ trail cash per played gold card (POWER upgrades)
 var holo_bonus := 50            # flat score per HOLO card in a hand (POWER upgrades)
 const HAZARD_DIRS: Array[Vector2i] = [
 	Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
@@ -998,8 +998,8 @@ func play_hand() -> void:
 		await _fire_boss_slug(center, boss_card)
 
 	var float_txt := "+%d" % result.score
-	if result.get("bonus_chips", 0) > 0:
-		float_txt += "  +%d CHIPS" % result.bonus_chips
+	if result.get("cash_earned", 0) > 0:
+		float_txt += "  +$%d" % result.cash_earned
 	var base: int = int(result.get("base", 0))
 	_spawn_float_text(float_txt, center, 3 if base >= 1200 else (2 if base >= 600 else 1))
 
@@ -1760,12 +1760,10 @@ func _apply_card_mods(result: Dictionary) -> void:
 		result.score = int(result.score * pow(mult_factor, mults))
 	if jokers > 0:
 		result.score = int(result.score * pow(2.0, jokers))
-	if chip_pay > 0:
-		result["bonus_chips"] = chip_pay
-	if gold_cards > 0:
-		# Real money, straight to the pocket: $1 per gold card (more
-		# once the Outfitter has gilded them).
-		result["cash_earned"] = gold_cards * gold_pay
+	if chip_pay > 0 or gold_cards > 0:
+		# Cash cards and Gold cards pay trail cash: Cash grows as it
+		# scores, Gold pays a bigger flat sum.
+		result["cash_earned"] = chip_pay + gold_cards * gold_pay
 	_apply_abilities(result, "mult")
 	if not hand_scores(String(result.get("name", ""))):
 		# Picky Crowd: the hand plays (chips and gold still pay) but
@@ -1816,9 +1814,8 @@ func _apply_abilities(result: Dictionary, stage: String) -> void:
 					x = float(fx.dead_mans[1])
 				result.score = int(result.score * x)
 				hit = true
-			if fx.has("chips_per_card"):
-				result["bonus_chips"] = int(result.get("bonus_chips", 0)) \
-						+ int(fx.chips_per_card) * selected.size()
+			if fx.has("cash"):
+				result["cash_earned"] = int(result.get("cash_earned", 0)) + int(fx.cash)
 				hit = true
 		if hit and not fired.has(Abilities.ability_name(String(id))):
 			fired.append(Abilities.ability_name(String(id)))

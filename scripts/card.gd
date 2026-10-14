@@ -105,7 +105,7 @@ static var washed_show_suit := false
 static var show_hazard_intent := true
 # What one chip level pays â€” mirrors board.chip_bonus (Gold Tooth
 # doubles it), pushed by trail's relic effects.
-static var chip_pay_base := 8
+static var chip_pay_base := 1
 # CRAZY 8s room: every 8 on the board is wild (drawn with a W badge).
 static var wild_rank := 0   # a table's wild rank (Wild 8s, Wild 5s...); 0 = none
 
@@ -1480,7 +1480,7 @@ func _draw_art(rect: Rect2) -> void:
 					else ThemeDB.fallback_font
 			draw_string(cfont, Vector2(rect.position.x + rect.size.x * 0.36,
 					rect.end.y - 14.0),
-					"+%d" % (chip_pay_base * (1 + chip_level)),
+					"+$%d" % (chip_pay_base * (1 + chip_level)),
 					HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 12, GOLD)
 		_draw_art_rank_suit(rect)
 		_draw_finish(rect)

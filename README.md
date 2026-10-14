@@ -14,7 +14,7 @@ When the deck reshuffles, duplicate cards start showing up. That's why
 
 | Mode | Hands | Pressure | Deck |
 | --- | --- | --- | --- |
-| **The Trail** | A set number per table (or a clock) | You bet your chips on every table, and losing costs HP | Your own deck, shaped as you play |
+| **The Trail** | A set number per table (or a clock) | Losing a table costs HP, and dying loses your trail cash | Your own deck, shaped as you play |
 | **Time Trial** | Unlimited | 1:00 / 3:00 / 5:00 countdown | Reshuffles |
 | **Single Deck** | Unlimited | None | One 52-card deck, played until no hands are left |
 | **Arcade** | Unlimited | A bar that's always draining | Reshuffles |
@@ -32,26 +32,31 @@ Refills play out the way a dealer would do it. The cards that are left
 settle first, then new cards are flicked in from the deck one at a time.
 Click during the animation to skip it.
 
-**The Trail** is the roguelike mode. You pick a rider, buy in for a stack
-of chips, and ride a 30-stop trail split into three regions. Each region
-has seven tables, two merchants and a campfire, and it ends with a
-**boss**: the Jack of All Trades, the Queen Bee, and finally King Cobra.
-At every table you pick from a few offers and bet chips on it. Win and
-you're paid at the table's odds, then you pick an **ability card**. Ability
-cards go on your poker hands (a Pair has 2 slots, a Flush 5) and kick in
-every time you play that hand. Lose and you're out
-the stake, you take a hit to your 10 HP, and a cursed card can sneak into
-your deck.
+**The Trail** is the roguelike mode. You pick a rider and ride a 30-stop
+trail split into three regions. Each region has seven tables, two
+merchants and a campfire, and it ends with a **boss**: the Jack of All
+Trades, the Queen Bee, and finally King Cobra. Tables are free to sit.
+Clear one and it pays **trail cash** (more at higher odds and deeper on
+the trail), then you pick an **ability card**. Ability cards go on your
+poker hands (a Pair has 2 slots, a Flush 5) and kick in every time you
+play that hand. Lose a table and you take a hit to your 10 HP, a cursed
+card can sneak into your deck, and you try the table again.
+
+Before you set out you can ride for free, bring cash from the bank to
+spend on the way, or **bet** bank cash on how far you'll get: the Jack
+(1.5 : 1), the Queen (3 : 1) or King Cobra (6 : 1). A winning bet is
+banked the moment that boss falls.
 
 Every table has one objective (reach the target, crack a safe, collect a
 bounty, work a gold mine, beat the dealer at blackjack, play hold'em...)
 and can stack **twists** on top: bombs on a fuse, fire that spreads, wind,
 stones and flood water, a random wild rank, a shorter hand count, or rules
 about which hands play or score. Each twist makes the table harder and
-raises its odds. Merchants sell cards, relics and
-provisions, and the campfire lets you rest or work on your deck. Your
-chips only turn into real cash if you reach the end of the trail (or
-play Gold cards along the way).
+raises its odds. Merchants take trail cash for cards, relics, abilities
+and provisions, and buy your spare provisions back at half price. The
+campfire lets you rest or work on your deck. Safes, chests, bounties and
+Cash and Gold cards all pay trail cash too, but it only comes home to the
+bank if you reach the end of the trail, along with the finishing purse.
 
 Every ride earns EXP, whether you win or bust. Leveling up unlocks new
 relics, cards and gear, and you spend your cash on them and on upgrades

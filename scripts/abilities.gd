@@ -11,7 +11,7 @@ extends RefCounted
 ##   board, scoring (pure, so the preview shows them):
 ##     flat: n            +n to the score before multipliers
 ##     mult: x            ×x after Mult cards and Jokers
-##     chips_per_card: n  +n chips for each card played
+##     cash: n            +$n trail cash
 ##     dead_mans: [a, b]  ×a, or ×b when the hand is Aces and Eights
 ##   trail, when the hand is played:
 ##     enhance: mod       the next plain card off the deck gets mod
@@ -42,9 +42,9 @@ const FIVE_CARD := ["Straight", "Flush", "Full House", "Straight Flush",
 		"Five of a Kind", "Royal Flush", "Flushed Five"]
 const RARITY_NAMES := ["Common", "Rare", "Epic", "Legendary"]
 const RARITY_IDS := ["common", "rare", "epic", "legendary"]
-const PRICES := [80, 160, 320, 600]   # merchant shelf, before the trail's _price()
+const PRICES := [8, 16, 32, 60]   # merchant shelf, before the trail's _price()
 const PASSIVE_FX := ["refill_hazard_mult", "extra_hands", "first_mult"]
-const SCORE_FX := ["flat", "mult", "chips_per_card", "dead_mans"]
+const SCORE_FX := ["flat", "mult", "cash", "dead_mans"]
 
 const DEFS := {
 	# --- Common ------------------------------------------------------------
@@ -52,8 +52,8 @@ const DEFS := {
 		"fx": {"flat": 20}, "glyph": ["relic_glyph", "horseshoe"],
 		"desc": "Every time you play this hand, it scores 20 more points before any multipliers."},
 	"side_bet": {"name": "Side Bet", "rarity": 0, "slots": 1, "hands": [],
-		"fx": {"chips_per_card": 4}, "glyph": ["mod_emblem", "chip"],
-		"desc": "Every time you play this hand, you win 4 chips for each card in it."},
+		"fx": {"cash": 1}, "glyph": ["mod_emblem", "chip"],
+		"desc": "Every time you play this hand, you win $1."},
 	"matched_pair": {"name": "Matched Pair", "rarity": 0, "slots": 2, "hands": ["Pair"],
 		"fx": {"mult": 1.5}, "glyph": ["mod_emblem", "mult"],
 		"desc": "Your Pairs score 1.5 times as much."},

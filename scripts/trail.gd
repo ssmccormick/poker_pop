@@ -1,10 +1,9 @@
 class_name TrailMode
 extends Node
 
-## Trail mode: a betting roguelike run. Buy in for a chip stack, ride
-## 21 tables, wager chips at every one, sculpt your deck as you go.
-## Bankruptcy ends the run; chips become permanent cash ONLY by
-## finishing the trail (gold cards pay $1 apiece along the way).
+## Trail mode: a roguelike run of 21 tables. Bet bank cash at the start
+## on how far you'll get, carry trail cash for the merchants, sculpt
+## your deck as you go. Trail cash only comes home if you finish.
 ## v1 scope: risk-tiered Normal rooms + shops. Bosses, room-rule
 ## variety, and card modifiers beyond Cursed come later (TRAIL_MODE.md).
 
@@ -21,12 +20,6 @@ const STOPS_LAYOUT_VERSION := 2  # run saves before 2 used 7-stop regions
 const BOSS_ROOMS := {9: "jack", 19: "queen", 29: "cobra"}
 const JACK_ROOM := 9
 const QUEEN_ROOM := 19
-# Beyond the Jack the trail plays for real money: every cost — antes,
-# bets, shop goods, relics, the forge — runs 6×, and beyond the
-# Queen it jumps 6× again (36× the frontier prices). A won boss
-# all-in quadruples the stack (3:1), so the wall stings without
-# flattening riders who limped through.
-const POST_BOSS_COST_MULT := 6
 const BOSSES := {
 	"jack": {"tarot": "THE JACK", "name": "Jack of All Trades", "hands": 30},
 	"queen": {"tarot": "THE QUEEN", "name": "Queen Bee", "hands": 14},
@@ -46,9 +39,9 @@ const RISKS := [
 	{"tarot": "HIGH STAKES", "label": "Dangerous", "target_scale": 1.4, "odds": 2.0, "hands": 9},
 ]
 
-# Entering a room costs its ANTE (the house keeps it, win or lose),
-# then you BET chips on yourself at the table's posted odds. The hand
-# (or minute) budget is fixed by the table and tightens with depth.
+# A table is free to sit and pays trail cash when you clear it, more
+# at higher odds. The hand (or minute) budget is fixed by the table and
+# tightens with depth.
 const MAX_HANDS_BUY := 12
 const WIN_LINGER_SECS := 2.5  # savour a cleared table before the pick
 
@@ -127,18 +120,21 @@ const REQUIRE_POOLS := [
 
 const BASE_TARGET := 850          # table 1 target before scaling
 const TARGET_STEP := 140          # + per table (21-table curve)
-const BLIND_BASE := 25            # table 1 ante / minimum bet
-const BLIND_STEP := 6             # + per table cleared — the floor climbs
-const SHOP_CARD_PRICE := 40       # plain card
-const SHOP_DUP_PRICE := 50        # exact duplicate of a card you own
-const SHOP_MOD_PRICE := 80        # chip/mult enhanced card
-const SHOP_REMOVE_PRICE := 30     # first burn; climbs every use
-const SHOP_REMOVE_STEP := 25      # + per burn used this run
+const SHOP_CARD_PRICE := 4       # plain card
+const SHOP_DUP_PRICE := 5        # exact duplicate of a card you own
+const SHOP_MOD_PRICE := 8        # chip/mult enhanced card
+const SHOP_REMOVE_PRICE := 3     # first burn; climbs every use
+const SHOP_REMOVE_STEP := 2      # + per burn used this run
 const CHEST_MOD_CHANCE := 0.25    # chest cards: chance of an enhanced one
 const SHOP_MOD_CHANCE := 0.35     # shop slots: chance of an enhanced card
-const FATE_KICKER := 15           # chips for trusting The Fool
-const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
-const CHIPS_PER_CASH := 1000      # finishing chips bank as $1 per 1,000 (x the rate)
+const FATE_KICKER := 2            # $ for trusting The Fool (× the region scale)
+const TABLE_PAY_BASE := 3.0       # what a first table pays, before odds
+const TABLE_PAY_STEP := 1.0 / 3.0 # added per table of depth
+const REGION_SCALE := [1.0, 1.5, 2.0]   # pay and prices climb region by region
+const BET_ODDS := {"jack": 1.5, "queen": 3.0, "king": 6.0}
+const BET_ROOMS := {"jack": JACK_ROOM, "queen": QUEEN_ROOM, "king": ROOMS_TOTAL - 1}
+const BET_NAMES := {"jack": "the Jack", "queen": "the Queen", "king": "King Cobra"}
+const BANKROLL_CASH := 5          # $ of free trail cash per Bankroll level
 const COMPLETE_PURSE := 100       # cash on finishing, x Ascension.purse_mult
 
 # Meta and run saves live under the active profile (main.profile_path).
@@ -166,7 +162,7 @@ const LADDERS := [
 		"Undoes your last hand: the cards, the score, the hand you spent, all of it. Each upgrade gives you one more undo per table.",
 		"rider", "the_doctor"],
 	["bankroll", "BANKROLL",
-		"Each level adds 20 chips to your starting stack on every buy-in, whatever the stakes.",
+		"Each level adds $5 to the cash you carry onto the trail, free.",
 		"gear", "bankroll"],
 	["provisions", "PACKED KIT",
 		"Each level puts one random provision in your kit at the start of every ride.",
@@ -182,7 +178,7 @@ const ROOM_EMBLEMS := {"room:plain": "limit_table", "room:clock": "high_noon",
 		"stake:0": "limit_table", "stake:1": "pot_limit", "stake:2": "no_limit"}
 const CATALOG_DESCS := {
 	"mod:mult": "Multiplies the hand's score by ×1.5.",
-	"mod:chip": "Adds extra chips to every score, and the bonus grows each time you play it.",
+	"mod:chip": "A Cash card: pays a little trail cash when played, and more each time it scores.",
 	"mod:gold": "Pays $1 cash every time you play it.",
 	"mod:plus": "Raises the card it points at by one rank. An Ace becomes THE JOKER, which is wild and doubles the hand.",
 	"mod:minus": "Lowers the card it points at by one rank. A 2 breaks.",
@@ -207,7 +203,7 @@ const CATALOG_DESCS := {
 
 # Relics: run-wide passives, max 5, bought at shops / found in chests.
 const MAX_RELICS := 999  # no satchel limit — the price is the gate
-const RELIC_PRICES := [150, 300, 600, 1000]  # by rarity C/R/EPIC/L — carry is unlimited, so they cost dear
+const RELIC_PRICES := [15, 30, 60, 100]  # by rarity C/R/EPIC/L — carry is unlimited, so they cost dear
 
 # Traveling merchants: each shop stop is a different trader, rolled
 # per room, with their own stock — some deal only in relics.
@@ -227,23 +223,23 @@ const MERCHANTS := [
 # aimed at a card on the table; "instant" ones fire on the spot. Using
 # one is a free action — the provision itself is the price.
 const PROVISIONS := {
-	"canteen": {"name": "Canteen", "kind": "target", "price": 45,
+	"canteen": {"name": "Canteen", "kind": "target", "price": 5,
 		"desc": "Douse one card to wash off any hazard or water"},
-	"dynamite": {"name": "Dynamite Stick", "kind": "target", "price": 60,
+	"dynamite": {"name": "Dynamite Stick", "kind": "target", "price": 6,
 		"desc": "Blow up any card, even a curse. On a stone, it blasts the stone off"},
-	"branding_iron": {"name": "Branding Iron", "kind": "target", "price": 70,
+	"branding_iron": {"name": "Branding Iron", "kind": "target", "price": 7,
 		"desc": "Brand a plain card with a random enhancement"},
-	"razor": {"name": "Barber's Razor", "kind": "target", "price": 50,
+	"razor": {"name": "Barber's Razor", "kind": "target", "price": 5,
 		"desc": "Give one card a new random rank and suit"},
-	"gold_pan": {"name": "Gold Pan", "kind": "target", "price": 65,
+	"gold_pan": {"name": "Gold Pan", "kind": "target", "price": 6,
 		"desc": "Turn one plain card solid GOLD"},
-	"shell_game": {"name": "Shell Game", "kind": "target", "price": 50,
+	"shell_game": {"name": "Shell Game", "kind": "target", "price": 5,
 		"desc": "Swap two cards that sit side by side: pick one, then its neighbor"},
-	"fresh_deck": {"name": "Fresh Deck", "kind": "instant", "price": 55,
+	"fresh_deck": {"name": "Fresh Deck", "kind": "instant", "price": 5,
 		"desc": "Re-deal every plain and enhanced card on the table"},
-	"pocket_flask": {"name": "Pocket Flask", "kind": "instant", "price": 60,
+	"pocket_flask": {"name": "Pocket Flask", "kind": "instant", "price": 6,
 		"desc": "+2 hands at this table, or +20 seconds on a timed one"},
-	"tonic": {"name": "Rattlesnake Tonic", "kind": "instant", "price": 70,
+	"tonic": {"name": "Rattlesnake Tonic", "kind": "instant", "price": 7,
 		"desc": "Your next scored hand counts DOUBLE"},
 }
 const MAX_PROVISIONS := 3
@@ -259,7 +255,7 @@ const RELICS := {
 	"swimming_goggles": {"name": "Swimming Goggles", "rarity": 1, "desc": "Water-filled cards still show their suit"},
 	"gold_tooth": {"name": "Gold Tooth", "rarity": 1, "desc": "Chip cards pay double"},
 	"mirror_shades": {"name": "Mirror Shades", "rarity": 1, "desc": "Mult cards multiply by 0.5 more (x1.5 becomes x2)"},
-	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "One free life: when the trail would finish you off, you get back up with 5 HP and enough chips for the table. Works once"},
+	"second_wind": {"name": "Second Wind", "rarity": 1, "desc": "One free life: when the trail would finish you off, you get back up with 5 HP. Works once"},
 	"bankroll_clip": {"name": "Bankroll Clip", "rarity": 1, "desc": "Finishing the trail pays +0.25x"},
 	"dowsing_rod": {"name": "Dowsing Rod", "rarity": 1, "desc": "Safe combinations only use ranks 2-6"},
 	"saddlebags": {"name": "Saddlebags", "rarity": 1, "desc": "A 4th slot in your provision kit"},
@@ -272,7 +268,7 @@ var main: Node2D  # set by main.gd before build()
 # Meta (persists forever) — everything the OUTFITTER sells for $cash.
 var cash := 0
 var sleeve_rank := 2     # ACE UP THE SLEEVE: the starting rank, up to an Ace
-var meta_bankroll := 0   # +20 starting chips per level on every buy-in (max 5)
+var meta_bankroll := 0   # +$5 of free trail cash per level on every ride (max 5)
 var meta_provisions := 0 # random provisions in the kit at run start (max 2)
 # Levels, unlocks, purchases and contracts (scripts/progression.gd).
 var progress := Progression.new()
@@ -311,7 +307,13 @@ var _rng := RandomNumberGenerator.new()
 var rng_room := RandomNumberGenerator.new()
 var _pick_round := 0
 var ascension := 0       # this ride's Ascension (0-20)
-var chips := 0
+# TRAIL CASH ($): what you carry and earn on the ride. Shops take it,
+# tables pay it, and it only comes home if you finish the trail.
+var trail_cash := 0
+var cash_brought := 0           # how much of it came from the bank
+# The starting BET: bank cash on how far the ride gets (the Jack, the
+# Queen, or King Cobra). Paid into the bank the moment it comes in.
+var bet: Dictionary = {}        # {target: "jack"/"queen"/"king", stake, odds, paid}
 var deck: Array = []          # [{rank, suit, cursed}]
 var room_index := 0           # 0-based; next room to play
 var in_room := false
@@ -411,7 +413,6 @@ var pending_retry := {}          # a room that MUST be played next
 var _outlaw_dead_pending := false  # killing slug in flight; clear on impact
 var pending_is_retry := true     # true = failed there (scarred); false = just stepped away
 var current_offer := {}
-var stake := 0
 var _offers: Array = []
 var _fate_offer := {}
 var _offers_room := -1       # the room those offers were dealt for
@@ -469,7 +470,7 @@ var _win_box: Control
 var _pick_title: Label
 var _pick_sub: Label
 var _relic_sub: Label
-var _chest_rewards: Array = []   # ambient chests opened this room: "chips"/"card"/"relic"
+var _chest_rewards: Array = []   # ambient chests opened this room: "chips" (coin)/"card"/"relic"
 var _chest_won_cards: Array = [] # deck cards won from chests, shown on the victory screen
 var _chest_card_rounds := 0      # extra ability offer rounds owed by chests
 var _in_chest_pick := false      # the pick screen is showing a chest round
@@ -478,8 +479,6 @@ var _tarot_info: Label
 var _tarot_cards_box: Control
 var _bet_info: Label
 var _bet_stake_label: Label
-var _bet_amount := 0
-var _bet_amount_label: Label
 var _bet_deal_btn: Button
 var _deck_view_burn := true   # deck viewer doubles as the shop's burn picker
 var abilities_screen: AbilitiesScreen
@@ -488,7 +487,6 @@ var _bet_chips: CenterContainer   # and as chips above that
 var _shop_stock_abilities: Array = []   # [{id, bought}] on the merchant's shelf
 var _shop_saved := {}    # what a saved ride already bought at this stop's merchant
 var _tarot_ab_btn: Button
-var stake_odds := 1.0    # effective odds locked in when the bet is placed
 var _pick_box: Control
 var _pick_tip: PanelContainer
 var _pick_tip_label: Label
@@ -510,6 +508,18 @@ var _shop_title: Label
 var _shop_flavor: Label
 var _shop_relic_box: Control
 var _shop_prov_box: Control
+var _shop_sell_box: Control      # your own kit, each provision with a SELL price
+# The buy-in's wager: cash to bring along and the starting bet. They
+# stay set between rides (clamped to the bank each time).
+var buyin_bring := 0
+var buyin_stake := 0
+var buyin_target := ""           # "", "jack", "queen", "king"
+var _wager_box: Control
+var _bring_label: Label
+var _stake_label: Label
+var _bet_pays_label: Label
+var _wager_note: Label
+var _bet_target_btns := {}
 var _shop_burn_btn: Button
 var _bet_back_btn: Button
 var _tarot_relics: Label
@@ -603,7 +613,10 @@ func _save_run() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("run", "active", run_active)
 	cf.set_value("run", "ascension", ascension)
-	cf.set_value("run", "chips", chips)
+	cf.set_value("run", "trail_cash", trail_cash)
+	cf.set_value("run", "cash_brought", cash_brought)
+	cf.set_value("run", "bet", bet)
+	cf.set_value("run", "econ_ver", 2)
 	cf.set_value("run", "room", room_index)
 	cf.set_value("run", "uid", run_uid)
 	cf.set_value("run", "score", main.score)
@@ -722,7 +735,13 @@ func _load_run() -> bool:
 	if cf.load(main.profile_path("trail_run.cfg")) != OK or not cf.get_value("run", "active", false):
 		return false
 	ascension = Ascension.clamp_a(int(cf.get_value("run", "ascension", 0)))  # stake-era saves ride at 0
-	chips = int(cf.get_value("run", "chips", 0))
+	if int(cf.get_value("run", "econ_ver", 1)) >= 2:
+		trail_cash = int(cf.get_value("run", "trail_cash", 0))
+	else:
+		# A ride saved in the chip days: its stack comes along as cash.
+		trail_cash = int(cf.get_value("run", "chips", 0)) / 10
+	cash_brought = int(cf.get_value("run", "cash_brought", 0))
+	bet = cf.get_value("run", "bet", {})
 	room_index = int(cf.get_value("run", "room", 0))
 	run_uid = String(cf.get_value("run", "uid", ""))
 	if run_uid == "":
@@ -843,18 +862,28 @@ func has_relic(id: String) -> bool:
 	return relics.has(id)
 
 
-## Shop pricing with Snake Oil applied.
-func _cost_mult(room: int) -> int:
-	if room > QUEEN_ROOM:
-		return POST_BOSS_COST_MULT * POST_BOSS_COST_MULT
-	if room > JACK_ROOM:
-		return POST_BOSS_COST_MULT
-	return 1
+## Pay and prices climb gently, region by region.
+func _region_scale(room: int) -> float:
+	return float(REGION_SCALE[clampi(room / REGION_SIZE, 0, REGION_SCALE.size() - 1)])
 
 
+## A merchant's price in $, with the region, Ascension and Snake Oil.
 func _price(base: int) -> int:
-	var p := int(base * _cost_mult(room_index) * Ascension.shop_mult(ascension))
-	return int(p * (1.0 - float(rv("snake_oil", "off")))) if has_relic("snake_oil") else p
+	var p := float(base) * _region_scale(room_index) * Ascension.shop_mult(ascension)
+	if has_relic("snake_oil"):
+		p *= 1.0 - float(rv("snake_oil", "off"))
+	return maxi(1, roundi(p))
+
+
+## What a table pays in trail cash when you clear it: grows with depth
+## and the region, multiplied by the table's odds (twists raise them).
+func _table_pay(offer: Dictionary, room := -1) -> int:
+	var r := room_index if room < 0 else room
+	var pay := (TABLE_PAY_BASE + TABLE_PAY_STEP * table_depth(r)) * float(offer.get("odds", 1.0)) \
+			* _region_scale(r) * Ascension.pay_mult(ascension)
+	if has_relic("bankroll_clip"):
+		pay *= 1.0 + float(rv("bankroll_clip", "pay"))
+	return maxi(1, roundi(pay))
 
 
 ## POWER values at the Outfitter level the player bought: a relic's,
@@ -992,7 +1021,7 @@ func all_equipped() -> Array:
 
 
 func _apply_relic_effects() -> void:
-	var chip := float(mv("chip", "chips")) \
+	var chip := float(mv("chip", "cash")) \
 			* (float(rv("gold_tooth", "x")) if has_relic("gold_tooth") else 1.0)
 	main.board.chip_bonus = roundi(chip)
 	PlayingCard.chip_pay_base = main.board.chip_bonus
@@ -1267,7 +1296,7 @@ func use_watch() -> void:
 	room_collect_kinds = _watch_snapshot.room_collect_kinds.duplicate()
 	room_require = _watch_snapshot.room_require.duplicate(true)
 	deck = _watch_snapshot.deck.duplicate(true)
-	chips = int(_watch_snapshot.chips)
+	trail_cash = int(_watch_snapshot.trail_cash)
 	cash = int(_watch_snapshot.cash)
 	outlaws_caught = int(_watch_snapshot.get("outlaws_caught", outlaws_caught))
 	best_hand_score = int(_watch_snapshot.get("best_hand_score", best_hand_score))
@@ -1308,7 +1337,7 @@ func _on_hand_committing() -> void:
 		"room_collect_kinds": room_collect_kinds.duplicate(),
 		"room_require": room_require.duplicate(true),
 		"deck": deck.duplicate(true),
-		"chips": chips, "cash": cash,
+		"trail_cash": trail_cash, "cash": cash,
 		"outlaws_caught": outlaws_caught,
 		"best_hand_score": best_hand_score, "best_hand_name": best_hand_name,
 		"rng_ability": rng_ability.state,
@@ -1317,24 +1346,35 @@ func _on_hand_committing() -> void:
 	}
 
 
+## The in-room HUD's money line: trail cash, what this table pays, and
+## the starting bet.
+func hud_cash_line() -> String:
+	var line := "CASH $%d" % trail_cash
+	if in_room and not current_offer.is_empty():
+		line += "   PAYS $%d" % _table_pay(current_offer)
+	if not bet.is_empty():
+		var who := String({"jack": "JACK", "queen": "QUEEN", "king": "KING COBRA"}.get(
+				String(bet.get("target", "")), ""))
+		line += "   BET WON" if bool(bet.get("paid", false)) else "   BET: %s" % who
+	return line
+
+
 ## Second Wind still has its one free life in it.
 func second_wind_ready() -> bool:
 	return has_relic("second_wind") and not _second_wind_used
 
 
-## The free life: back up with at least 5 HP and enough chips to sit
-## the table at hand (`seat`, or this table's cheapest seat). The relic
-## stays in the satchel, spent, so no merchant sells a second one.
-func _second_wind_revive(seat := -1) -> void:
+## The free life: back up with at least 5 HP. The relic stays in the
+## satchel, spent, so no merchant sells a second one.
+func _second_wind_revive() -> void:
 	_second_wind_used = true
 	hp = mini(max_hp(), maxi(hp, int(rv("second_wind", "hp"))))
-	chips = maxi(chips, seat if seat >= 0 else _cheapest_seat(room_index))
 	main.stat_bump("second_winds")
 	main.board._play_sound(Board.SFX_STING_WIN, 0.9, -6.0)
 	main.board._play_sound(Board.SFX_WINDS.pick_random(), 1.0, -8.0)
 	_save_run()
 	# Let the blow (or the lost table's verdict) land first.
-	var text := "SECOND WIND — BACK ON YOUR FEET  ·  HP %d  ·  %d CHIPS" % [hp, chips]
+	var text := "SECOND WIND — BACK ON YOUR FEET  ·  HP %d" % hp
 	while main.board.busy:
 		await get_tree().process_frame
 	await get_tree().create_timer(1.0).timeout
@@ -1692,42 +1732,6 @@ static func next_table(room: int) -> int:
 	return mini(r, ROOMS_TOTAL - 1)
 
 
-func _blind_for(room: int) -> int:
-	return int((BLIND_BASE + BLIND_STEP * table_depth(room)) * Ascension.blind_mult(ascension)) \
-			* _cost_mult(room)
-
-
-## The least a seat at this table can cost: the ante plus the minimum
-## bet (also the ante). Bosses take the whole stack anyway, so just
-## the ante.
-func _cheapest_seat(room: int) -> int:
-	if BOSS_ROOMS.has(room):
-		return _blind_for(room)
-	return _blind_for(room) * 2
-
-
-## True if the stack can't cover `cost` — and in that case the run is
-## over: chips only turn to cash for riders who reach the end, so a
-## short stack forfeits — the house keeps what's left.
-func _short_stacked(cost: int) -> bool:
-	if chips >= cost:
-		return false
-	if second_wind_ready():
-		_second_wind_revive(cost)
-		return false
-	if chips <= 0:
-		_clear_run_save()
-		_end_run("BUSTED OUT",
-				"That table took your last chip.\nThe trail ends here.", 0,
-				"Lost every chip at Table %d." % mini(room_index + 1, ROOMS_TOTAL))
-		return true
-	_clear_run_save()
-	_end_run("BLINDED OUT",
-			"A seat at this table costs at least %d chips, and you're down to %d.\nOnly riders who make it to the end cash out. The house keeps the rest." % [cost, chips],
-			0, "Needed %d chips but only had %d." % [cost, chips])
-	return true
-
-
 func _target_for(room: int, risk: Dictionary) -> int:
 	var base := BASE_TARGET + TARGET_STEP * table_depth(room)
 	return int(base * risk.target_scale * Ascension.target_mult(ascension))
@@ -1752,12 +1756,6 @@ func _apply_ascension_to_board() -> void:
 func _refill_chance() -> float:
 	return clampf((REFILL_HAZARD_BASE + REFILL_HAZARD_STEP * table_depth(room_index))
 			* Ascension.refill_mult(ascension), 0.0, REFILL_HAZARD_MAX * Ascension.refill_mult(ascension))
-
-
-func _cashout_value(rate_bonus := 1.0) -> int:
-	var rate: float = 1.0 + Ascension.rate_bonus(ascension) \
-			+ (float(rv("bankroll_clip", "rate")) if has_relic("bankroll_clip") else 0.0)
-	return int(chips * rate * rate_bonus / CHIPS_PER_CASH)
 
 
 ## Weighted enhancement roll over the ones on the trail (MOD_WEIGHTS).
@@ -1949,7 +1947,7 @@ func _open_buyin_now() -> void:
 	main.menu_layer.visible = false
 	main.menu_open = false
 	_hide_all()
-	_buyin_cash_label.text = "CASH  $%d" % cash
+	main.tutor_show("the_bet")
 	# The dial opens on the highest Ascension this rider has earned.
 	_asc_pick = ascension_open()
 	# A ride in progress takes top billing; a fresh saddle moves down.
@@ -1961,12 +1959,54 @@ func _open_buyin_now() -> void:
 	_buyin_resume_btn.position = Vector2(660, 300)
 	_buyin_new_label.position.y = 388
 	_asc_box.position = Vector2(0, dy)
-	_buyin_saddle_btn.position = Vector2(660 if riding else 810, 790 + dy * 0.2)
+	_buyin_saddle_btn.position = Vector2(660 if riding else 810, 860 + dy)
 	_buyin_saddle_btn.size = Vector2(290 if riding else 300, 66)
-	_buyin_rider_btn.position = Vector2(970, 790 + dy * 0.2)
+	_buyin_rider_btn.position = Vector2(970, 860 + dy)
 	_buyin_rider_btn.size = Vector2(290, 66)
 	_render_ascension()
+	_render_wager()
 	buyin_layer.visible = true
+
+
+## The wager rows: cash to bring, which boss to bet on, and the stake.
+## Seeded rides carry neither, so everyone starts the same.
+func _render_wager() -> void:
+	var seeded := next_standard
+	buyin_bring = clampi(buyin_bring, 0, maxi(cash, 0))
+	buyin_stake = clampi(buyin_stake, 0, maxi(cash - buyin_bring, 0))
+	if buyin_target == "":
+		buyin_stake = 0
+	for k in _wager_box.get_children():
+		(k as CanvasItem).visible = not seeded
+	_wager_note.visible = true
+	_buyin_cash_label.text = "BANK  $%d" % (cash - buyin_bring - buyin_stake) if not seeded \
+			else "BANK  $%d" % cash
+	if seeded:
+		_wager_note.text = "Seeded rides start the same for everyone: no bet and no cash brought."
+		return
+	_bring_label.text = "$%d" % buyin_bring
+	_stake_label.text = "$%d" % buyin_stake
+	for key in _bet_target_btns:
+		var on := String(key) == buyin_target
+		var tb := _bet_target_btns[key] as Button
+		tb.button_pressed = on
+		# The picked target stands out; the rest sit back.
+		tb.modulate = Color(1.15, 1.05, 0.8) if on else Color(0.6, 0.6, 0.6)
+	if buyin_target == "":
+		_bet_pays_label.text = "No bet. The ride is free."
+	elif buyin_stake <= 0:
+		_bet_pays_label.text = "Set a stake to bet on %s." % BET_NAMES[buyin_target]
+	else:
+		var odds := float(BET_ODDS[buyin_target]) * Ascension.bet_mult(_asc_pick)
+		_bet_pays_label.text = "Pays $%d if you beat %s." % [
+				buyin_stake + roundi(buyin_stake * odds), BET_NAMES[buyin_target]]
+	_wager_note.text = "Cash you bring is lost if the trail gets you. A bet pays the moment its boss falls."
+
+
+## Stepper sizes: fine steps for small sums, bigger past $50.
+func _wager_step(amount: int, up: bool) -> int:
+	var step := 25 if (amount >= 50 if up else amount > 50) else 5
+	return amount + (step if up else -step)
 
 
 ## The Ascension dial: the level, its newest rule, every rule below it,
@@ -1990,9 +2030,9 @@ func _render_ascension() -> void:
 			below.append(String(pair[1].name))
 		_asc_rest.text = "Also in effect: " + ", ".join(below) + "." if not below.is_empty() \
 				else "The first rung of the ladder."
-	_asc_reward.text = "EXP ×%s   ·   cash-out ×%s   ·   finish purse $%d" % [
+	_asc_reward.text = "EXP ×%s   ·   bet odds ×%s   ·   finish purse $%d" % [
 			String.num(Ascension.exp_mult(_asc_pick), 2),
-			String.num(1.0 + Ascension.rate_bonus(_asc_pick), 2),
+			String.num(Ascension.bet_mult(_asc_pick), 2),
 			roundi(COMPLETE_PURSE * Ascension.purse_mult(_asc_pick))]
 
 
@@ -2002,6 +2042,7 @@ func _step_ascension(d: int) -> void:
 	if _asc_pick != was:
 		main.board._play_sound(Board.SFX_FLIP, 1.1 + 0.02 * _asc_pick, -10.0)
 	_render_ascension()
+	_render_wager()
 
 
 # --- The Outfitter: meta upgrades bought with $cash -----------------------
@@ -2155,9 +2196,9 @@ func _ladder_texts(id: String, cost: int) -> Array:
 			bt = "ONE MORE SWAP — $%d" % cost if cost > 0 \
 					else "QUICKEST HANDS ON THE TRAIL"
 		"bankroll":
-			st = "Level %d / 5  ·  +%d chips at every buy-in" \
-					% [meta_bankroll, 20 * meta_bankroll]
-			bt = "MORE CHIPS — $%d" % cost if cost > 0 \
+			st = "Level %d / 5  ·  +$%d of trail cash on every ride" \
+					% [meta_bankroll, BANKROLL_CASH * meta_bankroll]
+			bt = "MORE TRAIL CASH — $%d" % cost if cost > 0 \
 					else "FULLY UPGRADED"
 		"provisions":
 			st = "Level %d / 2  ·  %d provision%s at the start" \
@@ -2476,14 +2517,30 @@ func _start_run(asc: int) -> void:
 	_stream("run", 0)
 	_ride_contracts = []
 	ascension = asc
-	chips = Ascension.start_chips(asc)
+	trail_cash = 0
 	deck = _fresh_deck()
 	for i in Ascension.cursed_start(asc):
 		deck.append({"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3), "cursed": true})
 	room_index = 0
-	# The Outfitter's gear rides along: extra chips on the stack, and
+	# The Outfitter's gear rides along: free trail cash, and
 	# provisions already in the kit.
-	chips += 20 * ride_lv("bankroll")
+	trail_cash += BANKROLL_CASH * ride_lv("bankroll")
+	# The wager leaves the bank now: brought cash rides at risk, and the
+	# bet waits on its boss. Seeded rides carry neither.
+	cash_brought = 0
+	bet = {}
+	if not standard_loadout:
+		var bring := clampi(buyin_bring, 0, maxi(cash, 0))
+		var stake := clampi(buyin_stake, 0, maxi(cash - bring, 0)) \
+				if BET_ODDS.has(buyin_target) else 0
+		cash -= bring + stake
+		trail_cash += bring
+		cash_brought = bring
+		if stake > 0:
+			bet = {"target": buyin_target, "stake": stake, "paid": false,
+					"odds": float(BET_ODDS[buyin_target]) * Ascension.bet_mult(asc)}
+			main.stat_bump("bets_placed")
+		_save_meta()
 	relics.clear()
 	provisions.clear()
 	abilities.clear()
@@ -2543,8 +2600,6 @@ func _resume_run() -> void:
 			return
 		if not pending_retry.is_empty():
 			# A failed room still bars the way — back to its table.
-			if _short_stacked(_cheapest_seat(room_index)):
-				return
 			main.menu_open = false
 			current_offer = pending_retry.duplicate(true)
 			_hide_all()
@@ -2575,9 +2630,6 @@ func _show_tarot_now() -> void:
 		_tarot_ab_btn.disabled = abilities.is_empty()
 		_tarot_ab_btn.tooltip_text = "You'll earn ability cards by clearing tables." \
 				if abilities.is_empty() else "Put your ability cards on your poker hands."
-	# Bankruptcy check against the coming table's cheapest seat.
-	if _short_stacked(_cheapest_seat(next_table(room_index))):
-		return
 	# Merchants and campfires are stops on the road, not cards to pick.
 	var fixed := stop_kind(room_index)
 	if fixed in ["shop", "camp"]:
@@ -2614,7 +2666,6 @@ func _make_offers() -> Array:
 			"target": 0,
 			"hands": int(b.hands),
 			"odds": 3.0,
-			"min_bet": mini(_blind_for(room_index), chips),
 			"boss": kind,
 		}]
 	var offers: Array = []
@@ -2701,7 +2752,6 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 		# squeeze enough without the budget draining too.
 		"hands": maxi(1, int(risk.hands) - mini(region, 1)),
 		"odds": float(risk.odds),
-		"min_bet": _blind_for(room_index),
 	}
 	var goal := forced_goal if forced_goal != "" 			else (_roll_room_goal(on_wall) if room_index >= 1 else "plain")
 	if goal != "plain":
@@ -2980,8 +3030,8 @@ func _render_tarot() -> void:
 		child.queue_free()
 	var is_boss := BOSS_ROOMS.has(room_index)
 	var region := room_index / REGION_SIZE + 1
-	_tarot_info.text = "TABLE %d / %d   ·   REGION %d   ·   CHIPS %d   ·   DECK %d cards" \
-			% [room_index + 1, ROOMS_TOTAL, region, chips, deck.size()]
+	_tarot_info.text = "TABLE %d / %d   ·   REGION %d   ·   CASH $%d   ·   DECK %d cards" \
+			% [room_index + 1, ROOMS_TOTAL, region, trail_cash, deck.size()]
 	if relics.is_empty():
 		_tarot_relics.text = ""
 	else:
@@ -3010,10 +3060,10 @@ func _render_tarot() -> void:
 		var fool_tier := _apply_poster(fool, "luck_of_the_draw")
 		if fool_tier != "":
 			_poster_face(fool, "LUCK OF THE DRAW", fool_tier, "A blind pick",
-					"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)))
+					"Let fate decide\n+$%d" % _fate_kicker())
 		else:
 			_tarot_face(fool, "LUCK OF THE DRAW", "A blind pick", "?",
-					"Let fate decide\n+%d chips" % (FATE_KICKER * _cost_mult(room_index)),
+					"Let fate decide\n+$%d" % _fate_kicker(),
 					false, 64)
 		fool.pressed.connect(func() -> void:
 			_choose_offer(_fate_offer, true))
@@ -3033,19 +3083,19 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 		var shop_tier := _apply_poster(b, "traveling_merchant")
 		if shop_tier != "":
 			_poster_face(b, String(m.name), shop_tier, String(m.line),
-					"%s\nNo bet, free to browse" % "  ·  ".join(wares))
+					"%s\nFree to browse" % "  ·  ".join(wares))
 		else:
 			_tarot_face(b, String(m.name), "Safe haven", String(m.line),
-					"%s\nNo bet, free to browse" % "  ·  ".join(wares))
+					"%s\nFree to browse" % "  ·  ".join(wares))
 	elif offer.kind == "camp":
 		if _apply_camp_poster(b):
 			_poster_face(b, "CAMPFIRE", "rest stop",
 					"Rest up, enhance a card, or throw one in the fire",
-					"No bet. Pick one comfort\nHP %d / %d" % [hp, max_hp()])
+					"Pick one comfort\nHP %d / %d" % [hp, max_hp()])
 		else:
 			_tarot_face(b, "THE CAMPFIRE", "Rest stop",
 					"Rest, enhance a card, or burn one",
-					"No bet. Pick one comfort\nHP %d / %d" % [hp, max_hp()])
+					"Pick one comfort\nHP %d / %d" % [hp, max_hp()])
 	else:
 		var goal_line := "Target  %d" % offer.target
 		if offer.has("boss"):
@@ -3081,12 +3131,10 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			goal_line = "Play " + _require_text(offer.require)
 		elif offer.get("goal", "") == "timed":
 			goal_line = "Target %d — beat the clock" % offer.target
-		var bet_line := "Ante %d  ·  ~%d hands" % [offer.min_bet, offer.hands]
+		var bet_line := "Pays $%d  ·  ~%d hands" % [_table_pay(offer), offer.hands]
 		if offer.get("limit", "hands") == "time":
-			bet_line = "Ante %d  ·  on the clock, ~%d min" % [offer.min_bet,
+			bet_line = "Pays $%d  ·  on the clock, ~%d min" % [_table_pay(offer),
 					offer.get("minutes", 4)]
-		if offer.has("boss"):
-			bet_line = "ALL IN"
 		var badges := twist_badges(offer)
 		if badges != "":
 			goal_line += "\n" + badges
@@ -3190,7 +3238,7 @@ func _apply_wanted_poster(b: Button, offer: Dictionary) -> bool:
 	if outlaws.is_empty() or not CharacterKit.available():
 		return false
 	var leader: Dictionary = outlaws[0]
-	var reward := int(round(float(offer.min_bet) * float(offer.odds)))
+	var reward := _table_pay(offer)
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	b.size = Vector2(300, 420)
@@ -3213,10 +3261,9 @@ func _apply_wanted_poster(b: Button, offer: Dictionary) -> bool:
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(paper)
 	CharacterKit.add_portrait(b, leader, Rect2(66, 125, 168, 168))
-	var sub_text := "GANG OF %d · %d HP EACH · ANTE %d" % [outlaws.size(),
-			int(offer.outlaw_hp), int(offer.min_bet)] if outlaws.size() > 1 \
-			else "DEAD OR ALIVE · %d HP · ANTE %d" % [int(offer.outlaw_hp),
-			int(offer.min_bet)]
+	var sub_text := "GANG OF %d · %d HP EACH" % [outlaws.size(),
+			int(offer.outlaw_hp)] if outlaws.size() > 1 \
+			else "DEAD OR ALIVE · %d HP" % int(offer.outlaw_hp)
 	var subtitle := _face_label(b, sub_text, 92.0, 20.0, 13, Color("8a3a30"))
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var who := String(leader.get("name", "THE WANTED MAN"))
@@ -3435,7 +3482,7 @@ func _log_stop(offer: Dictionary) -> void:
 
 func _choose_offer_now(offer: Dictionary, from_fate: bool) -> void:
 	if from_fate:
-		chips += FATE_KICKER * _cost_mult(room_index)
+		trail_cash += _fate_kicker()
 	current_offer = offer
 	tarot_layer.visible = false
 	_log_stop(offer)
@@ -3445,35 +3492,32 @@ func _choose_offer_now(offer: Dictionary, from_fate: bool) -> void:
 	elif offer.kind == "camp":
 		_show_camp()
 	elif offer.has("boss"):
-		# The house demands everything at a boss table.
 		main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 0.9, -6.0)
-		stake = chips
-		stake_odds = float(offer.odds)
-		chips = 0
 		_start_room()
 	else:
 		_show_bet()
 
 
-# --- Flow: betting --------------------------------------------------------
+# --- Flow: the table screen -----------------------------------------------
 
-## The stakes screen: the blind is forced, the hands are bought.
+## THE TABLE: what the job is, what it pays, its twists. Bosses go
+## straight in.
 func _show_bet() -> void:
 	_hide_all()
 	var o := current_offer
 	if o.has("boss"):
-		# The house demands everything at a boss table, retry included.
 		main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 0.9, -6.0)
-		stake = chips
-		stake_odds = float(o.odds)
-		chips = 0
 		_start_room()
 		return
 	# A pending room bars the way — no backing out to a fresh draw.
 	_bet_back_btn.visible = pending_retry.is_empty()
-	_bet_amount = int(o.min_bet)
 	_refresh_bet_labels()
 	bet_layer.visible = true
+
+
+## The Fool's purse for trusting fate.
+func _fate_kicker() -> int:
+	return roundi(FATE_KICKER * _region_scale(room_index))
 
 
 func _is_timed(o: Dictionary) -> bool:
@@ -3483,10 +3527,6 @@ func _is_timed(o: Dictionary) -> bool:
 ## Rooms that run on the clock instead of a hand budget.
 func room_on_clock() -> bool:
 	return room_limit == "time"
-
-
-func _max_bet() -> int:
-	return maxi(int(current_offer.min_bet), chips - int(current_offer.min_bet))
 
 
 func _bet_goal_text(o: Dictionary) -> String:
@@ -3531,33 +3571,24 @@ func _refresh_bet_labels() -> void:
 	var o := current_offer
 	var retry_line := ""
 	if not pending_retry.is_empty():
-		retry_line = "\nThis table still blocks the way. Beat it or bust." \
+		retry_line = "\nThis table still blocks the way. You have to beat it to ride on." \
 				if pending_is_retry else "\nBack to the table you stepped away from."
-	var blind := int(o.min_bet)
 	var unit := "min" if _is_timed(o) else "hands"
 	var reference := int(o.get("minutes", 4)) if _is_timed(o) else int(o.hands)
-	_bet_amount = clampi(_bet_amount, blind, _max_bet())
-	_bet_info.text = "%s — %s table\n%s   ·   odds %s   ·   %d %s to do it\nAnte %d (the house keeps it, win or lose)\nYour chips: %d%s" % [
-		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), reference,
-		unit, blind, chips, retry_line]
+	_bet_info.text = "%s — %s table\n%s\n%d %s to do it\nYour trail cash: $%d%s" % [
+		o.tarot, o.label, _bet_goal_text(o), reference, unit, trail_cash, retry_line]
 	var twist_line := twist_sentences(o)
 	_bet_twists.text = twist_line
 	for ch in _bet_chips.get_children():
 		ch.queue_free()
 	if twist_line != "":
 		_bet_chips.add_child(main.twist_chips(o))
-	_bet_amount_label.text = "BET  %d" % _bet_amount
-	_bet_stake_label.text = "Odds ×%.2f      a win pays back %d" % [
-		float(o.odds), _bet_amount + int(_bet_amount * float(o.odds))]
+	_bet_stake_label.text = "THIS TABLE PAYS  $%d" % _table_pay(o)
 
 
+## Sitting down: nothing to pay, straight to the table.
 func _confirm_bet() -> void:
 	main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 1.0, -8.0)
-	var o := current_offer
-	var blind := int(o.min_bet)
-	stake = clampi(_bet_amount, blind, maxi(blind, chips - blind))
-	stake_odds = float(o.odds)
-	chips -= blind + stake
 	bet_layer.visible = false
 	_start_room()
 
@@ -3600,11 +3631,11 @@ func _start_room() -> void:
 		if gain_provision(ration):
 			main._announce("CHUCK WAGON DELIVERY — %s"
 					% String(PROVISIONS[ration].name).to_upper())
-	elif has_relic("chuck_wagon") and int(rv("chuck_wagon", "chips")) > 0:
-		# A full kit takes its rations in chips instead.
-		var ration_chips := _blind_for(room_index)
-		chips += ration_chips
-		main._announce("THE CHUCK WAGON PAYS  +%d CHIPS" % ration_chips)
+	elif has_relic("chuck_wagon") and int(rv("chuck_wagon", "cash")) > 0:
+		# A full kit takes its rations in cash instead.
+		var ration_chips := _table_pay(current_offer)
+		trail_cash += ration_chips
+		main._announce("THE CHUCK WAGON PAYS  +$%d" % ration_chips)
 	match character:
 		"the_machine":
 			main.tutor_show("laser")
@@ -3646,14 +3677,14 @@ func _start_room() -> void:
 	if room_outlaws.is_empty() and room_goal == "outlaw" \
 			and CharacterKit.available():
 		room_outlaws = _roll_posse(int(current_offer.get("posse", 1)))
-	room_hands_left = maxi(1, int(current_offer.get("hands_bought", current_offer.hands))
+	room_hands_left = maxi(1, int(current_offer.hands)
 			- Ascension.hands_minus(ascension)) \
 			+ (int(rv("horseshoe", "hands")) if has_relic("horseshoe") else 0)
 	room_time_left = 0.0
 	if room_on_clock():
 		# The clock is the budget, not hands.
-		room_time_left = maxf(60.0, 60.0 * int(current_offer.get("minutes_bought",
-				current_offer.get("minutes", 3))) - Ascension.clock_minus_secs(ascension)) \
+		room_time_left = maxf(60.0, 60.0 * int(current_offer.get("minutes", 3))
+				- Ascension.clock_minus_secs(ascension)) \
 				+ (float(rv("horseshoe", "secs")) if has_relic("horseshoe") else 0.0)
 		room_hands_left = 999
 	var horn := int(_ability_passive("extra_hands", 0.0))
@@ -3892,7 +3923,6 @@ func _generate_combo() -> Array:
 
 func on_hand_played(result: Dictionary) -> void:
 	# main already added result.score to the run total (main.score).
-	chips += result.get("bonus_chips", 0)
 	var negs := int(result.get("negatives", 0))
 	if negs > 0 and in_room:
 		# NEGATIVE cards give the time back — banked before the hand is
@@ -3912,7 +3942,7 @@ func on_hand_played(result: Dictionary) -> void:
 	if int(result.score) > best_hand_score:
 		best_hand_score = int(result.score)
 		best_hand_name = String(result.get("name", ""))
-	# Chip cards SEASON with use: each scoring permanently bumps that
+	# Cash cards SEASON with use: each scoring permanently bumps that
 	# deck card's payout a full base step for the rest of the run.
 	for cc in result.get("cleared_cards", []):
 		if String(cc.get("mod", "")) != "chip" or bool(cc.get("joker", false)):
@@ -3924,13 +3954,11 @@ func on_hand_played(result: Dictionary) -> void:
 				d["chip_lv"] = int(d.get("chip_lv", 0)) + 1
 				break
 	var earned := int(result.get("cash_earned", 0))
-	if earned > 0 and standard_loadout:
-		_announce_after_settle("GOLD — seeded rides don't bank cash")
-	elif earned > 0:
-		# Cash cards pay real money, banked on the spot.
-		cash += earned
-		_save_meta()
-		_announce_after_settle("GOLD  +$%d" % earned)
+	if earned > 0:
+		# Cash and Gold cards pay trail cash: spend it on the road, and
+		# it comes home if you finish.
+		trail_cash += earned
+		_announce_after_settle("TRAIL CASH  +$%d" % earned)
 	if result.get("boss_defeated", false):
 		_room_cleared()
 		return
@@ -4257,11 +4285,11 @@ func on_safe_cracked() -> void:
 		return
 	# Ambient safe: bonus loot, but the crack still costs a hand.
 	var region := room_index / REGION_SIZE + 1
-	var loot := 40 + 20 * region
-	chips += loot
+	var loot := roundi((4 + 2 * region) * Ascension.pay_mult(ascension))
+	trail_cash += loot
 	main.board._play_sound(Board.SFX_BELL, 1.0, -8.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.3)
-	var msg := "SAFE LOOT  +%d CHIPS" % loot
+	var msg := "SAFE LOOT  +$%d" % loot
 	if _rng.randf() < 0.35 and provisions.size() < kit_size():
 		# Sometimes the safe holds supplies instead of just coin.
 		var pid := _random_provision()
@@ -4297,10 +4325,10 @@ func _open_chest() -> void:
 	var region := room_index / REGION_SIZE + 1
 	var roll := _rng.randf()
 	if roll < 0.45:
-		var loot := 30 + 15 * region
-		chips += loot
+		var loot := roundi((3 + 1.5 * region) * Ascension.pay_mult(ascension))
+		trail_cash += loot
 		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0)
-		_announce_after_settle("CHEST  +%d CHIPS" % loot)
+		_announce_after_settle("CHEST  +$%d" % loot)
 	elif roll < 0.65:
 		# An ability card, offered on its own round after the table.
 		_chest_card_rounds += 1
@@ -4498,7 +4526,11 @@ func _bounty_subtitle() -> String:
 
 ## The bounty figure inked on the poster: the pot this table pays.
 func bounty_reward() -> int:
-	return int(round(stake * stake_odds))
+	return _table_pay(current_offer)
+
+
+func _old_bounty_reward() -> int:
+	return 0
 
 
 ## One head of the posse down — the next rides in at full strength.
@@ -4706,34 +4738,29 @@ func _room_cleared() -> void:
 	_in_chest_pick = false
 	# Itemized winnings: the flash is just "TABLE CLEARED" — the full
 	# breakdown waits on the pick screen, where the eye has time.
-	var pot := stake + int(stake * stake_odds)
-	var winnings := pot
-	_win_rows = [["THE POT — %d bet at %s : 1" % [stake,
-			String.num(stake_odds, 1)], pot]]
+	var pay := _table_pay(current_offer)
+	var winnings := pay
+	_win_rows = [["THE TABLE PAYS", pay]]
 	if has_relic("tin_star"):
-		# The badge pays a blind, so it keeps pace with the trail.
-		var star := roundi(_blind_for(room_index) * float(rv("tin_star", "blinds")))
+		var star := int(rv("tin_star", "cash"))
 		winnings += star
 		_win_rows.append(["TIN STAR", star])
-	# Swift work pays: every spare hand (or every spare 10 seconds on
-	# a clock table) converts to chips, scaled to the table's blind.
+	# Swift work pays: $1 for every two spare hands (or every 20 spare
+	# seconds on a clock table).
 	var spare := int(room_time_left / 10.0) if room_on_clock() \
 			else maxi(room_hands_left, 0)
-	var bonus := spare * maxi(_blind_for(room_index) / 5, 1)
+	var bonus := spare / 2
 	if bonus > 0:
 		_win_rows.append([("%d SECONDS TO SPARE" % int(room_time_left))
 				if room_on_clock() else ("%d HANDS TO SPARE" % spare), bonus])
 	winnings += bonus
-	chips += winnings
+	trail_cash += winnings
 	main.board._play_sound(Board.SFX_STING_BOSS if current_offer.has("boss")
 			else Board.SFX_STING_WIN, 1.0, -6.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.4)
 	main.table_banner("TABLE CLEARED")
 	main.board.confetti()
-	if current_offer.has("boss") and room_index == JACK_ROOM:
-		_announce_after_settle("BIG LEAGUE NOW: EVERYTHING COSTS %d× FROM HERE" % POST_BOSS_COST_MULT)
-	elif current_offer.has("boss") and room_index == QUEEN_ROOM:
-		_announce_after_settle("HIGH SOCIETY: PRICES GO UP ANOTHER %d×" % POST_BOSS_COST_MULT)
+	_settle_bet(room_index)
 	if room_goal == "chest":
 		# The stagecoach strongbox: a relic for the hardest job around,
 		# unveiled on its own reward screen after the settle.
@@ -4743,17 +4770,17 @@ func _room_cleared() -> void:
 			_pending_relic_reward = relic_id
 			_relic_ambient = false
 		else:
-			chips += 60
-			_win_rows.append(["STRONGBOX (no new relics)", 60])
-	# Ambient chests crack open with the winnings: chips join the
+			trail_cash += 6
+			_win_rows.append(["STRONGBOX (no new relics)", 6])
+	# Ambient chests crack open with the winnings: coins join the
 	# ledger, an ability owes an extra offer round, a relic takes the
 	# strongbox screen.
 	for kind in _chest_rewards:
 		match String(kind):
 			"chips":
 				var region := room_index / REGION_SIZE + 1
-				var loot := 30 + 15 * region
-				chips += loot
+				var loot := roundi((3 + 1.5 * region) * Ascension.pay_mult(ascension))
+				trail_cash += loot
 				_win_rows.append(["THE CHEST — it held coins", loot])
 			"card", "ability":
 				_chest_card_rounds += 1
@@ -4764,8 +4791,8 @@ func _room_cleared() -> void:
 					_pending_relic_reward = rid
 					_relic_ambient = true
 				else:
-					chips += 60
-					_win_rows.append(["THE CHEST — nothing new inside", 60])
+					trail_cash += 6
+					_win_rows.append(["THE CHEST — nothing new inside", 6])
 	_chest_rewards.clear()
 	var cleared := room_index
 	var source := "boss" if current_offer.has("boss") else "table"
@@ -4819,10 +4846,8 @@ func _room_failed(reason := "BUSTED — CURSE ADDED TO DECK") -> void:
 	_after_board_settles(_retry_room)
 
 
-## Back to the same room's table: re-bet or bust.
+## Back to the same room's table: it still blocks the way.
 func _retry_room() -> void:
-	if _short_stacked(_cheapest_seat(room_index)):
-		return
 	pending_retry = current_offer.duplicate(true)
 	pending_is_retry = true
 	_save_run()
@@ -4835,10 +4860,8 @@ func _after_board_settles(then: Callable) -> void:
 	then.call()
 
 
-## Player bailed mid-room (M to menu): the stake is already spent, so it
-## counts as a fail — scar applied, and the room still awaits on resume.
 ## The live table as pure data: board photograph plus every room
-## counter and the stake on the line. {} when it can't be taken
+## counter. {} when it can't be taken
 ## (busy board, or a mid-round blackjack pacing itself).
 func _capture_room_state() -> Dictionary:
 	if main.board.busy:
@@ -4849,7 +4872,6 @@ func _capture_room_state() -> Dictionary:
 	return {
 		"board": snap,
 		"offer": current_offer.duplicate(true),
-		"stake": stake, "stake_odds": stake_odds,
 		"room_score": room_score, "room_hands_left": room_hands_left,
 		"run_score": main.score,
 		"room_time_left": room_time_left, "room_wins": room_wins,
@@ -4874,13 +4896,11 @@ func _capture_room_state() -> Dictionary:
 
 
 ## Sits the rider back down exactly where they stood up: same board,
-## same counters, same stake, no scar.
+## same counters, no scar.
 func _restore_room_state() -> void:
 	var rs := _room_save
 	_room_save = {}
 	current_offer = rs.offer.duplicate(true)
-	stake = int(rs.stake)
-	stake_odds = float(rs.stake_odds)
 	room_score = int(rs.room_score)
 	# The photograph's score wins: a hand in flight at the save is
 	# replayed from the pre-hand board, so it mustn't count twice.
@@ -4987,14 +5007,29 @@ func on_abandon_room() -> void:
 	_swap_first = null
 	main.board.pending_provision = ""
 	if _room_save.is_empty():
-		if current_offer.has("boss"):
-			chips += stake
-		else:
-			chips += stake + int(current_offer.get("min_bet", 0))
-		stake = 0
 		pending_retry = current_offer.duplicate(true)
 		pending_is_retry = false
 	_save_run()
+
+
+## The starting bet comes in when its boss falls: stake plus winnings,
+## straight to the bank, safe whatever happens after.
+func _settle_bet(room: int) -> void:
+	if bet.is_empty() or bool(bet.get("paid", false)) or standard_loadout:
+		return
+	var target := String(bet.get("target", ""))
+	if not BET_ROOMS.has(target) or int(BET_ROOMS[target]) != room:
+		return
+	var stake := int(bet.get("stake", 0))
+	var won := stake + roundi(stake * float(bet.get("odds", 1.0)))
+	bet["paid"] = true
+	bet["won"] = won
+	cash += won
+	main.stat_bump("bets_won")
+	_save_meta()
+	_save_run()
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -4.0, 0.3)
+	_announce_after_settle("YOUR BET CAME IN — $%d BANKED" % won)
 
 
 func _trail_complete() -> void:
@@ -5009,12 +5044,13 @@ func _trail_complete() -> void:
 	main._stats_save()
 	main.board._play_sound(Board.SFX_STING_COMPLETE, 1.0, -5.0)
 	main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0, 0.5)
-	var payout := 0 if standard_loadout else _cashout_value(COMPLETE_RATE_BONUS) \
+	_settle_bet(ROOMS_TOTAL - 1)
+	var payout := 0 if standard_loadout else trail_cash \
 			+ roundi(COMPLETE_PURSE * Ascension.purse_mult(ascension))
 	cash += payout
 	_save_meta()
 	_clear_run_save()
-	var body := "You rode all %d stops and beat the trail.\nWinnings banked: $%d" % [ROOMS_TOTAL, payout]
+	var body := "You rode all %d stops and beat the trail.\nYour trail cash and the purse come home: $%d" % [ROOMS_TOTAL, payout]
 	if standard_loadout:
 		body = "You rode all %d stops on a seeded ride.\nYour score goes on the seed's board. Seeded rides don't bank cash." % ROOMS_TOTAL
 	if opened:
@@ -5034,7 +5070,7 @@ func _show_relic_reward_now() -> void:
 	main.game_started = false
 	main.play_music("tarot")
 	_relic_sub.text = ("The chest you opened along the way held a relic."
-			if _relic_ambient else "The stagecoach job pays in more than chips.")
+			if _relic_ambient else "The stagecoach job pays in more than cash.")
 	var r: Dictionary = RELICS.get(_pending_relic_reward, {})
 	_relic_icon.relic_id = _pending_relic_reward
 	_relic_name.text = String(r.get("name", "")).to_upper()
@@ -5218,7 +5254,7 @@ func _render_win_ledger() -> void:
 		name_l.add_theme_color_override("font_color", main.OFFWHITE)
 		_win_box.add_child(name_l)
 		var val_l := Label.new()
-		val_l.text = "+%d" % int(row[1])
+		val_l.text = "+$%d" % int(row[1])
 		val_l.position = Vector2(310, 66 + i * 34)
 		val_l.size = Vector2(90, 30)
 		val_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -5227,14 +5263,14 @@ func _render_win_ledger() -> void:
 		_win_box.add_child(val_l)
 	UiKit.hrule(_win_box, Vector2(20, 74 + rows * 34), 380)
 	var total_l := Label.new()
-	total_l.text = "WON  +%d" % total
+	total_l.text = "WON  +$%d" % total
 	total_l.position = Vector2(20, 86 + rows * 34)
 	total_l.size = Vector2(280, 34)
 	total_l.add_theme_font_size_override("font_size", 24)
 	total_l.add_theme_color_override("font_color", main.GOLD)
 	_win_box.add_child(total_l)
 	var stack_l := Label.new()
-	stack_l.text = "CHIPS NOW  %d" % chips
+	stack_l.text = "TRAIL CASH NOW  $%d" % trail_cash
 	stack_l.position = Vector2(20, 120 + rows * 34)
 	stack_l.size = Vector2(380, 28)
 	stack_l.add_theme_font_size_override("font_size", 17)
@@ -5287,14 +5323,6 @@ func _burn_price() -> int:
 	return _price(SHOP_REMOVE_PRICE + SHOP_REMOVE_STEP * burns_used)
 
 
-## Chips that must stay in the pocket while shopping: the cheapest
-## seat at the next table. Spending below it is a guaranteed bust.
-func _shop_reserve() -> int:
-	if room_index + 1 >= ROOMS_TOTAL:
-		return 0  # the last shop before the payout — spend it all
-	return _cheapest_seat(room_index + 1)
-
-
 ## A refused purchase gets a LOUD reason: error sting plus the message
 ## in red on both shop info lines (reset on the next re-render).
 func _shop_refuse(msg: String) -> void:
@@ -5305,21 +5333,8 @@ func _shop_refuse(msg: String) -> void:
 	_remove_info.add_theme_color_override("font_color", main.RED)
 
 
-## Blocks any purchase that would leave the player unable to sit down
-## at the next table, and says so.
-func _would_bust(price: int) -> bool:
-	if chips - price >= _shop_reserve():
-		return false
-	_shop_refuse("THAT WOULD BUST YOU — the next table's seat costs %d chips (you'd have %d left)" \
-			% [_shop_reserve(), chips - price])
-	return true
-
-
 func _shop_chips_line() -> String:
-	if _shop_reserve() <= 0:
-		return "CHIPS  %d" % chips
-	return "CHIPS  %d      (keep %d for the next table's seat)" \
-			% [chips, _shop_reserve()]
+	return "TRAIL CASH  $%d" % trail_cash
 
 
 func _show_shop() -> void:
@@ -5366,7 +5381,7 @@ func _show_shop() -> void:
 	_shop_info.text = _shop_chips_line()
 	_shop_info.add_theme_color_override("font_color", main.GOLD)
 	_shop_burn_btn.visible = _shop_merchant.forge
-	_shop_burn_btn.text = "BURN A CARD — %d chips" % _burn_price()
+	_shop_burn_btn.text = "BURN A CARD — $%d" % _burn_price()
 	_shop_burn_btn.tooltip_text = "Destroy one card from your deck. One burn per shop."
 	_shop_burn_btn.disabled = _shop_burned_here
 	if _shop_burned_here:
@@ -5375,6 +5390,7 @@ func _show_shop() -> void:
 	UiKit.fit_button_text(_shop_burn_btn, 20)
 	_render_shop_relics()
 	_render_shop_provisions()
+	_render_shop_sell()
 	for child in _shop_box.get_children():
 		child.queue_free()
 	for i in _shop_stock.size():
@@ -5394,7 +5410,7 @@ func _show_shop() -> void:
 		pc.position = Vector2(85, 95)
 		holder.add_child(pc)
 		var price: int = _price(int(offer.base))
-		var price_tag: Label = main._label(holder, "%d chips" % price,
+		var price_tag: Label = main._label(holder, "$%d" % price,
 				Vector2(0, 212), 18, main.GOLD)
 		price_tag.size = Vector2(170, 30)
 		price_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5406,12 +5422,10 @@ func _show_shop() -> void:
 			if slot.bought:
 				return
 			var c: int = _price(int(slot.base))
-			if chips < c:
-				_shop_refuse("NOT ENOUGH CHIPS — that card costs %d" % c)
+			if trail_cash < c:
+				_shop_refuse("NOT ENOUGH CASH — that card costs $%d" % c)
 				return
-			if _would_bust(c):
-				return
-			chips -= c
+			trail_cash -= c
 			slot.bought = true
 			deck.append(slot.data)
 			main.board._play_sound(Board.SFX_DEALS.pick_random(), 1.0, -8.0)
@@ -5459,7 +5473,7 @@ func _render_shop_abilities() -> void:
 		face.position = Vector2(85, 104)
 		holder.add_child(face)
 		var cost := _price(int(Abilities.PRICES[Abilities.rarity(id)]))
-		var price_tag: Label = main._label(holder, "%d chips" % cost, Vector2(0, 212), 18, main.GOLD)
+		var price_tag: Label = main._label(holder, "$%d" % cost, Vector2(0, 212), 18, main.GOLD)
 		price_tag.size = Vector2(170, 30)
 		price_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if slot.bought:
@@ -5470,12 +5484,10 @@ func _render_shop_abilities() -> void:
 			if pressed_slot.bought:
 				return
 			var c := _price(int(Abilities.PRICES[Abilities.rarity(String(pressed_slot.id))]))
-			if chips < c:
-				_shop_refuse("NOT ENOUGH CHIPS — that ability costs %d" % c)
+			if trail_cash < c:
+				_shop_refuse("NOT ENOUGH CASH — that ability costs $%d" % c)
 				return
-			if _would_bust(c):
-				return
-			chips -= c
+			trail_cash -= c
 			pressed_slot.bought = true
 			_take_ability(String(pressed_slot.id))
 			_save_run()
@@ -5532,7 +5544,7 @@ func _render_shop_relics() -> void:
 		var desc_l := _face_label(btn, relic_desc(String(slot.id)), 46.0, 64.0, 16, main.OFFWHITE)
 		desc_l.position.x = 96
 		desc_l.size.x = 292
-		var price_l := _face_label(btn, "%d chips" % cost, 116.0, 30.0, 18, main.GOLD)
+		var price_l := _face_label(btn, "$%d" % cost, 116.0, 30.0, 18, main.GOLD)
 		price_l.position.x = 96
 		price_l.size.x = 292
 		if slot.bought:
@@ -5546,12 +5558,10 @@ func _render_shop_relics() -> void:
 			if pressed_slot.bought:
 				return
 			var c := _price(RELIC_PRICES[RELICS[pressed_slot.id].rarity])
-			if chips < c:
-				_shop_refuse("NOT ENOUGH CHIPS — that relic costs %d" % c)
+			if trail_cash < c:
+				_shop_refuse("NOT ENOUGH CASH — that relic costs $%d" % c)
 				return
-			if _would_bust(c):
-				return
-			chips -= c
+			trail_cash -= c
 			pressed_slot.bought = true
 			_gain_relic(pressed_slot.id)
 			main.board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.3, -8.0)
@@ -5597,7 +5607,7 @@ func _render_shop_provisions() -> void:
 		var desc_l := _face_label(btn, provision_desc(String(slot.id)), 38.0, 58.0, 12, main.OFFWHITE)
 		desc_l.position.x = 10
 		desc_l.size.x = 142
-		var price_l := _face_label(btn, "%d chips" % cost, 96.0, 24.0, 16, main.GOLD)
+		var price_l := _face_label(btn, "$%d" % cost, 96.0, 24.0, 16, main.GOLD)
 		price_l.position.x = 10
 		price_l.size.x = 190
 		if slot.bought:
@@ -5605,7 +5615,7 @@ func _render_shop_provisions() -> void:
 			price_l.text = "SOLD"
 		elif provisions.size() >= kit_size():
 			btn.disabled = true
-			price_l.text = "%d chips — KIT FULL" % cost
+			price_l.text = "$%d — KIT FULL" % cost
 		var pressed_slot := slot
 		btn.pressed.connect(func() -> void:
 			if pressed_slot.bought:
@@ -5614,17 +5624,73 @@ func _render_shop_provisions() -> void:
 				_shop_refuse("YOUR KIT IS FULL — it holds %d provisions" % kit_size())
 				return
 			var c := _price(int(PROVISIONS[pressed_slot.id].price))
-			if chips < c:
-				_shop_refuse("NOT ENOUGH CHIPS — that costs %d" % c)
+			if trail_cash < c:
+				_shop_refuse("NOT ENOUGH CASH — that costs $%d" % c)
 				return
-			if _would_bust(c):
-				return
-			chips -= c
+			trail_cash -= c
 			pressed_slot.bought = true
 			gain_provision(pressed_slot.id)
 			main.board._play_sound(Board.SFX_COINS.pick_random(), 1.1, -8.0)
 			_save_run()
 			_show_shop())
+
+
+## A [−] $N [+] stepper at row `y`; `step` gets true for up. Returns
+## the amount label.
+func _stepper(parent: Control, y: float, step: Callable) -> Label:
+	var minus: Button = main._button(parent, "◀", Vector2(740, y - 4), Vector2(76, 48))
+	minus.add_theme_font_size_override("font_size", 20)
+	minus.pressed.connect(func() -> void:
+		step.call(false))
+	var amount := main._label(parent, "$0", Vector2(820, y), 24, main.OFFWHITE) as Label
+	amount.size = Vector2(120, 40)
+	amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var plus: Button = main._button(parent, "▶", Vector2(944, y - 4), Vector2(76, 48))
+	plus.add_theme_font_size_override("font_size", 20)
+	plus.pressed.connect(func() -> void:
+		step.call(true))
+	return amount
+
+
+## What a merchant pays for one of your provisions: half its price here.
+func sell_price(id: String) -> int:
+	return maxi(1, _price(int(PROVISIONS[id].price)) / 2)
+
+
+## Your kit along the bottom of the shop, each provision with a SELL button.
+func _render_shop_sell() -> void:
+	for child in _shop_sell_box.get_children():
+		child.queue_free()
+	if provisions.is_empty():
+		return
+	var head := main._label(_shop_sell_box, "YOUR KIT", Vector2(0, 12), 18, main.GOLD) as Label
+	head.size = Vector2(110, 30)
+	for i in provisions.size():
+		var id := String(provisions[i])
+		var btn: Button = main._button(_shop_sell_box,
+				"Sell %s  $%d" % [String(PROVISIONS[id].name), sell_price(id)],
+				Vector2(120 + i * 290, 0), Vector2(280, 54))
+		btn.add_theme_font_size_override("font_size", 16)
+		UiKit.fit_button_text(btn, 16)
+		btn.tooltip_text = provision_desc(id)
+		var slot := i
+		btn.pressed.connect(func() -> void:
+			sell_provision(slot))
+
+
+## Sells a provision from the kit back to the merchant for trail cash.
+func sell_provision(slot: int) -> void:
+	if slot < 0 or slot >= provisions.size():
+		return
+	var id := String(provisions[slot])
+	var pay := sell_price(id)
+	provisions.remove_at(slot)
+	trail_cash += pay
+	main.board._play_sound(Board.SFX_COINS.pick_random(), 0.95, -8.0)
+	main._announce("SOLD THE %s  +$%d" % [String(PROVISIONS[id].name).to_upper(), pay])
+	_save_run()
+	if shop_layer.visible:
+		_show_shop()
 
 
 ## A wrapping label built the safe way: autowrap on BEFORE the size is
@@ -5751,7 +5817,7 @@ func _camp_pick(idx: int) -> void:
 func _show_remove() -> void:
 	shop_layer.visible = false
 	_deck_view_burn = true
-	_remove_info.text = "Pick a card to burn — %d chips (one per shop)" % _burn_price()
+	_remove_info.text = "Pick a card to burn for $%d (one per shop)." % _burn_price()
 	_remove_info.add_theme_color_override("font_color", main.OFFWHITE)
 	_populate_deck_view()
 
@@ -5810,12 +5876,10 @@ func _populate_deck_view() -> void:
 				return
 			if not _deck_view_burn or _shop_burned_here:
 				return
-			if chips < _burn_price():
-				_shop_refuse("NOT ENOUGH CHIPS — the burn costs %d" % _burn_price())
+			if trail_cash < _burn_price():
+				_shop_refuse("NOT ENOUGH CASH — the burn costs $%d" % _burn_price())
 				return
-			if _would_bust(_burn_price()):
-				return
-			chips -= _burn_price()
+			trail_cash -= _burn_price()
 			burns_used += 1
 			_shop_burned_here = true
 			deck.remove_at(idx)
@@ -5837,14 +5901,14 @@ func _deck_stat_text(d: Dictionary) -> String:
 	match String(d.get("mod", "")):
 		"chip":
 			var lv := int(d.get("chip_lv", 0))
-			text += "CHIP\nPays +%d bonus chips when played. It gets better with use: every time it scores, the payout grows by +%d for the rest of the run.%s" % [
+			text += "CASH\nPays $%d in trail cash when played. It gets better with use: every time it scores, it pays $%d more for the rest of the ride.%s" % [
 					main.board.chip_bonus * (1 + lv), main.board.chip_bonus,
 					"" if lv == 0 else "\nScored %d time%s so far." % [lv,
 					"" if lv == 1 else "s"]]
 		"mult":
 			text += "MULT\nMultiplies the whole hand's score ×%.1f. Stacks with other mult cards." % main.board.mult_factor
 		"gold":
-			text += "GOLD\nPays $%d in real cash when played, banked right away." % main.board.gold_pay
+			text += "GOLD\nPays $%d in trail cash when played." % main.board.gold_pay
 		"plus":
 			text += "PLUS\nWhen you clear it, the card its arrow points at goes up one rank. The arrow turns a quarter turn every hand, so time it right. Raising an ACE turns it into THE JOKER: wild for good, and it doubles every hand it scores in."
 		"minus":
@@ -6095,6 +6159,7 @@ func _ending_data(title: String, payout: int, cause: String) -> Dictionary:
 		"best_name": best_hand_name, "best_score": best_hand_score,
 		"outlaws": outlaws_caught, "reached": reached, "total": ROOMS_TOTAL,
 		"cash": cash, "stake": "Ascension %d" % ascension, "seed": run_seed,
+		"trail_cash": trail_cash, "cash_brought": cash_brought, "bet": bet.duplicate(),
 		"seed_line": seed_line(), "seeded": standard_loadout,
 		"relics": relics.duplicate(), "stops": stops,
 		"relic_descs": _relic_descs(),
@@ -6226,7 +6291,43 @@ func build_ui() -> void:
 	_asc_reward = main._label(_asc_box, "", Vector2(600, 604), 17, main.GOLD)
 	_asc_reward.size = Vector2(720, 26)
 	_asc_reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_buyin_saddle_btn = main._button(buyin_layer, "SADDLE UP", Vector2(810, 790), Vector2(300, 66), true)
+	# The wager rows sit under the dial, in its box so they move with it.
+	_wager_box = Control.new()
+	_wager_box.size = Vector2(1920, 1080)
+	_wager_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_asc_box.add_child(_wager_box)
+	var bring_t := main._label(_wager_box, "BRING CASH", Vector2(560, 672), 22, main.GOLD) as Label
+	bring_t.size = Vector2(200, 40)
+	_bring_label = _stepper(_wager_box, 672, func(up: bool) -> void:
+		buyin_bring = maxi(0, _wager_step(buyin_bring, up))
+		_render_wager())
+	var bet_t := main._label(_wager_box, "BET ON", Vector2(560, 730), 22, main.GOLD) as Label
+	bet_t.size = Vector2(200, 40)
+	var targets := [["", "NO BET"], ["jack", "THE JACK"], ["queen", "THE QUEEN"], ["king", "KING COBRA"]]
+	for t in targets.size():
+		var key: String = targets[t][0]
+		var tb: Button = main._button(_wager_box, String(targets[t][1]),
+				Vector2(740 + t * 156, 726), Vector2(150, 48))
+		tb.toggle_mode = true
+		tb.add_theme_font_size_override("font_size", 16)
+		tb.pressed.connect(func() -> void:
+			buyin_target = key
+			if key != "" and buyin_stake <= 0:
+				buyin_stake = 10
+			main.board._play_sound(Board.SFX_FLIP, 1.0, -10.0)
+			_render_wager())
+		_bet_target_btns[key] = tb
+	var stake_t := main._label(_wager_box, "STAKE", Vector2(560, 788), 22, main.GOLD) as Label
+	stake_t.size = Vector2(200, 40)
+	_stake_label = _stepper(_wager_box, 788, func(up: bool) -> void:
+		buyin_stake = maxi(0, _wager_step(buyin_stake, up))
+		_render_wager())
+	_bet_pays_label = main._label(_wager_box, "", Vector2(1040, 792), 18, main.OFFWHITE)
+	_bet_pays_label.size = Vector2(330, 32)
+	_wager_note = main._label(_asc_box, "", Vector2(460, 836), 15, main.DIM)
+	_wager_note.size = Vector2(1000, 22)
+	_wager_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_buyin_saddle_btn = main._button(buyin_layer, "SADDLE UP", Vector2(810, 860), Vector2(300, 66), true)
 	_buyin_saddle_btn.add_theme_font_size_override("font_size", 26)
 	_buyin_saddle_btn.pressed.connect(func() -> void:
 		_start_run(_asc_pick))
@@ -6385,7 +6486,7 @@ func build_ui() -> void:
 		open_abilities(_show_tarot_now))
 
 	bet_layer = _layer()
-	_screen_title(bet_layer, "THE STAKES")
+	_screen_title(bet_layer, "THE TABLE")
 	_bet_chips = CenterContainer.new()
 	_bet_chips.position = Vector2(0, 812)
 	_bet_chips.size = Vector2(main.VIEW.x, 36)
@@ -6396,27 +6497,7 @@ func build_ui() -> void:
 	_bet_twists.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_bet_twists.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_bet_info = _center(bet_layer, "", 240, 26, main.OFFWHITE)
-	# The info block runs four lines (five on a retry) — the bet row
-	# sits well below so nothing ever overlaps it.
-	_bet_amount_label = _center(bet_layer, "", 468, 36, main.OFFWHITE)
-	# Poker presets: MIN sits at the blind, RAISE doubles the bet each
-	# press, ALL IN shoves the whole stack.
-	var bet_min: Button = main._button(bet_layer, "MIN", Vector2(640, 524), Vector2(200, 60))
-	bet_min.add_theme_font_size_override("font_size", 24)
-	bet_min.pressed.connect(func() -> void:
-		_bet_amount = int(current_offer.min_bet)
-		_refresh_bet_labels())
-	var bet_raise: Button = main._button(bet_layer, "RAISE ×2", Vector2(860, 524), Vector2(200, 60))
-	bet_raise.add_theme_font_size_override("font_size", 24)
-	bet_raise.pressed.connect(func() -> void:
-		_bet_amount = mini(_bet_amount * 2, _max_bet())
-		_refresh_bet_labels())
-	var bet_allin: Button = main._button(bet_layer, "ALL IN", Vector2(1080, 524), Vector2(200, 60))
-	bet_allin.add_theme_font_size_override("font_size", 24)
-	bet_allin.pressed.connect(func() -> void:
-		_bet_amount = _max_bet()
-		_refresh_bet_labels())
-	_bet_stake_label = _center(bet_layer, "", 622, 36, main.GOLD)
+	_bet_stake_label = _center(bet_layer, "", 560, 40, main.GOLD)
 	_bet_deal_btn = main._button(bet_layer, "DEAL ME IN", Vector2(760, 720), Vector2(400, 70), true)
 	_bet_deal_btn.add_theme_font_size_override("font_size", 28)
 	_bet_deal_btn.pressed.connect(_confirm_bet)
@@ -6462,6 +6543,9 @@ func build_ui() -> void:
 	_shop_prov_box = Control.new()
 	_shop_prov_box.position = Vector2(30, 250)
 	shop_layer.add_child(_shop_prov_box)
+	_shop_sell_box = Control.new()
+	_shop_sell_box.position = Vector2(300, 970)
+	shop_layer.add_child(_shop_sell_box)
 	# Hover tooltip for the shelves, floated beside the hovered card.
 	_shop_tip = _make_stat_tip(shop_layer)
 	_shop_tip_label = _shop_tip.get_child(0) as Label
@@ -6480,7 +6564,7 @@ func build_ui() -> void:
 
 	relic_layer = _layer()
 	_screen_title(relic_layer, "THE STRONGBOX")
-	_relic_sub = _center(relic_layer, "The stagecoach job pays in more than chips.", 210, 22, main.DIM)
+	_relic_sub = _center(relic_layer, "The stagecoach job pays in more than cash.", 210, 22, main.DIM)
 	# The hero strongbox — open, padlock off the hasp, glow baked in —
 	# with the leather plate as the no-art fallback.
 	var strongbox: Texture2D = null

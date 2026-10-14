@@ -63,6 +63,7 @@ func _run() -> void:
 			"rider": "the_doctor", "score": 41300, "best_name": "Full House",
 			"best_score": 840, "outlaws": 7, "reached": reached, "total": TrailMode.ROOMS_TOTAL,
 			"cash": 88, "stake": "Penny Ante", "relics": ["horseshoe", "rabbits_foot"],
+			"trail_cash": 41, "bet": {"target": "queen", "stake": 20, "paid": complete, "won": 80},
 			"stops": stops, "bosses": TrailMode.BOSS_ROOMS, "region_size": TrailMode.REGION_SIZE,
 			"camp_slot": 5})
 		failures += _check(shown, "%s: the painted page builds" % kind)

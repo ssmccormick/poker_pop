@@ -19,9 +19,10 @@ func _initialize() -> void:
 
 	# Ascension 0: the plain trail, nothing added.
 	_check(is_equal_approx(Ascension.target_mult(0), 1.0)
-			and is_equal_approx(Ascension.blind_mult(0), 1.0)
+			and is_equal_approx(Ascension.pay_mult(0), 1.0)
+			and is_equal_approx(Ascension.shop_mult(0), 1.0)
 			and Ascension.hazard_bonus(0) == 0.0 and Ascension.hands_minus(0) == 0
-			and Ascension.start_chips(0) == 180 and Ascension.max_hp(0) == 10
+			and Ascension.max_hp(0) == 10
 			and Ascension.lost_table_hp(0) == 1 and Ascension.camp_rest(0) == 5
 			and Ascension.bomb_hp(0) == 2 and Ascension.cursed_start(0) == 0
 			and is_equal_approx(Ascension.boss_mult(0), 1.0)
@@ -38,12 +39,11 @@ func _initialize() -> void:
 	for a in range(0, Ascension.MAX):
 		var b := a + 1
 		if Ascension.target_mult(b) < Ascension.target_mult(a) \
-				or Ascension.blind_mult(b) < Ascension.blind_mult(a) \
+				or Ascension.pay_mult(b) > Ascension.pay_mult(a) \
 				or Ascension.hazard_bonus(b) < Ascension.hazard_bonus(a) \
 				or Ascension.refill_mult(b) < Ascension.refill_mult(a) \
 				or Ascension.boss_mult(b) < Ascension.boss_mult(a) \
 				or Ascension.hands_minus(b) < Ascension.hands_minus(a) \
-				or Ascension.start_chips(b) > Ascension.start_chips(a) \
 				or Ascension.max_hp(b) > Ascension.max_hp(a) \
 				or Ascension.camp_rest(b) > Ascension.camp_rest(a) \
 				or Ascension.lost_table_hp(b) < Ascension.lost_table_hp(a) \
@@ -54,7 +54,7 @@ func _initialize() -> void:
 				or Ascension.outlaw_hp_plus(b) < Ascension.outlaw_hp_plus(a):
 			harder = false
 		if Ascension.exp_mult(b) <= Ascension.exp_mult(a) \
-				or Ascension.rate_bonus(b) <= Ascension.rate_bonus(a) \
+				or Ascension.bet_mult(b) <= Ascension.bet_mult(a) \
 				or Ascension.purse_mult(b) <= Ascension.purse_mult(a):
 			richer = false
 	_check(harder, "every rule only gets harder going up")
@@ -68,8 +68,13 @@ func _initialize() -> void:
 			"the Long Snake grows two segments at 20")
 	_check(is_equal_approx(Ascension.target_mult(20), 1.35), "targets +35% by the top")
 	_check(is_equal_approx(Ascension.exp_mult(20), 2.0)
-			and is_equal_approx(1.0 + Ascension.rate_bonus(20), 2.5),
-			"Ascension 20 pays double EXP and a 2.5× cash-out")
+			and is_equal_approx(Ascension.bet_mult(20), 2.0),
+			"Ascension 20 pays double EXP and doubles the bet odds")
+	_check(is_equal_approx(Ascension.pay_mult(2), 1.0) and is_equal_approx(Ascension.pay_mult(3), 0.8),
+			"Lean Pickings: tables pay 20% less from 3")
+	_check(is_equal_approx(Ascension.shop_mult(3), 1.0) and is_equal_approx(Ascension.shop_mult(4), 1.15)
+			and is_equal_approx(Ascension.shop_mult(8), 1.15 * 1.2),
+			"Dear Supplies: merchants charge 15% more from 4, and Price Gouging stacks on top")
 	var active := Ascension.active(3)
 	_check(active.size() == 3 and int(active[0][0]) == 1 and int(active[2][0]) == 3,
 			"Ascension 3 is the first three rules")

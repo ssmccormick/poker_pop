@@ -17,7 +17,7 @@ func _init() -> void:
 	b.selected.assign([cards[0]])
 	var res := {"score": 100}
 	b._apply_card_mods(res)
-	failures += _check(res.score == 100 and not res.has("bonus_chips"),
+	failures += _check(res.score == 100 and not res.has("cash_earned"),
 			"plain selection untouched")
 
 	# One mult: x1.5.
@@ -32,21 +32,27 @@ func _init() -> void:
 	b._apply_card_mods(res)
 	failures += _check(res.score == 225, "two mult cards stack to x2.25")
 
-	# Chip cards pay bonus chips without touching the score.
+	# Cash cards pay trail cash without touching the score.
 	b.selected.assign([cards[3], cards[4]])
 	res = {"score": 60}
 	b._apply_card_mods(res)
-	failures += _check(res.score == 60 and res.bonus_chips == Board.CHIP_BONUS * 2,
-			"two chip cards pay double bonus, score unchanged")
+	failures += _check(res.score == 60 and res.cash_earned == Board.CHIP_BONUS * 2,
+			"two Cash cards pay $1 each, score unchanged")
 
 	# Mixed hand: both effects apply.
 	b.selected.assign([cards[1], cards[3]])
 	res = {"score": 100}
 	b._apply_card_mods(res)
-	failures += _check(res.score == 150 and res.bonus_chips == Board.CHIP_BONUS,
-			"mult and chip in one hand both apply")
+	failures += _check(res.score == 150 and res.cash_earned == Board.CHIP_BONUS,
+			"mult and Cash in one hand both apply")
+	cards[3].chip_level = 2
+	b.selected.assign([cards[3]])
+	res = {"score": 60}
+	b._apply_card_mods(res)
+	failures += _check(res.cash_earned == 3, "a Cash card that has scored twice pays $3")
+	cards[3].chip_level = 0
 
-	# Gold cards bank real dollars: $1 apiece.
+	# Gold cards pay trail cash: $3 apiece.
 	var cash1 := PlayingCard.new()
 	cash1.mod = "gold"
 	var cash2 := PlayingCard.new()
@@ -54,8 +60,8 @@ func _init() -> void:
 	b.selected.assign([cash1, cash2])
 	res = {"score": 40}
 	b._apply_card_mods(res)
-	failures += _check(res.score == 40 and res.cash_earned == 2,
-			"two gold cards earn $2, score unchanged")
+	failures += _check(res.score == 40 and res.cash_earned == 6,
+			"two gold cards earn $6, score unchanged")
 
 	# HOLO: a flat +50 before the multipliers, which then multiply it.
 	var holo := PlayingCard.new()
@@ -262,8 +268,8 @@ func _init() -> void:
 	ab.ability_loadout = {"Two Pair": ["dead_mans_hand", "side_bet"]}
 	res = {"name": "Two Pair", "score": 100}
 	ab._apply_card_mods(res)
-	failures += _check(res.score == 400 and res.bonus_chips == 16,
-			"Dead Man's Hand gives ×4 on Aces and Eights, and Side Bet pays 4 chips a card")
+	failures += _check(res.score == 400 and res.cash_earned == 1,
+			"Dead Man's Hand gives ×4 on Aces and Eights, and Side Bet pays $1")
 	plain_cards[3].rank = 9
 	plain_cards[2].rank = 9
 	res = {"name": "Two Pair", "score": 100}
