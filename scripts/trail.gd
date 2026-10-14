@@ -134,7 +134,7 @@ const SHOP_DUP_PRICE := 50        # exact duplicate of a card you own
 const SHOP_MOD_PRICE := 80        # chip/mult enhanced card
 const SHOP_REMOVE_PRICE := 30     # first burn; climbs every use
 const SHOP_REMOVE_STEP := 25      # + per burn used this run
-const PICK_MOD_CHANCE := 0.25     # card picks: chance of an enhanced offer
+const CHEST_MOD_CHANCE := 0.25    # chest cards: chance of an enhanced one
 const SHOP_MOD_CHANCE := 0.35     # shop slots: chance of an enhanced card
 const FATE_KICKER := 15           # chips for trusting The Fool
 const COMPLETE_RATE_BONUS := 1.5  # completion multiplies cash-out rate
@@ -146,10 +146,11 @@ const COMPLETE_PURSE := 100       # cash on finishing, x Ascension.purse_mult
 # The Outfitter's shelves: GEAR holds the upgrade ladders, the rest list
 # the catalog by kind.
 const OUTFITTER_TABS := [["gear", "GEAR"], ["riders", "RIDERS"], ["relics", "RELICS"],
-		["provisions", "PROVISIONS"], ["cards", "CARDS"], ["merchants", "MERCHANTS"]]
+		["provisions", "PROVISIONS"], ["cards", "CARDS"], ["abilities", "ABILITIES"],
+		["merchants", "MERCHANTS"]]
 const TAB_KINDS := {"riders": ["rider", "trick"], "relics": ["relic"],
 		"provisions": ["provision"], "cards": ["mod", "finish"],
-		"merchants": ["merchant"]}
+		"abilities": ["ability"], "merchants": ["merchant"]}
 # [ladder id, title, blurb, owner kind, owner id]
 const LADDERS := [
 	["sleeve", "ACE UP THE SLEEVE — THE GAMBLER",
@@ -212,14 +213,14 @@ const RELIC_PRICES := [150, 300, 600, 1000]  # by rarity C/R/EPIC/L — carry is
 # per room, with their own stock — some deal only in relics.
 const MERCHANTS := [
 	{"id": "peddler", "name": "THE PEDDLER'S WAGON",
-		"line": "A little of everything, friend. Cards, trinkets, and a hot forge.",
-		"cards": 8, "relics": 2, "provisions": 2, "forge": true},
+		"line": "A little of everything, friend. Cards, trinkets, a hot forge, and a trick or two.",
+		"cards": 5, "relics": 2, "provisions": 2, "abilities": 2, "forge": true},
 	{"id": "collector", "name": "THE COLLECTOR",
-		"line": "I don't deal in cards. Just trinkets with real power in them.",
-		"cards": 0, "relics": 4, "provisions": 2, "forge": false},
+		"line": "I don't deal in playing cards. Just trinkets and tricks with real power in them.",
+		"cards": 0, "relics": 4, "provisions": 2, "abilities": 3, "forge": false},
 	{"id": "sharp", "name": "THE CARD SHARP",
 		"line": "Finest cards on the trail, and a forge to burn the ones you regret.",
-		"cards": 10, "relics": 0, "provisions": 1, "forge": true},
+		"cards": 10, "relics": 0, "provisions": 1, "abilities": 0, "forge": true},
 ]
 
 # Provisions: one-shot consumables in a 3-slot kit. "target" ones are
@@ -248,7 +249,7 @@ const PROVISIONS := {
 const MAX_PROVISIONS := 3
 const RELICS := {
 	"horseshoe": {"name": "Horseshoe", "rarity": 0, "desc": "+1 hand at every table"},
-	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Card picks give you 4 choices"},
+	"card_sleeve": {"name": "Card Sleeve", "rarity": 0, "desc": "Ability offers give you 4 to choose from"},
 	"snake_oil": {"name": "Snake Oil", "rarity": 0, "desc": "Shop prices are 25% lower"},
 	"tin_star": {"name": "Tin Star", "rarity": 0, "desc": "Every table you clear pays one extra blind"},
 	"rabbits_foot": {"name": "Rabbit's Foot", "rarity": 0, "desc": "Surprise safes and chests turn up twice as often on plain tables"},
@@ -341,6 +342,16 @@ var room_outlaw_idx := 0
 const OUTLAW_BAR_BASE := 75      # score under this and he fires (+ per region)
 var relics: Array = []   # relic ids held this run
 var provisions: Array = []       # provision ids in the kit (max 3, dupes fine)
+# ABILITY CARDS, won this ride: one id per copy (duplicates allowed).
+# The loadout puts them on poker hands: hand name -> [indices into
+# abilities]. A copy sits on one hand at most, and a hand never holds two
+# of the same ability. It only changes between tables.
+var abilities: Array = []
+var loadout: Dictionary = {}
+var pending_reward: Dictionary = {}   # an ability offer not yet settled (resumable)
+var room_ability_counts: Dictionary = {}  # per-table counters (Borrowed Time)
+var rng_ability := RandomNumberGenerator.new()  # in-table ability rolls
+var _time_granted := 0.0         # seconds handed back at this table (watch rewinds it)
 var _aiming_slot := -1           # kit slot waiting on a target, -1 = none
 # ACE UP THE SLEEVE: the hidden card you can trade onto the table once
 # per room — the card you take waits up the sleeve for another table.
@@ -460,7 +471,7 @@ var _pick_sub: Label
 var _relic_sub: Label
 var _chest_rewards: Array = []   # ambient chests opened this room: "chips"/"card"/"relic"
 var _chest_won_cards: Array = [] # deck cards won from chests, shown on the victory screen
-var _chest_card_rounds := 0      # extra 3-card pick rounds owed by chests
+var _chest_card_rounds := 0      # extra ability offer rounds owed by chests
 var _in_chest_pick := false      # the pick screen is showing a chest round
 var _relic_ambient := false      # the strongbox screen shows chest loot, not the stagecoach job
 var _tarot_info: Label
@@ -471,6 +482,10 @@ var _bet_amount := 0
 var _bet_amount_label: Label
 var _bet_deal_btn: Button
 var _deck_view_burn := true   # deck viewer doubles as the shop's burn picker
+var abilities_screen: AbilitiesScreen
+var _shop_stock_abilities: Array = []   # [{id, bought}] on the merchant's shelf
+var _shop_saved := {}    # what a saved ride already bought at this stop's merchant
+var _tarot_ab_btn: Button
 var stake_odds := 1.0    # effective odds locked in when the bet is placed
 var _pick_box: Control
 var _pick_tip: PanelContainer
@@ -626,6 +641,20 @@ func _save_run() -> void:
 	for id in provisions:
 		prov_arr.append(id)
 	cf.set_value("run", "provisions", prov_arr)
+	cf.set_value("run", "abilities", PackedStringArray(abilities))
+	cf.set_value("run", "loadout", loadout)
+	cf.set_value("run", "pending_reward", pending_reward)
+	cf.set_value("run", "ability_ver", 1)
+	if _shop_stock_room == room_index and shop_layer != null:
+		var sold := {"room": room_index, "burned": _shop_burned_here}
+		for pair in [["cards", _shop_stock], ["relics", _shop_stock_relics],
+				["provisions", _shop_stock_provisions], ["abilities", _shop_stock_abilities]]:
+			var idx: Array = []
+			for i in (pair[1] as Array).size():
+				if bool(pair[1][i].get("bought", false)):
+					idx.append(i)
+			sold[pair[0]] = idx
+		cf.set_value("run", "shop_sold", sold)
 	cf.set_value("run", "sleeve", sleeve_card)
 	cf.set_value("run", "character", character)
 	cf.set_value("run", "gambler_ability", gambler_ability)
@@ -737,6 +766,24 @@ func _load_run() -> bool:
 	for id in cf.get_value("run", "provisions", PackedStringArray()):
 		if PROVISIONS.has(String(id)):
 			provisions.append(String(id))
+	abilities.clear()
+	var ab_map := {}   # saved index -> kept index, so retired ids drop cleanly
+	var saved_ab: PackedStringArray = cf.get_value("run", "abilities", PackedStringArray())
+	for i in saved_ab.size():
+		if Abilities.has(String(saved_ab[i])):
+			ab_map[i] = abilities.size()
+			abilities.append(String(saved_ab[i]))
+	loadout = {}
+	var saved_lo: Dictionary = cf.get_value("run", "loadout", {})
+	for hand in saved_lo:
+		var kept: Array = []
+		for i in saved_lo[hand]:
+			if ab_map.has(int(i)):
+				kept.append(int(ab_map[int(i)]))
+		loadout[String(hand)] = kept
+	_validate_loadout()
+	pending_reward = cf.get_value("run", "pending_reward", {})
+	_shop_saved = cf.get_value("run", "shop_sold", {})
 	sleeve_card = cf.get_value("run", "sleeve", {})
 	if sleeve_card.is_empty():
 		sleeve_card = _fresh_sleeve()  # runs saved before the sleeve existed
@@ -830,6 +877,113 @@ func provision_desc(id: String) -> String:
 
 ## Pushes relic- and POWER-driven settings into the board/card layer.
 ## Call at run start, on load, and whenever a relic is gained.
+# --- Ability cards: the collection and the loadout ------------------------
+
+## The ability ids on a hand, in the order they were equipped.
+func equipped_on(hand: String) -> Array:
+	var out: Array = []
+	for i in loadout.get(hand, []):
+		if int(i) >= 0 and int(i) < abilities.size():
+			out.append(String(abilities[int(i)]))
+	return out
+
+
+func used_slots(hand: String) -> int:
+	var n := 0
+	for id in equipped_on(hand):
+		n += Abilities.slots(id)
+	return n
+
+
+## The hand a copy is equipped to ("" when it's loose).
+func hand_of(idx: int) -> String:
+	for hand in loadout:
+		if (loadout[hand] as Array).has(idx):
+			return String(hand)
+	return ""
+
+
+## Why this copy can't go on this hand right now ("" when it can).
+func can_equip(idx: int, hand: String) -> String:
+	if idx < 0 or idx >= abilities.size():
+		return "That ability isn't in your collection."
+	var id := String(abilities[idx])
+	var reason := Abilities.misfit_reason(id, hand)
+	if reason != "":
+		return reason
+	if hand_of(idx) == hand:
+		return ""
+	if equipped_on(hand).has(id):
+		return "This hand already has %s." % Abilities.ability_name(id)
+	if used_slots(hand) + Abilities.slots(id) > int(Abilities.HAND_SLOTS[hand]):
+		return "There isn't room. Take something off the %s first." % hand
+	return ""
+
+
+func equip(idx: int, hand: String) -> bool:
+	if can_equip(idx, hand) != "":
+		return false
+	unequip(idx)
+	var on: Array = loadout.get(hand, [])
+	on.append(idx)
+	loadout[hand] = on
+	_push_loadout()
+	return true
+
+
+func unequip(idx: int) -> void:
+	for hand in loadout.keys():
+		var on: Array = loadout[hand]
+		on.erase(idx)
+		if on.is_empty():
+			loadout.erase(hand)
+	_push_loadout()
+
+
+## Drops anything a save or a change left impossible: bad indices,
+## retired ids, over-full hands, broken restrictions, double copies.
+func _validate_loadout() -> void:
+	var fixed := {}
+	var seen := {}
+	for hand in loadout:
+		if not Abilities.HAND_SLOTS.has(String(hand)):
+			continue
+		var used := 0
+		var keep: Array = []
+		var ids_here: Array = []
+		for i in loadout[hand]:
+			var idx := int(i)
+			if idx < 0 or idx >= abilities.size() or seen.has(idx):
+				continue
+			var id := String(abilities[idx])
+			if not Abilities.fits(id, String(hand)) or ids_here.has(id) \
+					or used + Abilities.slots(id) > int(Abilities.HAND_SLOTS[hand]):
+				continue
+			used += Abilities.slots(id)
+			keep.append(idx)
+			ids_here.append(id)
+			seen[idx] = true
+		if not keep.is_empty():
+			fixed[String(hand)] = keep
+	loadout = fixed
+
+
+## The board sees the loadout as hand -> [ids] for its scoring abilities.
+func _push_loadout() -> void:
+	var out := {}
+	for hand in loadout:
+		out[hand] = equipped_on(String(hand))
+	main.board.ability_loadout = out
+
+
+## Every ability equipped anywhere (passives act from any hand).
+func all_equipped() -> Array:
+	var out: Array = []
+	for hand in loadout:
+		out.append_array(equipped_on(String(hand)))
+	return out
+
+
 func _apply_relic_effects() -> void:
 	var chip := float(mv("chip", "chips")) \
 			* (float(rv("gold_tooth", "x")) if has_relic("gold_tooth") else 1.0)
@@ -1111,6 +1265,14 @@ func use_watch() -> void:
 	outlaws_caught = int(_watch_snapshot.get("outlaws_caught", outlaws_caught))
 	best_hand_score = int(_watch_snapshot.get("best_hand_score", best_hand_score))
 	best_hand_name = String(_watch_snapshot.get("best_hand_name", best_hand_name))
+	if _watch_snapshot.has("rng_ability"):
+		rng_ability.state = int(_watch_snapshot.rng_ability)
+	room_ability_counts = (_watch_snapshot.get("ability_counts", {}) as Dictionary).duplicate()
+	# Seconds that hand gave back go back too (the clock itself keeps running).
+	var given: float = _time_granted - float(_watch_snapshot.get("time_granted", _time_granted))
+	if given > 0.0:
+		room_time_left = maxf(1.0, room_time_left - given)
+	_time_granted = float(_watch_snapshot.get("time_granted", _time_granted))
 	_watch_snapshot = {}
 	watch_uses_left -= 1
 	main.stat_bump("hands_unwound")
@@ -1142,6 +1304,9 @@ func _on_hand_committing() -> void:
 		"chips": chips, "cash": cash,
 		"outlaws_caught": outlaws_caught,
 		"best_hand_score": best_hand_score, "best_hand_name": best_hand_name,
+		"rng_ability": rng_ability.state,
+		"ability_counts": room_ability_counts.duplicate(),
+		"time_granted": _time_granted,
 	}
 
 
@@ -1608,7 +1773,7 @@ func _roll_finish() -> String:
 	return progress.pick("finish", w, [], _rng)
 
 
-func _random_card_offer(mod_chance := PICK_MOD_CHANCE) -> Dictionary:
+func _random_card_offer(mod_chance := CHEST_MOD_CHANCE) -> Dictionary:
 	var mod := ""
 	var finish := ""
 	if _rng.randf() < mod_chance:
@@ -1697,7 +1862,7 @@ func _unlock_rule(r: Dictionary) -> String:
 	var after := String(r.get("after_win", ""))
 	if after != "":
 		return "COMPLETE THE TRAIL AS %s" % String(CHARACTERS[after].name).to_upper()
-	return "UNLOCKS AT LEVEL %d" % int(r.level)
+	return "UNLOCKS AT LEVEL %d" % int(r.get("gate", r.level))
 
 
 ## The Gambler's two-way selector: the kit's oxblood "selected" face
@@ -2052,7 +2217,7 @@ func _catalog_row(r: Dictionary) -> Control:
 		row.modulate = Color(1, 1, 1, 0.5)
 		_row_status(row, _unlock_rule(r))
 		return row
-	if int(r.level) > progress.seen_level and r.get("after_win", "") == "":
+	if int(r.get("gate", r.level)) > progress.seen_level and r.get("after_win", "") == "":
 		var pip: Label = main._label(row, "NEW", Vector2(966, 8), 15, main.GOLD)
 		pip.size = Vector2(60, 20)
 		pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -2193,6 +2358,12 @@ func _row_icon(row: Control, kind: String, id: String) -> void:
 			row.add_child(icon)
 		"provision":
 			_row_texture(row, CardArt.provision_icon(id))
+		"ability":
+			var face := AbilityCard.new()
+			face.ability_id = id
+			face.position = Vector2(56, 48)
+			face.scale = Vector2(0.42, 0.42)
+			row.add_child(face)
 		"mod", "finish":
 			var pc := PlayingCard.new()
 			pc.material = Themes.current_material()
@@ -2233,6 +2404,12 @@ func _catalog_desc(kind: String, id: String) -> String:
 			if fd != "":
 				return fd
 			return String(PlayingCard.FINISHES[id].desc) if PlayingCard.FINISHES.has(id) else ""
+		"ability":
+			var ad := Abilities.def(id)
+			var limit := Abilities.restriction_line(id)
+			return "%s (%d slot%s%s)" % [String(ad.get("desc", "")), Abilities.slots(id),
+					"" if Abilities.slots(id) == 1 else "s",
+					(", " + limit.to_lower()) if limit != "" else ""]
 		"rider":
 			return "%s — %s" % [String(CHARACTERS[id].ability), String(CHARACTERS[id].line)]
 		"trick":
@@ -2302,6 +2479,9 @@ func _start_run(asc: int) -> void:
 	chips += 20 * ride_lv("bankroll")
 	relics.clear()
 	provisions.clear()
+	abilities.clear()
+	loadout = {}
+	pending_reward = {}
 	for i in (ride_lv("provisions") if _avail("gear", "provisions") else 0):
 		provisions.append(_random_provision())
 	_aiming_slot = -1
@@ -2341,6 +2521,19 @@ func _resume_run() -> void:
 			_hide_all()
 			_restore_room_state()
 			return
+		if not pending_reward.is_empty():
+			# Stood up on the reward screen: the same offer is waiting.
+			main.menu_open = false
+			main.menu_layer.visible = false
+			_hide_all()
+			_win_rows = (pending_reward.get("ledger", []) as Array).duplicate(true)
+			_pending_relic_reward = String(pending_reward.get("relic", ""))
+			_relic_ambient = bool(pending_reward.get("relic_ambient", false))
+			if _pending_relic_reward != "":
+				_show_relic_reward()
+			else:
+				_show_pick()
+			return
 		if not pending_retry.is_empty():
 			# A failed room still bars the way — back to its table.
 			if _short_stacked(_cheapest_seat(room_index)):
@@ -2371,6 +2564,10 @@ func _show_tarot_now() -> void:
 	main.game_started = false
 	main.board.locked = true
 	main.play_music("tarot")
+	if _tarot_ab_btn != null:
+		_tarot_ab_btn.disabled = abilities.is_empty()
+		_tarot_ab_btn.tooltip_text = "You'll earn ability cards by clearing tables." \
+				if abilities.is_empty() else "Put your ability cards on your poker hands."
 	# Bankruptcy check against the coming table's cheapest seat.
 	if _short_stacked(_cheapest_seat(next_table(room_index))):
 		return
@@ -3235,6 +3432,10 @@ func _start_room() -> void:
 	rng_room = SeedRng.stream(run_seed, "room", room_index, room_attempt)
 	_rng = rng_room
 	main.board.rng = SeedRng.stream(run_seed, "board", room_index, room_attempt)
+	rng_ability = SeedRng.stream(run_seed, "ability", room_index, room_attempt)
+	room_ability_counts = {}
+	_time_granted = 0.0
+	_push_loadout()
 	main.stat_max("deepest_table", room_index + 1)
 	sleeve_used = false  # one signature use per table, fresh each sit-down
 	_aiming_sleeve = false
@@ -3251,6 +3452,7 @@ func _start_room() -> void:
 	_apply_ascension_to_board()
 	_chest_rewards.clear()  # unopened luck doesn't carry between tables
 	_chest_won_cards.clear()
+	_chest_card_rounds = 0
 	main.tutor_show("hp")
 	# The Chuck Wagon rolls in with supplies at every table.
 	if has_relic("chuck_wagon") and provisions.size() < kit_size():
@@ -3314,6 +3516,12 @@ func _start_room() -> void:
 				current_offer.get("minutes", 3))) - Ascension.clock_minus_secs(ascension)) \
 				+ (float(rv("horseshoe", "secs")) if has_relic("horseshoe") else 0.0)
 		room_hands_left = 999
+	var horn := int(_ability_passive("extra_hands", 0.0))
+	if horn > 0 and room_goal != "blackjack":
+		if room_on_clock():
+			room_time_left += SADDLE_HORN_SECS * horn
+		else:
+			room_hands_left += horn
 	main.mode_kind = "trail"
 	main.mode_label_text = "Trail · A%d · %s · Seed %s" % [ascension,
 			character_name().trim_prefix("The "), SeedRng.pretty(run_seed)]
@@ -3330,6 +3538,10 @@ func _start_room() -> void:
 		main.parallax.set_scene(looks[clampi(room_index / REGION_SIZE, 0, 2)])
 	main.board.visible = true
 	main.board.reset(room_goal == "blackjack")
+	var first := _ability_passive("first_mult", 1.0)
+	if first > 1.0:
+		# Fastest Gun: the opening hand at every table counts extra.
+		main.board.next_hand_mult = maxf(main.board.next_hand_mult, first)
 	main._begin_countdown()
 	_seed_room_specials()
 
@@ -3410,7 +3622,7 @@ func _seed_room_specials() -> void:
 	# And the deck itself turns mean: every refilled card has a chance
 	# to arrive hazarded, climbing the deeper you ride.
 	if room_goal != "purge":
-		main.board.refill_hazard_chance = _refill_chance()
+		main.board.refill_hazard_chance = _refill_chance() * _ability_passive("refill_hazard_mult", 1.0)
 	# Relic adjustments to freshly-seeded hazards (purge seeds included).
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
@@ -3511,11 +3723,14 @@ func on_hand_played(result: Dictionary) -> void:
 		if room_on_clock():
 			var secs := negs * int(progress.val("finish", "negative", "secs", 10))
 			room_time_left += secs
+			_time_granted += secs
 			_announce_after_settle("NEGATIVE  +%d SECONDS" % secs)
 		else:
 			room_hands_left += negs
 			_announce_after_settle("NEGATIVE — HAND BACK" if negs == 1
 					else "NEGATIVE — %d HANDS BACK" % negs)
+	if in_room:
+		_fire_play_abilities(result)
 	room_score += result.score
 	if int(result.score) > best_hand_score:
 		best_hand_score = int(result.score)
@@ -3679,6 +3894,123 @@ func on_hand_played(result: Dictionary) -> void:
 	_consume_hand()
 
 
+const SADDLE_HORN_SECS := 15
+
+
+## A passive ability's strength across the whole loadout: extra hands
+## add up; multipliers take the strongest one (1.0 or 0.0 when none).
+func _ability_passive(key: String, none: float) -> float:
+	var out := none
+	for id in all_equipped():
+		var fx: Dictionary = Abilities.def(id).get("fx", {})
+		if not fx.has(key):
+			continue
+		match key:
+			"extra_hands":
+				out += float(fx[key])
+			"refill_hazard_mult":
+				out = minf(out, float(fx[key]))
+			_:
+				out = maxf(out, float(fx[key]))
+	return out
+
+
+## The abilities on the hand just played act on the table. They fire
+## before the hand is charged and before any goal check, so a refund
+## covers this very hand and cleared hazards count toward a purge.
+## Random picks use the table's own ability stream.
+func _fire_play_abilities(result: Dictionary) -> void:
+	var hand := String(result.get("name", ""))
+	if not Abilities.HAND_SLOTS.has(hand):
+		return  # blackjack rounds and the like carry no abilities
+	var fired: Array = []
+	var refunded := false
+	var popping: Array = result.get("cleared_cells", [])
+	for id in equipped_on(hand):
+		var fx: Dictionary = Abilities.def(id).get("fx", {})
+		var hit := false
+		if fx.has("enhance"):
+			hit = main.board.enhance_next_draw(String(fx.enhance))
+		if fx.has("clear") or fx.has("douse"):
+			var fire_only := fx.has("douse")
+			var n := int(fx.get("douse", fx.get("clear", 0)))
+			var targets: Array = []
+			for p in main.board.grid:
+				var c: PlayingCard = main.board.grid[p]
+				if popping.has(p) or c.hazard == "" or c.hazard == "stone":
+					continue
+				if fire_only and c.hazard != "fire":
+					continue
+				targets.append(c)
+			targets.sort_custom(func(a: PlayingCard, b: PlayingCard) -> bool:
+				return a.grid_pos.y * 10 + a.grid_pos.x < b.grid_pos.y * 10 + b.grid_pos.x)
+			SeedRng.shuffle(rng_ability, targets)
+			for i in mini(n, targets.size()):
+				main.board.provision_clean(targets[i])
+				main.board._fx(targets[i].position, "smoke")
+				hit = true
+		if fx.has("fuse"):
+			for p in main.board.grid:
+				var c: PlayingCard = main.board.grid[p]
+				if c.hazard == "bomb" and not popping.has(p):
+					c.fuse += int(fx.fuse)
+					hit = true
+		if fx.has("time") and room_on_clock():
+			room_time_left += float(fx.time)
+			_time_granted += float(fx.time)
+			hit = true
+		elif fx.has("hand_every") and not room_on_clock():
+			var count := int(room_ability_counts.get(id, 0)) + 1
+			room_ability_counts[id] = count
+			if count % int(fx.hand_every) == 0 and not refunded:
+				room_hands_left += 1
+				refunded = true
+				hit = true
+		if fx.has("free") and not refunded:
+			if room_on_clock():
+				room_time_left += float(fx.free)
+				_time_granted += float(fx.free)
+			else:
+				room_hands_left += 1
+			refunded = true
+			hit = true
+		if fx.has("next_mult"):
+			main.board.next_hand_mult = maxf(main.board.next_hand_mult, float(fx.next_mult))
+			hit = true
+		if fx.has("extra_hit") and room_goal == "outlaw" and int(result.get("bullets_you", 0)) > 0:
+			result["bullets_you"] = int(result.bullets_you) + int(fx.extra_hit)
+			hit = true
+		if fx.has("brand"):
+			hit = _brand_from_hand(result, String(fx.brand))
+		if hit:
+			fired.append(Abilities.ability_name(id))
+	for n in result.get("abilities", []):
+		if not fired.has(n):
+			fired.append(n)
+	if not fired.is_empty():
+		main.stat_bump("abilities_fired", fired.size())
+		_announce_after_settle(", ".join(PackedStringArray(fired)).to_upper())
+
+
+## Branded for Life: one plain card from the hand becomes an enhanced
+## card in the deck for the rest of the ride.
+func _brand_from_hand(result: Dictionary, mod: String) -> bool:
+	var plain: Array = []
+	for cc in result.get("cleared_cards", []):
+		if String(cc.get("mod", "")) == "" and not bool(cc.get("cursed", false)) \
+				and not bool(cc.get("joker", false)):
+			plain.append(cc)
+	if plain.is_empty():
+		return false
+	var pick: Dictionary = SeedRng.pick(rng_ability, plain)
+	for d in deck:
+		if int(d.rank) == int(pick.rank) and int(d.suit) == int(pick.suit) \
+				and String(d.get("mod", "")) == "" and not bool(d.get("cursed", false)):
+			d["mod"] = mod
+			return true
+	return false
+
+
 ## A hand (or a safe crack) is spent; run out and the room is lost.
 func _consume_hand() -> void:
 	if room_on_clock():
@@ -3768,7 +4100,7 @@ func _defer_chest_reward() -> void:
 	if roll < 0.5:
 		_chest_rewards.append("chips")
 	elif roll < 0.85:
-		_chest_rewards.append("card")
+		_chest_rewards.append("ability")
 	elif _unowned_common_relic() != "":
 		_chest_rewards.append("relic")
 	else:
@@ -3792,12 +4124,10 @@ func _open_chest() -> void:
 		main.board._play_sound(Board.SFX_COINS.pick_random(), 1.0, -6.0)
 		_announce_after_settle("CHEST  +%d CHIPS" % loot)
 	elif roll < 0.65:
-		# A card for the deck — held back and SHOWN on the victory
-		# screen, not narrated mid-heist.
-		var card := _random_card_offer(0.25)
-		deck.append(card)
-		_chest_won_cards.append(card)
+		# An ability card, offered on its own round after the table.
+		_chest_card_rounds += 1
 		main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+		_announce_after_settle("CHEST  AN ABILITY CARD (YOU'LL PICK IT AFTER THE TABLE)")
 	elif roll < 0.80:
 		# No loose cash on the trail — the chest holds a GOLD card.
 		var gold := {"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3),
@@ -4236,9 +4566,8 @@ func _room_cleared() -> void:
 			chips += 60
 			_win_rows.append(["STRONGBOX (no new relics)", 60])
 	# Ambient chests crack open with the winnings: chips join the
-	# ledger, a card owes an extra pick round, a relic takes the
+	# ledger, an ability owes an extra offer round, a relic takes the
 	# strongbox screen.
-	_chest_card_rounds = 0
 	for kind in _chest_rewards:
 		match String(kind):
 			"chips":
@@ -4246,7 +4575,7 @@ func _room_cleared() -> void:
 				var loot := 30 + 15 * region
 				chips += loot
 				_win_rows.append(["THE CHEST — it held coins", loot])
-			"card":
+			"card", "ability":
 				_chest_card_rounds += 1
 			"relic":
 				var rid := _unowned_common_relic()
@@ -4258,11 +4587,21 @@ func _room_cleared() -> void:
 					chips += 60
 					_win_rows.append(["THE CHEST — nothing new inside", 60])
 	_chest_rewards.clear()
+	var cleared := room_index
+	var source := "boss" if current_offer.has("boss") else "table"
 	_after_board_settles(func() -> void:
 		room_index += 1
 		if room_index >= ROOMS_TOTAL:
 			_trail_complete()
 		else:
+			# The reward is rolled now and saved with the ride, so quitting
+			# on the reward screen comes back to the very same offer.
+			pending_reward = {"room": cleared, "source": source, "round": 0,
+					"offers": _roll_ability_offer(cleared, 0, source),
+					"chest_rounds": _chest_card_rounds,
+					"relic": _pending_relic_reward, "relic_ambient": _relic_ambient,
+					"ledger": _win_rows.duplicate(true)}
+			_chest_card_rounds = 0
 			_save_run()
 			# Let the win sink in — confetti, chips, the cleared table —
 			# before fate deals the next card.
@@ -4346,6 +4685,11 @@ func _capture_room_state() -> Dictionary:
 		"watch_uses_left": watch_uses_left,
 		"rng_room": rng_room.state,
 		"room_attempt": room_attempt,
+		"rng_ability": rng_ability.state,
+		"ability_counts": room_ability_counts.duplicate(),
+		"time_granted": _time_granted,
+		"chest_rewards": _chest_rewards.duplicate(),
+		"chest_rounds": _chest_card_rounds,
 	}
 
 
@@ -4397,6 +4741,15 @@ func _restore_room_state() -> void:
 	if rs.has("rng_room"):
 		rng_room.state = int(rs.rng_room)
 	_rng = rng_room
+	rng_ability = SeedRng.stream(run_seed, "ability", room_index, room_attempt)
+	if rs.has("rng_ability"):
+		rng_ability.state = int(rs.rng_ability)
+	room_ability_counts = (rs.get("ability_counts", {}) as Dictionary).duplicate()
+	_time_granted = float(rs.get("time_granted", 0.0))
+	if rs.has("chest_rewards"):
+		_chest_rewards = (rs.chest_rewards as Array).duplicate()
+	_chest_card_rounds = int(rs.get("chest_rounds", _chest_card_rounds))
+	_push_loadout()
 	sleight_uses_left = int(rs.get("sleight_uses_left",
 			0 if bool(rs.get("sleight_used", false)) else 1 + ride_lv("sleight")))
 	watch_uses_left = int(rs.watch_uses_left)
@@ -4425,7 +4778,8 @@ func _restore_room_state() -> void:
 	main.board.custom_deck = deck.duplicate(true)
 	main.board.undo_enabled = character == "the_doctor"
 	_apply_ascension_to_board()
-	main.board.refill_hazard_chance = 0.0 if room_goal == "purge" else _refill_chance()
+	main.board.refill_hazard_chance = 0.0 if room_goal == "purge" \
+			else _refill_chance() * _ability_passive("refill_hazard_mult", 1.0)
 	main.board.apply_state_snapshot(rs.board)
 	if room_goal == "crazy8":
 		main.board.eights_wild = true
@@ -4512,7 +4866,49 @@ func _show_relic_reward_now() -> void:
 	relic_layer.visible = true
 
 
-# --- Flow: card pick ------------------------------------------------------
+# --- Flow: the ability reward ----------------------------------------------
+
+# Rarity odds by where an offer comes from (Common, Rare, Epic, Legendary).
+const ABILITY_WEIGHTS := {
+	"region1": [70, 25, 5, 0], "region2": [55, 32, 11, 2], "region3": [45, 35, 16, 4],
+	"chest": [50, 35, 15, 0], "boss": [0, 0, 75, 25],
+}
+const ABILITY_OFFER := 3
+
+
+## Rolls an ability offer from the "pick" stream for (room, round).
+## Each card rolls a rarity first, then an available ability of that
+## rarity; abilities you already hold come up half as often.
+func _roll_ability_offer(room: int, round: int, source: String) -> Array:
+	_stream("pick", room, round)
+	var count := ABILITY_OFFER
+	if source != "chest" and has_relic("card_sleeve"):
+		count = int(rv("card_sleeve", "picks"))
+	var key := source if source in ["chest", "boss"] \
+			else "region%d" % clampi(room / REGION_SIZE + 1, 1, 3)
+	var weights: Array = ABILITY_WEIGHTS[key]
+	var offer: Array = []
+	for i in count:
+		var roll := _rng.randf() * float(weights[0] + weights[1] + weights[2] + weights[3])
+		var r := 0
+		while r < 3 and roll >= float(weights[r]):
+			roll -= float(weights[r])
+			r += 1
+		var id := _ability_pick(Abilities.ids_of_rarity(r), offer)
+		if id == "":
+			# Nothing left at that rarity: any available ability will do.
+			id = _ability_pick(Abilities.DEFS.keys(), offer)
+		if id != "":
+			offer.append(id)
+	return offer
+
+
+func _ability_pick(ids: Array, exclude: Array) -> String:
+	var w := {}
+	for id in ids:
+		w[id] = 0.5 if abilities.has(id) else 1.0
+	return progress.pick("ability", w, exclude, _rng)
+
 
 func _show_pick() -> void:
 	main.transition(_show_pick_now)
@@ -4520,65 +4916,95 @@ func _show_pick() -> void:
 
 func _show_pick_now() -> void:
 	_hide_all()
-	_stream("pick", room_index, _pick_round)
-	_pick_round += 1
+	if pending_reward.is_empty():
+		_show_tarot_now()
+		return
 	main.game_started = false
 	main.play_music("tarot")
+	var round := int(pending_reward.get("round", 0))
+	_in_chest_pick = round > 0
 	if _in_chest_pick:
 		_pick_title.text = "FROM THE CHEST"
-		_pick_sub.text = "The chest held a card. Take it, or leave it behind."
+		_pick_sub.text = "The chest held an ability card. Take one, or leave them all."
 		for child in _win_box.get_children():
 			child.queue_free()  # the ledger already had its moment
 	else:
 		_pick_title.text = "TABLE CLEARED"
-		_pick_sub.text = "Pick a card to add to your deck, or take none."
+		_pick_sub.text = ("The house pays its best for that one. Pick an ability to keep, or take none."
+				if String(pending_reward.get("source", "")) == "boss"
+				else "Pick an ability to keep, or take none.")
 		_render_win_ledger()
 	for child in _pick_box.get_children():
 		child.queue_free()
-	var pick_count := 3 if _in_chest_pick \
-			else (int(rv("card_sleeve", "picks")) if has_relic("card_sleeve") else 3)
-	var start_x := (1920.0 - (pick_count * 220.0 - 50.0)) / 2.0
-	for i in pick_count:
-		var card_data := _random_card_offer(0.25 if _in_chest_pick else PICK_MOD_CHANCE)
+	var offers: Array = pending_reward.get("offers", [])
+	var start_x := (1920.0 - (offers.size() * 220.0 - 50.0)) / 2.0
+	for i in offers.size():
+		var id := String(offers[i])
 		var holder: Button = main._button(_pick_box, "", Vector2(start_x + i * 220, 0), Vector2(170, 240))
 		UiKit.style_shop_slot(holder)
-		var pc := PlayingCard.new()
-		pc.rank = card_data.rank
-		pc.suit = card_data.suit
-		pc.mod = card_data.get("mod", "")
-		pc.finish = PlayingCard.finish_of(card_data)
-		pc.material = Themes.current_material()
-		pc.scale = Vector2(1.6, 1.6)
-		pc.position = Vector2(85, 120)
-		holder.add_child(pc)
-		var data := card_data
+		holder.tooltip_text = "%s (%s)\n%s" % [Abilities.ability_name(id),
+				Abilities.RARITY_NAMES[Abilities.rarity(id)], String(Abilities.def(id).desc)]
+		var face := AbilityCard.new()
+		face.ability_id = id
+		face.position = Vector2(85, 120)
+		face.scale = Vector2(1.08, 1.08)
+		holder.add_child(face)
+		# What it does, in words, right under the card.
+		var what := Label.new()
+		what.text = String(Abilities.def(id).desc)
+		what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		what.position = Vector2(start_x + i * 220 - 15, 252)
+		what.custom_minimum_size = Vector2(200, 0)
+		what.size = Vector2(200, 110)
+		what.add_theme_font_size_override("font_size", 15)
+		what.add_theme_color_override("font_color", main.OFFWHITE)
+		if FontLib.label != null:
+			what.add_theme_font_override("font", FontLib.label)
+		_pick_box.add_child(what)
 		holder.pressed.connect(func() -> void:
-			deck.append(data)
-			main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
-			_save_run()
+			_take_ability(id)
 			_after_pick())
-		# Hover: the card's full story in a tooltip beneath it.
-		holder.mouse_entered.connect(func() -> void:
-			_pick_tip_label.text = _deck_stat_text(data)
-			_pick_tip.reset_size()
-			_pick_tip.position = Vector2(
-					clampf(holder.position.x + 85.0 - 195.0, 20.0, 1510.0), 620.0)
-			_pick_tip.visible = true)
-		holder.mouse_exited.connect(func() -> void:
-			_pick_tip.visible = false)
 	_pick_tip.visible = false
 	pick_layer.visible = true
 
 
-## After a pick (or a skip): any chest-owed card rounds run first,
+## The ABILITIES screen, between tables only; `back` re-shows the
+## screen it was opened from.
+func open_abilities(back: Callable) -> void:
+	if in_room:
+		return  # the loadout is locked once you sit down
+	abilities_screen.open(back)
+
+
+## A new ability joins the collection. The very first one goes straight
+## onto the smallest hand it fits, so it works from the next table on.
+func _take_ability(id: String) -> void:
+	abilities.append(id)
+	main.stat_bump("abilities_taken")
+	main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+	if loadout.is_empty():
+		var hand := Abilities.smallest_fit(id)
+		if hand != "" and equip(abilities.size() - 1, hand):
+			_announce_after_settle("%s IS ON YOUR %s" % [Abilities.ability_name(id).to_upper(),
+					hand.to_upper()])
+	main.tutor_show("abilities")
+
+
+## After a pick (or a skip): any chest-owed ability rounds run first,
 ## then fate deals the next tables.
 func _after_pick() -> void:
-	if _chest_card_rounds > 0:
-		_chest_card_rounds -= 1
-		_in_chest_pick = true
+	if not pending_reward.is_empty() and int(pending_reward.get("chest_rounds", 0)) > 0:
+		pending_reward["chest_rounds"] = int(pending_reward.chest_rounds) - 1
+		pending_reward["round"] = int(pending_reward.get("round", 0)) + 1
+		pending_reward["offers"] = _roll_ability_offer(int(pending_reward.room),
+				int(pending_reward.round), "chest")
+		_save_run()
 		main.transition(_show_pick_now)
 		return
 	_in_chest_pick = false
+	pending_reward = {}
+	_save_run()
 	_show_tarot()
 
 
@@ -4741,8 +5167,20 @@ func _show_shop() -> void:
 		_shop_stock_provisions = []
 		for id in _provision_shelf(int(_shop_merchant.get("provisions", 0))):
 			_shop_stock_provisions.append({"id": id, "bought": false})
+		_shop_stock_abilities = []
+		for id in _ability_shelf(int(_shop_merchant.get("abilities", 0))):
+			_shop_stock_abilities.append({"id": id, "bought": false})
 		_shop_burned_here = false
 		_shop_stock_room = room_index
+		if int(_shop_saved.get("room", -1)) == room_index:
+			# Resumed at this merchant: what you bought stays sold.
+			for pair in [["cards", _shop_stock], ["relics", _shop_stock_relics],
+					["provisions", _shop_stock_provisions], ["abilities", _shop_stock_abilities]]:
+				for i in _shop_saved.get(pair[0], []):
+					if int(i) < (pair[1] as Array).size():
+						pair[1][int(i)]["bought"] = true
+			_shop_burned_here = bool(_shop_saved.get("burned", false))
+		_shop_saved = {}
 	_shop_title.text = _shop_merchant.name
 	_shop_flavor.text = _shop_merchant.line
 	_shop_info.text = _shop_chips_line()
@@ -4816,8 +5254,71 @@ func _show_shop() -> void:
 			_shop_tip.visible = true)
 		holder.mouse_exited.connect(func() -> void:
 			_shop_tip.visible = false)
+	_render_shop_abilities()
 	_shop_tip.visible = false
 	shop_layer.visible = true
+
+
+## Ability cards on the middle shelf, after the playing cards.
+func _render_shop_abilities() -> void:
+	var first := _shop_stock.size()
+	for i in _shop_stock_abilities.size():
+		var slot: Dictionary = _shop_stock_abilities[i]
+		var id := String(slot.id)
+		var col := (first + i) % 5
+		var row := (first + i) / 5
+		var holder: Button = main._button(_shop_box, "",
+				Vector2(265 + col * 220, row * 280), Vector2(170, 250))
+		UiKit.style_shop_slot(holder)
+		holder.tooltip_text = "%s (%s, %d slot%s)\n%s" % [Abilities.ability_name(id),
+				Abilities.RARITY_NAMES[Abilities.rarity(id)], Abilities.slots(id),
+				"" if Abilities.slots(id) == 1 else "s", String(Abilities.def(id).desc)]
+		var face := AbilityCard.new()
+		face.ability_id = id
+		face.scale = Vector2(0.95, 0.95)
+		face.position = Vector2(85, 104)
+		holder.add_child(face)
+		var cost := _price(int(Abilities.PRICES[Abilities.rarity(id)]))
+		var price_tag: Label = main._label(holder, "%d chips" % cost, Vector2(0, 212), 18, main.GOLD)
+		price_tag.size = Vector2(170, 30)
+		price_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if slot.bought:
+			holder.disabled = true
+			price_tag.text = "SOLD"
+		var pressed_slot := slot
+		holder.pressed.connect(func() -> void:
+			if pressed_slot.bought:
+				return
+			var c := _price(int(Abilities.PRICES[Abilities.rarity(String(pressed_slot.id))]))
+			if chips < c:
+				_shop_refuse("NOT ENOUGH CHIPS — that ability costs %d" % c)
+				return
+			if _would_bust(c):
+				return
+			chips -= c
+			pressed_slot.bought = true
+			_take_ability(String(pressed_slot.id))
+			_save_run()
+			_show_shop())
+
+
+## The merchant's ability shelf, rolled on the shop stream after
+## everything else, with the region's rarity odds.
+func _ability_shelf(n: int) -> Array:
+	var out: Array = []
+	var weights: Array = ABILITY_WEIGHTS["region%d" % clampi(room_index / REGION_SIZE + 1, 1, 3)]
+	for i in n:
+		var roll := _rng.randf() * float(weights[0] + weights[1] + weights[2] + weights[3])
+		var r := 0
+		while r < 3 and roll >= float(weights[r]):
+			roll -= float(weights[r])
+			r += 1
+		var id := _ability_pick(Abilities.ids_of_rarity(r), out)
+		if id == "":
+			id = _ability_pick(Abilities.DEFS.keys(), out)
+		if id != "":
+			out.append(id)
+	return out
 
 
 ## The merchant's relic shelf: icon, name, effect, and price per slot.
@@ -5582,12 +6083,12 @@ func build_ui() -> void:
 	for i in OUTFITTER_TABS.size():
 		var key := String(OUTFITTER_TABS[i][0])
 		var tb: Button = main._button(upgrades_layer, String(OUTFITTER_TABS[i][1]),
-				Vector2(425 + i * 180, 278), Vector2(170, 50))
+				Vector2(411 + i * 158, 278), Vector2(150, 50))
 		tb.focus_mode = Control.FOCUS_NONE
 		tb.pressed.connect(func() -> void:
 			_set_up_tab(key))
 		_up_tab_btns[key] = tb
-		var pip: Label = main._label(upgrades_layer, "NEW", Vector2(425 + i * 180 + 120, 262), 14, main.GOLD)
+		var pip: Label = main._label(upgrades_layer, "NEW", Vector2(411 + i * 158 + 100, 262), 14, main.GOLD)
 		pip.size = Vector2(50, 18)
 		pip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_up_tab_pips[key] = pip
@@ -5697,6 +6198,10 @@ func build_ui() -> void:
 	var deck_btn: Button = main._button(tarot_layer, "VIEW DECK", Vector2(1660, 970), Vector2(200, 54))
 	deck_btn.add_theme_font_size_override("font_size", 20)
 	deck_btn.pressed.connect(_show_deck)
+	_tarot_ab_btn = main._button(tarot_layer, "ABILITIES", Vector2(1440, 970), Vector2(200, 54))
+	_tarot_ab_btn.add_theme_font_size_override("font_size", 20)
+	_tarot_ab_btn.pressed.connect(func() -> void:
+		open_abilities(_show_tarot_now))
 
 	bet_layer = _layer()
 	_screen_title(bet_layer, "THE STAKES")
@@ -5732,7 +6237,7 @@ func build_ui() -> void:
 
 	pick_layer = _layer()
 	_pick_title = _center(pick_layer, "TABLE CLEARED", 100, 64, main.GOLD)
-	_pick_sub = _center(pick_layer, "Pick a card to add to your deck, or take none.", 240, 22, main.DIM)
+	_pick_sub = _center(pick_layer, "Pick an ability to keep, or take none.", 240, 22, main.DIM)
 	# The winnings ledger sits at the left; the card offers keep the floor.
 	_win_box = Control.new()
 	_win_box.position = Vector2(120, 330)
@@ -5744,6 +6249,11 @@ func build_ui() -> void:
 	skip.add_theme_font_size_override("font_size", 24)
 	skip.pressed.connect(func() -> void:
 		_after_pick())
+	var pick_ab: Button = main._button(pick_layer, "ABILITIES", Vector2(1660, 970), Vector2(200, 54))
+	pick_ab.add_theme_font_size_override("font_size", 20)
+	pick_ab.tooltip_text = "See your ability cards and which hands they're on."
+	pick_ab.pressed.connect(func() -> void:
+		open_abilities(_show_pick_now))
 	# Hover tooltip for the offered cards: stats, mods, and what they do.
 	_pick_tip = _make_stat_tip(pick_layer)
 	_pick_tip_label = _pick_tip.get_child(0) as Label
@@ -5769,6 +6279,11 @@ func build_ui() -> void:
 	_shop_burn_btn.clip_text = true
 	_shop_burn_btn.add_theme_font_size_override("font_size", 20)
 	_shop_burn_btn.pressed.connect(_show_remove)
+	var shop_ab: Button = main._button(shop_layer, "ABILITIES", Vector2(60, 970), Vector2(200, 54))
+	shop_ab.add_theme_font_size_override("font_size", 20)
+	shop_ab.tooltip_text = "See your ability cards and which hands they're on."
+	shop_ab.pressed.connect(func() -> void:
+		open_abilities(_show_shop))
 	var leave: Button = main._button(shop_layer, "BACK ON THE TRAIL", Vector2(985, 850), Vector2(380, 56))
 	leave.add_theme_font_size_override("font_size", 20)
 	leave.pressed.connect(_leave_shop)
@@ -5809,6 +6324,9 @@ func build_ui() -> void:
 	take.add_theme_font_size_override("font_size", 26)
 	take.pressed.connect(func() -> void:
 		_pending_relic_reward = ""
+		if not pending_reward.is_empty():
+			pending_reward["relic"] = ""
+			_save_run()
 		_show_pick())
 
 	remove_layer = _layer()
@@ -5833,6 +6351,10 @@ func build_ui() -> void:
 		else:
 			_show_tarot()
 	_back_button(remove_layer, remove_back, "BACK")
+
+	abilities_screen = AbilitiesScreen.new()
+	main.ui_root.add_child(abilities_screen)
+	abilities_screen.setup(self)
 
 	end_layer = _layer()
 	_end_label = Label.new()
@@ -5871,7 +6393,7 @@ func _layer() -> ColorRect:
 func _hide_all() -> void:
 	for l in [select_layer, buyin_layer, upgrades_layer, tarot_layer, bet_layer,
 			pick_layer, shop_layer, camp_layer, remove_layer, relic_layer,
-			end_layer]:
+			end_layer, abilities_screen]:
 		if l:
 			l.visible = false
 

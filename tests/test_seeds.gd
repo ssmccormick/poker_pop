@@ -57,7 +57,7 @@ func _initialize() -> void:
 	var book := SeedBook.new()
 	book.load_file(path)
 	var k := SeedBook.key("trail", "K7QX2M9P", SeedBook.trail_variant("the_gambler", 3))
-	_check(k == "trail|K7QX2M9P|the_gambler-a3", "a board key is mode, seed and variant")
+	_check(k == "trail|K7QX2M9P|the_gambler-a3|" + SeedBook.RULESET, "a board key is mode, seed, variant and ruleset")
 	_check(book.record(k, 500, {"tables": 12}), "a first score is a best")
 	_check(not book.record(k, 300), "a lower one isn't")
 	_check(book.record(k, 900, {"tables": 20}) and book.best(k) == 900, "a higher one is")

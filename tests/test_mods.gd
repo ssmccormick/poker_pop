@@ -238,6 +238,73 @@ func _init() -> void:
 			"metal stays for four plays and clears on the fifth")
 	steel.free()
 
+	# --- Ability cards on a poker hand ------------------------------------
+	var ab := Board.new()
+	var plain_cards: Array = []
+	for r in [14, 14, 8, 8]:
+		var pc := PlayingCard.new()
+		pc.rank = r
+		plain_cards.append(pc)
+	var mult_card := PlayingCard.new()
+	mult_card.mod = "mult"
+	mult_card.rank = 9
+	ab.selected.assign([plain_cards[0], mult_card])
+	ab.ability_loadout = {"Pair": ["spurs"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == int((100 + 20) * Board.MULT_FACTOR) and res.abilities == ["Spurs"],
+			"Spurs adds 20 before the Mult card multiplies (%d)" % res.score)
+	ab.ability_loadout = {"Flush": ["big_iron"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(not res.has("abilities"), "an ability only fires on the hand it's equipped to")
+	ab.selected.assign(plain_cards)
+	ab.ability_loadout = {"Two Pair": ["dead_mans_hand", "side_bet"]}
+	res = {"name": "Two Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 400 and res.bonus_chips == 16,
+			"Dead Man's Hand gives ×4 on Aces and Eights, and Side Bet pays 4 chips a card")
+	plain_cards[3].rank = 9
+	plain_cards[2].rank = 9
+	res = {"name": "Two Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 150, "and ×1.5 on any other Two Pair")
+	failures += _check(Abilities.fits("big_iron", "Flush") and not Abilities.fits("big_iron", "Pair")
+			and Abilities.misfit_reason("big_iron", "Pair").contains("five-card"),
+			"Big Iron fits a Flush but not a Pair, and says why")
+	failures += _check(not Abilities.fits("scattergun", "Pair") and Abilities.fits("scattergun", "Three of a Kind"),
+			"a 3-slot ability won't fit a 2-slot Pair")
+	failures += _check(Abilities.smallest_fit("matched_pair") == "Pair"
+			and Abilities.smallest_fit("house_money") == "Full House", "the smallest hand an ability fits")
+	# The next plain card off the shoe takes the enhancement.
+	ab.deck = [{"rank": 5, "suit": 0}, {"rank": 6, "suit": 1, "cursed": true},
+			{"rank": 7, "suit": 2, "mod": "chip"}]
+	failures += _check(ab.enhance_next_draw("plus") and ab.deck[0].get("mod", "") == "plus"
+			and ab.deck[2].mod == "chip" and not ab.deck[1].has("mod"),
+			"Hot Brand skips cursed and enhanced cards and marks the next plain one")
+	ab.deck = []
+	failures += _check(ab.enhance_next_draw("mult") and not ab.deck.is_empty(),
+			"an empty shoe is refilled before the enhancement lands")
+	ab.selected.clear()
+	for pc in plain_cards:
+		pc.free()
+	mult_card.free()
+	ab.free()
+	# Every ability definition is sound.
+	for id in Abilities.DEFS:
+		var d: Dictionary = Abilities.DEFS[id]
+		var fits_one := false
+		for hand in Abilities.HAND_ORDER:
+			if Abilities.fits(id, hand):
+				fits_one = true
+		var desc := String(d.desc)
+		failures += _check(fits_one and int(d.slots) >= 1 and int(d.slots) <= 5
+				and desc.ends_with(".") and desc.length() > 20 and not desc.contains(" — ")
+				and int(d.rarity) >= 0 and int(d.rarity) <= 3,
+				"ability %s is well formed" % id)
+		for h in d.hands:
+			failures += _check(Abilities.HAND_SLOTS.has(h), "ability %s names a real hand (%s)" % [id, h])
+
 	# Old save ids map onto the current mod family.
 	failures += _check(Board.migrate_mod("cash") == "gold"
 			and Board.migrate_mod("boost") == "plus"

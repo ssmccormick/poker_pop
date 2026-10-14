@@ -16,8 +16,13 @@ var player_name := ""   # the name it posts under (Options / SEEDED PLAY)
 const NAME_MAX := 12
 
 
+## Bumped whenever the rules change what a seed deals (r2: ability cards
+## replace the card pick), so old and new scores never share a board.
+const RULESET := "r2"
+
+
 static func key(mode: String, seed_text: String, variant := "") -> String:
-	return "%s|%s|%s" % [mode, seed_text, variant]
+	return "%s|%s|%s|%s" % [mode, seed_text, variant, RULESET]
 
 
 ## The board variant for a trail ride: rider and Ascension.

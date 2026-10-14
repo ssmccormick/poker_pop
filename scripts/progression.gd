@@ -17,11 +17,11 @@ const LAST_UNLOCK := 29              # every level past this pays only the purse
 const CATALOG_VERSION := 2           # 2: tables open, riders won, curve repacked
 const PURSE_PER_LEVEL := 5           # each level-up pays $5 × the new level
 # Kinds whose odds a FIND upgrade can lift.
-const FINDABLE := ["relic", "provision", "mod", "finish", "merchant"]
+const FINDABLE := ["relic", "provision", "mod", "finish", "merchant", "ability"]
 # What a starter (owned for free) would have cost — the base its
 # upgrade prices are worked out from.
 const VIRTUAL_PRICE := {"relic": 80, "provision": 50, "mod": 80, "finish": 150,
-		"merchant": 60}
+		"merchant": 60, "ability": 60}
 
 ## One row per unlockable. level 1 = the starter set. price 0 = goes
 ## straight onto the trail on unlock; a price = buy it at the Outfitter.
@@ -49,6 +49,32 @@ const CATALOG := [
 	# --- Riders are WON: a full ride with the one before opens the next ---
 	{"kind": "rider", "id": "the_machine", "name": "The Machine", "level": 0, "price": 0, "ladder": "laser", "after_win": "the_gambler"},
 	{"kind": "rider", "id": "the_doctor", "name": "The Doctor", "level": 0, "price": 0, "ladder": "watch", "after_win": "the_machine"},
+	# --- Ability cards: the commons from the start, the rest opening on
+	# their own track (a `gate` level), free, beside the level curve ---
+	{"kind": "ability", "id": "spurs", "name": "Spurs", "level": 1, "price": 0},
+	{"kind": "ability", "id": "side_bet", "name": "Side Bet", "level": 1, "price": 0},
+	{"kind": "ability", "id": "matched_pair", "name": "Matched Pair", "level": 1, "price": 0},
+	{"kind": "ability", "id": "triple_threat", "name": "Triple Threat", "level": 1, "price": 0},
+	{"kind": "ability", "id": "hot_brand", "name": "Hot Brand", "level": 1, "price": 0},
+	{"kind": "ability", "id": "push_broom", "name": "Push Broom", "level": 1, "price": 0},
+	{"kind": "ability", "id": "borrowed_time", "name": "Borrowed Time", "level": 1, "price": 0},
+	{"kind": "ability", "id": "lookout", "name": "Lookout", "level": 1, "price": 0},
+	{"kind": "ability", "id": "scattergun", "name": "Scattergun", "level": 0, "price": 0, "gate": 3},
+	{"kind": "ability", "id": "deputy_badge", "name": "Deputy's Badge", "level": 0, "price": 0, "gate": 5},
+	{"kind": "ability", "id": "fan_the_hammer", "name": "Fan the Hammer", "level": 0, "price": 0, "gate": 7},
+	{"kind": "ability", "id": "cool_head", "name": "Cool Head", "level": 0, "price": 0, "gate": 9},
+	{"kind": "ability", "id": "rain_barrel", "name": "Rain Barrel", "level": 0, "price": 0, "gate": 11},
+	{"kind": "ability", "id": "marked_card", "name": "Marked Card", "level": 0, "price": 0, "gate": 12},
+	{"kind": "ability", "id": "hired_gun", "name": "Hired Gun", "level": 0, "price": 0, "gate": 13},
+	{"kind": "ability", "id": "double_down", "name": "Double Down", "level": 0, "price": 0, "gate": 14},
+	{"kind": "ability", "id": "saddle_horn", "name": "Saddle Horn", "level": 0, "price": 0, "gate": 15},
+	{"kind": "ability", "id": "on_the_house", "name": "On the House", "level": 0, "price": 0, "gate": 17},
+	{"kind": "ability", "id": "big_iron", "name": "Big Iron", "level": 0, "price": 0, "gate": 19},
+	{"kind": "ability", "id": "dead_mans_hand", "name": "Dead Man's Hand", "level": 0, "price": 0, "gate": 21},
+	{"kind": "ability", "id": "clean_sweep", "name": "Clean Sweep", "level": 0, "price": 0, "gate": 23},
+	{"kind": "ability", "id": "fastest_gun", "name": "Fastest Gun", "level": 0, "price": 0, "gate": 25},
+	{"kind": "ability", "id": "branded_for_life", "name": "Branded for Life", "level": 0, "price": 0, "gate": 26},
+	{"kind": "ability", "id": "house_money", "name": "House Money", "level": 0, "price": 0, "gate": 27},
 	# --- One unlock per level (every table type is on the trail from the start)
 	{"kind": "mod", "id": "plus", "name": "Plus", "level": 2, "price": 80},
 	{"kind": "relic", "id": "rabbits_foot", "name": "Rabbit's Foot", "level": 3, "price": 60},
@@ -88,7 +114,7 @@ const POWER := {
 		"pdesc": ["+1 hand in every room.", "+1 hand in every room, and +15 seconds on clock tables.",
 			"+2 hands in every room, and +15 seconds on clock tables."]},
 	"relic:card_sleeve": {"vals": {"picks": [4, 5]},
-		"pdesc": ["Card picks give you 4 cards to choose from.", "Card picks give you 5 cards to choose from."]},
+		"pdesc": ["Ability offers give you 4 to choose from.", "Ability offers give you 5 to choose from."]},
 	"relic:snake_oil": {"vals": {"off": [0.25, 0.30, 0.35]},
 		"pdesc": ["Everything in shops costs 25% less.", "Everything in shops costs 30% less.",
 			"Everything in shops costs 35% less."]},
@@ -297,6 +323,15 @@ static func purse_between(l0: int, l1: int) -> int:
 
 
 ## Catalog rows unlocked by climbing from l0 to l1 (reserved rows aside).
+## Ability cards whose own-track gate opened between two levels.
+static func gates_between(l0: int, l1: int) -> Array:
+	var out: Array = []
+	for r in CATALOG:
+		if r.has("gate") and int(r.gate) > l0 and int(r.gate) <= l1:
+			out.append(r)
+	return out
+
+
 static func unlocks_between(l0: int, l1: int) -> Array:
 	var out: Array = []
 	for r in CATALOG:
@@ -324,6 +359,8 @@ func is_unlocked(kind: String, id: String) -> bool:
 		return true
 	if r.has("after_win"):
 		return won_as(String(r.after_win))
+	if r.has("gate"):
+		return level() >= int(r.gate)
 	return level() >= int(r.level)
 
 

@@ -64,9 +64,31 @@ func _catalog() -> void:
 			"merchant:peddler", "mod:mult", "mod:chip", "mod:gold",
 			"relic:horseshoe", "relic:card_sleeve", "relic:snake_oil", "relic:tin_star",
 			"relic:bomb_badge", "relic:chisel", "provision:canteen",
-			"provision:dynamite", "provision:pocket_flask", "provision:gold_pan"]
+			"provision:dynamite", "provision:pocket_flask", "provision:gold_pan",
+			"ability:spurs", "ability:side_bet", "ability:matched_pair", "ability:triple_threat",
+			"ability:hot_brand", "ability:push_broom", "ability:borrowed_time", "ability:lookout"]
 	expect.sort()
 	_check(starters == expect, "the starter set is exactly the small kit")
+	# Ability cards: every one is in the catalog; the commons start free,
+	# the rest open on their own track without touching the level curve.
+	for aid in Abilities.DEFS:
+		var ar := Progression.row("ability", String(aid))
+		_check(not ar.is_empty(), "ability %s is in the catalog" % aid)
+		_check((Abilities.rarity(String(aid)) == 0) == (int(ar.get("level", 0)) == 1),
+				"ability %s starts free only if it's a common" % aid)
+	var gated_seen := false
+	for lv in range(0, 40):
+		for ur in Progression.unlocks_between(lv, lv + 1):
+			if ur.has("gate"):
+				gated_seen = true
+	_check(not gated_seen, "gated abilities never show up as level-up unlocks")
+	var gp := Progression.new()
+	gp.exp_total = 0
+	_check(not gp.is_unlocked("ability", "scattergun") and gp.is_unlocked("ability", "spurs"),
+			"a fresh profile has the commons but not Scattergun")
+	_check(Progression.gates_between(2, 3).size() == 1
+			and String(Progression.gates_between(2, 3)[0].id) == "scattergun",
+			"Scattergun opens at level 3")
 
 	# One unlock on every level 2..29, nothing past it.
 	var per_level := {}

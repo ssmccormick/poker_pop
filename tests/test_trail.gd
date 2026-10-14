@@ -278,6 +278,7 @@ func _run() -> void:
 	failures += _check(rec1.wall2 == rec2.wall2, "and the same second wall")
 	failures += _check(rec1.shop == rec2.shop and not rec1.shop.is_empty(),
 			"and the same merchant's shelves")
+	failures += _check(rec1.abilities == rec2.abilities, "and the same first ability offer")
 	var rec3: Dictionary = await _seeded_probe("ABCDEFGH")
 	failures += _check(rec3.deal != rec1.deal, "a different seed deals a different table")
 	# The other modes deal from seeds too.
@@ -336,7 +337,8 @@ func _run() -> void:
 	var std2: Dictionary = await _seeded_probe("STANDRD2", true)
 	failures += _check(std1.kit == std2.kit and std1.kit[1] == 2 and std1.kit[2] == 0,
 			"the standard loadout ignores the Outfitter (%s vs %s)" % [str(std1.kit), str(std2.kit)])
-	failures += _check(std1.wall == std2.wall and std1.deal == std2.deal and std1.shop == std2.shop,
+	failures += _check(std1.wall == std2.wall and std1.deal == std2.deal and std1.shop == std2.shop
+			and std1.abilities == std2.abilities and std1.abilities.size() == 3,
 			"so a maxed profile and a fresh one get the very same seeded ride")
 	var own: Dictionary = await _seeded_probe("STANDRD2", false)
 	failures += _check(own.kit != std1.kit and not trail.standard_loadout and not trail.progress.standard,
@@ -444,6 +446,133 @@ func _run() -> void:
 			"a late answer for another board is ignored")
 	main.seeds_layer.visible = false
 	await _enter_room("the_gambler")  # an ordinary ride again for what follows
+
+	# --- Ability cards: equipping, effects, the reward, saving -----------
+	trail.abilities = ["matched_pair", "scattergun", "big_iron", "spurs", "spurs", "hot_brand",
+			"push_broom", "on_the_house", "double_down", "borrowed_time"]
+	trail.loadout = {}
+	failures += _check(trail.equip(0, "Pair") and trail.used_slots("Pair") == 2,
+			"Matched Pair fills a Pair's two slots")
+	failures += _check(not trail.equip(1, "Pair") and trail.can_equip(1, "Pair").contains("slots"),
+			"a 3-slot ability won't go on a Pair, and says why")
+	failures += _check(not trail.equip(3, "Pair") and trail.can_equip(3, "Pair").contains("room"),
+			"a full hand takes nothing more")
+	failures += _check(trail.equip(2, "Flush") and not trail.equip(2, "Pair"),
+			"Big Iron goes on a Flush, and only fits five-card hands")
+	failures += _check(trail.equip(3, "Straight") and not trail.equip(4, "Straight")
+			and trail.can_equip(4, "Straight").contains("already"),
+			"a hand never holds two copies of the same ability")
+	failures += _check(trail.equip(3, "Three of a Kind") and trail.hand_of(3) == "Three of a Kind"
+			and trail.used_slots("Straight") == 0, "equipping a copy elsewhere moves it")
+	failures += _check(main.board.ability_loadout.get("Flush", []) == ["big_iron"],
+			"the board sees the loadout as ability ids")
+	trail.unequip(0)
+	failures += _check(trail.hand_of(0) == "" and not trail.loadout.has("Pair"),
+			"taking an ability off frees its slots")
+	# What fires when a hand is played.
+	trail.room_limit = "hands"
+	trail.equip(5, "Pair")       # Hot Brand
+	trail.equip(7, "Full House") # On the House
+	trail.equip(8, "Two Pair")   # Double Down
+	trail.equip(9, "Flush")      # Borrowed Time beside Big Iron? (1 + 5 > 5: refused)
+	failures += _check(trail.hand_of(9) == "", "Borrowed Time can't squeeze in beside Big Iron")
+	trail.equip(9, "Straight")
+	var plus_before := 0
+	for d in main.board.deck:
+		if String(d.get("mod", "")) == "plus":
+			plus_before += 1
+	trail._fire_play_abilities({"name": "Pair", "cleared_cells": []})
+	var plus_after := 0
+	for d in main.board.deck:
+		if String(d.get("mod", "")) == "plus":
+			plus_after += 1
+	failures += _check(plus_after == plus_before + 1, "Hot Brand puts a Plus on the next plain card")
+	var hands0: int = trail.room_hands_left
+	trail._fire_play_abilities({"name": "Full House", "cleared_cells": []})
+	failures += _check(trail.room_hands_left == hands0 + 1, "On the House hands the hand back")
+	main.board.next_hand_mult = 1.0
+	trail._fire_play_abilities({"name": "Two Pair", "cleared_cells": []})
+	failures += _check(main.board.next_hand_mult == 2.0, "Double Down doubles the next hand")
+	main.board.next_hand_mult = 1.0
+	var hands1: int = trail.room_hands_left
+	for n in 4:
+		trail._fire_play_abilities({"name": "Straight", "cleared_cells": []})
+	failures += _check(trail.room_hands_left == hands1 + 1,
+			"Borrowed Time gives a hand back on the fourth play")
+	# Push Broom clears a hazard but never a stone.
+	trail.unequip(5)
+	trail.equip(6, "Pair")
+	var hz_cards: Array = []
+	for pp in main.board.grid:
+		var hc: PlayingCard = main.board.grid[pp]
+		if hc.hazard == "" and hc.boss == "" and not hc.is_safe and not hc.cursed:
+			hz_cards.append(hc)
+		if hz_cards.size() == 2:
+			break
+	for pp in main.board.grid:
+		var other: PlayingCard = main.board.grid[pp]
+		if other.hazard != "" and not hz_cards.has(other):
+			main.board.provision_clean(other)
+			other.hazard = ""
+	failures += _check(hz_cards.size() == 2, "the Push Broom test found two cards to use")
+	if hz_cards.size() == 2:
+		main.board._init_hazard(hz_cards[0], "stone")
+		main.board._init_hazard(hz_cards[1], "fire")
+		trail._fire_play_abilities({"name": "Pair", "cleared_cells": []})
+		failures += _check(hz_cards[0].hazard == "stone" and hz_cards[1].hazard == "",
+				"Push Broom puts out the fire and leaves the stone alone")
+		main.board.break_stone(hz_cards[0])
+	# The board's own snapshot keeps the next-hand multiplier.
+	main.board.next_hand_mult = 2.0
+	var bsnap: Dictionary = main.board.build_state_snapshot()
+	main.board.next_hand_mult = 1.0
+	failures += _check(not bsnap.is_empty(), "the board could be photographed")
+	if not bsnap.is_empty():
+		main.board.undo_state = bsnap
+		main.board.restore_state()
+		failures += _check(main.board.next_hand_mult == 2.0,
+				"a snapshot brings back a pending double (the Tonic or Double Down)")
+	main.board.next_hand_mult = 1.0
+	# The reward: ability cards, never a card for the deck.
+	var keep_all: bool = trail.progress.unlock_all
+	trail.progress.unlock_all = true
+	var offer3: Array = trail._roll_ability_offer(4, 0, "table")
+	failures += _check(offer3.size() == 3, "a cleared table offers three ability cards")
+	var boss_offer: Array = trail._roll_ability_offer(9, 0, "boss")
+	var boss_ok := true
+	for bid in boss_offer:
+		if Abilities.rarity(String(bid)) < 2:
+			boss_ok = false
+	failures += _check(boss_ok and boss_offer.size() == 3, "a boss offers only Epic and Legendary abilities")
+	failures += _check(trail._roll_ability_offer(4, 0, "table") == offer3,
+			"the same table and round always offer the same cards")
+	trail.relics.append("card_sleeve")
+	failures += _check(trail._roll_ability_offer(4, 0, "table").size() == 4,
+			"Card Sleeve adds a fourth ability to choose from")
+	trail.relics.erase("card_sleeve")
+	trail.progress.unlock_all = keep_all
+	var deck_n: int = trail.deck.size()
+	var held: int = trail.abilities.size()
+	trail._take_ability("spurs")
+	failures += _check(trail.deck.size() == deck_n and trail.abilities.size() == held + 1,
+			"taking an ability doesn't touch the deck")
+	# The collection, the loadout and a pending offer ride in the save.
+	trail.pending_reward = {"room": 4, "source": "table", "round": 0, "offers": ["lookout", "spurs", "cool_head"],
+			"chest_rounds": 1, "relic": "", "ledger": []}
+	var lo_before: Dictionary = trail.loadout.duplicate(true)
+	var ab_before: Array = trail.abilities.duplicate()
+	trail._save_run()
+	trail.abilities = []
+	trail.loadout = {}
+	trail.pending_reward = {}
+	trail._load_run()
+	failures += _check(trail.abilities == ab_before and trail.loadout == lo_before
+			and trail.pending_reward.get("offers", []) == ["lookout", "spurs", "cool_head"],
+			"abilities, the loadout and an unfinished reward come back from the save")
+	trail.pending_reward = {}
+	trail.abilities = []
+	trail.loadout = {}
+	trail._push_loadout()
 
 	# --- Stones cover cards: a hand next to one breaks it off ------------
 	var spair := _plain_neighbors()
@@ -907,6 +1036,7 @@ func _seeded_probe(seed_text: String, standard := false) -> Dictionary:
 	await _wait(0.5)
 	rec["kit"] = [trail.chips, trail.sleeve_card.rank, trail.provisions.size(),
 			trail.ride_lv("laser")]
+	rec["abilities"] = trail._roll_ability_offer(0, 0, "table")
 	rec["wall"] = _wall_sig(trail._offers) + [_offer_sig(trail._fate_offer)]
 	trail._choose_offer(trail._offers[0], false)
 	await _wait(0.5)
@@ -946,6 +1076,8 @@ func _seeded_probe(seed_text: String, standard := false) -> Dictionary:
 	for o in trail._shop_stock_relics:
 		shop.append(o.id)
 	for o in trail._shop_stock_provisions:
+		shop.append(o.id)
+	for o in trail._shop_stock_abilities:
 		shop.append(o.id)
 	rec["shop"] = shop
 	trail._hide_all()

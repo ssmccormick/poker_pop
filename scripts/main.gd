@@ -279,8 +279,10 @@ func _ready() -> void:
 			"seeds":
 				# Sample boards for the picture (shot mode never saves them).
 				var now := int(Time.get_unix_time_from_system())
-				var rows := [["trail|K7QX2M9P|the_gambler-a0", 48210], ["time|ABCDEFGH|180", 12750],
-						["daily|%s|the_doctor" % SeedRng.daily_seed(), 30115], ["arcade|QWERTY23|", 9420]]
+				var rows := [[SeedBook.key("trail", "K7QX2M9P", "the_gambler-a0"), 48210],
+						[SeedBook.key("time", "ABCDEFGH", "180"), 12750],
+						[SeedBook.key("daily", SeedRng.daily_seed(), "the_doctor"), 30115],
+						[SeedBook.key("arcade", "QWERTY23", ""), 9420]]
 				for i in rows.size():
 					var parts := String(rows[i][0]).split("|")
 					seed_book.boards[rows[i][0]] = {"mode": parts[0], "seed": parts[1],
@@ -439,15 +441,29 @@ func _ready() -> void:
 				_dismiss_splash()
 				menu_layer.visible = false
 				_open_cardgrid()
+			"trailabilities":
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail.abilities = ["matched_pair", "big_iron", "hot_brand", "double_down",
+						"spurs", "push_broom", "house_money", "lookout"]
+				trail.loadout = {}
+				trail.equip(0, "Pair")
+				trail.equip(1, "Flush")
+				trail.equip(4, "Straight")
+				trail.equip(2, "Two Pair")
+				trail.equip(6, "Full House")
+				trail._hide_all()
+				trail.abilities_screen.refresh()
+				trail.abilities_screen.visible = true
 			"trailpick":
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail.chips = 372
 				trail._win_rows = [["THE POT — 50 staked at 1.5 : 1", 125],
 						["TIN STAR", 10], ["3 HANDS TO SPARE", 36]]
-				trail._chest_won_cards = [
-					{"rank": 13, "suit": 1, "cursed": false, "mod": "gold", "finish": ""},
-					{"rank": 7, "suit": 0, "cursed": false, "mod": "", "finish": ""}]
+				trail.pending_reward = {"room": 0, "source": "table", "round": 0,
+						"offers": ["hot_brand", "scattergun", "big_iron"], "chest_rounds": 0,
+						"relic": "", "ledger": trail._win_rows.duplicate(true)}
 				trail._show_pick()
 			"trailrelic":
 				menu_layer.visible = false
@@ -1176,6 +1192,14 @@ func _preview_mod_text(result: Dictionary) -> String:
 		parts += "  +%d chips" % int(result.bonus_chips)
 	if result.has("cash_earned"):
 		parts += "  +$%d" % int(result.cash_earned)
+	if mode_kind == "trail":
+		# Every ability on this hand, scoring or not, so you know what
+		# playing it will set off.
+		var names: Array = []
+		for id in trail.equipped_on(String(result.get("name", ""))):
+			names.append(Abilities.ability_name(id).to_upper())
+		if not names.is_empty():
+			parts += "  ·  " + ", ".join(PackedStringArray(names))
 	return parts
 
 
@@ -1950,7 +1974,8 @@ const TUTOR := {
 	"hp": ["YOUR HIDE", "The trail can hurt you now. A fire card that burns all the way down burns you, a bomb going off blasts you, every outlaw bullet costs you, and losing a table leaves a mark. The red pips under your score are all that stand between you and a shallow grave. Campfires along the trail patch you up."],
 	"goal_collect": ["THE ROUNDUP", "This table wants particular cards: a number of one SUIT, a stack of one RANK, or cards of many DIFFERENT ranks. Only cards you actually clear in scoring hands count, and the banner keeps the tally."],
 	"goal_landrush": ["LAND RUSH", "Stake a claim on every plot by clearing a card from each of the 25 spaces. A claimed plot gets a gold ring. Claim the whole homestead to win the table."],
-	"loot_chest": ["KEY & CHEST", "Surprise loot! Get the key and the chest into one valid scoring hand to claim it. The chest opens once you CLEAR THE TABLE, and it might hold coin, a card of your choice, or even a charm. It's completely optional; the table's real goal still comes first."],
+	"loot_chest": ["KEY & CHEST", "Surprise loot! Get the key and the chest into one valid scoring hand to claim it. The chest opens once you CLEAR THE TABLE, and it might hold coin, an ability card, or even a charm. It's completely optional; the table's real goal still comes first."],
+	"abilities": ["ABILITY CARDS", "Clearing a table now pays an ABILITY CARD instead of a card for your deck. Ability cards have no rank or suit. You put them on your poker hands, and each hand has one slot for every card in it: a Pair has 2, a Two Pair 4, a Flush 5. Every time you play that hand, its abilities kick in, or they just help in the background. Your first one went onto a hand for you. Between tables, press ABILITIES to move them around."],
 	"relics": ["RELICS", "Charms that last the whole ride. Carry as many as you can afford. Each one quietly bends the rules in your favor until the ride is over."],
 	"provisions": ["PROVISIONS", "Single-use supplies that sit in the KIT on the right. You have three slots, and good SADDLEBAGS add a fourth. Some are AIMED: click the provision, then a card on the table. Others work the moment you click them. Using one is FREE and never costs a hand. Restock at shops, or find more by cracking safes and chests."],
 	"sleeve": ["ACE UP THE SLEEVE", "You ride with a card hidden up your sleeve: the SLEEVE row at the top of your kit. Once per table, click it and pick a plain card on the table. The two swap places, and the card you took waits up your sleeve for a later table. You can raise its starting rank with $cash at the Outfitter (UPGRADES on the main menu)."],

@@ -130,6 +130,9 @@ var eights_wild := false
 # Tonic's promise (applied by _apply_card_mods, consumed by play_hand).
 var pending_provision := ""
 var next_hand_mult := 1.0
+# Ability cards on each poker hand: hand name -> [ability ids]. The trail
+# pushes it in at every table; only the scoring abilities act here.
+var ability_loadout := {}
 
 
 func _select_cap() -> int:
@@ -1727,6 +1730,7 @@ func _apply_card_mods(result: Dictionary) -> void:
 		# cards, the Joker and the Tonic all multiply it too.
 		result.score = int(result.score) + holo_bonus * holos
 		result["holo_bonus"] = holo_bonus * holos
+	_apply_abilities(result, "flat")
 	if negatives > 0:
 		# NEGATIVE: trail mode hands back a hand (or seconds) per card.
 		result["negatives"] = negatives
@@ -1740,11 +1744,77 @@ func _apply_card_mods(result: Dictionary) -> void:
 		# Real money, straight to the pocket: $1 per gold card (more
 		# once the Outfitter has gilded them).
 		result["cash_earned"] = gold_cards * gold_pay
+	_apply_abilities(result, "mult")
 	if next_hand_mult != 1.0:
 		# Rattlesnake Tonic: the promised double, shown in the preview
 		# too. play_hand consumes the flag when the hand actually scores.
 		result.score = int(result.score * next_hand_mult)
 		result["tonic"] = true
+
+
+## The scoring abilities on the played hand. "flat" adds points before
+## any multiplier; "mult" multiplies after Mult cards and Jokers and adds
+## per-card chips. Pure on the result (no counters, no RNG), so the
+## preview shows exactly what the hand will score. Names of the
+## abilities that changed the score are listed in result.abilities.
+func _apply_abilities(result: Dictionary, stage: String) -> void:
+	var ids: Array = ability_loadout.get(String(result.get("name", "")), [])
+	if ids.is_empty():
+		return
+	var fired: Array = result.get("abilities", [])
+	for id in ids:
+		var fx: Dictionary = Abilities.def(String(id)).get("fx", {})
+		var hit := false
+		if stage == "flat":
+			if fx.has("flat"):
+				result.score = int(result.score) + int(fx.flat)
+				hit = true
+		else:
+			if fx.has("mult"):
+				result.score = int(result.score * float(fx.mult))
+				hit = true
+			if fx.has("dead_mans"):
+				var x: float = float(fx.dead_mans[0])
+				if _is_aces_and_eights():
+					x = float(fx.dead_mans[1])
+				result.score = int(result.score * x)
+				hit = true
+			if fx.has("chips_per_card"):
+				result["bonus_chips"] = int(result.get("bonus_chips", 0)) \
+						+ int(fx.chips_per_card) * selected.size()
+				hit = true
+		if hit and not fired.has(Abilities.ability_name(String(id))):
+			fired.append(Abilities.ability_name(String(id)))
+	if not fired.is_empty():
+		result["abilities"] = fired
+
+
+## Dead Man's Hand: a Two Pair of Aces and Eights.
+func _is_aces_and_eights() -> bool:
+	var aces := 0
+	var eights := 0
+	for card in selected:
+		if card.rank == 14:
+			aces += 1
+		elif card.rank == 8:
+			eights += 1
+	return aces == 2 and eights == 2
+
+
+## The next plain, uncursed card coming off the shoe takes an
+## enhancement (Hot Brand, Deputy's Badge, Marked Card). Refills an
+## empty shoe first. Returns false when no card can take it.
+func enhance_next_draw(mod: String) -> bool:
+	if deck.is_empty():
+		_refill_deck()
+	for i in range(deck.size() - 1, -1, -1):
+		var d: Dictionary = deck[i]
+		if String(d.get("mod", "")) == "" and not bool(d.get("cursed", false)) \
+				and String(d.get("finish", "")) != "metal":
+			d["mod"] = mod
+			deck[i] = d
+			return true
+	return false
 
 
 # --- Provisions: board primitives (validity rules live in trail) ----------
@@ -1827,6 +1897,7 @@ func build_state_snapshot() -> Dictionary:
 		# The seeded stream rewinds with the table, so the same hand
 		# replays the same refill.
 		"rng_state": rng.state,
+		"next_hand_mult": next_hand_mult,
 	}
 
 
@@ -1878,6 +1949,7 @@ func restore_state() -> bool:
 	holdem_community = undo_state.community.duplicate(true)
 	if undo_state.has("rng_state"):
 		rng.state = int(undo_state.rng_state)
+	next_hand_mult = float(undo_state.get("next_hand_mult", 1.0))
 	community_changed.emit()
 	undo_state = {}
 	queue_redraw()

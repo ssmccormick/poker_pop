@@ -37,8 +37,9 @@ of chips, and ride a 30-stop trail split into three regions. Each region
 has seven tables, two merchants and a campfire, and it ends with a
 **boss**: the Jack of All Trades, the Queen Bee, and finally King Cobra.
 At every table you pick from a few offers and bet chips on it. Win and
-you're paid at the table's odds, then you get to add a card to your deck
-(duplicates are what make Five of a Kind possible). Lose and you're out
+you're paid at the table's odds, then you pick an **ability card**. Ability
+cards go on your poker hands (a Pair has 2 slots, a Flush 5) and kick in
+every time you play that hand. Lose and you're out
 the stake, you take a hit to your 10 HP, and a cursed card can sneak into
 your deck.
 
