@@ -43,9 +43,12 @@ every time you play that hand. Lose and you're out
 the stake, you take a hit to your 10 HP, and a cursed card can sneak into
 your deck.
 
-Tables come in lots of flavors: hazard tables with bombs on a fuse, fire
-that spreads, wind, stones and flood water, plus bounties, heists, a gold
-mine, blackjack and hold'em rounds. Merchants sell cards, relics and
+Every table has one objective (reach the target, crack a safe, collect a
+bounty, work a gold mine, beat the dealer at blackjack, play hold'em...)
+and can stack **twists** on top: bombs on a fuse, fire that spreads, wind,
+stones and flood water, a random wild rank, a shorter hand count, or rules
+about which hands play or score. Each twist makes the table harder and
+raises its odds. Merchants sell cards, relics and
 provisions, and the campfire lets you rest or work on your deck. Your
 chips only turn into real cash if you reach the end of the trail (or
 play Gold cards along the way).

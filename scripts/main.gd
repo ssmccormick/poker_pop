@@ -62,6 +62,7 @@ var meta_label: Label
 var meter_back: ColorRect
 var meter_fill: ColorRect
 var target_label: Label
+var _twist_label: Label   # the table's twists, under the score bar
 var target_bar_back: Panel
 var _boss_ticks: Control  # HP segment marks over the banner bar
 var _kit_plate: Panel
@@ -408,6 +409,7 @@ func _ready() -> void:
 						offer["outlaws"] = trail._roll_posse(2)
 						offer.hands = 13
 						offer.target = 0
+						offer["twists"] = [{"id": "hz_fire"}]
 						break
 				trail._render_tarot()
 			"trailbet", "trailroom", "trailhazard":
@@ -430,6 +432,16 @@ func _ready() -> void:
 					trail.provisions = ["canteen", "tonic", "dynamite"]
 				if m == "trailhazard":
 					_debug_seed_hazards()
+			"trailtwist":
+				# A plain table carrying three twists, for the twist strip.
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail._choose_offer({"kind": "play", "tarot": "FAT POT", "label": "Risky",
+						"target": 1400, "hands": 9, "odds": 2.4, "min_bet": 25, "limit": "hands",
+						"goal": "", "objective": "plain", "twists": [{"id": "wild", "rank": 5},
+						{"id": "hz_fire"}, {"id": "play_only", "hands": ["Pair", "Straight", "Flush"]}]}, false)
+				if OS.get_environment("POKERPOP_STAGE") != "bet":
+					trail._confirm_bet()
 			"trailheist":
 				menu_layer.visible = false
 				trail._start_run(0)
@@ -767,6 +779,13 @@ func _update_labels() -> void:
 			target_bar_fill.size.x = BAR_W * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_kit()
+	if _twist_label != null:
+		var in_table: bool = mode_kind == "trail" and game_started and not menu_open and trail.in_room
+		var strip: String = trail.twist_badges(trail.current_offer) if in_table else ""
+		_twist_label.visible = strip != ""
+		if strip != "" and _twist_label.text != strip:
+			_twist_label.text = strip
+			_twist_label.tooltip_text = trail.twist_sentences(trail.current_offer)
 	if _deck_btn != null:
 		var show_deck := game_started and not menu_open and not game_over
 		_deck_btn.visible = show_deck
@@ -800,7 +819,7 @@ func _open_cardgrid() -> void:
 	if _cardgrid_layer != null:
 		_cardgrid_layer.queue_free()
 	# Reveal-everything flags for the grid only; restored on close.
-	PlayingCard.eights_wild = true
+	PlayingCard.wild_rank = 8
 	PlayingCard.show_hazard_intent = true
 	_cardgrid_layer = ColorRect.new()
 	_cardgrid_layer.color = Color("15100c")
@@ -879,7 +898,7 @@ func _close_cardgrid() -> void:
 		_cardgrid_layer = null
 	# Back to the game's own rules for the reveal flags (hazard intent
 	# stays on for everyone since the Weathervane retired).
-	PlayingCard.eights_wild = board.eights_wild
+	PlayingCard.wild_rank = board.wild_rank
 
 
 ## Riffle through the undealt pile — shuffled for display, so the
@@ -1259,6 +1278,16 @@ func _update_preview() -> void:
 				preview_label.add_theme_color_override("font_color", GOLD)
 				return
 		var result := Poker.evaluate(data)
+		if result.playable and not board.hand_allowed(String(result.name)):
+			preview_label.text = "This table only takes %s." % TableMods.join_and(Array(board.play_only))
+			preview_label.add_theme_color_override("font_color", RED)
+			return
+		if result.playable and not board.hand_scores(String(result.name)):
+			board._apply_card_mods(result)
+			preview_label.text = "A %s plays here, but it won't score. Only %s count.%s" % [
+					result.name, TableMods.join_and(Array(board.score_only)), _preview_mod_text(result)]
+			preview_label.add_theme_color_override("font_color", RED)
+			return
 		if result.playable:
 			board._apply_card_mods(result)
 			preview_label.text = "%s  —  %d pts   (base %d + pips %d%s)" % \
@@ -1916,8 +1945,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		"wild":
 			if not card.joker:
 				lines.append("WILD: counts as any rank and any suit.")
-	if PlayingCard.eights_wild and card.rank == 8 and not card.washed:
-		lines.append("CRAZY 8: wild at this table.")
+	if PlayingCard.wild_rank > 0 and card.rank == PlayingCard.wild_rank and not card.washed:
+		lines.append("WILD RANK: wild at this table.")
 	match card.finish:
 		"holo":
 			lines.append("HOLO: +%d to the hand, before multipliers." % board.holo_bonus)
@@ -1967,7 +1996,9 @@ const TUTOR := {
 	"boss_queen": ["QUEEN BEE", "The Queen has a 2,400 SCORE pool (bigger on higher Ascensions), and every hand she's in takes its score out of it. She never sits still, though. Each turn she moves to a new space and leaves HONEY where she walked. A honeyed card can go in any hand, but once one joins your chain, only ONE more card can follow it, so big hands get harder to build."],
 	"boss_cobra": ["KING COBRA", "King Cobra has a 5,000 SCORE pool (bigger on higher Ascensions), and every hand that includes his head takes its score out of it. Each hit stuns him and breaks off the tip of his tail. Every hand, he EATS a card next to him and takes its face. His tail is a wall you have to chain around."],
 	"goal_holdem": ["TEXAS HOLD'EM", "Five COMMUNITY cards sit in the panel for the whole table. Each hand, chain exactly TWO touching hole cards, and your hand is the best five of those seven. Reach the score target to clear the table. Sometimes a RE-DEAL card shows up: play it to get a fresh set of community cards."],
-	"goal_crazy8": ["CRAZY 8s", "House rules tonight: every 8 on the board is WILD and counts as any rank and suit. The catch is that the board is CRAWLING with hazards. Let the eights do the dirty work, but watch out for fires, fuses and floods while they do."],
+	"goal_crazy8": ["A WILD RANK", "One rank is WILD at this table, and every card of that rank counts as any rank and suit. The wild cards wear a purple W. Score tables ask a quarter more to make up for it, so lean on the wild cards to build big hands."],
+	"twists": ["TWISTS", "Some tables come with TWISTS: extra rules stacked on top of the table's job, listed under its goal. A twist might put hazards on the table, make a rank wild, shorten your hands, or limit which hands count. Every twist makes the table harder, and every one raises the odds it pays. Hover over a table on the trail to read its twists."],
+	"twist_hands": ["HAND RULES", "This table limits your hands. With HOUSE RULES, only the listed hands can be played at all. With a PICKY CROWD, any hand plays, but only the listed ones add to your score. Chips and gold from the others still pay. The list is under the score bar at the top."],
 	"goal_blackjack": ["BLACKJACK", "Poker's off tonight. You're playing the house at a table dealt FACE DOWN, with only the four corners showing. Start a chain from a face-up card, then HIT one card at a time. Each face-down card you select flips over ON THE SPOT and its pips add to your total (face cards count 10, aces 11 or 1). Hits are final, with no clearing and no take-backs, and if a flip takes you over 21 you BUST right there. Press PLAY HAND to stand: the dealer flips his hole card and draws until he beats you or busts. Every hand turns another random card face up. Win enough rounds to clear the table."],
 	"goal_outlaw": ["THE BOUNTY", "A wanted gunman has taken over this table. Clear YOUR bullets (gold) in scoring hands to shoot at him. HIS bullets (red) are trouble waiting to happen: clear a card carrying one and he SHOOTS you, so build your hands AROUND them. A hand that scores under the posted number gives him a free shot too. Some outlaws ride with a gang, and when you drop one, the next steps up fresh. Every shot he lands costs HP, and if you run out, the ride is over."],
 	"campfire": ["THE CAMPFIRE", "A rest stop on the trail. Pick ONE of three things. REST lets you sleep off the road and get HP back. TEND A CARD gives a plain card in your deck a random enhancement. CAST ONE OFF burns a card out of your deck for good. Then the fire dies down and it's back to the trail."],
@@ -2859,6 +2890,11 @@ func _build_ui() -> void:
 	target_label.visible = false
 	target_bar_back.visible = false
 	target_bar_fill.visible = false
+	_twist_label = _label(hud_root, "", Vector2(380, 94), 17, GOLD)
+	_twist_label.size = Vector2(1160, 26)
+	_twist_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_twist_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	_twist_label.visible = false
 	_boss_ticks = Control.new()
 	_boss_ticks.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	target_bar_fill.add_child(_boss_ticks)
@@ -4308,7 +4344,7 @@ func _take_screenshot(path: String) -> void:
 		get_tree().quit()
 		return
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial", "trailcallout":
+		"trailhazard", "trailtwist", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial", "trailcallout":
 			# The last page's EXP bar and level-up banner come in last.
 			await get_tree().create_timer(6.2 if OS.get_environment("POKERPOP_MODE") in ["trailover", "trailcallout"] else 4.2).timeout
 			get_viewport().get_texture().get_image().save_png(path)

@@ -33,7 +33,7 @@ const LIST := [
 	{"id": "prospector", "name": "Prospector", "desc": "Clear a Gold Mine.", "stat": "cleared_mine", "target": 1, "reward": 80, "requires": []},
 	{"id": "exterminator", "name": "Exterminator", "desc": "Clear 5 purge jobs.", "stat": "cleared_purge", "target": 5, "reward": 100, "requires": []},
 	{"id": "land_baron", "name": "Land Baron", "desc": "Clear a Land Rush.", "stat": "cleared_landrush", "target": 1, "reward": 80, "requires": []},
-	{"id": "crazy_eights", "name": "Crazy Eights", "desc": "Clear a Crazy 8s table.", "stat": "cleared_crazy8", "target": 1, "reward": 80, "requires": []},
+	{"id": "crazy_eights", "name": "Crazy Eights", "desc": "Clear a table with a wild rank.", "stat": "cleared_crazy8", "target": 1, "reward": 80, "requires": []},
 	{"id": "card_counter", "name": "Card Counter", "desc": "Win 10 blackjack rounds.", "stat": "blackjack_rounds", "target": 10, "reward": 120, "requires": []},
 	{"id": "river_rat", "name": "River Rat", "desc": "Clear a Texas Hold'em table.", "stat": "cleared_holdem", "target": 1, "reward": 100, "requires": []},
 	{"id": "up_the_sleeve", "name": "Up the Sleeve", "desc": "Swap in 25 cards with your Ace up the Sleeve.", "stat": "sleeve_swaps", "target": 25, "reward": 60, "requires": []},

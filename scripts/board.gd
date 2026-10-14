@@ -125,7 +125,11 @@ var blackjack_revealed := 2             # how many of his cards the panel shows
 var blackjack_presenting := false       # he's playing his hand out — table locked
 var blackjack_facedown := false         # this table deals its refills face-down
 # CRAZY 8s: every 8 on the board counts as wild.
-var eights_wild := false
+var wild_rank := 0   # the table's wild rank (0 = none)
+# House Rules / Picky Crowd twists: the only hands that play here, and the
+# only hands that score here (empty = no limit).
+var play_only := PackedStringArray()
+var score_only := PackedStringArray()
 # Provisions: a targeted one waiting for its card, and the Rattlesnake
 # Tonic's promise (applied by _apply_card_mods, consumed by play_hand).
 var pending_provision := ""
@@ -346,8 +350,10 @@ func reset(deal_facedown := false) -> void:
 	blackjack_presenting = false
 	blackjack_revealed = 2
 	blackjack_facedown = deal_facedown
-	eights_wild = false
-	PlayingCard.eights_wild = false
+	wild_rank = 0
+	PlayingCard.wild_rank = 0
+	play_only = PackedStringArray()
+	score_only = PackedStringArray()
 	pending_provision = ""
 	next_hand_mult = 1.0
 	for card in grid.values():
@@ -662,7 +668,8 @@ func _update_hand_validity() -> void:
 	elif not holdem_community.is_empty():
 		valid = selected.size() == 2 and not holdem_result().is_empty()
 	elif not selected.is_empty():
-		valid = Poker.evaluate(get_selected_data()).playable
+		var ev := Poker.evaluate(get_selected_data())
+		valid = ev.playable and hand_allowed(String(ev.name))
 		for card in selected:
 			if card.washed:
 				valid = false
@@ -700,7 +707,7 @@ func get_selected_data() -> Array:
 	var out := []
 	for card in selected:
 		var d := {"rank": card.rank, "suit": card.suit}
-		if card.mod == "wild" or (eights_wild and card.rank == 8):
+		if card.mod == "wild" or (wild_rank > 0 and card.rank == wild_rank):
 			d["wild"] = true
 		out.append(d)
 	return out
@@ -762,7 +769,7 @@ func play_hand() -> void:
 			return
 	else:
 		result = Poker.evaluate(get_selected_data())
-		if not result.playable:
+		if not result.playable or not hand_allowed(String(result.name)):
 			_reject_hand()
 			return
 	_apply_card_mods(result)
@@ -1545,11 +1552,23 @@ func _skip_refill() -> void:
 ## True if any submittable hand can be chained on the current board.
 ## Every card in a chain must participate in the hand (no kickers), so a
 ## hand is playable only if its exact cards form an adjacent chain.
+var _groups_allowed: Array = [[2], [3], [4], [5], [2, 2], [2, 3]]
+
+
 func has_playable_hand() -> bool:
 	# Variant rooms judge hands by their own rules; the trail reshuffles
 	# dead boards anyway, so never call these dead.
 	if blackjack_target > 0 or not holdem_community.is_empty():
 		return true
+	_groups_allowed = []
+	for pair in [["Pair", [2]], ["Three of a Kind", [3]], ["Four of a Kind", [4]],
+			["Five of a Kind", [5]], ["Two Pair", [2, 2]], ["Full House", [2, 3]]]:
+		if hand_allowed(String(pair[0])):
+			_groups_allowed.append(pair[1])
+	var flush_ok := hand_allowed("Flush") or hand_allowed("Straight Flush") \
+			or hand_allowed("Royal Flush") or hand_allowed("Flushed Five")
+	var straight_ok := hand_allowed("Straight") or hand_allowed("Straight Flush") \
+			or hand_allowed("Royal Flush")
 	# Rank-group hands (pair, trips, quads, five, two pair, full house):
 	# chains using at most two distinct ranks. Cursed cards can't start
 	# or join any chain.
@@ -1561,6 +1580,8 @@ func has_playable_hand() -> bool:
 			return true
 	# 5-card flush chains.
 	for p in grid:
+		if not flush_ok:
+			break
 		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail \
 				or grid[p].hazard == "stone":
 			continue
@@ -1568,6 +1589,8 @@ func has_playable_hand() -> bool:
 			return true
 	# 5-card straight chains (any pick order along the chain).
 	for p in grid:
+		if not straight_ok:
+			break
 		if grid[p].cursed or grid[p].is_safe or grid[p].snake_tail \
 				or grid[p].hazard == "stone":
 			continue
@@ -1582,8 +1605,7 @@ func has_playable_hand() -> bool:
 func _group_chain_exists(p: Vector2i, visited: Dictionary, rank_counts: Dictionary) -> bool:
 	var counts: Array = rank_counts.values()
 	counts.sort()
-	if counts == [2] or counts == [3] or counts == [4] or counts == [5] \
-			or counts == [2, 2] or counts == [2, 3]:
+	if _groups_allowed.has(counts):
 		return true
 	if visited.size() == MAX_SELECT:
 		return false
@@ -1745,11 +1767,26 @@ func _apply_card_mods(result: Dictionary) -> void:
 		# once the Outfitter has gilded them).
 		result["cash_earned"] = gold_cards * gold_pay
 	_apply_abilities(result, "mult")
+	if not hand_scores(String(result.get("name", ""))):
+		# Picky Crowd: the hand plays (chips and gold still pay) but
+		# doesn't score.
+		result.score = 0
+		result["unscored"] = true
 	if next_hand_mult != 1.0:
 		# Rattlesnake Tonic: the promised double, shown in the preview
 		# too. play_hand consumes the flag when the hand actually scores.
 		result.score = int(result.score * next_hand_mult)
 		result["tonic"] = true
+
+
+## House Rules: whether this hand can be played at the table at all.
+func hand_allowed(hand: String) -> bool:
+	return play_only.is_empty() or play_only.has(hand)
+
+
+## Picky Crowd: whether this hand counts toward the score here.
+func hand_scores(hand: String) -> bool:
+	return score_only.is_empty() or score_only.has(hand)
 
 
 ## The scoring abilities on the played hand. "flat" adds points before
@@ -1898,6 +1935,9 @@ func build_state_snapshot() -> Dictionary:
 		# replays the same refill.
 		"rng_state": rng.state,
 		"next_hand_mult": next_hand_mult,
+		"wild_rank": wild_rank,
+		"play_only": play_only,
+		"score_only": score_only,
 	}
 
 
@@ -1950,6 +1990,9 @@ func restore_state() -> bool:
 	if undo_state.has("rng_state"):
 		rng.state = int(undo_state.rng_state)
 	next_hand_mult = float(undo_state.get("next_hand_mult", 1.0))
+	if undo_state.has("play_only"):
+		play_only = PackedStringArray(undo_state.play_only)
+		score_only = PackedStringArray(undo_state.get("score_only", PackedStringArray()))
 	community_changed.emit()
 	undo_state = {}
 	queue_redraw()

@@ -574,6 +574,41 @@ func _run() -> void:
 	trail.loadout = {}
 	trail._push_loadout()
 
+	# --- Twists at the table: wild ranks, hand rules, hazard top-ups ----
+	main.board.wild_rank = 5
+	var fives: Array = []
+	for pp in main.board.grid:
+		if main.board.grid[pp].rank == 5:
+			fives.append(main.board.grid[pp])
+	if not fives.is_empty():
+		main.board.selected.assign([fives[0]])
+		failures += _check(main.board.get_selected_data()[0].get("wild", false),
+				"with Wild 5s, a 5 plays as wild")
+		main.board.selected.clear()
+	main.board.wild_rank = 0
+	main.board.play_only = PackedStringArray(["Pair", "Flush"])
+	failures += _check(main.board.hand_allowed("Pair") and not main.board.hand_allowed("Straight"),
+			"House Rules lets only the listed hands play")
+	main.board.play_only = PackedStringArray()
+	main.board.score_only = PackedStringArray(["Flush"])
+	var picky := {"name": "Pair", "score": 100}
+	main.board.selected.clear()
+	main.board._apply_card_mods(picky)
+	failures += _check(int(picky.score) == 0 and picky.get("unscored", false),
+			"a Picky Crowd lets an off-list hand play for no score")
+	main.board.score_only = PackedStringArray()
+	var keep_offer: Dictionary = trail.current_offer
+	trail.current_offer = {"kind": "play", "twists": [{"id": "hz_bomb"}]}
+	for pp in main.board.grid:
+		if main.board.grid[pp].hazard == "bomb":
+			main.board.provision_clean(main.board.grid[pp])
+	main.board._pending_refill_hazards.clear()
+	trail._hazard_twist_upkeep()
+	failures += _check(main.board._pending_refill_hazards.has("bomb"),
+			"Lit Fuses tops the bombs back up with the next deal")
+	main.board._pending_refill_hazards.clear()
+	trail.current_offer = keep_offer
+
 	# --- Stones cover cards: a hand next to one breaks it off ------------
 	var spair := _plain_neighbors()
 	var rock: PlayingCard = null
@@ -731,13 +766,68 @@ func _run() -> void:
 	var goals := {}
 	var only_peddler := true
 	var clocks := 0
+	var twists_ok := true
+	var twist_kinds := {}
+	var max_twists := 0
 	for i in 400:
 		var o: Dictionary = trail._make_one_offer(true)
 		goals[String(o.get("goal", ""))] = true
 		if String(o.get("limit", "")) == "time":
 			clocks += 1
+			if not TableMods.has_twist(o, "clock"):
+				twists_ok = false  # a clock table shows its clock as a twist
 		if trail._random_merchant_index() != 0:
 			only_peddler = false
+		# One objective, and twists that belong on it.
+		if not o.has("objective") or not o.has("twists"):
+			twists_ok = false
+		var rolled := 0
+		var seen := {}
+		for tw in o.get("twists", []):
+			var tid := String(tw.id)
+			if seen.has(tid) or not TableMods.TWISTS.has(tid):
+				twists_ok = false
+			seen[tid] = true
+			twist_kinds[tid] = true
+			if tid in TableMods.ROLLABLE:
+				rolled += 1
+			if tid == "play_only" and not (tw.hands as Array).has("Pair"):
+				twists_ok = false  # House Rules always lets a Pair play
+			if tid == "wild" and (int(tw.rank) < 2 or int(tw.rank) > 14):
+				twists_ok = false
+			if (tid == "hz_stone" and o.get("goal", "") == "mine") \
+					or (tid.begins_with("hz_") and o.get("goal", "") == "purge"
+					and tid.substr(3) == String(o.get("purge_kind", ""))):
+				twists_ok = false
+		max_twists = maxi(max_twists, rolled)
+		if o.get("goal", "") == "crazy8":
+			twists_ok = false  # Crazy 8s is a twist now
+	failures += _check(twists_ok and max_twists <= TableMods.MAX_TWISTS and max_twists >= 1,
+			"every table has one objective and twists that fit it (up to %d)" % max_twists)
+	failures += _check(twist_kinds.has("wild") and twist_kinds.has("hz_fire")
+			and twist_kinds.has("play_only") and twist_kinds.has("score_only"),
+			"wild ranks, hazards and hand rules all turn up (%s)" % str(twist_kinds.keys()))
+	trail.room_index = 0
+	var first_twists := 0
+	for i in 30:
+		for tw in trail._make_one_offer(true).get("twists", []):
+			if String(tw.id) in TableMods.ROLLABLE:
+				first_twists += 1
+	failures += _check(first_twists == 0, "the first table never has twists")
+	trail.room_index = 5
+	# Old saved tables move onto twists.
+	var old8: Dictionary = trail._migrate_offer({"kind": "play", "goal": "crazy8", "target": 900,
+			"limit": "hands", "tarot": "CRAZY 8s", "odds": 1.5, "hands": 10})
+	failures += _check(String(old8.goal) == "" and TableMods.wild_rank(old8) == 8
+			and TrailMode.table_type(old8) == "plain", "an old Crazy 8s table becomes a plain table with wild 8s")
+	var old_noon: Dictionary = trail._migrate_offer({"kind": "play", "goal": "timed", "target": 900,
+			"limit": "hands", "odds": 1.0, "hands": 10, "minutes": 3})
+	failures += _check(String(old_noon.goal) == "" and old_noon.limit == "time"
+			and TableMods.has_twist(old_noon, "clock"), "an old HIGH NOON table keeps its clock")
+	failures += _check(TableMods.twist_name({"id": "wild", "rank": 5}) == "Wild 5s"
+			and TableMods.twist_desc({"id": "play_only", "hands": ["Pair", "Straight"]})
+			== "You can only play Pairs and Straights at this table.",
+			"twists read in plain words")
 	failures += _check(goals.size() >= 8 and clocks > 0,
 			"a level-1 rider meets every kind of table (%d kinds, %d on the clock)" % [goals.size(), clocks])
 	failures += _check(only_peddler, "merchants are still unlocked one by one: only the Peddler at level 1")

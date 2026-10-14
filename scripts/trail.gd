@@ -91,7 +91,7 @@ const AMBIENT_CHANCE := 0.12     # bonus safe or chest in plain rooms
 const ROOM_TABLE := {
 	"safe": OBJECTIVE_CHANCE * 0.5, "chest": OBJECTIVE_CHANCE * 0.5,
 	"mine": PURGE_CHANCE * 0.2, "purge": PURGE_CHANCE * 0.8,
-	"hands": REQUIRE_CHANCE, "holdem": HOLDEM_CHANCE, "crazy8": CRAZY8_CHANCE,
+	"hands": REQUIRE_CHANCE, "holdem": HOLDEM_CHANCE,
 	"blackjack": BLACKJACK_CHANCE, "outlaw": OUTLAW_CHANCE,
 	"collect": COLLECT_CHANCE, "landrush": LANDRUSH_CHANCE,
 	"plain": 0.20,
@@ -197,7 +197,7 @@ const CATALOG_DESCS := {
 	"room:purge": "Powder Keg, Wildfire, Dust Storm and Flash Flood: clear a set number of one kind of hazard.",
 	"room:mine": "Gold Mine: break the stones off the cards. Some of those cards are gold.",
 	"room:collect": "The Roundup and The Census: clear the suit or rank the table calls, or one of every rank.",
-	"room:crazy8": "Every 8 on the board is wild.",
+	"room:crazy8": "A random rank is wild at this table.",
 	"room:landrush": "Stake a claim on every plot by clearing a card from all 25 spaces.",
 	"room:blackjack": "Make chains that add up to 21 and beat the dealer, round after round.",
 	"room:holdem": "Five community cards everyone shares, plus two hole cards of your own.",
@@ -483,6 +483,7 @@ var _bet_amount_label: Label
 var _bet_deal_btn: Button
 var _deck_view_burn := true   # deck viewer doubles as the shop's burn picker
 var abilities_screen: AbilitiesScreen
+var _bet_twists: Label    # the table's twists, spelled out under the bet
 var _shop_stock_abilities: Array = []   # [{id, bought}] on the merchant's shelf
 var _shop_saved := {}    # what a saved ride already bought at this stop's merchant
 var _tarot_ab_btn: Button
@@ -805,12 +806,17 @@ func _load_run() -> bool:
 	trail_log = Array(cf.get_value("run", "trail_log", PackedStringArray()))
 	_second_wind_used = cf.get_value("run", "second_wind_used", false)
 	burns_used = int(cf.get_value("run", "burns_used", 0))
-	pending_retry = cf.get_value("run", "pending", {})
+	pending_retry = _migrate_offer(cf.get_value("run", "pending", {}))
 	pending_is_retry = cf.get_value("run", "pending_hard", true)
 	_offers = cf.get_value("run", "offers", [])
-	_fate_offer = cf.get_value("run", "fate", {})
+	for i in _offers.size():
+		_offers[i] = _migrate_offer(_offers[i])
+	_fate_offer = _migrate_offer(cf.get_value("run", "fate", {}))
 	_offers_room = int(cf.get_value("run", "offers_room", -1))
 	_room_save = cf.get_value("run", "room_state", {})
+	if _room_save.has("offer"):
+		_room_save["offer"] = _migrate_offer(_room_save.offer)
+	tables_played.erase("crazy8")
 	if int(cf.get_value("run", "layout", 1)) < STOPS_LAYOUT_VERSION:
 		_migrate_stops()
 	_shop_stock_room = -1  # resumed runs sit at a tarot or a retry bet
@@ -2663,7 +2669,7 @@ func _roll_room_goal(on_wall: Array = [], strict := false) -> String:
 ## The rotation type of a play offer: its goal, or "plain".
 static func table_type(offer: Dictionary) -> String:
 	var goal := String(offer.get("goal", ""))
-	return "plain" if goal == "" or goal == "timed" else goal
+	return "plain" if goal in ["", "timed", "crazy8"] else goal
 
 
 ## A table was sat down at: its type leaves the rotation until every
@@ -2779,13 +2785,6 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 			offer["goal"] = "holdem"
 			offer.target = _target_for(room_index, {"target_scale": 1.1})
 			offer.hands = 8
-		elif goal == "crazy8":
-			# Crazy 8s: a normal table, but every 8 is wild.
-			offer.tarot = "CRAZY 8s"
-			offer.label = "Wild Eights"
-			offer.odds = 1.5
-			offer["goal"] = "crazy8"
-			offer.target = _target_for(room_index, {"target_scale": 1.25})
 		elif goal == "blackjack":
 			# Blackjack: chains score their pip sum — beat the dealer.
 			offer.tarot = "BLACKJACK"
@@ -2864,7 +2863,115 @@ func _make_one_offer(random_risk: bool, risk: Dictionary = {}, on_wall: Array = 
 			offer.tarot = "HIGH NOON"
 	else:
 		offer["limit"] = "hands"
+	# The objective is set; now the TWISTS. The clock and the blackjack
+	# storm come with their tables (a chosen clock pays a little extra);
+	# the rest roll by risk and region, last of all, so the objective a
+	# seed deals never depends on them.
+	var forced_clock := String(offer.get("goal", "")) in ["safe", "chest", "mine"] \
+			or String(offer.get("tarot", "")) == "ROYAL HUNT"
+	var twists: Array = []
+	if offer.limit == "time":
+		twists.append({"id": "clock", "forced": forced_clock})
+		if not forced_clock:
+			offer.odds = float(offer.odds) + float(TableMods.TWISTS.clock.odds)
+	if offer.get("goal", "") == "blackjack":
+		twists.append({"id": "storm", "forced": true})
+	offer["objective"] = table_type(offer)
+	offer["twists"] = twists
+	_roll_twists(offer, TableMods.twist_count(room_index, maxi(RISKS.find(risk), 0),
+			region, _rng))
+	offer.odds = snappedf(float(offer.odds), 0.05)
 	return offer
+
+
+## Adds `n` twists that fit the table, each with its own detail, and
+## raises the odds for each.
+func _roll_twists(offer: Dictionary, n: int) -> void:
+	for i in n:
+		var pool: Array = []
+		for id in TableMods.ROLLABLE:
+			if TableMods.fits(id, offer):
+				pool.append(id)
+		if pool.is_empty():
+			return
+		var id := String(SeedRng.pick(_rng, pool))
+		var tw := {"id": id}
+		match id:
+			"wild":
+				tw["rank"] = _rng.randi_range(2, 14)
+				if int(offer.target) > 0:
+					offer.target = int(int(offer.target) * 1.25)
+			"short":
+				if offer.limit == "time":
+					offer["minutes"] = maxi(2, int(offer.get("minutes", 3)) - 1)
+				else:
+					offer.hands = maxi(4, int(offer.hands) - 2)
+			"tough":
+				offer.target = int(int(offer.target) * 1.2)
+			"play_only":
+				var extra: Array = TableMods.PLAY_ONLY_EXTRA.duplicate()
+				SeedRng.shuffle(_rng, extra)
+				var hands: Array = ["Pair"] + extra.slice(0, _rng.randi_range(1, 2))
+				tw["hands"] = _hand_order(hands)
+			"score_only":
+				var low: Array = TableMods.SCORE_ONLY_LOW.duplicate()
+				var high: Array = TableMods.SCORE_ONLY_HIGH.duplicate()
+				SeedRng.shuffle(_rng, low)
+				SeedRng.shuffle(_rng, high)
+				tw["hands"] = _hand_order(low.slice(0, 1) + high.slice(0, _rng.randi_range(1, 2)))
+		(offer.twists as Array).append(tw)
+		offer.odds = float(offer.odds) + float(TableMods.TWISTS[id].odds)
+
+
+func _hand_order(hands: Array) -> Array:
+	var out: Array = []
+	for h in Abilities.HAND_ORDER:
+		if hands.has(h):
+			out.append(h)
+	return out
+
+
+## The twists in words, one sentence each (for the bet screen and tips).
+func twist_sentences(o: Dictionary) -> String:
+	var out: Array = []
+	for tw in o.get("twists", []):
+		var d := TableMods.twist_desc(tw)
+		if d != "":
+			out.append(d)
+	return " ".join(PackedStringArray(out))
+
+
+## The twists as short badges ("WILD 5s  +  BRUSHFIRE").
+func twist_badges(o: Dictionary) -> String:
+	var out: Array = []
+	for tw in o.get("twists", []):
+		var badge := TableMods.twist_name(tw).to_upper()
+		if String(tw.get("id", "")) == "wild" and int(tw.get("rank", 0)) <= 10:
+			badge = "WILD %ds" % int(tw.rank)  # "WILD 5s", not "WILD 5S"
+		out.append(badge)
+	return "  +  ".join(PackedStringArray(out))
+
+
+## Older rides saved before twists: Crazy 8s becomes a plain table with
+## wild 8s, and a timed or blackjack table gets its clock or storm.
+func _migrate_offer(o: Dictionary) -> Dictionary:
+	if o.is_empty() or o.get("kind", "") != "play" or o.has("twists") or o.has("boss"):
+		return o
+	var twists: Array = []
+	if String(o.get("goal", "")) == "crazy8":
+		o["goal"] = ""
+		twists.append({"id": "wild", "rank": 8})
+	if String(o.get("goal", "")) == "timed":
+		o["goal"] = ""
+		o["limit"] = "time"
+	if String(o.get("limit", "hands")) == "time":
+		twists.append({"id": "clock", "forced": true})
+	if String(o.get("goal", "")) == "blackjack":
+		twists.append({"id": "storm", "forced": true})
+	o["twists"] = twists
+	o["objective"] = table_type(o)
+	o["legacy_ambient"] = true  # keeps the old hidden hazard roll
+	return o
 
 
 func _render_tarot() -> void:
@@ -2954,8 +3061,6 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 			goal_line = "Break all %d stones. Some have gold cards under them" % offer.stones
 		elif offer.get("goal", "") == "holdem":
 			goal_line = "Target %d — HOLD'EM rules" % offer.target
-		elif offer.get("goal", "") == "crazy8":
-			goal_line = "Target %d. 8s are WILD, and hazards are everywhere" % offer.target
 		elif offer.get("goal", "") == "blackjack":
 			goal_line = "Beat the dealer %d times, with hazards in play" % offer.wins
 		elif offer.get("goal", "") == "outlaw":
@@ -2981,7 +3086,12 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					offer.get("minutes", 4)]
 		if offer.has("boss"):
 			bet_line = "ALL IN"
+		var badges := twist_badges(offer)
+		if badges != "":
+			goal_line += "\n" + badges
+			b.tooltip_text = twist_sentences(offer)
 		if offer.get("goal", "") == "outlaw" and _apply_wanted_poster(b, offer):
+			_add_twist_strip(b, offer)
 			return b
 		var tier := _apply_poster(b, _poster_job(String(offer.tarot)),
 				_offer_tier(offer))
@@ -2993,6 +3103,19 @@ func _tarot_card_button(offer: Dictionary, x: float) -> Button:
 					"Odds  %s\n%s" % [_odds_text(offer.odds), bet_line],
 					offer.has("boss"))
 	return b
+
+
+## The wanted poster has no room for the goal line, so its twists ride
+## on a little strip under it.
+func _add_twist_strip(b: Button, offer: Dictionary) -> void:
+	var badges := twist_badges(offer)
+	if badges == "":
+		return
+	var l: Label = main._label(b, badges, Vector2(0, b.size.y + 4), 14, main.GOLD)
+	l.size = Vector2(b.size.x, 40)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 ## The campfire's poster: the design pack's REST STOP band and
@@ -3267,7 +3390,10 @@ func _odds_text(odds: float) -> String:
 		return "5 : 2"
 	if is_equal_approx(odds, 3.5):
 		return "7 : 2"
-	return "%d : 1" % maxi(1, int(round(odds)))
+	if is_equal_approx(odds, round(odds)):
+		return "%d : 1" % maxi(1, int(round(odds)))
+	# Twists push the odds off the round numbers: show them as they are.
+	return "%s : 1" % String.num(odds, 2)
 
 
 func _require_text(req: Array) -> String:
@@ -3370,8 +3496,6 @@ func _bet_goal_text(o: Dictionary) -> String:
 			return "Break all %d stones. Some have gold cards under them, and more stones drop in as you dig" % o.stones
 		"holdem":
 			return "Target %d. Pick 2 hole cards and score the best 5 of 7 with the community" % o.target
-		"crazy8":
-			return "Target %d. Every 8 is WILD, but the board is crawling with hazards" % o.target
 		"blackjack":
 			return "Beat the dealer %d times. The table's face down, you hit blind, and the dealer plays his hand" % o.wins
 		"outlaw":
@@ -3406,6 +3530,8 @@ func _refresh_bet_labels() -> void:
 	_bet_info.text = "%s — %s table\n%s   ·   odds %s   ·   %d %s to do it\nAnte %d (the house keeps it, win or lose)\nYour chips: %d%s" % [
 		o.tarot, o.label, _bet_goal_text(o), _odds_text(o.odds), reference,
 		unit, blind, chips, retry_line]
+	var twist_line := twist_sentences(o)
+	_bet_twists.text = ("TWISTS:  " + twist_badges(o) + "\n" + twist_line) if twist_line != "" else ""
 	_bet_amount_label.text = "BET  %d" % _bet_amount
 	_bet_stake_label.text = "Odds ×%.2f      a win pays back %d" % [
 		float(o.odds), _bet_amount + int(_bet_amount * float(o.odds))]
@@ -3577,10 +3703,6 @@ func _seed_room_specials() -> void:
 		main.board.deal_community()
 		if _rng.randf() < 0.5:
 			main.board.spawn_objective("redeal")
-	elif room_goal == "crazy8":
-		main.board.eights_wild = true
-		PlayingCard.eights_wild = true
-		main.board.apply_theme()  # repaint so the 8s show their W
 	elif room_goal == "blackjack":
 		_deal_dealer()
 		main.board.set_blackjack_facedown()
@@ -3603,15 +3725,21 @@ func _seed_room_specials() -> void:
 			main.board.spawn_safe(room_combo)
 		else:
 			main.board.spawn_key_and_chest()
-	# Storm tables (Crazy 8s, Blackjack) trade the ambient roll for a
-	# guaranteed mixed hazard load — the house evening the odds.
+	_apply_twist_rules()
+	# Storm tables (Blackjack) trade the ambient roll for a guaranteed
+	# mixed hazard load — the house evening the odds.
 	var storm := _hazard_floor()
 	for i in storm:
 		main.board.apply_room_hazards(SeedRng.pick(_rng, HAZARD_KINDS), 1)
-	# Hazards are ambient in EVERY other play room — bosses included —
-	# and get more frequent and more numerous with depth and stakes.
-	# Purge rooms are exempt: their hazards ARE the room.
-	if room_goal != "purge" and storm == 0:
+	# Hazard TWISTS put their hazard on the table up front (and keep it
+	# topped up). Tables dealt with twists show their danger, so the old
+	# hidden hazard roll only runs for bosses and older saved tables.
+	for kind in TableMods.HAZARD_TWISTS:
+		if TableMods.has_twist(current_offer, String(TableMods.HAZARD_TWISTS[kind])):
+			main.board.apply_room_hazards(String(kind), _hazard_twist_floor())
+	var hidden_roll := current_offer.has("boss") or not current_offer.has("twists") \
+			or bool(current_offer.get("legacy_ambient", false))
+	if room_goal != "purge" and storm == 0 and hidden_roll:
 		var hz_chance := clampf(HAZARD_BASE_CHANCE + HAZARD_ROOM_STEP * table_depth(room_index)
 				+ Ascension.hazard_bonus(ascension), 0.0, 0.95)
 		if _rng.randf() < hz_chance:
@@ -3651,11 +3779,41 @@ func _seed_room_specials() -> void:
 ## other room returns 0 and rides the ordinary ambient roll.
 func _hazard_floor() -> int:
 	match room_goal:
-		"crazy8":
-			return CRAZY8_HAZARDS_BASE + room_index / REGION_SIZE
 		"blackjack":
 			return BLACKJACK_HAZARDS_BASE + room_index / REGION_SIZE
 	return 0
+
+
+## How many of its hazard a hazard twist keeps on the table.
+func _hazard_twist_floor() -> int:
+	return 2 + room_index / REGION_SIZE
+
+
+## The board takes the table's twists: the wild rank and any hand rules.
+## Runs at the sit-down and when a photographed table is restored.
+func _apply_twist_rules() -> void:
+	var wr := TableMods.wild_rank(current_offer)
+	main.board.wild_rank = wr
+	PlayingCard.wild_rank = wr
+	main.board.play_only = PackedStringArray(TableMods.twist(current_offer, "play_only").get("hands", []))
+	main.board.score_only = PackedStringArray(TableMods.twist(current_offer, "score_only").get("hands", []))
+	if wr > 0:
+		main.board.apply_theme()  # repaint so the wild cards show their W
+
+
+## After every hand, each hazard twist tops its hazard back up to its
+## floor, one card at a time on the deal.
+func _hazard_twist_upkeep() -> void:
+	for kind in TableMods.HAZARD_TWISTS:
+		if not TableMods.has_twist(current_offer, String(TableMods.HAZARD_TWISTS[kind])):
+			continue
+		var live := 0
+		for p in main.board.grid:
+			var c: PlayingCard = main.board.grid[p]
+			if c.hazard == String(kind):
+				live += 1
+		if live < _hazard_twist_floor():
+			main.board.queue_refill_hazards(String(kind), 1)
 
 
 ## First-encounter popups for whatever this room just put in play.
@@ -3673,8 +3831,6 @@ func _tutor_room_intros() -> void:
 			main.tutor_show("goal_hands")
 		"holdem":
 			main.tutor_show("goal_holdem")
-		"crazy8":
-			main.tutor_show("goal_crazy8")
 		"blackjack":
 			main.tutor_show("goal_blackjack")
 		"outlaw":
@@ -3685,6 +3841,13 @@ func _tutor_room_intros() -> void:
 			main.tutor_show("goal_landrush")
 	if room_on_clock():
 		main.tutor_show("goal_timed")
+	for tw in current_offer.get("twists", []):
+		if not bool(tw.get("forced", false)):
+			main.tutor_show("twists")
+	if TableMods.wild_rank(current_offer) > 0:
+		main.tutor_show("goal_crazy8")
+	if TableMods.has_twist(current_offer, "play_only") or TableMods.has_twist(current_offer, "score_only"):
+		main.tutor_show("twist_hands")
 	for p in main.board.grid:
 		var card: PlayingCard = main.board.grid[p]
 		if card.hazard != "":
@@ -3888,6 +4051,7 @@ func on_hand_played(result: Dictionary) -> void:
 		if _require_left() == 0:
 			_room_cleared()
 			return
+	_hazard_twist_upkeep()
 	# Lost keys and chests (played without a partner, blown off by
 	# wind, burned out) respawn from the hazard tick's settle check —
 	# one place, after everything that can remove a card has acted.
@@ -4514,6 +4678,8 @@ func _room_cleared() -> void:
 		run_bosses += 1
 	elif room_goal == "outlaw":
 		main.stat_bump("duels_won")
+	if TableMods.wild_rank(current_offer) > 0:
+		main.stat_bump("cleared_crazy8")  # the Crazy Eights contract: any wild table
 	if String(current_offer.get("tarot", "")) == "ROYAL HUNT":
 		main.stat_bump("cleared_royal")
 	elif room_goal != "" and room_goal != "boss":
@@ -4781,11 +4947,8 @@ func _restore_room_state() -> void:
 	main.board.refill_hazard_chance = 0.0 if room_goal == "purge" \
 			else _refill_chance() * _ability_passive("refill_hazard_mult", 1.0)
 	main.board.apply_state_snapshot(rs.board)
-	if room_goal == "crazy8":
-		main.board.eights_wild = true
-		PlayingCard.eights_wild = true
-		main.board.apply_theme()
-	elif room_goal == "landrush":
+	_apply_twist_rules()
+	if room_goal == "landrush":
 		main.board.landrush_active = true
 		main.board.queue_redraw()
 	elif room_goal == "outlaw":
@@ -6205,6 +6368,10 @@ func build_ui() -> void:
 
 	bet_layer = _layer()
 	_screen_title(bet_layer, "THE STAKES")
+	_bet_twists = main._label(bet_layer, "", Vector2(310, 820), 19, main.GOLD)
+	_bet_twists.size = Vector2(1300, 120)
+	_bet_twists.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_bet_twists.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_bet_info = _center(bet_layer, "", 240, 26, main.OFFWHITE)
 	# The info block runs four lines (five on a retry) — the bet row
 	# sits well below so nothing ever overlaps it.

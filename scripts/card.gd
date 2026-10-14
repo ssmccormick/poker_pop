@@ -107,7 +107,7 @@ static var show_hazard_intent := true
 # doubles it), pushed by trail's relic effects.
 static var chip_pay_base := 8
 # CRAZY 8s room: every 8 on the board is wild (drawn with a W badge).
-static var eights_wild := false
+static var wild_rank := 0   # a table's wild rank (Wild 8s, Wild 5s...); 0 = none
 
 static var _face_box: StyleBoxFlat
 static var _selected_box: StyleBoxFlat
@@ -1082,11 +1082,11 @@ func _draw() -> void:
 		if mod != "":
 			# Enhanced cards wear their power as the center art.
 			_draw_mod_art(font)
-			if eights_wild and rank == 8:
+			if wild_rank > 0 and rank == wild_rank:
 				# Still an 8 under the mod's face â€” still WILD.
 				draw_string(font, Vector2(W / 2.0 - 44, -H / 2.0 + 32), "W",
 						HORIZONTAL_ALIGNMENT_CENTER, 36, 28, WILD_PURPLE)
-		elif eights_wild and rank == 8:
+		elif wild_rank > 0 and rank == wild_rank:
 			draw_string(font, Vector2(-24, 22), "W",
 					HORIZONTAL_ALIGNMENT_CENTER, 48, 46, WILD_PURPLE)
 		else:
@@ -1536,8 +1536,15 @@ func _draw_art(rect: Rect2) -> void:
 				WIND_BLUE)
 	if honey:
 		_art(rect, "special", "honey")
-	if eights_wild and rank == 8:
-		_art(rect, "rider", "wild8_badge")
+	if wild_rank > 0 and rank == wild_rank:
+		if wild_rank == 8:
+			_art(rect, "rider", "wild8_badge")
+		else:
+			# No badge art for other ranks: a purple W in the corner.
+			var wf: Font = FontLib.display if FontLib.display != null else ThemeDB.fallback_font
+			draw_circle(Vector2(W / 2.0 - 16, -H / 2.0 + 18), 13, Color(0.16, 0.08, 0.22, 0.9))
+			draw_string(wf, Vector2(W / 2.0 - 29, -H / 2.0 + 26), "W",
+					HORIZONTAL_ALIGNMENT_CENTER, 26, 20, WILD_PURPLE)
 	if cursed:
 		_art(rect, "special", "cursed")
 	_draw_art_chain_badge(font)

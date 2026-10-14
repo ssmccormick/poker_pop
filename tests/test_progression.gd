@@ -240,9 +240,13 @@ func _odds() -> void:
 	var p := Progression.new()
 	p.unlock_all = true
 	# The old cumulative chain, goal by goal.
+	# Crazy 8s became a twist (a wild rank on any table), so the other
+	# objectives share its 7%.
 	var old_rooms := {"safe": 0.06, "chest": 0.06, "mine": 0.024, "purge": 0.096,
-			"hands": 0.10, "holdem": 0.08, "crazy8": 0.07, "blackjack": 0.08,
+			"hands": 0.10, "holdem": 0.08, "blackjack": 0.08,
 			"outlaw": 0.08, "collect": 0.08, "landrush": 0.07, "plain": 0.20}
+	for k in old_rooms:
+		old_rooms[k] = float(old_rooms[k]) / 0.93
 	_check(_odds_match(p, "room", TrailMode.ROOM_TABLE, old_rooms),
 			"table odds match the old draw within 1.5%")
 	var old_mods := {"mult": 0.26, "chip": 0.26, "plus": 0.14, "minus": 0.10,

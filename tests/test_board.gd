@@ -55,6 +55,17 @@ func _init() -> void:
 		[13, 0, 0, 0], [14, 1, 1, 0], [2, 2, 2, 0], [3, 3, 3, 0], [4, 0, 4, 0],
 	])
 
+	# House Rules: only the listed hands count as moves.
+	failures += _check(false, "a lone pair is no move when only Flushes play", [
+		[13, 0, 0, 0], [13, 1, 1, 0],
+	], ["Flush"])
+	failures += _check(true, "a flush chain is a move when Flushes play", [
+		[2, 1, 0, 0], [6, 1, 1, 0], [9, 1, 2, 0], [11, 1, 3, 0], [13, 1, 4, 0],
+	], ["Pair", "Flush"])
+	failures += _check(false, "a straight is no move when only Pairs and Flushes play", [
+		[5, 0, 0, 0], [6, 1, 1, 0], [7, 2, 2, 0], [8, 3, 3, 0], [9, 0, 4, 0],
+	], ["Pair", "Flush"])
+
 	if failures == 0:
 		print("ALL BOARD TESTS PASSED")
 	else:
@@ -63,8 +74,9 @@ func _init() -> void:
 
 
 ## cards: [[rank, suit, x, y], ...]
-func _check(expected: bool, label: String, cards: Array) -> int:
+func _check(expected: bool, label: String, cards: Array, play_only: Array = []) -> int:
 	var board := Board.new()
+	board.play_only = PackedStringArray(play_only)
 	for c in cards:
 		var card := PlayingCard.new()
 		card.rank = c[0]
