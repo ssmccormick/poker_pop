@@ -1474,14 +1474,15 @@ func _draw_art(rect: Rect2) -> void:
 					rect.end.y - 14.0), "JOKER  ×2",
 					HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 11,
 					Color("2a4a2a"))
-		elif mod == "chip" and chip_level > 0:
-			# A seasoned chip wears its grown payout beside its badge.
+		elif mod == "chip":
+			# The Cash card wears its live payout beside its "$" seal (the
+			# art carries no number), in the banknote's engraving ink.
 			var cfont: Font = FontLib.numbers if FontLib.numbers != null \
 					else ThemeDB.fallback_font
 			draw_string(cfont, Vector2(rect.position.x + rect.size.x * 0.36,
 					rect.end.y - 14.0),
 					"+$%d" % (chip_pay_base * (1 + chip_level)),
-					HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 12, GOLD)
+					HORIZONTAL_ALIGNMENT_CENTER, rect.size.x * 0.56, 13, Color("2f4a3c"))
 		_draw_art_rank_suit(rect)
 		_draw_finish(rect)
 

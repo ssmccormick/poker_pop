@@ -374,7 +374,7 @@
   "icons": "relics/ and provisions/: glyph/, frame/, framed/. 256x256 transparent.",
   "mod_colors": {
    "mult": "#8f4a34",
-   "chip": "#4b6272",
+   "chip": "#4f6b5a",
    "plus": "#5e7447",
    "minus": "#83403a",
    "bumper": "#9a6b40",
