@@ -17,8 +17,9 @@ const NAME_MAX := 12
 
 
 ## Bumped whenever the rules change what a seed deals (r2: ability cards
-## replace the card pick), so old and new scores never share a board.
-const RULESET := "r2"
+## replace the card pick; r3: tables carry twists), so old and new
+## scores never share a board.
+const RULESET := "r3"
 
 
 static func key(mode: String, seed_text: String, variant := "") -> String:
