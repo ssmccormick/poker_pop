@@ -1400,7 +1400,9 @@ func _draw_art(rect: Rect2) -> void:
 		return
 
 	# A playing card: base, identity (or mod regalia), then trouble.
-	_art(rect, "base", "card_blank")
+	# Fire, water, wind and bomb cards have their own full-card bases.
+	var hz_base := _hazard_base()
+	_art(rect, "base", hz_base if hz_base != "" else "card_blank")
 	if washed:
 		# FILLED: water to the brim hides everything.
 		_art(rect, "hazard", "water_4")
@@ -1409,7 +1411,18 @@ func _draw_art(rect: Rect2) -> void:
 		_draw_art_chain_badge(font)
 		_draw_art_rings(rect)
 		return
-	if joker and CardArt.tex("center", "face_joker") != null:
+	if hz_base != "":
+		# The hazard IS the card: no center face, but the rank and suit
+		# stay in the corners and an enhancement keeps its corner badge.
+		if mod != "" and not joker:
+			if mod in ["plus", "minus", "bumper"]:
+				_art_badge(rect, "mod_emblem", mod + "_arrow_up", Vector2(0.24, 0.78), 0.52,
+						Color.WHITE, CardArt.arrow_rotation(boost_dir))
+			else:
+				_art_badge(rect, "mod_emblem", mod, Vector2(0.24, 0.78), 0.52)
+		_draw_art_rank_suit(rect)
+		_draw_finish(rect)
+	elif joker and CardArt.tex("center", "face_joker") != null:
 		# THE JOKER's own stack: harlequin skin, the jester, his JKR
 		# index (no suit), any finish, then the ×2 badge on top.
 		_art(rect, "mod_wash", "joker")
@@ -1485,6 +1498,14 @@ func _draw_art(rect: Rect2) -> void:
 			# the streaming chevrons carry the direction.
 			_draw_wind_swirl()
 			_draw_wind_stream(rect)
+		"bomb" when hz_base == "bomb":
+			# The whole card is the bomb: its clockwork timer lights one
+			# lamp per hand left, and the countdown reads in the window.
+			var alert_b := 0.55 + 0.45 * sin(_t * 6.0 + _phase)
+			if fuse >= 1:
+				_art(rect, "hazard", "bomb_timer_lamps_%d" % clampi(fuse, 1, 5))
+			_draw_bomb_countdown(rect)
+			_art(rect, "hazard", "bomb_alert_ring", Color(1, 1, 1, alert_b))
 		"bomb":
 			# The dynamite rides the free top-right corner â€” center
 			# stage belongs to the card's own face.
@@ -2020,3 +2041,26 @@ func _crumble_burst() -> void:
 	p.color = Color(0.5, 0.5, 0.55)
 	add_child(p)
 	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
+
+## The full-card hazard base this card wears ("" for none): fire,
+## water, wind and bomb have their own, when the kit has the art.
+func _hazard_base() -> String:
+	if hazard in ["fire", "water", "wind", "bomb"] and CardArt.tex("base", hazard) != null:
+		return hazard
+	return ""
+
+
+## The bomb timer's readout: the hands left, red, in the dark window
+## (x 204, y 322, 92 x 68 on the 500 x 700 card art).
+func _draw_bomb_countdown(rect: Rect2) -> void:
+	var k := rect.size.x / 500.0
+	var font: Font = FontLib.numbers if FontLib.numbers != null else ThemeDB.fallback_font
+	var size := maxi(8, int(round(44.0 * k)))
+	var box := Rect2(rect.position + Vector2(204, 322) * k, Vector2(92, 68) * k)
+	var text := str(maxi(fuse, 0))
+	var base_y := box.position.y + box.size.y * 0.5 + size * 0.36
+	for g in [6, 3]:  # a soft red glow under the digits
+		draw_string_outline(font, Vector2(box.position.x, base_y), text, HORIZONTAL_ALIGNMENT_CENTER,
+				box.size.x, size, g, Color(0.88, 0.25, 0.16, 0.22))
+	draw_string(font, Vector2(box.position.x, base_y), text, HORIZONTAL_ALIGNMENT_CENTER,
+			box.size.x, size, Color("e0402a"))
