@@ -109,6 +109,37 @@ func _run() -> void:
 	failures += _check(trail.cash == 530 and trail.bet.is_empty() and trail.cash_brought == 0,
 			"a free ride takes nothing from the bank")
 
+	# --- Abilities stack, and Rio Bravo makes a last stand --------------------
+	await _enter_room("the_machine")
+	trail.abilities = ["spurs", "spurs", "rio_bravo", "posse_up", "keep_the_peace",
+			"keep_the_peace", "law_of_the_land"]
+	trail.loadout = {}
+	failures += _check(trail.equip(0, "Pair") and trail.equip(1, "Pair")
+			and trail.equipped_on("Pair").size() == 2,
+			"two copies of Spurs share a Pair")
+	failures += _check(trail.equip(2, "Flush"), "Rio Bravo goes on a Flush")
+	trail.room_limit = "hands"
+	trail.room_goal = ""
+	trail.room_hands_left = 0
+	failures += _check(trail._last_stand() and trail.room_hands_left == 2,
+			"running out with Rio Bravo buys two more hands")
+	failures += _check(not trail._last_stand(), "but only once a table")
+	# Posse Up: one hand per three Sheriffs (Posse Up, two Peacekeepers, the Law).
+	trail.equip(3, "Two Pair")
+	trail.equip(4, "Three of a Kind")
+	trail.equip(5, "Three of a Kind")
+	trail.equip(6, "Full House")
+	failures += _check(int(Abilities.posse_counts(trail.all_equipped()).sheriff) == 5,
+			"five Sheriffs ride (Rio Bravo, Posse Up, two Peacekeepers, the Law)")
+	# The fire's three brands are distinct, and the same each visit.
+	var brands: Array = trail.camp_tend_choices()
+	var again: Array = trail.camp_tend_choices()
+	failures += _check(brands.size() == 3 and brands == again
+			and brands[0] != brands[1] and brands[1] != brands[2] and brands[0] != brands[2],
+			"the campfire offers three different brands, and the same three again")
+	trail.abilities = []
+	trail.loadout = {}
+
 	# --- The Gambler's choice is remembered -----------------------------
 	trail._pick_gambler_ability("sleight")
 	failures += _check(trail.gambler_ability == "sleight"
@@ -493,11 +524,12 @@ func _run() -> void:
 			"a full hand takes nothing more")
 	failures += _check(trail.equip(2, "Flush") and not trail.equip(2, "Pair"),
 			"Big Iron goes on a Flush, and only fits five-card hands")
-	failures += _check(trail.equip(3, "Straight") and not trail.equip(4, "Straight")
-			and trail.can_equip(4, "Straight").contains("already"),
-			"a hand never holds two copies of the same ability")
+	failures += _check(trail.equip(3, "Straight") and trail.equip(4, "Straight")
+			and trail.equipped_on("Straight") == ["spurs", "spurs"],
+			"two copies of the same ability stack on one hand")
 	failures += _check(trail.equip(3, "Three of a Kind") and trail.hand_of(3) == "Three of a Kind"
-			and trail.used_slots("Straight") == 0, "equipping a copy elsewhere moves it")
+			and trail.used_slots("Straight") == 1, "equipping a copy elsewhere moves it")
+	trail.unequip(4)
 	failures += _check(main.board.ability_loadout.get("Flush", []) == ["big_iron"],
 			"the board sees the loadout as ability ids")
 	trail.unequip(0)

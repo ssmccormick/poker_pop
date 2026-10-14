@@ -132,7 +132,7 @@ func _zone(z: Rect2, rect: Rect2, k: float) -> Rect2:
 
 func _draw_kit_face(d: Dictionary, rect: Rect2, k: float, r: int) -> void:
 	draw_texture_rect(CardArt.tex("ability_frame", Abilities.RARITY_IDS[r]), rect, false)
-	var glyph := CardArt.tex("ability_glyph", ability_id)
+	var glyph := glyph_tex(ability_id)
 	if glyph != null:
 		draw_texture_rect(glyph, _zone(GLYPH_BOX, rect, k), false)
 	var display: Font = FontLib.display if FontLib.display != null else ThemeDB.fallback_font
@@ -159,13 +159,27 @@ func _draw_kit_face(d: Dictionary, rect: Rect2, k: float, r: int) -> void:
 			draw_texture_rect(pip_tex, pr, false)
 		else:
 			draw_circle(pr.get_center(), pip / 2.0, RARITY_COLORS[r])
-	# The restriction line in the footer.
+	# The side it rides with, and any restriction, in the footer.
+	var foot := Abilities.side_name(ability_id).to_upper()
 	var limit := Abilities.restriction_line(ability_id)
 	if limit != "":
-		var fb := _zone(FOOTER_BAND, rect, k)
-		var fs := maxi(6, int(round(26.0 * k)))
-		draw_string(label, Vector2(fb.position.x, fb.get_center().y + fs * 0.36), limit.to_upper(),
-				HORIZONTAL_ALIGNMENT_CENTER, fb.size.x, fs, FOOTER)
+		foot += "  ·  " + limit.to_upper()
+	var fb := _zone(FOOTER_BAND, rect, k)
+	var fs := maxi(6, int(round((26.0 if limit == "" else 22.0) * k)))
+	draw_string(label, Vector2(fb.position.x, fb.get_center().y + fs * 0.36), foot,
+			HORIZONTAL_ALIGNMENT_CENTER, fb.size.x, fs, FOOTER)
+
+
+## The ability's own glyph from the kit, or until it's painted, the
+## stand-in its definition names (a relic or provision glyph, an icon).
+static func glyph_tex(id: String) -> Texture2D:
+	var t := CardArt.tex("ability_glyph", id)
+	if t != null:
+		return t
+	var g: Array = Abilities.def(id).get("glyph", [])
+	if g.size() == 2 and String(g[0]) in ["relic_glyph", "provision_glyph", "icon", "twist_icon"]:
+		return CardArt.tex(String(g[0]), String(g[1]))
+	return null
 
 
 ## No kit: a parchment card with a rarity band, a disc and the name.
@@ -186,6 +200,6 @@ func _draw_plain_face(d: Dictionary, rect: Rect2, r: int, tint: Color) -> void:
 	for i in n:
 		draw_rect(Rect2(x0 + i * 17.0, 58, 12, 12), tint)
 	var limit := Abilities.restriction_line(ability_id)
-	if limit != "":
-		draw_multiline_string(body, Vector2(-W / 2 + 8, 100), limit,
-				HORIZONTAL_ALIGNMENT_CENTER, W - 16, 11, 2, Color("8a3a30"))
+	var foot := Abilities.side_name(ability_id) + ("\n" + limit if limit != "" else "")
+	draw_multiline_string(body, Vector2(-W / 2 + 8, 100), foot,
+			HORIZONTAL_ALIGNMENT_CENTER, W - 16, 11, 2, Color("8a3a30"))

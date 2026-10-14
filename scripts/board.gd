@@ -134,9 +134,15 @@ var score_only := PackedStringArray()
 # Tonic's promise (applied by _apply_card_mods, consumed by play_hand).
 var pending_provision := ""
 var next_hand_mult := 1.0
+var next_hand_flat := 0      # I'm Your Huckleberry: points promised to the next hand
 # Ability cards on each poker hand: hand name -> [ability ids]. The trail
 # pushes it in at every table; only the scoring abilities act here.
 var ability_loadout := {}
+# What the scoring abilities need to know about the ride, asked for on
+# every score: {posse: {sheriff, outlaw, bounty, sides}, trail_cash,
+# curses, caught, hand_plays: {hand: n}, room_played, last_hand, bounty}.
+# Unset (tests, other modes) reads as an empty ride.
+var ability_ctx: Callable
 
 
 func _select_cap() -> int:
@@ -356,6 +362,7 @@ func reset(deal_facedown := false) -> void:
 	score_only = PackedStringArray()
 	pending_provision = ""
 	next_hand_mult = 1.0
+	next_hand_flat = 0
 	for card in grid.values():
 		card.queue_free()
 	grid.clear()
@@ -774,6 +781,7 @@ func play_hand() -> void:
 			return
 	_apply_card_mods(result)
 	next_hand_mult = 1.0  # the tonic's promise is spent on this hand
+	next_hand_flat = 0
 	result["count"] = selected.size()
 	# Objectives riding in the hand: key+chest pairs, duel bullets, and
 	# the hold'em re-deal card.
@@ -1752,6 +1760,10 @@ func _apply_card_mods(result: Dictionary) -> void:
 		# cards, the Joker and the Tonic all multiply it too.
 		result.score = int(result.score) + holo_bonus * holos
 		result["holo_bonus"] = holo_bonus * holos
+	if next_hand_flat > 0:
+		# I'm Your Huckleberry: the promised points, before any multiplier.
+		result.score = int(result.score) + next_hand_flat
+		result["next_flat"] = next_hand_flat
 	_apply_abilities(result, "flat")
 	if negatives > 0:
 		# NEGATIVE: trail mode hands back a hand (or seconds) per card.
@@ -1788,39 +1800,108 @@ func hand_scores(hand: String) -> bool:
 
 
 ## The scoring abilities on the played hand. "flat" adds points before
-## any multiplier; "mult" multiplies after Mult cards and Jokers and adds
-## per-card chips. Pure on the result (no counters, no RNG), so the
-## preview shows exactly what the hand will score. Names of the
+## any multiplier; "mult" multiplies after Mult cards and Jokers and pays
+## cash. Pure on the result and the ride context (no counters, no RNG),
+## so the preview shows exactly what the hand will score. Names of the
 ## abilities that changed the score are listed in result.abilities.
 func _apply_abilities(result: Dictionary, stage: String) -> void:
-	var ids: Array = ability_loadout.get(String(result.get("name", "")), [])
+	var hand := String(result.get("name", ""))
+	var ids: Array = ability_loadout.get(hand, [])
 	if ids.is_empty():
 		return
+	var ctx: Dictionary = ability_ctx.call() if ability_ctx.is_valid() else {}
+	var posse: Dictionary = ctx.get("posse", {})
+	var hazards := -1
 	var fired: Array = result.get("abilities", [])
 	for id in ids:
 		var fx: Dictionary = Abilities.def(String(id)).get("fx", {})
+		var mine := Abilities.side(String(id))
+		var own_posse := 0
+		for s in Abilities.SIDES:
+			if mine == s:
+				own_posse = int(posse.get(s, 0))
 		var hit := false
 		if stage == "flat":
+			var add := 0
 			if fx.has("flat"):
-				result.score = int(result.score) + int(fx.flat)
+				add += int(fx.flat)
+			if fx.has("posse_flat") and own_posse > 0:
+				add += int(fx.posse_flat) * own_posse
+			if fx.has("clean_flat") or fx.has("flat_per_hazard"):
+				if hazards < 0:
+					hazards = hazard_count()
+				if fx.has("clean_flat") and hazards == 0:
+					add += int(fx.clean_flat)
+				if fx.has("flat_per_hazard"):
+					add += int(fx.flat_per_hazard) * hazards
+			if fx.has("flat_per_cash"):
+				add += mini(int(fx.flat_per_cash) * int(ctx.get("trail_cash", 0)), Abilities.CASH_CAP)
+			if fx.has("flat_per_curse"):
+				add += int(fx.flat_per_curse) * int(ctx.get("curses", 0))
+			if fx.has("notch_flat"):
+				add += int(fx.notch_flat) * int((ctx.get("hand_plays", {}) as Dictionary).get(hand, 0))
+			if fx.has("flat_per_played"):
+				add += int(fx.flat_per_played) * int(ctx.get("room_played", 0))
+			if fx.has("off_flat") and not bool(ctx.get("bounty", false)):
+				add += int(fx.off_flat)
+			if add > 0:
+				result.score = int(result.score) + add
 				hit = true
 		else:
+			var x := 1.0
 			if fx.has("mult"):
-				result.score = int(result.score * float(fx.mult))
-				hit = true
+				x *= float(fx.mult)
 			if fx.has("dead_mans"):
-				var x: float = float(fx.dead_mans[0])
-				if _is_aces_and_eights():
-					x = float(fx.dead_mans[1])
+				x *= float(fx.dead_mans[1]) if _is_aces_and_eights() else float(fx.dead_mans[0])
+			if fx.has("posse_mult") and own_posse > 0:
+				x *= 1.0 + float(fx.posse_mult) * own_posse
+			if fx.has("clean_mult"):
+				if hazards < 0:
+					hazards = hazard_count()
+				if hazards == 0:
+					x *= float(fx.clean_mult)
+			if fx.has("clutch_mult") and bool(ctx.get("last_hand", false)):
+				x *= float(fx.clutch_mult)
+			if fx.has("bounty_mult") and bool(ctx.get("bounty", false)):
+				x *= float(fx.bounty_mult)
+			if fx.has("mult_per_caught"):
+				x *= 1.0 + float(fx.mult_per_caught) * int(ctx.get("caught", 0))
+			if fx.has("sides_mult"):
+				x *= 1.0 + float(fx.sides_mult) * int(posse.get("sides", 0))
+			if fx.has("pay_mult"):
+				# Desperado: the triple is bought with trail cash, copy by copy.
+				var cost := int(fx.pay_mult[0])
+				var spent := int(result.get("cash_spent", 0))
+				if int(ctx.get("trail_cash", 0)) - spent >= cost:
+					x *= float(fx.pay_mult[1])
+					result["cash_spent"] = spent + cost
+			if x != 1.0:
 				result.score = int(result.score * x)
 				hit = true
+			var pay := 0
 			if fx.has("cash"):
-				result["cash_earned"] = int(result.get("cash_earned", 0)) + int(fx.cash)
+				pay += int(fx.cash)
+			if fx.has("cash_per_mod"):
+				for card in selected:
+					if card.mod == "chip" or card.mod == "gold":
+						pay += int(fx.cash_per_mod)
+			if pay > 0:
+				result["cash_earned"] = int(result.get("cash_earned", 0)) + pay
 				hit = true
 		if hit and not fired.has(Abilities.ability_name(String(id))):
 			fired.append(Abilities.ability_name(String(id)))
 	if not fired.is_empty():
 		result["abilities"] = fired
+
+
+## Every hazard on the table, stones included (Law and Order wants none,
+## Powder Keg wants plenty).
+func hazard_count() -> int:
+	var n := 0
+	for card in grid.values():
+		if card != null and card.hazard != "":
+			n += 1
+	return n
 
 
 ## Dead Man's Hand: a Two Pair of Aces and Eights.
@@ -1932,6 +2013,7 @@ func build_state_snapshot() -> Dictionary:
 		# replays the same refill.
 		"rng_state": rng.state,
 		"next_hand_mult": next_hand_mult,
+		"next_hand_flat": next_hand_flat,
 		"wild_rank": wild_rank,
 		"play_only": play_only,
 		"score_only": score_only,
@@ -1987,6 +2069,7 @@ func restore_state() -> bool:
 	if undo_state.has("rng_state"):
 		rng.state = int(undo_state.rng_state)
 	next_hand_mult = float(undo_state.get("next_hand_mult", 1.0))
+	next_hand_flat = int(undo_state.get("next_hand_flat", 0))
 	if undo_state.has("play_only"):
 		play_only = PackedStringArray(undo_state.play_only)
 		score_only = PackedStringArray(undo_state.get("score_only", PackedStringArray()))

@@ -321,6 +321,9 @@ func _ready() -> void:
 				trail._start_run(0)
 				trail.hp = 6
 				trail._choose_offer({"kind": "camp", "tarot": "THE CAMPFIRE"}, false)
+				# POKERPOP_STAGE=tend shows the fire's three brands.
+				if OS.get_environment("POKERPOP_STAGE") == "tend":
+					trail._show_tend()
 			"trailbuyin":
 				# POKERPOP_RIDING shows the screen as it is with a ride saved.
 				menu_layer.visible = false
@@ -467,14 +470,17 @@ func _ready() -> void:
 			"trailabilities":
 				menu_layer.visible = false
 				trail._start_run(0)
-				trail.abilities = ["matched_pair", "big_iron", "hot_brand", "double_down",
-						"spurs", "push_broom", "house_money", "lookout"]
+				trail.abilities = ["keep_the_peace", "keep_the_peace", "law_of_the_land",
+						"high_noon", "wild_bunch", "desperado", "notches", "no_name",
+						"good_bad_ugly", "huckleberry", "powder_keg", "this_is_the_way"]
 				trail.loadout = {}
 				trail.equip(0, "Pair")
-				trail.equip(1, "Flush")
-				trail.equip(4, "Straight")
+				trail.equip(1, "Pair")
 				trail.equip(2, "Two Pair")
-				trail.equip(6, "Full House")
+				trail.equip(3, "Three of a Kind")
+				trail.equip(7, "Flush")
+				trail.equip(6, "Straight")
+				trail.equip(8, "Full House")
 				trail._hide_all()
 				trail.abilities_screen.refresh()
 				trail.abilities_screen.visible = true
@@ -485,7 +491,7 @@ func _ready() -> void:
 				trail._win_rows = [["THE TABLE PAYS", 6],
 						["TIN STAR", 2], ["3 HANDS TO SPARE", 1]]
 				trail.pending_reward = {"room": 0, "source": "table", "round": 0,
-						"offers": ["hot_brand", "scattergun", "big_iron"], "chest_rounds": 0,
+						"offers": ["keep_the_peace", "wild_bunch", "no_name"], "chest_rounds": 0,
 						"relic": "", "ledger": trail._win_rows.duplicate(true)}
 				trail._show_pick()
 			"trailrelic":
@@ -1222,6 +1228,8 @@ func _preview_mod_text(result: Dictionary) -> String:
 		parts += "  ×%s MULT" % String.num(pow(board.mult_factor, mults), 2)
 	if result.has("cash_earned"):
 		parts += "  +$%d" % int(result.cash_earned)
+	if int(result.get("cash_spent", 0)) > 0:
+		parts += "  −$%d" % int(result.cash_spent)
 	if mode_kind == "trail":
 		# Every ability on this hand, scoring or not, so you know what
 		# playing it will set off.

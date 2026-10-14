@@ -23,6 +23,7 @@ var _row_box: Control
 var _grid: GridContainer
 var _status: Label
 var _empty_note: Label
+var _posse: Label            # how many of each side ride along
 
 
 func setup(owner_trail) -> void:
@@ -39,6 +40,9 @@ func setup(owner_trail) -> void:
 			Vector2(0, 168), 22, main.DIM)
 	sub.size = Vector2(main.VIEW.x, 30)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_posse = main._label(self, "", Vector2(0, 200), 20, main.GOLD)
+	_posse.size = Vector2(main.VIEW.x, 28)
+	_posse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	UiKit.plate(self, Rect2(90, 236, 1040, 712))
 	_row_box = Control.new()
 	_row_box.size = main.VIEW
@@ -114,6 +118,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func refresh() -> void:
 	_build_rows()
 	_build_collection()
+	var pc := Abilities.posse_counts(trail.all_equipped())
+	_posse.text = "YOUR POSSE:   Sheriff %d   ·   Outlaw %d   ·   Bounty Hunter %d" \
+			% [int(pc.sheriff), int(pc.outlaw), int(pc.bounty)]
 	if _sel >= 0:
 		_status.text = "Now pick a hand for %s. Right-click to put it down." \
 				% Abilities.ability_name(String(trail.abilities[_sel]))
@@ -183,7 +190,7 @@ func _build_rows() -> void:
 				tile.add_theme_color_override("font_color", main.OFFWHITE)
 				tile.add_theme_color_override("font_hover_color", main.GOLD)
 				tile.alignment = HORIZONTAL_ALIGNMENT_LEFT
-				var glyph := CardArt.tex("ability_glyph", id)
+				var glyph := AbilityCard.glyph_tex(id)
 				if glyph != null and n > 1:
 					tile.icon = glyph
 					tile.expand_icon = true
@@ -228,8 +235,8 @@ func _build_collection() -> void:
 		holder.custom_minimum_size = Vector2(204, 196)
 		UiKit.style_shop_slot(holder)
 		var on: String = trail.hand_of(i)
-		holder.tooltip_text = "%s (%s, %d slot%s)\n%s%s" % [Abilities.ability_name(id),
-				Abilities.RARITY_NAMES[Abilities.rarity(id)], Abilities.slots(id),
+		holder.tooltip_text = "%s (%s, %s, %d slot%s)\n%s%s" % [Abilities.ability_name(id),
+				Abilities.side_name(id), Abilities.RARITY_NAMES[Abilities.rarity(id)], Abilities.slots(id),
 				"" if Abilities.slots(id) == 1 else "s", String(Abilities.def(id).desc),
 				("\nIt's on your %s." % on) if on != "" else ""]
 		var face := AbilityCard.new()

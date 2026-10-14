@@ -66,7 +66,10 @@ func _catalog() -> void:
 			"relic:bomb_badge", "relic:chisel", "provision:canteen",
 			"provision:dynamite", "provision:pocket_flask", "provision:gold_pan",
 			"ability:spurs", "ability:side_bet", "ability:matched_pair", "ability:triple_threat",
-			"ability:hot_brand", "ability:push_broom", "ability:borrowed_time", "ability:lookout"]
+			"ability:hot_brand", "ability:push_broom", "ability:borrowed_time", "ability:lookout",
+			"ability:keep_the_peace", "ability:reach_for_the_sky", "ability:hole_in_the_wall",
+			"ability:powder_keg", "ability:fistful_of_dollars", "ability:hunting_party",
+			"ability:notches"]
 	expect.sort()
 	_check(starters == expect, "the starter set is exactly the small kit")
 	# Ability cards: every one is in the catalog; the commons start free,

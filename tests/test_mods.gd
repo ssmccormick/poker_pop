@@ -291,6 +291,66 @@ func _init() -> void:
 	ab.deck = []
 	failures += _check(ab.enhance_next_draw("mult") and not ab.deck.is_empty(),
 			"an empty shoe is refilled before the enhancement lands")
+	# --- The sides: posse counts and the ride-aware abilities ----------------
+	var pc3 := Abilities.posse_counts(["keep_the_peace", "no_name", "side_bet", "spurs"])
+	failures += _check(int(pc3.sheriff) == 2 and int(pc3.outlaw) == 2 and int(pc3.bounty) == 1
+			and int(pc3.sides) == 3, "No Name rides with every side; drifters with none")
+	var ctx := {"posse": {"sheriff": 3, "outlaw": 0, "bounty": 0, "sides": 1}}
+	ab.ability_ctx = func() -> Dictionary: return ctx
+	ab.selected.assign([plain_cards[0], plain_cards[1]])
+	ab.ability_loadout = {"Pair": ["keep_the_peace"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 145, "Keep the Peace adds 15 for each of three Sheriffs (%d)" % res.score)
+	ab.ability_loadout = {"Pair": ["keep_the_peace", "keep_the_peace"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 190, "two copies on one hand both fire (%d)" % res.score)
+	ab.ability_loadout = {"Pair": ["law_and_order", "powder_keg"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 150, "a table without hazards: Law and Order ×1.5, Powder Keg nothing")
+	var fire := PlayingCard.new()
+	fire.hazard = "fire"
+	ab.grid[Vector2i(4, 4)] = fire
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 125, "one hazard: Powder Keg +25, Law and Order nothing")
+	ab.grid.erase(Vector2i(4, 4))
+	fire.free()
+	ctx.clear()
+	ctx.merge({"trail_cash": 3, "posse": {}})
+	ab.ability_loadout = {"Pair": ["desperado", "desperado"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 300 and int(res.cash_spent) == 2,
+			"with $3 on you, only one Desperado can pay his $2 (%d)" % res.score)
+	ctx.clear()
+	ctx.merge({"posse": {"sides": 3}, "hand_plays": {"Pair": 4}, "last_hand": true})
+	ab.ability_loadout = {"Pair": ["notches", "high_noon"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 240, "Notches +5 for four plays, then High Noon doubles the last hand")
+	ab.ability_loadout = {"Flush": ["good_bad_ugly"]}
+	res = {"name": "Flush", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 250, "the Good, the Bad and the Ugly: ×2.5 with all three sides")
+	ab.next_hand_flat = 100
+	ab.ability_loadout = {}
+	res = {"name": "Pair", "score": 50}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 150 and int(res.next_flat) == 100, "Huckleberry's promise lands on the next hand")
+	ab.next_hand_flat = 0
+	var cashc := PlayingCard.new()
+	cashc.mod = "chip"
+	ab.selected.assign([plain_cards[0], cashc])
+	ab.ability_loadout = {"Pair": ["fistful_of_dollars"]}
+	res = {"name": "Pair", "score": 50}
+	ab._apply_card_mods(res)
+	failures += _check(int(res.cash_earned) == Board.CHIP_BONUS + 2,
+			"A Fistful of Dollars: $1, plus $1 for the Cash card in the hand")
+	cashc.free()
+	ab.ability_ctx = Callable()
 	ab.selected.clear()
 	for pc in plain_cards:
 		pc.free()
@@ -304,6 +364,8 @@ func _init() -> void:
 			if Abilities.fits(id, hand):
 				fits_one = true
 		var desc := String(d.desc)
+		failures += _check(String(d.get("side", "")) in ["sheriff", "outlaw", "bounty", "drifter", "any"],
+				"ability %s rides with a side" % id)
 		failures += _check(fits_one and int(d.slots) >= 1 and int(d.slots) <= 5
 				and desc.ends_with(".") and desc.length() > 20 and not desc.contains(" — ")
 				and int(d.rarity) >= 0 and int(d.rarity) <= 3,

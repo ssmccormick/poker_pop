@@ -179,7 +179,7 @@ const ROOM_EMBLEMS := {"room:plain": "limit_table", "room:clock": "high_noon",
 const CATALOG_DESCS := {
 	"mod:mult": "Multiplies the hand's score by ×1.5.",
 	"mod:chip": "A Cash card: pays a little trail cash when played, and more each time it scores.",
-	"mod:gold": "Pays $1 cash every time you play it.",
+	"mod:gold": "Pays $3 in trail cash every time you play it.",
 	"mod:plus": "Raises the card it points at by one rank. An Ace becomes THE JOKER, which is wild and doubles the hand.",
 	"mod:minus": "Lowers the card it points at by one rank. A 2 breaks.",
 	"mod:bumper": "When you clear it, it shoves the line it points at one step.",
@@ -351,7 +351,8 @@ var provisions: Array = []       # provision ids in the kit (max 3, dupes fine)
 var abilities: Array = []
 var loadout: Dictionary = {}
 var pending_reward: Dictionary = {}   # an ability offer not yet settled (resumable)
-var room_ability_counts: Dictionary = {}  # per-table counters (Borrowed Time)
+var room_ability_counts: Dictionary = {}  # per-table counters (Borrowed Time; "_played", "_last_stand")
+var hand_plays: Dictionary = {}           # poker hand -> times played this ride (Notches on the Gun)
 var rng_ability := RandomNumberGenerator.new()  # in-table ability rolls
 var _time_granted := 0.0         # seconds handed back at this table (watch rewinds it)
 var _aiming_slot := -1           # kit slot waiting on a target, -1 = none
@@ -456,6 +457,10 @@ var _camp_scene: CampScene       # the animated night camp behind it all
 var _camp_hp_label: Label
 var _camp_rest_btn: BaseButton
 var _camp_mode := ""             # "" | "tend" | "burn" — deck view purpose
+var _camp_tend_mod := ""         # the brand picked at the fire, waiting for its card
+var tend_layer: Control          # the fire's three brands
+var _tend_box: Control
+var _tend_scene: CampScene
 var _swap_first: PlayingCard = null  # the Shell Game's first pick
 var _up_cash: Label
 var _up_level: Label
@@ -658,6 +663,7 @@ func _save_run() -> void:
 	cf.set_value("run", "provisions", prov_arr)
 	cf.set_value("run", "abilities", PackedStringArray(abilities))
 	cf.set_value("run", "loadout", loadout)
+	cf.set_value("run", "hand_plays", hand_plays)
 	cf.set_value("run", "pending_reward", pending_reward)
 	cf.set_value("run", "ability_ver", 1)
 	if _shop_stock_room == room_index and shop_layer != null:
@@ -803,6 +809,7 @@ func _load_run() -> bool:
 				kept.append(int(ab_map[int(i)]))
 		loadout[String(hand)] = kept
 	_validate_loadout()
+	hand_plays = (cf.get_value("run", "hand_plays", {}) as Dictionary).duplicate()
 	pending_reward = cf.get_value("run", "pending_reward", {})
 	_shop_saved = cf.get_value("run", "shop_sold", {})
 	sleeve_card = cf.get_value("run", "sleeve", {})
@@ -949,8 +956,6 @@ func can_equip(idx: int, hand: String) -> String:
 		return reason
 	if hand_of(idx) == hand:
 		return ""
-	if equipped_on(hand).has(id):
-		return "This hand already has %s." % Abilities.ability_name(id)
 	if used_slots(hand) + Abilities.slots(id) > int(Abilities.HAND_SLOTS[hand]):
 		return "There isn't room. Take something off the %s first." % hand
 	return ""
@@ -977,7 +982,8 @@ func unequip(idx: int) -> void:
 
 
 ## Drops anything a save or a change left impossible: bad indices,
-## retired ids, over-full hands, broken restrictions, double copies.
+## retired ids, over-full hands, broken restrictions. (Two copies of the
+## same ability may share a hand: they stack.)
 func _validate_loadout() -> void:
 	var fixed := {}
 	var seen := {}
@@ -992,7 +998,7 @@ func _validate_loadout() -> void:
 			if idx < 0 or idx >= abilities.size() or seen.has(idx):
 				continue
 			var id := String(abilities[idx])
-			if not Abilities.fits(id, String(hand)) or ids_here.has(id) \
+			if not Abilities.fits(id, String(hand)) \
 					or used + Abilities.slots(id) > int(Abilities.HAND_SLOTS[hand]):
 				continue
 			used += Abilities.slots(id)
@@ -1004,12 +1010,31 @@ func _validate_loadout() -> void:
 	loadout = fixed
 
 
-## The board sees the loadout as hand -> [ids] for its scoring abilities.
+## The board sees the loadout as hand -> [ids] for its scoring abilities,
+## and asks _ability_ctx for the ride around them on every score.
 func _push_loadout() -> void:
 	var out := {}
 	for hand in loadout:
 		out[hand] = equipped_on(String(hand))
 	main.board.ability_loadout = out
+	main.board.ability_ctx = _ability_ctx
+
+
+## What the scoring abilities read off the ride: posse sizes, cash,
+## curses, bounties brought in, how often each hand has been played,
+## and whether this is the last hand at the table.
+func _ability_ctx() -> Dictionary:
+	var curses := 0
+	for d in deck:
+		if bool(d.get("cursed", false)):
+			curses += 1
+	var last := false
+	if in_room:
+		last = room_time_left <= 30.0 if room_on_clock() else room_hands_left <= 1
+	return {"posse": Abilities.posse_counts(all_equipped()), "trail_cash": trail_cash,
+			"curses": curses, "caught": outlaws_caught, "hand_plays": hand_plays,
+			"room_played": int(room_ability_counts.get("_played", 0)),
+			"last_hand": last, "bounty": room_goal == "outlaw"}
 
 
 ## Every ability equipped anywhere (passives act from any hand).
@@ -1304,6 +1329,7 @@ func use_watch() -> void:
 	if _watch_snapshot.has("rng_ability"):
 		rng_ability.state = int(_watch_snapshot.rng_ability)
 	room_ability_counts = (_watch_snapshot.get("ability_counts", {}) as Dictionary).duplicate()
+	hand_plays = (_watch_snapshot.get("hand_plays", hand_plays) as Dictionary).duplicate()
 	# Seconds that hand gave back go back too (the clock itself keeps running).
 	var given: float = _time_granted - float(_watch_snapshot.get("time_granted", _time_granted))
 	if given > 0.0:
@@ -1342,6 +1368,7 @@ func _on_hand_committing() -> void:
 		"best_hand_score": best_hand_score, "best_hand_name": best_hand_name,
 		"rng_ability": rng_ability.state,
 		"ability_counts": room_ability_counts.duplicate(),
+		"hand_plays": hand_plays.duplicate(),
 		"time_granted": _time_granted,
 	}
 
@@ -2518,6 +2545,7 @@ func _start_run(asc: int) -> void:
 	_ride_contracts = []
 	ascension = asc
 	trail_cash = 0
+	hand_plays = {}
 	deck = _fresh_deck()
 	for i in Ascension.cursed_start(asc):
 		deck.append({"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3), "cursed": true})
@@ -3688,6 +3716,12 @@ func _start_room() -> void:
 				+ (float(rv("horseshoe", "secs")) if has_relic("horseshoe") else 0.0)
 		room_hands_left = 999
 	var horn := int(_ability_passive("extra_hands", 0.0))
+	# Posse Up: a hand for every few Sheriffs riding along (per copy).
+	var sheriffs := int(Abilities.posse_counts(all_equipped()).sheriff)
+	for id in all_equipped():
+		var every := int(Abilities.def(id).get("fx", {}).get("posse_hands", 0))
+		if every > 0:
+			horn += sheriffs / every
 	if horn > 0 and room_goal != "blackjack":
 		if room_on_clock():
 			room_time_left += SADDLE_HORN_SECS * horn
@@ -3938,6 +3972,16 @@ func on_hand_played(result: Dictionary) -> void:
 					else "NEGATIVE — %d HANDS BACK" % negs)
 	if in_room:
 		_fire_play_abilities(result)
+		# The ride remembers how often each hand has been played (Notches
+		# on the Gun), and the table how many hands it has seen (True Grit).
+		var played := String(result.get("name", ""))
+		if Abilities.HAND_SLOTS.has(played):
+			hand_plays[played] = int(hand_plays.get(played, 0)) + 1
+		room_ability_counts["_played"] = int(room_ability_counts.get("_played", 0)) + 1
+	var spent := int(result.get("cash_spent", 0))
+	if spent > 0:
+		# Desperado bought his triple with trail cash.
+		trail_cash = maxi(0, trail_cash - spent)
 	room_score += result.score
 	if int(result.score) > best_hand_score:
 		best_hand_score = int(result.score)
@@ -4183,13 +4227,24 @@ func _fire_play_abilities(result: Dictionary) -> void:
 		if fx.has("next_mult"):
 			main.board.next_hand_mult = maxf(main.board.next_hand_mult, float(fx.next_mult))
 			hit = true
+		if fx.has("next_flat"):
+			main.board.next_hand_flat += int(fx.next_flat)
+			hit = true
 		if fx.has("extra_hit") and room_goal == "outlaw" and int(result.get("bullets_you", 0)) > 0:
 			result["bullets_you"] = int(result.bullets_you) + int(fx.extra_hit)
 			hit = true
 		if fx.has("brand"):
 			hit = _brand_from_hand(result, String(fx.brand))
-		if hit:
+		if hit and not fired.has(Abilities.ability_name(id)):
 			fired.append(Abilities.ability_name(id))
+	# Reward Money counts the hits once every Hired Gun has added his.
+	var hits := int(result.get("bullets_you", 0)) if room_goal == "outlaw" else 0
+	for id in equipped_on(hand):
+		var per := int(Abilities.def(id).get("fx", {}).get("cash_per_hit", 0))
+		if per > 0 and hits > 0:
+			trail_cash += per * hits
+			if not fired.has(Abilities.ability_name(id)):
+				fired.append(Abilities.ability_name(id))
 	for n in result.get("abilities", []):
 		if not fired.has(n):
 			fired.append(n)
@@ -4245,7 +4300,26 @@ func _last_hand_verdict() -> void:
 			and purge_left() == 0:
 		_room_cleared()
 		return
+	if _last_stand():
+		return
 	_room_failed()
+
+
+## Rio Bravo: once at every table, running out buys a last stand.
+func _last_stand() -> bool:
+	var more := int(_ability_passive("last_stand", 0.0))
+	if more <= 0 or room_ability_counts.has("_last_stand") or room_goal == "blackjack":
+		return false
+	room_ability_counts["_last_stand"] = 1
+	if room_on_clock():
+		room_time_left += 15.0 * more
+		_time_granted += 15.0 * more
+		main._announce("RIO BRAVO — %d MORE SECONDS" % (15 * more), main.GOLD)
+	else:
+		room_hands_left += more
+		main._announce("RIO BRAVO — %d MORE HANDS" % more, main.GOLD)
+	main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 1.0, -6.0)
+	return true
 
 
 ## The ONE treasure respawn, run from the hazard tick after every
@@ -4825,6 +4899,8 @@ func _room_cleared() -> void:
 func on_time_up() -> void:
 	if not in_room or not room_on_clock():
 		return
+	if _last_stand():
+		return
 	_room_failed("TIME'S UP — THE STAGECOACH LEFT" if room_goal == "chest"
 			else "TIME'S UP — THE TABLE WINS")
 
@@ -5155,8 +5231,9 @@ func _show_pick_now() -> void:
 		var id := String(offers[i])
 		var holder: Button = main._button(_pick_box, "", Vector2(start_x + i * 220, 0), Vector2(170, 240))
 		UiKit.style_shop_slot(holder)
-		holder.tooltip_text = "%s (%s)\n%s" % [Abilities.ability_name(id),
-				Abilities.RARITY_NAMES[Abilities.rarity(id)], String(Abilities.def(id).desc)]
+		holder.tooltip_text = "%s (%s, %s)\n%s" % [Abilities.ability_name(id),
+				Abilities.side_name(id), Abilities.RARITY_NAMES[Abilities.rarity(id)],
+				String(Abilities.def(id).desc)]
 		var face := AbilityCard.new()
 		face.ability_id = id
 		face.position = Vector2(85, 120)
@@ -5464,8 +5541,8 @@ func _render_shop_abilities() -> void:
 		var holder: Button = main._button(_shop_box, "",
 				Vector2(265 + col * 220, row * 280), Vector2(170, 250))
 		UiKit.style_shop_slot(holder)
-		holder.tooltip_text = "%s (%s, %d slot%s)\n%s" % [Abilities.ability_name(id),
-				Abilities.RARITY_NAMES[Abilities.rarity(id)], Abilities.slots(id),
+		holder.tooltip_text = "%s (%s, %s, %d slot%s)\n%s" % [Abilities.ability_name(id),
+				Abilities.side_name(id), Abilities.RARITY_NAMES[Abilities.rarity(id)], Abilities.slots(id),
 				"" if Abilities.slots(id) == 1 else "s", String(Abilities.def(id).desc)]
 		var face := AbilityCard.new()
 		face.ability_id = id
@@ -5774,12 +5851,69 @@ func _camp_rest() -> void:
 	_leave_camp()
 
 
+## The three brands the fire offers at this stop. Rolled from the stop's
+## own stream, so backing out and coming back shows the same three.
+func camp_tend_choices() -> Array:
+	_stream("camp_tend", room_index)
+	var out: Array = []
+	for i in 3:
+		var id := progress.pick("mod", MOD_WEIGHTS, out, _rng)
+		if id == "":
+			break
+		out.append(id)
+	return out
+
+
+## TEND A CARD: pick one of three brands, then the card it goes on.
+func _show_tend() -> void:
+	camp_layer.visible = false
+	_tend_scene.setup(character)
+	for child in _tend_box.get_children():
+		child.queue_free()
+	var choices := camp_tend_choices()
+	var x0: float = (main.VIEW.x - choices.size() * 340.0 + 40.0) / 2.0
+	for i in choices.size():
+		var id := String(choices[i])
+		var btn: Button = main._button(_tend_box, "", Vector2(x0 + i * 340.0, 0), Vector2(300, 470))
+		UiKit.style_shop_slot(btn)
+		var pc := PlayingCard.new()
+		pc.rank = 7
+		pc.suit = 3
+		pc.mod = id
+		pc.boost_dir = Vector2i.UP
+		pc.material = Themes.current_material()
+		pc.scale = Vector2(1.6, 1.6)
+		pc.position = Vector2(150, 150)
+		btn.add_child(pc)
+		var name_l := _face_label(btn, _mod_title(id).to_upper(), 290.0, 34.0, 24, main.GOLD)
+		name_l.position.x = 10
+		name_l.size.x = 280
+		var desc_l := _wrap_label(btn, mod_desc(id), Rect2(20, 334, 260, 120), 16, main.OFFWHITE)
+		desc_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		btn.pressed.connect(func() -> void:
+			_camp_tend_mod = id
+			main.board._play_sound(Board.SFX_FLIP, 1.0, -8.0)
+			tend_layer.visible = false
+			_camp_open_deck("tend"))
+	tend_layer.visible = true
+
+
+func _mod_title(id: String) -> String:
+	var r := Progression.row("mod", id)
+	return String(r.get("name", id.capitalize()))
+
+
+func mod_desc(id: String) -> String:
+	var d := progress.pdesc("mod", id)
+	return d if d != "" else String(CATALOG_DESCS.get("mod:" + id, ""))
+
+
 ## TEND or CAST OFF both ride the deck viewer, in a campfire mode.
 func _camp_open_deck(mode: String) -> void:
 	camp_layer.visible = false
 	_camp_mode = mode
 	_deck_view_burn = false
-	_remove_info.text = "Pick a plain card. The fire will brand it with a random enhancement." \
+	_remove_info.text = "Pick a plain card for the %s brand." % _mod_title(_camp_tend_mod) \
 			if mode == "tend" else "Pick a card to throw in the fire. It's gone for good."
 	_remove_info.add_theme_color_override("font_color", main.OFFWHITE)
 	_populate_deck_view()
@@ -5798,10 +5932,11 @@ func _camp_pick(idx: int) -> void:
 			_remove_info.text = "ALREADY ENHANCED — pick a plain card."
 			_remove_info.add_theme_color_override("font_color", main.RED)
 			return
-		var mod := _random_mod()
+		var mod := _camp_tend_mod if _camp_tend_mod != "" else _random_mod()
+		_camp_tend_mod = ""
 		d["mod"] = mod
 		main.stat_bump("campfire_tends")
-		main._announce("BRANDED BY THE FIRE — %s" % mod.to_upper())
+		main._announce("BRANDED BY THE FIRE — %s" % _mod_title(mod).to_upper())
 		main.board._play_sound(Board.SFX_MATCHES.pick_random(), 1.1, -6.0)
 	else:
 		deck.remove_at(idx)
@@ -6422,7 +6557,7 @@ func build_ui() -> void:
 					tb.pressed.connect(_camp_rest)
 				1:
 					tb.pressed.connect(func() -> void:
-						_camp_open_deck("tend"))
+						_show_tend())
 				2:
 					tb.pressed.connect(func() -> void:
 						_camp_open_deck("burn"))
@@ -6433,7 +6568,7 @@ func build_ui() -> void:
 	else:
 		var camp_opts := [
 			["REST", "Sleep off the road.\nRecover %d HP." % Ascension.camp_rest(0)],
-			["TEND A CARD", "Hold a plain card to the fire\nto give it a random enhancement."],
+			["TEND A CARD", "The fire offers three brands.\nPick one, then the card it goes on."],
 			["CAST ONE OFF", "Throw a card in the fire.\nIt's gone from your deck for good."],
 		]
 		for i in camp_opts.size():
@@ -6455,7 +6590,7 @@ func build_ui() -> void:
 					cb.pressed.connect(_camp_rest)
 				1:
 					cb.pressed.connect(func() -> void:
-						_camp_open_deck("tend"))
+						_show_tend())
 				2:
 					cb.pressed.connect(func() -> void:
 						_camp_open_deck("burn"))
@@ -6463,6 +6598,18 @@ func build_ui() -> void:
 				Vector2(760, 740), Vector2(400, 60))
 		camp_leave.add_theme_font_size_override("font_size", 20)
 		camp_leave.pressed.connect(_leave_camp)
+
+	tend_layer = _layer()
+	_tend_scene = CampScene.new()
+	tend_layer.add_child(_tend_scene)
+	_screen_title(tend_layer, "TEND A CARD")
+	_center(tend_layer, "The fire offers three brands. Pick one, then pick the plain card it goes on.", 200, 22, main.DIM)
+	_tend_box = Control.new()
+	_tend_box.position = Vector2(0, 290)
+	tend_layer.add_child(_tend_box)
+	_back_button(tend_layer, func() -> void:
+		tend_layer.visible = false
+		_show_camp(), "BACK")
 
 	tarot_layer = _layer()
 	_screen_title(tarot_layer, "FATE DEALS")
@@ -6666,7 +6813,7 @@ func _layer() -> ColorRect:
 
 func _hide_all() -> void:
 	for l in [select_layer, buyin_layer, upgrades_layer, tarot_layer, bet_layer,
-			pick_layer, shop_layer, camp_layer, remove_layer, relic_layer,
+			pick_layer, shop_layer, camp_layer, tend_layer, remove_layer, relic_layer,
 			end_layer, abilities_screen]:
 		if l:
 			l.visible = false
