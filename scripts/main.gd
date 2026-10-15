@@ -1969,6 +1969,8 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 		lines.append("FILLED: its face is hidden. Pours every hand.")
 	elif card.joker:
 		lines.append("The Joker")
+	elif card.cursed:
+		lines.append("A cursed card")
 	else:
 		lines.append("%s of %s" % [rank_names.get(card.rank, str(card.rank)),
 				PlayingCard.SUIT_NAMES[card.suit]])
@@ -1994,7 +1996,7 @@ func _card_tooltip_text(card: PlayingCard) -> String:
 	if card.honey:
 		lines.append("HONEY: only 1 card can follow it in a chain.")
 	if card.cursed:
-		lines.append("CURSED: can't be played. Burn it at a forge.")
+		lines.append("CURSED: it can't be played and it blocks chains. A Bumper can shove it off the edge, or the wind can blow it away. It's only dealt once a table. Burn it at a forge or cast it off at a campfire to get rid of it for good.")
 	if card.joker:
 		lines.append("JOKER: wild, and doubles the hand's score.")
 	match card.mod:

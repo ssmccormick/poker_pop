@@ -58,6 +58,9 @@ var single_deck := false  # deck never reshuffles; the board runs dry
 # Trail mode: when non-empty, the deck refills from this custom card
 # list ({rank, suit, cursed}) instead of a standard 52.
 var custom_deck: Array = []
+# Curses ride the first pass through the shoe only: once the deck has
+# dealt every card and goes back in, the cursed cards stay out.
+var shoe_passes := 0
 
 # --- Trail hazards --------------------------------------------------------
 const BOMB_FUSE := 5
@@ -368,6 +371,7 @@ func reset(deal_facedown := false) -> void:
 	grid.clear()
 	selected.clear()
 	deck.clear()
+	shoe_passes = 0
 	_refill_deck()
 	selection_changed.emit()
 	await _fall_and_fill(true)
@@ -383,6 +387,9 @@ func _refill_deck() -> void:
 				deck.append({"rank": r, "suit": s})
 	else:
 		deck = custom_deck.duplicate(true)
+		if shoe_passes > 0:
+			deck = deck.filter(func(d: Dictionary) -> bool: return not bool(d.get("cursed", false)))
+	shoe_passes += 1
 	SeedRng.shuffle(rng, deck)
 
 
@@ -2014,6 +2021,7 @@ func build_state_snapshot() -> Dictionary:
 		"rng_state": rng.state,
 		"next_hand_mult": next_hand_mult,
 		"next_hand_flat": next_hand_flat,
+		"shoe_passes": shoe_passes,
 		"wild_rank": wild_rank,
 		"play_only": play_only,
 		"score_only": score_only,
@@ -2070,6 +2078,7 @@ func restore_state() -> bool:
 		rng.state = int(undo_state.rng_state)
 	next_hand_mult = float(undo_state.get("next_hand_mult", 1.0))
 	next_hand_flat = int(undo_state.get("next_hand_flat", 0))
+	shoe_passes = int(undo_state.get("shoe_passes", shoe_passes))
 	if undo_state.has("play_only"):
 		play_only = PackedStringArray(undo_state.play_only)
 		score_only = PackedStringArray(undo_state.get("score_only", PackedStringArray()))

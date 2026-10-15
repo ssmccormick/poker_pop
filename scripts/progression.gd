@@ -13,7 +13,7 @@ extends RefCounted
 const FIND_MULT := [1.0, 1.5, 2.0]   # pool weight by FIND level
 const MAX_FIND := 2
 const MAX_POWER := 2
-const LAST_UNLOCK := 29              # every level past this pays only the purse
+const LAST_UNLOCK := 28              # every level past this pays only the purse
 const CATALOG_VERSION := 2           # 2: tables open, riders won, curve repacked
 const PURSE_PER_LEVEL := 5           # each level-up pays $5 × the new level
 # Kinds whose odds a FIND upgrade can lift.
@@ -36,6 +36,7 @@ const CATALOG := [
 	{"kind": "mod", "id": "mult", "name": "Mult", "level": 1, "price": 0},
 	{"kind": "mod", "id": "chip", "name": "Cash", "level": 1, "price": 0},
 	{"kind": "mod", "id": "gold", "name": "Gold", "level": 1, "price": 0},
+	{"kind": "mod", "id": "bumper", "name": "Bumper", "level": 1, "price": 0},
 	{"kind": "relic", "id": "horseshoe", "name": "Horseshoe", "level": 1, "price": 0},
 	{"kind": "relic", "id": "card_sleeve", "name": "Card Sleeve", "level": 1, "price": 0},
 	{"kind": "relic", "id": "snake_oil", "name": "Snake Oil", "level": 1, "price": 0},
@@ -115,20 +116,19 @@ const CATALOG := [
 	{"kind": "provision", "id": "branding_iron", "name": "Branding Iron", "level": 13, "price": 60},
 	{"kind": "relic", "id": "saddlebags", "name": "Saddlebags", "level": 14, "price": 120},
 	{"kind": "finish", "id": "metal", "name": "Metal", "level": 15, "price": 200},
-	{"kind": "mod", "id": "bumper", "name": "Bumper", "level": 16, "price": 100},
-	{"kind": "merchant", "id": "sharp", "name": "The Card Sharp", "level": 17, "price": 0},
-	{"kind": "relic", "id": "swimming_goggles", "name": "Swimming Goggles", "level": 18, "price": 80},
-	{"kind": "provision", "id": "fresh_deck", "name": "Fresh Deck", "level": 19, "price": 50},
-	{"kind": "relic", "id": "second_wind", "name": "Second Wind", "level": 20, "price": 150},
-	{"kind": "finish", "id": "holo", "name": "Holo", "level": 21, "price": 200},
-	{"kind": "relic", "id": "dowsing_rod", "name": "Dowsing Rod", "level": 22, "price": 100},
-	{"kind": "provision", "id": "tonic", "name": "Rattlesnake Tonic", "level": 23, "price": 80},
-	{"kind": "relic", "id": "mirror_shades", "name": "Mirror Shades", "level": 24, "price": 150},
-	{"kind": "finish", "id": "negative", "name": "Negative", "level": 25, "price": 250},
-	{"kind": "relic", "id": "bankroll_clip", "name": "Bankroll Clip", "level": 26, "price": 150},
-	{"kind": "relic", "id": "chuck_wagon", "name": "Chuck Wagon", "level": 27, "price": 300},
-	{"kind": "mod", "id": "wild", "name": "Wild", "level": 28, "price": 250},
-	{"kind": "relic", "id": "lucky_chip", "name": "Lucky Chip", "level": 29, "price": 500},
+	{"kind": "merchant", "id": "sharp", "name": "The Card Sharp", "level": 16, "price": 0},
+	{"kind": "relic", "id": "swimming_goggles", "name": "Swimming Goggles", "level": 17, "price": 80},
+	{"kind": "provision", "id": "fresh_deck", "name": "Fresh Deck", "level": 18, "price": 50},
+	{"kind": "relic", "id": "second_wind", "name": "Second Wind", "level": 19, "price": 150},
+	{"kind": "finish", "id": "holo", "name": "Holo", "level": 20, "price": 200},
+	{"kind": "relic", "id": "dowsing_rod", "name": "Dowsing Rod", "level": 21, "price": 100},
+	{"kind": "provision", "id": "tonic", "name": "Rattlesnake Tonic", "level": 22, "price": 80},
+	{"kind": "relic", "id": "mirror_shades", "name": "Mirror Shades", "level": 23, "price": 150},
+	{"kind": "finish", "id": "negative", "name": "Negative", "level": 24, "price": 250},
+	{"kind": "relic", "id": "bankroll_clip", "name": "Bankroll Clip", "level": 25, "price": 150},
+	{"kind": "relic", "id": "chuck_wagon", "name": "Chuck Wagon", "level": 26, "price": 300},
+	{"kind": "mod", "id": "wild", "name": "Wild", "level": 27, "price": 250},
+	{"kind": "relic", "id": "lucky_chip", "name": "Lucky Chip", "level": 28, "price": 500},
 ]
 
 ## POWER levels, hand-designed: each value has one entry per level, and

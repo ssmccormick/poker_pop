@@ -773,7 +773,7 @@ func _load_run() -> bool:
 	deck.clear()
 	for i in ranks.size():
 		var raw_mod: String = mods[i] if i < mods.size() else ""
-		deck.append({"rank": ranks[i], "suit": suits[i],
+		deck.append({"rank": 0 if curses[i] == 1 else ranks[i], "suit": 0 if curses[i] == 1 else suits[i],
 				"cursed": curses[i] == 1,
 				"mod": Board.migrate_mod(raw_mod),
 				"finish": finishes[i] if i < finishes.size()
@@ -2594,7 +2594,7 @@ func _start_run(asc: int) -> void:
 	hand_plays = {}
 	deck = _fresh_deck()
 	for i in Ascension.cursed_start(asc):
-		deck.append({"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3), "cursed": true})
+		deck.append(cursed_card())
 	room_index = 0
 	# The Outfitter's gear rides along: free trail cash, and
 	# provisions already in the kit.
@@ -4235,15 +4235,17 @@ func _fire_play_abilities(result: Dictionary) -> void:
 			var targets: Array = []
 			for p in main.board.grid:
 				var c: PlayingCard = main.board.grid[p]
-				if popping.has(p) or c.hazard == "" or c.hazard == "stone":
+				if popping.has(p):
 					continue
-				if fire_only and c.hazard != "fire":
+				var dirty := (c.hazard != "" and c.hazard != "stone") or (c.honey and not fire_only)
+				if not dirty or (fire_only and c.hazard != "fire"):
 					continue
 				targets.append(c)
 			targets.sort_custom(func(a: PlayingCard, b: PlayingCard) -> bool:
 				return a.grid_pos.y * 10 + a.grid_pos.x < b.grid_pos.y * 10 + b.grid_pos.x)
 			SeedRng.shuffle(rng_ability, targets)
 			for i in mini(n, targets.size()):
+				targets[i].honey = false  # honey counts as a hazard to sweep
 				main.board.provision_clean(targets[i])
 				main.board._fx(targets[i].position, "smoke")
 				hit = true
@@ -4955,6 +4957,11 @@ func on_time_up() -> void:
 			else "TIME'S UP — THE TABLE WINS")
 
 
+## A curse joins the deck as an extra card with no rank and no suit.
+static func cursed_card() -> Dictionary:
+	return {"rank": 0, "suit": 0, "cursed": true}
+
+
 func _room_failed(reason := "BUSTED — CURSE ADDED TO DECK") -> void:
 	in_room = false
 	_room_save = {}
@@ -4963,7 +4970,7 @@ func _room_failed(reason := "BUSTED — CURSE ADDED TO DECK") -> void:
 	main.board.locked = true
 	# The stake is gone and a curse joins the deck — and the room does
 	# NOT clear: the same table must be beaten before the trail continues.
-	deck.append({"rank": _rng.randi_range(2, 14), "suit": _rng.randi_range(0, 3), "cursed": true})
+	deck.append(cursed_card())
 	main.board._play_sound(Board.SFX_CROWS.pick_random(), 1.0, -8.0)
 	# Losing a table leaves a mark on the rider too.
 	if not take_damage(Ascension.lost_table_hp(ascension), "", "One lost table too many."):
@@ -6083,6 +6090,8 @@ func _populate_deck_view() -> void:
 
 ## The hover panel: what this card is and what it does.
 func _deck_stat_text(d: Dictionary) -> String:
+	if d.get("cursed", false):
+		return "A CURSED CARD\nIt has no rank or suit. It can't be played and it blocks chains, and it's only dealt once a table. A Bumper or the wind can push it off the board. Burn it at a forge or cast it off at a campfire to lose it for good."
 	var rank := int(d.rank)
 	var rank_names := {11: "JACK", 12: "QUEEN", 13: "KING", 14: "ACE"}
 	var text := "%s OF %s\nPip value  %d\n\n" % [rank_names.get(rank, str(rank)),

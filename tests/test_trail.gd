@@ -137,6 +137,19 @@ func _run() -> void:
 	failures += _check(brands.size() == 3 and brands == again
 			and brands[0] != brands[1] and brands[1] != brands[2] and brands[0] != brands[2],
 			"the campfire offers three different brands, and the same three again")
+	# Push Broom sweeps honey like any other hazard.
+	for p in main.board.grid:
+		var gc: PlayingCard = main.board.grid[p]
+		gc.hazard = ""
+		gc.honey = false
+	var sticky: PlayingCard = main.board.grid.values()[0]
+	sticky.honey = true
+	trail.abilities = ["push_broom"]
+	trail.loadout = {}
+	trail.equip(0, "Pair")
+	trail._fire_play_abilities({"name": "Pair", "cleared_cells": []})
+	failures += _check(not sticky.honey, "Push Broom clears honey")
+
 	# Two copies combine into one a level up, keeping its hand.
 	trail.abilities = ["matched_pair", "spurs", "spurs", "big_iron"]
 	trail.loadout = {}
@@ -924,9 +937,9 @@ func _run() -> void:
 			"and only provisions on the trail")
 	var mods_ok := true
 	for i in 300:
-		if not trail._random_mod() in ["mult", "chip", "gold"]:
+		if not trail._random_mod() in ["mult", "chip", "gold", "bumper"]:
 			mods_ok = false
-	failures += _check(mods_ok, "only Mult, Chip and Gold cards are dealt at level 1")
+	failures += _check(mods_ok, "only Mult, Cash, Gold and Bumper cards are dealt at level 1")
 
 	# --- The road: 30 stops, merchants and campfires fixed between tables
 	failures += _check(TrailMode.ROOMS_TOTAL == 30 and TrailMode.BOSS_ROOMS.keys() == [9, 19, 29],

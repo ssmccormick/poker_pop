@@ -19,9 +19,10 @@ const NAME_MAX := 12
 ## Bumped whenever the rules change what a seed deals (r2: ability cards
 ## replace the card pick; r3: tables carry twists; r4: trail cash
 ## replaces chips; r5: the three sides join the ability pool; r6: owned abilities
-## come up more often, to combine), so old and new
+## come up more often, to combine; r7: curses are dealt once a table
+## and Bumper is a starter), so old and new
 ## scores never share a board.
-const RULESET := "r6"
+const RULESET := "r7"
 
 
 static func key(mode: String, seed_text: String, variant := "") -> String:

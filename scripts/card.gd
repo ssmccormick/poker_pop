@@ -1399,6 +1399,13 @@ func _draw_art(rect: Rect2) -> void:
 		_draw_art_rings(rect)
 		return
 
+	if cursed:
+		# A curse has no rank or suit: the whole face is the curse.
+		_art(rect, "base", "card_blank")
+		_art(rect, "special", "cursed")
+		_draw_art_chain_badge(font)
+		_draw_art_rings(rect)
+		return
 	# A playing card: base, identity (or mod regalia), then trouble.
 	# Fire, water, wind and bomb cards have their own full-card bases.
 	var hz_base := _hazard_base()

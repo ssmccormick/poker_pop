@@ -291,6 +291,20 @@ func _init() -> void:
 	ab.deck = []
 	failures += _check(ab.enhance_next_draw("mult") and not ab.deck.is_empty(),
 			"an empty shoe is refilled before the enhancement lands")
+	# Curses ride the first pass through the shoe only.
+	ab.custom_deck = [{"rank": 5, "suit": 0}, TrailMode.cursed_card(), TrailMode.cursed_card()]
+	ab.deck = []
+	ab.shoe_passes = 0
+	ab._refill_deck()
+	var first_pass := ab.deck.size()
+	ab.deck = []
+	ab._refill_deck()
+	failures += _check(first_pass == 3 and ab.deck.size() == 1 and not bool(ab.deck[0].get("cursed", false)),
+			"cursed cards are dealt once, then stay out when the shoe goes back in")
+	failures += _check(int(TrailMode.cursed_card().rank) == 0 and bool(TrailMode.cursed_card().cursed),
+			"a curse is an extra card with no rank")
+	ab.custom_deck = []
+	ab.deck = []
 	# --- The sides: posse counts and the ride-aware abilities ----------------
 	var pc3 := Abilities.posse_counts(["keep_the_peace", "no_name", "side_bet", "spurs"])
 	failures += _check(int(pc3.sheriff) == 2 and int(pc3.outlaw) == 2 and int(pc3.bounty) == 1

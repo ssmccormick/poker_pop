@@ -20,6 +20,19 @@ var _boost := 0.0
 var _layers: Array = []
 var _sky_bands: Array = []  # {rect: Rect2, color: Color}
 var _rng := RandomNumberGenerator.new()
+var _kaleido: ShaderMaterial   # set while the trail's kaleidoscope is up
+var _k_extra := 0.0            # how far a lurch has pushed its clock
+
+# The trail plays over an animated kaleidoscope of suits (the design
+# kit's shader): its own four colours per region, six slices for a boss.
+const KALEIDO_DIR := "res://assets/art/kaleido/"
+const KALEIDO := {
+	"trail_day": {"bg": "15100c", "a": "7c1f16", "b": "b08a4a", "c": "3f6b63", "d": "5f3f78"},
+	"trail_dusk": {"bg": "140e0b", "a": "8a3b1c", "b": "c09a5b", "c": "5e7a55", "d": "7a3f4e"},
+	"trail_night": {"bg": "0c0e14", "a": "2f5143", "b": "5d6f80", "c": "3a3666", "d": "9a9ca6"},
+	"storm": {"bg": "0e1110", "a": "7c1f16", "b": "3e5a48", "c": "4a5560", "d": "8e7440",
+			"segments": 6, "spin": 0.04},
+}
 
 
 ## One drifting silhouette strip. Polygons are laid out across TILE_W
@@ -60,6 +73,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_boost = maxf(0.0, _boost - _boost * LURCH_DECAY * delta)
+	if _kaleido != null and _boost > 0.5:
+		# A scoring hand spins the colours on ahead for a moment.
+		_k_extra += delta * _boost / 60.0
+		_kaleido.set_shader_parameter("t_extra", _k_extra)
 	for l: Layer in _layers:
 		l.offset += (l.speed + _boost * l.speed / BASE_NEAR_SPEED) * delta
 		l.position.x = -fposmod(l.offset, TILE_W)
@@ -88,6 +105,11 @@ func set_scene(new_kind: String, new_variant := 0) -> void:
 	_layers.clear()
 	_sky_bands.clear()
 	_art_ambient = Color.TRANSPARENT
+	_kaleido = null
+	if KALEIDO.has(kind) and _try_kaleido(kind):
+		queue_redraw()
+		_add_overlays()
+		return
 	if _try_art_scene(kind, variant):
 		queue_redraw()
 		_add_overlays()
@@ -138,6 +160,33 @@ func set_scene(new_kind: String, new_variant := 0) -> void:
 			_add_layer(10, Color("070812"), _ground(900, 40, 1.2))
 	queue_redraw()
 	_add_overlays()
+
+
+# --- The kaleidoscope (trail) ----------------------------------------------
+
+func _try_kaleido(k: String) -> bool:
+	var shader_path := KALEIDO_DIR + "kaleido_suits.gdshader"
+	if not ResourceLoader.exists(shader_path) \
+			or not ResourceLoader.exists(KALEIDO_DIR + "suits_tile_solid.png"):
+		return false
+	var mat := ShaderMaterial.new()
+	mat.shader = load(shader_path)
+	mat.set_shader_parameter("suits_solid", load(KALEIDO_DIR + "suits_tile_solid.png"))
+	mat.set_shader_parameter("suits_outline", load(KALEIDO_DIR + "suits_tile_outline.png"))
+	var pal: Dictionary = KALEIDO[k]
+	mat.set_shader_parameter("bg", Color(String(pal.bg)))
+	for key in ["a", "b", "c", "d"]:
+		mat.set_shader_parameter("col_" + key, Color(String(pal[key])))
+	mat.set_shader_parameter("segments", int(pal.get("segments", 8)))
+	mat.set_shader_parameter("spin_speed", float(pal.get("spin", 0.025)))
+	mat.set_shader_parameter("t_extra", _k_extra)
+	var rect := ColorRect.new()
+	rect.size = VIEW
+	rect.material = mat
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(rect)
+	_kaleido = mat
+	return true
 
 
 # --- Painted scenes (round-2 art kit) -------------------------------------

@@ -61,7 +61,7 @@ func _catalog() -> void:
 			starters.append(Progression.key(String(r.kind), String(r.id)))
 	starters.sort()
 	var expect := ["rider:the_gambler", "trick:sleeve", "gear:bankroll",
-			"merchant:peddler", "mod:mult", "mod:chip", "mod:gold",
+			"merchant:peddler", "mod:mult", "mod:chip", "mod:gold", "mod:bumper",
 			"relic:horseshoe", "relic:card_sleeve", "relic:snake_oil", "relic:tin_star",
 			"relic:bomb_badge", "relic:chisel", "provision:canteen",
 			"provision:dynamite", "provision:pocket_flask", "provision:gold_pan",
@@ -102,10 +102,10 @@ func _catalog() -> void:
 	for lv in range(2, Progression.LAST_UNLOCK + 1):
 		if int(per_level.get(lv, 0)) != 1:
 			bad.append(lv)
-	_check(bad.is_empty() and Progression.LAST_UNLOCK == 29,
-			"exactly one unlock on each level 2-29 %s" % str(bad))
+	_check(bad.is_empty() and Progression.LAST_UNLOCK == 28,
+			"exactly one unlock on each level 2-28 %s" % str(bad))
 	var past := per_level.keys().filter(func(lv): return int(lv) > Progression.LAST_UNLOCK)
-	_check(past.is_empty(), "no unlocks past level 29")
+	_check(past.is_empty(), "no unlocks past level 28")
 	# Riders are won, not levelled.
 	var p := Progression.new()
 	p.exp_total = Progression.exp_at_level(60)
@@ -261,9 +261,9 @@ func _odds() -> void:
 			"at level 1 every table type deals at its full odds")
 	var mods_ok := true
 	for i in 2000:
-		if not fresh.pick("mod", TrailMode.MOD_WEIGHTS) in ["mult", "chip", "gold"]:
+		if not fresh.pick("mod", TrailMode.MOD_WEIGHTS) in ["mult", "chip", "gold", "bumper"]:
 			mods_ok = false
-	_check(mods_ok, "at level 1 only Mult, Chip and Gold turn up")
+	_check(mods_ok, "at level 1 only Mult, Cash, Gold and Bumper turn up")
 
 
 func _odds_match(p: Progression, kind: String, weights: Dictionary, want: Dictionary) -> bool:
