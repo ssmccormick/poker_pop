@@ -931,6 +931,53 @@ func equipped_on(hand: String) -> Array:
 	return out
 
 
+## Whether any copy of this ability (at any level) is in the collection.
+func owns_ability(id: String) -> bool:
+	for k in abilities:
+		if Abilities.base(String(k)) == Abilities.base(id):
+			return true
+	return false
+
+
+## Another copy at the same level as `idx` ("" partner: -1). A loose one
+## is preferred, so combining disturbs the loadout as little as it can.
+func combine_partner(idx: int) -> int:
+	if idx < 0 or idx >= abilities.size() or Abilities.combined(String(abilities[idx])) == "":
+		return -1
+	var best := -1
+	for j in abilities.size():
+		if j != idx and String(abilities[j]) == String(abilities[idx]):
+			if hand_of(j) == "":
+				return j
+			if best < 0:
+				best = j
+	return best
+
+
+## Two copies at the same level become one a level up: stronger, a
+## rarity higher, and only one card's slots. The copy at `idx` keeps
+## its hand; its partner leaves the collection. Returns the upgraded
+## copy's new index (or -1 when there was nothing to combine).
+func combine(idx: int) -> int:
+	var j := combine_partner(idx)
+	if j < 0:
+		return -1
+	abilities[idx] = Abilities.combined(String(abilities[idx]))
+	unequip(j)
+	abilities.remove_at(j)
+	var fixed := {}
+	for hand in loadout:
+		var on: Array = []
+		for i in loadout[hand]:
+			on.append(int(i) - 1 if int(i) > j else int(i))
+		fixed[hand] = on
+	loadout = fixed
+	_validate_loadout()
+	_push_loadout()
+	main.stat_bump("abilities_combined")
+	return idx - 1 if j < idx else idx
+
+
 func used_slots(hand: String) -> int:
 	var n := 0
 	for id in equipped_on(hand):
@@ -2480,9 +2527,8 @@ func _catalog_desc(kind: String, id: String) -> String:
 				return fd
 			return String(PlayingCard.FINISHES[id].desc) if PlayingCard.FINISHES.has(id) else ""
 		"ability":
-			var ad := Abilities.def(id)
 			var limit := Abilities.restriction_line(id)
-			return "%s (%d slot%s%s)" % [String(ad.get("desc", "")), Abilities.slots(id),
+			return "%s (%d slot%s%s)" % [Abilities.describe(id), Abilities.slots(id),
 					"" if Abilities.slots(id) == 1 else "s",
 					(", " + limit.to_lower()) if limit != "" else ""]
 		"rider":
@@ -3719,7 +3765,7 @@ func _start_room() -> void:
 	# Posse Up: a hand for every few Sheriffs riding along (per copy).
 	var sheriffs := int(Abilities.posse_counts(all_equipped()).sheriff)
 	for id in all_equipped():
-		var every := int(Abilities.def(id).get("fx", {}).get("posse_hands", 0))
+		var every := int(Abilities.fx(id).get("posse_hands", 0))
 		if every > 0:
 			horn += sheriffs / every
 	if horn > 0 and room_goal != "blackjack":
@@ -4152,7 +4198,7 @@ const SADDLE_HORN_SECS := 15
 func _ability_passive(key: String, none: float) -> float:
 	var out := none
 	for id in all_equipped():
-		var fx: Dictionary = Abilities.def(id).get("fx", {})
+		var fx: Dictionary = Abilities.fx(id)
 		if not fx.has(key):
 			continue
 		match key:
@@ -4177,10 +4223,12 @@ func _fire_play_abilities(result: Dictionary) -> void:
 	var refunded := false
 	var popping: Array = result.get("cleared_cells", [])
 	for id in equipped_on(hand):
-		var fx: Dictionary = Abilities.def(id).get("fx", {})
+		var fx: Dictionary = Abilities.fx(id)
 		var hit := false
 		if fx.has("enhance"):
-			hit = main.board.enhance_next_draw(String(fx.enhance))
+			for n in int(fx.get("enhance_n", 1)):
+				if main.board.enhance_next_draw(String(fx.enhance)):
+					hit = true
 		if fx.has("clear") or fx.has("douse"):
 			var fire_only := fx.has("douse")
 			var n := int(fx.get("douse", fx.get("clear", 0)))
@@ -4234,13 +4282,15 @@ func _fire_play_abilities(result: Dictionary) -> void:
 			result["bullets_you"] = int(result.bullets_you) + int(fx.extra_hit)
 			hit = true
 		if fx.has("brand"):
-			hit = _brand_from_hand(result, String(fx.brand))
+			for n in int(fx.get("brand_n", 1)):
+				if _brand_from_hand(result, String(fx.brand)):
+					hit = true
 		if hit and not fired.has(Abilities.ability_name(id)):
 			fired.append(Abilities.ability_name(id))
 	# Reward Money counts the hits once every Hired Gun has added his.
 	var hits := int(result.get("bullets_you", 0)) if room_goal == "outlaw" else 0
 	for id in equipped_on(hand):
-		var per := int(Abilities.def(id).get("fx", {}).get("cash_per_hit", 0))
+		var per := int(Abilities.fx(id).get("cash_per_hit", 0))
 		if per > 0 and hits > 0:
 			trail_cash += per * hits
 			if not fired.has(Abilities.ability_name(id)):
@@ -5167,7 +5217,8 @@ const ABILITY_OFFER := 3
 
 ## Rolls an ability offer from the "pick" stream for (room, round).
 ## Each card rolls a rarity first, then an available ability of that
-## rarity; abilities you already hold come up half as often.
+## rarity; abilities you already hold come up 1.5 times as often, since
+## a second copy can be combined into a stronger one.
 func _roll_ability_offer(room: int, round: int, source: String) -> Array:
 	_stream("pick", room, round)
 	var count := ABILITY_OFFER
@@ -5195,7 +5246,7 @@ func _roll_ability_offer(room: int, round: int, source: String) -> Array:
 func _ability_pick(ids: Array, exclude: Array) -> String:
 	var w := {}
 	for id in ids:
-		w[id] = 0.5 if abilities.has(id) else 1.0
+		w[id] = 1.5 if owns_ability(String(id)) else 1.0
 	return progress.pick("ability", w, exclude, _rng)
 
 
@@ -5231,9 +5282,9 @@ func _show_pick_now() -> void:
 		var id := String(offers[i])
 		var holder: Button = main._button(_pick_box, "", Vector2(start_x + i * 220, 0), Vector2(170, 240))
 		UiKit.style_shop_slot(holder)
-		holder.tooltip_text = "%s (%s, %s)\n%s" % [Abilities.ability_name(id),
+		holder.tooltip_text = "%s (%s, %s)\n%s" % [Abilities.display_name(id),
 				Abilities.side_name(id), Abilities.RARITY_NAMES[Abilities.rarity(id)],
-				String(Abilities.def(id).desc)]
+				Abilities.describe(id)]
 		var face := AbilityCard.new()
 		face.ability_id = id
 		face.position = Vector2(85, 120)
@@ -5244,7 +5295,7 @@ func _show_pick_now() -> void:
 			face.reveal(0.25 + 0.06 * i)  # each card flips over a beat after the last
 		# What it does, in words, right under the card.
 		var what := Label.new()
-		what.text = String(Abilities.def(id).desc)
+		what.text = Abilities.describe(id)
 		what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		what.position = Vector2(start_x + i * 220 - 15, 252)
@@ -5282,6 +5333,11 @@ func _take_ability(id: String) -> void:
 			_announce_after_settle("%s IS ON YOUR %s" % [Abilities.ability_name(id).to_upper(),
 					hand.to_upper()])
 	main.tutor_show("abilities")
+	if combine_partner(abilities.size() - 1) >= 0:
+		# A twin: say once that two copies combine into a stronger one.
+		main.tutor_show("combine")
+		_announce_after_settle("TWO %s — COMBINE THEM ON THE ABILITIES SCREEN"
+				% Abilities.ability_name(id).to_upper())
 
 
 ## After a pick (or a skip): any chest-owed ability rounds run first,
@@ -5541,9 +5597,9 @@ func _render_shop_abilities() -> void:
 		var holder: Button = main._button(_shop_box, "",
 				Vector2(265 + col * 220, row * 280), Vector2(170, 250))
 		UiKit.style_shop_slot(holder)
-		holder.tooltip_text = "%s (%s, %s, %d slot%s)\n%s" % [Abilities.ability_name(id),
+		holder.tooltip_text = "%s (%s, %s, %d slot%s)\n%s" % [Abilities.display_name(id),
 				Abilities.side_name(id), Abilities.RARITY_NAMES[Abilities.rarity(id)], Abilities.slots(id),
-				"" if Abilities.slots(id) == 1 else "s", String(Abilities.def(id).desc)]
+				"" if Abilities.slots(id) == 1 else "s", Abilities.describe(id)]
 		var face := AbilityCard.new()
 		face.ability_id = id
 		face.scale = Vector2(0.95, 0.95)

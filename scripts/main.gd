@@ -471,8 +471,8 @@ func _ready() -> void:
 				menu_layer.visible = false
 				trail._start_run(0)
 				trail.abilities = ["keep_the_peace", "keep_the_peace", "law_of_the_land",
-						"high_noon", "wild_bunch", "desperado", "notches", "no_name",
-						"good_bad_ugly", "huckleberry", "powder_keg", "this_is_the_way"]
+						"high_noon@2", "wild_bunch", "desperado", "notches@3", "no_name",
+						"good_bad_ugly", "huckleberry", "powder_keg", "spurs@2"]
 				trail.loadout = {}
 				trail.equip(0, "Pair")
 				trail.equip(1, "Pair")
@@ -482,6 +482,9 @@ func _ready() -> void:
 				trail.equip(6, "Straight")
 				trail.equip(8, "Full House")
 				trail._hide_all()
+				# POKERPOP_STAGE=combine picks up a twin, so COMBINE shows.
+				if OS.get_environment("POKERPOP_STAGE") == "combine":
+					trail.abilities_screen._sel = 1
 				trail.abilities_screen.refresh()
 				trail.abilities_screen.visible = true
 			"trailpick":
@@ -2046,6 +2049,7 @@ const TUTOR := {
 	"mode_arcade": ["ARCADE", "The bar on the right is always draining. Scoring fills it back up, and reaching the level target moves you up a level. When the bar runs empty, the game ends."],
 	"mode_zen": ["ZEN", "No timer, no limits, no losing. Just you, the cards, and the sound of the pops."],
 	"mode_trail": ["THE TRAIL", "A ride of 21 tables over 30 stops. Every region has two merchants and a campfire along the road, and a boss at the end. Tables are free to sit, and each one you clear pays TRAIL CASH. Safes, chests and bounties pay more, and so do Cash and Gold cards. Spend it at the merchants. Whatever trail cash you're holding only comes home if you RIDE TO THE END. Lose your HP and it's gone. Before you set out, you can also bring cash from the bank and bet on how far you'll get."],
+	"combine": ["COMBINING ABILITIES", "You have two copies of the same ability. Open the ABILITIES screen, click one, and press COMBINE. The two become one card a level up (II, then III): its numbers grow, its rarity goes up a step, and it only takes one card's slots. A combined card also counts as two members of its posse, or three at level III, so your posse never shrinks. Only copies at the same level combine."],
 	"the_bet": ["THE BET", "You can ride for free, or put some of your bank on the line. BRING CASH to spend at the merchants: it's yours again only if you finish the trail. Or BET on how far you'll get. Pick the Jack, the Queen, or King Cobra, and the further you go, the better the odds. A winning bet goes straight to the bank the moment that boss falls, so it's safe even if the trail gets you later."],
 	"hazard_bomb": ["BOMB CARD", "The number on the fuse drops after every hand you score. Play the bomb in any hand to defuse it. If the fuse reaches zero, it goes off. The bomb is gone and the blast costs you 2 HP."],
 	"hazard_fire": ["FIRE CARD", "After every hand, the fire spreads to one card next to it, and the fire card's own rank burns down. The card it'll catch next shows SPARKS along its bottom edge, so clear that card out of the way or play the fire card to douse it. If EVERY card on the table catches fire, you LOSE the table."],

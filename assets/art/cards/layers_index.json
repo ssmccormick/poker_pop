@@ -304,7 +304,8 @@
    "rare": "cards/ability_frame/rare.png",
    "epic": "cards/ability_frame/epic.png",
    "legendary": "cards/ability_frame/legendary.png",
-   "back": "cards/ability_frame/back.png"
+   "back": "cards/ability_frame/back.png",
+   "legendary_all_sides": "cards/ability_frame/legendary_all_sides.png"
   },
   "ability_pip": {
    "common": "cards/ability_pip/common.png",
@@ -337,7 +338,32 @@
    "clean_sweep": "cards/ability_glyph/clean_sweep.png",
    "fastest_gun": "cards/ability_glyph/fastest_gun.png",
    "branded_for_life": "cards/ability_glyph/branded_for_life.png",
-   "house_money": "cards/ability_glyph/house_money.png"
+   "house_money": "cards/ability_glyph/house_money.png",
+   "keep_the_peace": "cards/ability_glyph/keep_the_peace.png",
+   "reach_for_the_sky": "cards/ability_glyph/reach_for_the_sky.png",
+   "posse_up": "cards/ability_glyph/posse_up.png",
+   "law_and_order": "cards/ability_glyph/law_and_order.png",
+   "high_noon": "cards/ability_glyph/high_noon.png",
+   "huckleberry": "cards/ability_glyph/huckleberry.png",
+   "law_of_the_land": "cards/ability_glyph/law_of_the_land.png",
+   "rio_bravo": "cards/ability_glyph/rio_bravo.png",
+   "hole_in_the_wall": "cards/ability_glyph/hole_in_the_wall.png",
+   "powder_keg": "cards/ability_glyph/powder_keg.png",
+   "fistful_of_dollars": "cards/ability_glyph/fistful_of_dollars.png",
+   "few_dollars_more": "cards/ability_glyph/few_dollars_more.png",
+   "bad_reputation": "cards/ability_glyph/bad_reputation.png",
+   "wild_bunch": "cards/ability_glyph/wild_bunch.png",
+   "great_train_robbery": "cards/ability_glyph/great_train_robbery.png",
+   "desperado": "cards/ability_glyph/desperado.png",
+   "hunting_party": "cards/ability_glyph/hunting_party.png",
+   "notches": "cards/ability_glyph/notches.png",
+   "dead_or_alive": "cards/ability_glyph/dead_or_alive.png",
+   "true_grit": "cards/ability_glyph/true_grit.png",
+   "reward_money": "cards/ability_glyph/reward_money.png",
+   "this_is_the_way": "cards/ability_glyph/this_is_the_way.png",
+   "hang_em_high": "cards/ability_glyph/hang_em_high.png",
+   "no_name": "cards/ability_glyph/no_name.png",
+   "good_bad_ugly": "cards/ability_glyph/good_bad_ugly.png"
   },
   "twist_icon": {
    "wild": "cards/twist_icon/wild.png",
@@ -352,6 +378,12 @@
    "play_only": "cards/twist_icon/play_only.png",
    "score_only": "cards/twist_icon/score_only.png",
    "storm": "cards/twist_icon/storm.png"
+  },
+  "ability_side": {
+   "sheriff": "cards/ability_side/sheriff.png",
+   "outlaw": "cards/ability_side/outlaw.png",
+   "bounty": "cards/ability_side/bounty.png",
+   "drifter": "cards/ability_side/drifter.png"
   }
  },
  "how_to_stack": {
@@ -864,5 +896,31 @@
   "fx/ability_reveal_rays": "700x900, card centred at offset (100,100); rotate slowly (20°/s), fade in 0->0.8, tint by rarity",
   "fx/ability_reveal_glow": "700x900 soft glow behind the card; tint by rarity, pulse 0.6->1",
   "flip": "scaleX 1 -> 0 on the back (120 ms), swap to the face, 0 -> 1 (120 ms), then rays + glow, 60 ms stagger per card"
+ },
+ "three_sides": {
+  "sides": {
+   "sheriff": {
+    "name": "Sheriff",
+    "color": "#1e2a44"
+   },
+   "outlaw": {
+    "name": "Outlaw",
+    "color": "#7c1f16"
+   },
+   "bounty": {
+    "name": "Bounty Hunter",
+    "color": "#5f7f96"
+   },
+   "drifter": {
+    "name": "Drifter",
+    "color": "#b89a6e"
+   },
+   "all": "The Man with No Name counts as every side: use ability_frame/legendary_all_sides and show all three badges."
+  },
+  "notes": {
+   "ability_side": "128x128 round badges for the card footer, the posse line and hand tiles.",
+   "ability_glyph": "256x256, draw in the ability card emblem box (140, 90, 220x220 on the 500x700 frame).",
+   "campfire_choices": "440x560 rendered at 1x like the originals; replaces the three full_tend_* files. Body text now reads: 'The fire offers three brands. / Pick one, then the card it goes on.' Button: ENHANCE 1."
+  }
  }
 }

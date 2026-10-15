@@ -137,6 +137,22 @@ func _run() -> void:
 	failures += _check(brands.size() == 3 and brands == again
 			and brands[0] != brands[1] and brands[1] != brands[2] and brands[0] != brands[2],
 			"the campfire offers three different brands, and the same three again")
+	# Two copies combine into one a level up, keeping its hand.
+	trail.abilities = ["matched_pair", "spurs", "spurs", "big_iron"]
+	trail.loadout = {}
+	trail.equip(2, "Pair")
+	trail.equip(3, "Flush")
+	failures += _check(trail.combine_partner(0) == -1 and trail.combine_partner(2) == 1,
+			"a copy's twin is the loose one at the same level")
+	var at: int = trail.combine(2)
+	failures += _check(at == 1 and trail.abilities == ["matched_pair", "spurs@2", "big_iron"]
+			and trail.hand_of(1) == "Pair" and trail.hand_of(2) == "Flush",
+			"combining keeps the upgraded copy on its hand and the loadout lined up %s %s %d"
+			% [str(trail.abilities), str(trail.loadout), at])
+	failures += _check(main.board.ability_loadout.get("Pair", []) == ["spurs@2"],
+			"the board sees the combined copy %s" % str(main.board.ability_loadout))
+	trail.abilities.append("spurs")
+	failures += _check(trail.combine_partner(1) == -1, "only copies at the same level combine")
 	trail.abilities = []
 	trail.loadout = {}
 

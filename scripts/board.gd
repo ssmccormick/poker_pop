@@ -1814,7 +1814,7 @@ func _apply_abilities(result: Dictionary, stage: String) -> void:
 	var hazards := -1
 	var fired: Array = result.get("abilities", [])
 	for id in ids:
-		var fx: Dictionary = Abilities.def(String(id)).get("fx", {})
+		var fx: Dictionary = Abilities.fx(String(id))
 		var mine := Abilities.side(String(id))
 		var own_posse := 0
 		for s in Abilities.SIDES:
@@ -1835,7 +1835,7 @@ func _apply_abilities(result: Dictionary, stage: String) -> void:
 				if fx.has("flat_per_hazard"):
 					add += int(fx.flat_per_hazard) * hazards
 			if fx.has("flat_per_cash"):
-				add += mini(int(fx.flat_per_cash) * int(ctx.get("trail_cash", 0)), Abilities.CASH_CAP)
+				add += mini(int(fx.flat_per_cash) * int(ctx.get("trail_cash", 0)), int(fx.get("cap", Abilities.CASH_CAP)))
 			if fx.has("flat_per_curse"):
 				add += int(fx.flat_per_curse) * int(ctx.get("curses", 0))
 			if fx.has("notch_flat"):

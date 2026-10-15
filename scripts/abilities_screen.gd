@@ -24,6 +24,7 @@ var _grid: GridContainer
 var _status: Label
 var _empty_note: Label
 var _posse: Label            # how many of each side ride along
+var _combine: Button         # merges the picked copy with its twin
 
 
 func setup(owner_trail) -> void:
@@ -65,12 +66,16 @@ func setup(owner_trail) -> void:
 			Vector2(1180, 330), 18, main.DIM)
 	_empty_note.size = Vector2(620, 80)
 	_empty_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status = main._label(self, "", Vector2(0, 960), 20, main.OFFWHITE)
+	_status = main._label(self, "", Vector2(0, 952), 20, main.OFFWHITE)
 	_status.size = Vector2(main.VIEW.x, 30)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var back: Button = main._button(self, "BACK", Vector2(60, 984), Vector2(200, 54))
 	back.add_theme_font_size_override("font_size", 20)
 	back.pressed.connect(close)
+	_combine = main._button(self, "COMBINE", Vector2(1230, 984), Vector2(350, 54), true)
+	_combine.add_theme_font_size_override("font_size", 18)
+	_combine.visible = false
+	_combine.pressed.connect(_do_combine)
 	var clear: Button = main._button(self, "TAKE ALL OFF", Vector2(1600, 984), Vector2(260, 54))
 	clear.add_theme_font_size_override("font_size", 18)
 	clear.tooltip_text = "Takes every ability off your hands. They stay in your collection."
@@ -121,15 +126,61 @@ func refresh() -> void:
 	var pc := Abilities.posse_counts(trail.all_equipped())
 	_posse.text = "YOUR POSSE:   Sheriff %d   ·   Outlaw %d   ·   Bounty Hunter %d" \
 			% [int(pc.sheriff), int(pc.outlaw), int(pc.bounty)]
+	var twin: int = trail.combine_partner(_sel) if _sel >= 0 else -1
+	_combine.visible = twin >= 0
+	if twin >= 0:
+		var up := Abilities.combined(String(trail.abilities[_sel]))
+		_combine.text = "COMBINE INTO %s" % Abilities.display_name(up).to_upper()
+		UiKit.fit_button_text(_combine, 18)
+		_combine.tooltip_text = "Two copies become one %s: %s" % [Abilities.display_name(up),
+				Abilities.describe(up)]
 	if _sel >= 0:
 		_status.text = "Now pick a hand for %s. Right-click to put it down." \
-				% Abilities.ability_name(String(trail.abilities[_sel]))
+				% Abilities.display_name(String(trail.abilities[_sel]))
+		if twin >= 0:
+			_status.text = "Pick a hand for %s, or combine it with its twin." \
+					% Abilities.display_name(String(trail.abilities[_sel]))
 		_status.add_theme_color_override("font_color", main.GOLD)
 	elif trail.abilities.is_empty():
 		_status.text = ""
+	elif _any_twins():
+		_status.text = "You have two of the same ability. Click one to combine them into a stronger card."
+		_status.add_theme_color_override("font_color", main.GOLD)
 	else:
 		_status.text = "Click an ability, then a hand to put it on."
 		_status.add_theme_color_override("font_color", main.OFFWHITE)
+
+
+func _any_twins() -> bool:
+	for i in trail.abilities.size():
+		if trail.combine_partner(i) >= 0:
+			return true
+	return false
+
+
+## Two copies become one a level up, with a flourish.
+func _do_combine() -> void:
+	if _sel < 0:
+		return
+	var at: int = trail.combine(_sel)
+	if at < 0:
+		return
+	_sel = -1
+	main.board._play_sound(Board.SFX_REVOLVER_CHARGE, 1.1, -6.0)
+	main._announce("COMBINED — %s" % Abilities.display_name(String(trail.abilities[at])).to_upper(), main.GOLD)
+	trail._save_run()
+	refresh()
+	_reveal_at(at)
+
+
+## Plays the card reveal on the upgraded copy in the collection.
+func _reveal_at(idx: int) -> void:
+	await get_tree().process_frame
+	if idx < _grid.get_child_count():
+		var holder := _grid.get_child(idx)
+		for c in holder.get_children():
+			if c is AbilityCard:
+				(c as AbilityCard).reveal()
 
 
 func _build_rows() -> void:
@@ -176,12 +227,12 @@ func _build_rows() -> void:
 		for idx in trail.loadout.get(hand, []):
 			var id := String(trail.abilities[int(idx)])
 			var n := Abilities.slots(id)
-			var tile: Button = main._button(_row_box, Abilities.ability_name(id),
+			var tile: Button = main._button(_row_box, Abilities.display_name(id),
 					Vector2(CELLS_X + at * (CELL_W + CELL_GAP), y + 4),
 					Vector2(n * CELL_W + (n - 1) * CELL_GAP, CELL_H))
 			tile.add_theme_font_size_override("font_size", 15 if n > 1 else 11)
-			tile.tooltip_text = "%s\n%s\nClick to take it off." % [Abilities.ability_name(id),
-					String(Abilities.def(id).desc)]
+			tile.tooltip_text = "%s\n%s\nClick to take it off." % [Abilities.display_name(id),
+					Abilities.describe(id)]
 			var tile_sb := CardArt.nine_half("ui", "ability_tile_" + Abilities.RARITY_IDS[Abilities.rarity(id)],
 					[28, 22, 28, 22])
 			if tile_sb != null:
@@ -235,9 +286,9 @@ func _build_collection() -> void:
 		holder.custom_minimum_size = Vector2(204, 196)
 		UiKit.style_shop_slot(holder)
 		var on: String = trail.hand_of(i)
-		holder.tooltip_text = "%s (%s, %s, %d slot%s)\n%s%s" % [Abilities.ability_name(id),
+		holder.tooltip_text = "%s (%s, %s, %d slot%s)\n%s%s" % [Abilities.display_name(id),
 				Abilities.side_name(id), Abilities.RARITY_NAMES[Abilities.rarity(id)], Abilities.slots(id),
-				"" if Abilities.slots(id) == 1 else "s", String(Abilities.def(id).desc),
+				"" if Abilities.slots(id) == 1 else "s", Abilities.describe(id),
 				("\nIt's on your %s." % on) if on != "" else ""]
 		var face := AbilityCard.new()
 		face.ability_id = id

@@ -350,7 +350,33 @@ func _init() -> void:
 	failures += _check(int(res.cash_earned) == Board.CHIP_BONUS + 2,
 			"A Fistful of Dollars: $1, plus $1 for the Cash card in the hand")
 	cashc.free()
+	# --- Levels: combined copies grow -------------------------------------
 	ab.ability_ctx = Callable()
+	ab.selected.assign([plain_cards[0], plain_cards[1]])
+	ab.ability_loadout = {"Pair": ["spurs@2"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 140, "Spurs II adds 40 (%d)" % res.score)
+	ab.ability_loadout = {"Pair": ["matched_pair@3"]}
+	res = {"name": "Pair", "score": 100}
+	ab._apply_card_mods(res)
+	failures += _check(res.score == 250, "Matched Pair III scores 2.5 times as much (%d)" % res.score)
+	failures += _check(Abilities.rarity("spurs@2") == 1 and Abilities.rarity("spurs@3") == 2
+			and Abilities.rarity("house_money@2") == 3, "each level lifts the rarity, up to Legendary")
+	failures += _check(is_equal_approx(float(Abilities.fx("lookout@3").refill_hazard_mult), 0.125)
+			and int(Abilities.fx("borrowed_time@3").hand_every) == 2
+			and int(Abilities.fx("posse_up@3").posse_hands) == 1
+			and int(Abilities.fx("hot_brand@2").enhance_n) == 2,
+			"steps and counts scale the right way")
+	failures += _check(Abilities.combined("spurs") == "spurs@2" and Abilities.combined("spurs@2") == "spurs@3"
+			and Abilities.combined("spurs@3") == "" and Abilities.display_name("spurs@3") == "Spurs III",
+			"two copies make the next level, up to III")
+	failures += _check(int(Abilities.posse_counts(["keep_the_peace@2", "keep_the_peace"]).sheriff) == 3,
+			"a level II copy counts twice in its posse")
+	failures += _check(Abilities.describe("spurs") == String(Abilities.DEFS.spurs.desc).format({"flat": "20"})
+			and Abilities.describe("rain_barrel@2").contains("up to four fires")
+			and Abilities.describe("matched_pair@2") == "Your Pairs score double.",
+			"descriptions carry each level's own numbers")
 	ab.selected.clear()
 	for pc in plain_cards:
 		pc.free()
@@ -372,6 +398,10 @@ func _init() -> void:
 				"ability %s is well formed" % id)
 		for h in d.hands:
 			failures += _check(Abilities.HAND_SLOTS.has(h), "ability %s names a real hand (%s)" % [id, h])
+		for lv in range(1, Abilities.MAX_LEVEL + 1):
+			var text := Abilities.describe(Abilities.key_at(String(id), lv))
+			failures += _check(not text.contains("{") and not text.contains("}") and text.ends_with("."),
+					"ability %s reads cleanly at level %d: %s" % [id, lv, text])
 
 	# Old save ids map onto the current mod family.
 	failures += _check(Board.migrate_mod("cash") == "gold"

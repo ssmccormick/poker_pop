@@ -18,9 +18,10 @@ const NAME_MAX := 12
 
 ## Bumped whenever the rules change what a seed deals (r2: ability cards
 ## replace the card pick; r3: tables carry twists; r4: trail cash
-## replaces chips; r5: the three sides join the ability pool), so old and new
+## replaces chips; r5: the three sides join the ability pool; r6: owned abilities
+## come up more often, to combine), so old and new
 ## scores never share a board.
-const RULESET := "r5"
+const RULESET := "r6"
 
 
 static func key(mode: String, seed_text: String, variant := "") -> String:

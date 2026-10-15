@@ -90,7 +90,7 @@ func _draw() -> void:
 	if d.is_empty():
 		return
 	var rect := Rect2(-W / 2, -H / 2, W, H)
-	var r := clampi(int(d.rarity), 0, 3)
+	var r := clampi(Abilities.rarity(ability_id), 0, 3)
 	var tint: Color = RARITY_COLORS[r]
 	var k := W / 500.0
 	if _reveal_a > 0.0 and not face_down:
@@ -131,7 +131,13 @@ func _zone(z: Rect2, rect: Rect2, k: float) -> Rect2:
 
 
 func _draw_kit_face(d: Dictionary, rect: Rect2, k: float, r: int) -> void:
-	draw_texture_rect(CardArt.tex("ability_frame", Abilities.RARITY_IDS[r]), rect, false)
+	var frame := CardArt.tex("ability_frame", Abilities.RARITY_IDS[r])
+	if Abilities.side(ability_id) == "any" and r == 3:
+		# The Man with No Name: the legendary rim split into all three sides.
+		var all_sides := CardArt.tex("ability_frame", "legendary_all_sides")
+		if all_sides != null:
+			frame = all_sides
+	draw_texture_rect(frame, rect, false)
 	var glyph := glyph_tex(ability_id)
 	if glyph != null:
 		draw_texture_rect(glyph, _zone(GLYPH_BOX, rect, k), false)
@@ -139,7 +145,7 @@ func _draw_kit_face(d: Dictionary, rect: Rect2, k: float, r: int) -> void:
 	var label: Font = FontLib.label if FontLib.label != null else ThemeDB.fallback_font
 	# The name on the plaque, one or two lines, centered in the band.
 	var band := _zone(NAME_BAND, rect, k)
-	var name_text := String(d.name).to_upper()
+	var name_text := Abilities.display_name(ability_id).to_upper()
 	var size := int(round((40.0 if name_text.length() <= 10 else 32.0) * k * 1.0))
 	var lines := 1 if display.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= band.size.x - 8 else 2
 	var line_h := size * 1.05
@@ -159,21 +165,38 @@ func _draw_kit_face(d: Dictionary, rect: Rect2, k: float, r: int) -> void:
 			draw_texture_rect(pip_tex, pr, false)
 		else:
 			draw_circle(pr.get_center(), pip / 2.0, RARITY_COLORS[r])
-	# The side it rides with, and any restriction, in the footer.
+	# The side it rides with (its badge, then its name), and any
+	# restriction, in the footer. No Name wears all three badges.
+	var side := Abilities.side(ability_id)
 	var foot := Abilities.side_name(ability_id).to_upper()
 	var limit := Abilities.restriction_line(ability_id)
 	if limit != "":
 		foot += "  ·  " + limit.to_upper()
 	var fb := _zone(FOOTER_BAND, rect, k)
 	var fs := maxi(6, int(round((26.0 if limit == "" else 22.0) * k)))
-	draw_string(label, Vector2(fb.position.x, fb.get_center().y + fs * 0.36), foot,
-			HORIZONTAL_ALIGNMENT_CENTER, fb.size.x, fs, FOOTER)
+	var badges: Array = []
+	for s in (Abilities.SIDES if side == "any" else [side]):
+		var b := CardArt.tex("ability_side", String(s))
+		if b != null:
+			badges.append(b)
+	var bsz := fs * 1.35
+	var text_w := label.get_string_size(foot, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	if side == "any" and not badges.is_empty():
+		text_w = 0.0  # the three badges say it
+	var group_w := badges.size() * (bsz + 3.0) + text_w
+	var x := fb.get_center().x - group_w / 2.0
+	for b in badges:
+		draw_texture_rect(b, Rect2(x, fb.get_center().y - bsz / 2.0, bsz, bsz), false)
+		x += bsz + 3.0
+	if text_w > 0.0:
+		draw_string(label, Vector2(x, fb.get_center().y + fs * 0.36), foot,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, FOOTER)
 
 
 ## The ability's own glyph from the kit, or until it's painted, the
 ## stand-in its definition names (a relic or provision glyph, an icon).
 static func glyph_tex(id: String) -> Texture2D:
-	var t := CardArt.tex("ability_glyph", id)
+	var t := CardArt.tex("ability_glyph", Abilities.base(id))
 	if t != null:
 		return t
 	var g: Array = Abilities.def(id).get("glyph", [])
@@ -192,7 +215,7 @@ func _draw_plain_face(d: Dictionary, rect: Rect2, r: int, tint: Color) -> void:
 	draw_arc(c, 34, 0, TAU, 40, tint, 3.0)
 	var font: Font = FontLib.display if FontLib.display != null else ThemeDB.fallback_font
 	var body: Font = FontLib.label if FontLib.label != null else ThemeDB.fallback_font
-	var name_text := String(d.name).to_upper()
+	var name_text := Abilities.display_name(ability_id).to_upper()
 	draw_multiline_string(font, Vector2(-W / 2 + 8, 22), name_text,
 			HORIZONTAL_ALIGNMENT_CENTER, W - 16, 17 if name_text.length() <= 12 else 14, 2, INK)
 	var n := int(d.slots)
