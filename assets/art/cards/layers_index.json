@@ -17,7 +17,8 @@
    "wind": "cards/base/wind.png",
    "bomb": "cards/base/bomb.png",
    "safe": "cards/base/safe.png",
-   "cobra_tail": "cards/base/cobra_tail.png"
+   "cobra_tail": "cards/base/cobra_tail.png",
+   "honey": "cards/base/honey.png"
   },
   "rank": {
    "2_black": "cards/rank/2_black.png",

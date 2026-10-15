@@ -1563,8 +1563,8 @@ func _draw_art(rect: Rect2) -> void:
 			draw_colored_polygon(PackedVector2Array([
 				tip + Vector2(4, -4), tip + Vector2(-4, -4), tip + Vector2(0, 5)]),
 				WIND_BLUE)
-	if honey:
-		_art(rect, "special", "honey")
+	if honey and _hazard_base() != "honey":
+		_art(rect, "special", "honey")  # the old overlay, when the base is missing
 	if wild_rank > 0 and rank == wild_rank:
 		var badge := "wild%s_badge" % CardArt.rank_name(wild_rank)
 		if CardArt.tex("rider", badge) == null:
@@ -2058,6 +2058,9 @@ func _crumble_burst() -> void:
 func _hazard_base() -> String:
 	if hazard in ["fire", "water", "wind", "bomb"] and CardArt.tex("base", hazard) != null:
 		return hazard
+	# The Queen's honey is a full-card base too, rank and suit on top.
+	if honey and hazard == "" and CardArt.tex("base", "honey") != null:
+		return "honey"
 	return ""
 
 
