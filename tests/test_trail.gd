@@ -169,6 +169,24 @@ func _run() -> void:
 	trail.abilities = []
 	trail.loadout = {}
 
+	# --- Each table picks its backdrop ------------------------------------
+	var bg_offer: Dictionary = trail.current_offer
+	var bg_room: int = trail.room_index
+	trail.current_offer = {"boss": "queen"}
+	var queen_bg: String = trail.table_scene()
+	trail.current_offer = {"boss": "cobra"}
+	var cobra_bg: String = trail.table_scene()
+	trail.current_offer = {"kind": "play", "collect_suit": 3}
+	var clubs_bg: String = trail.table_scene()
+	trail.current_offer = {"kind": "play"}
+	trail.room_index = 15
+	var dusk_bg: String = trail.table_scene()
+	failures += _check(queen_bg == "suit_hearts" and cobra_bg == "suit_spades"
+			and clubs_bg == "suit_clubs" and dusk_bg == "trail_dusk",
+			"bosses and one-suit tables get their suit; the rest follow the region")
+	trail.current_offer = bg_offer
+	trail.room_index = bg_room
+
 	# --- The Gambler's choice is remembered -----------------------------
 	trail._pick_gambler_ability("sleight")
 	failures += _check(trail.gambler_ability == "sleight"

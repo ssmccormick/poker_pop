@@ -25,8 +25,9 @@ var _k_extra := 0.0            # how far a lurch has pushed its clock
 
 # The trail plays over the design kit's animated suit backdrops, one
 # per region and its own four colours: the kaleidoscope in region I,
-# horizontal bands in II, falling vertical bands in III, and the
-# diagonal drift (in a storm palette) at the boss tables.
+# horizontal bands in II, falling vertical bands in III. Bosses and
+# one-suit tables get a single-suit backdrop (TrailMode.table_scene);
+# the diagonal drift ("storm") stays as the fallback for anything else.
 const KALEIDO_DIR := "res://assets/art/kaleido/"
 const KALEIDO := {
 	"trail_day": {"shader": "kaleido_suits", "bg": "15100c", "a": "7c1f16", "b": "b08a4a",
@@ -37,6 +38,13 @@ const KALEIDO := {
 			"b": "5d6f80", "c": "3a3666", "d": "9a9ca6"},
 	"storm": {"shader": "suits_parallax_diagonal", "bg": "0e1110", "a": "7c1f16", "b": "3e5a48",
 			"c": "4a5560", "d": "8e7440", "speed": 0.08},
+	# Single-suit backdrops, each in its own palette (no overrides): the
+	# bosses (Jack on diamonds, Queen Bee on hearts, King Cobra on spades)
+	# and tables that ask you to collect one suit.
+	"suit_spades": {"shader": "spades_bg", "tiles": "spades"},
+	"suit_hearts": {"shader": "hearts_bg", "tiles": "hearts"},
+	"suit_diamonds": {"shader": "diamonds_bg", "tiles": "diamonds"},
+	"suit_clubs": {"shader": "clubs_bg", "tiles": "clubs"},
 }
 
 
@@ -172,16 +180,18 @@ func set_scene(new_kind: String, new_variant := 0) -> void:
 func _try_kaleido(k: String) -> bool:
 	var pal: Dictionary = KALEIDO[k]
 	var shader_path := KALEIDO_DIR + String(pal.get("shader", "kaleido_suits")) + ".gdshader"
-	if not ResourceLoader.exists(shader_path) \
-			or not ResourceLoader.exists(KALEIDO_DIR + "suits_tile_solid.png"):
+	var tiles := KALEIDO_DIR + String(pal.get("tiles", "suits")) + "_tile_"
+	if not ResourceLoader.exists(shader_path) or not ResourceLoader.exists(tiles + "solid.png"):
 		return false
 	var mat := ShaderMaterial.new()
 	mat.shader = load(shader_path)
-	mat.set_shader_parameter("suits_solid", load(KALEIDO_DIR + "suits_tile_solid.png"))
-	mat.set_shader_parameter("suits_outline", load(KALEIDO_DIR + "suits_tile_outline.png"))
-	mat.set_shader_parameter("bg", Color(String(pal.bg)))
+	mat.set_shader_parameter("suits_solid", load(tiles + "solid.png"))
+	mat.set_shader_parameter("suits_outline", load(tiles + "outline.png"))
+	if pal.has("bg"):
+		mat.set_shader_parameter("bg", Color(String(pal.bg)))
 	for key in ["a", "b", "c", "d"]:
-		mat.set_shader_parameter("col_" + key, Color(String(pal[key])))
+		if pal.has(key):
+			mat.set_shader_parameter("col_" + key, Color(String(pal[key])))
 	# Only the uniforms this shader has (segments/spin are the kaleidoscope's,
 	# speed the bands').
 	for pair in [["segments", "segments"], ["spin", "spin_speed"], ["speed", "speed"]]:

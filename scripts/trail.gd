@@ -3780,13 +3780,7 @@ func _start_room() -> void:
 	main.game_started = true
 	main.game_over = false
 	main.play_music("boss" if current_offer.has("boss") else "room")
-	# The ride's backdrop: daylight fades region by region; bosses
-	# play under a storm.
-	if current_offer.has("boss"):
-		main.parallax.set_scene("storm")
-	else:
-		var looks := ["trail_day", "trail_dusk", "trail_night"]
-		main.parallax.set_scene(looks[clampi(room_index / REGION_SIZE, 0, 2)])
+	main.parallax.set_scene(table_scene())
 	main.board.visible = true
 	main.board.reset(room_goal == "blackjack")
 	var first := _ability_passive("first_mult", 1.0)
@@ -4957,6 +4951,19 @@ func on_time_up() -> void:
 			else "TIME'S UP — THE TABLE WINS")
 
 
+## The backdrop for the table at hand: each boss has its suit (the Jack
+## diamonds, the Queen Bee hearts, King Cobra spades), a table that asks
+## for one suit shows that suit, and the rest follow the region.
+func table_scene() -> String:
+	var boss := String(current_offer.get("boss", ""))
+	if boss != "":
+		return String({"jack": "suit_diamonds", "queen": "suit_hearts",
+				"cobra": "suit_spades"}.get(boss, "storm"))
+	if current_offer.has("collect_suit"):
+		return "suit_" + String(PlayingCard.SUIT_NAMES[clampi(int(current_offer.collect_suit), 0, 3)]).to_lower()
+	return ["trail_day", "trail_dusk", "trail_night"][clampi(room_index / REGION_SIZE, 0, 2)]
+
+
 ## A curse joins the deck as an extra card with no rank and no suit.
 static func cursed_card() -> Dictionary:
 	return {"rank": 0, "suit": 0, "cursed": true}
@@ -5100,11 +5107,7 @@ func _restore_room_state() -> void:
 	main.game_started = true
 	main.game_over = false
 	main.play_music("boss" if current_offer.has("boss") else "room")
-	if current_offer.has("boss"):
-		main.parallax.set_scene("storm")
-	else:
-		var looks := ["trail_day", "trail_dusk", "trail_night"]
-		main.parallax.set_scene(looks[clampi(room_index / REGION_SIZE, 0, 2)])
+	main.parallax.set_scene(table_scene())
 	main.board.visible = true
 	main.board.locked = false
 	main.board.suppress_refill = false
