@@ -4012,6 +4012,7 @@ func on_hand_played(result: Dictionary) -> void:
 					else "NEGATIVE — %d HANDS BACK" % negs)
 	if in_room:
 		_fire_play_abilities(result)
+		_flush_backdrop(result)
 		# The ride remembers how often each hand has been played (Notches
 		# on the Gun), and the table how many hands it has seen (True Grit).
 		var played := String(result.get("name", ""))
@@ -4962,6 +4963,24 @@ func table_scene() -> String:
 	if current_offer.has("collect_suit"):
 		return "suit_" + String(PlayingCard.SUIT_NAMES[clampi(int(current_offer.collect_suit), 0, 3)]).to_lower()
 	return ["trail_day", "trail_dusk", "trail_night"][clampi(room_index / REGION_SIZE, 0, 2)]
+
+
+## A flush turns the table's backdrop to its suit, fading across rather
+## than cutting, for the rest of the table.
+const FLUSH_HANDS := ["Flush", "Straight Flush", "Royal Flush", "Flushed Five"]
+
+
+func _flush_backdrop(result: Dictionary) -> void:
+	if not String(result.get("name", "")) in FLUSH_HANDS:
+		return
+	var counts := [0, 0, 0, 0]
+	for cc in result.get("cleared_cards", []):
+		if not bool(cc.get("joker", false)) and int(cc.get("suit", -1)) in [0, 1, 2, 3]:
+			counts[int(cc.suit)] += 1
+	var best := counts.find(counts.max())
+	if counts[best] <= 0:
+		return
+	main.parallax.crossfade_scene("suit_" + String(PlayingCard.SUIT_NAMES[best]).to_lower())
 
 
 ## A curse joins the deck as an extra card with no rank and no suit.

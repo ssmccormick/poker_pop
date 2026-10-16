@@ -186,6 +186,20 @@ func _run() -> void:
 			"bosses and one-suit tables get their suit; the rest follow the region")
 	trail.current_offer = bg_offer
 	trail.room_index = bg_room
+	# A flush fades the backdrop to its suit.
+	trail._flush_backdrop({"name": "Flush", "cleared_cards": [{"suit": 1}, {"suit": 1},
+			{"suit": 1}, {"suit": 1}, {"suit": 1, "joker": true}]})
+	failures += _check(main.parallax.kind == "suit_hearts", "a heart flush turns the backdrop to hearts")
+	trail._flush_backdrop({"name": "Straight", "cleared_cards": [{"suit": 2}]})
+	failures += _check(main.parallax.kind == "suit_hearts", "a plain straight leaves it alone")
+	# The UI style swaps the textures under the styleboxes already out.
+	var plate: StyleBoxTexture = UiKit.box("panel_plate")
+	var classic_tex: Texture2D = plate.texture if plate != null else null
+	var swapped := UiKit.set_style("modern")
+	var modern_tex: Texture2D = plate.texture if plate != null else null
+	UiKit.set_style("classic")
+	failures += _check(plate == null or (swapped and modern_tex != classic_tex and plate.texture == classic_tex),
+			"switching the UI style re-skins a panel in place, and back")
 
 	# --- The Gambler's choice is remembered -----------------------------
 	trail._pick_gambler_ability("sleight")

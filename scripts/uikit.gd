@@ -24,24 +24,114 @@ const DISABLED_TEXT := Color("6f6a62")
 
 const ART_DIR := "res://assets/art/r2/"
 
+# Two UI styles share one set of item names, sizes and margins: CLASSIC
+# (leather and brass, ui_index.json) and MODERN (smoked glass,
+# ui_index_modern.json). Switching swaps the textures under every
+# stylebox already handed out, so the screens change in place.
+const STYLES := ["classic", "modern"]
+const STYLE_NAMES := {"classic": "Classic", "modern": "Modern"}
+static var style := "classic"
+
 static var _knob_cache := {}
-static var _items := {}       # ui_index.json "items"
+static var _items := {}       # the active manifest's "items"
 static var _tex_cache := {}
 static var _box_cache := {}
+static var _issued: Array = []    # [WeakRef(StyleBoxTexture), item] copies handed out
+static var _sliders: Array = []   # WeakRef(HSlider) styled from the kit
+static var _buttons: Array = []   # WeakRef(Button) wearing the style's button font
 
 
-## Parses the round-2 UI manifest. Call once at startup, before any
-## chrome is built; without the manifest everything falls back flat.
-static func setup() -> void:
-	_items = {}
+## Parses the UI manifest for `ui_style` (or the current style). Call once
+## at startup, before any chrome is built; without the manifest everything
+## falls back flat.
+static func setup(ui_style := "") -> void:
+	if ui_style != "":
+		style = ui_style
 	_tex_cache = {}
 	_box_cache = {}
-	var path := ART_DIR + "ui_index.json"
-	if not FileAccess.file_exists(path):
+	_issued = []
+	_sliders = []
+	_buttons = []
+	_load_items()
+
+
+static func _load_items() -> void:
+	_items = {}
+	_tex_cache = {}
+	var file := "ui_index_modern.json" if style == "modern" else "ui_index.json"
+	if not FileAccess.file_exists(ART_DIR + file):
+		style = "classic"
+		file = "ui_index.json"
+	if not FileAccess.file_exists(ART_DIR + file):
 		return
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(ART_DIR + file))
 	if typeof(parsed) == TYPE_DICTIONARY:
 		_items = parsed.get("items", {})
+
+
+## Switches the UI style in place: every stylebox and slider the kit has
+## handed out takes the other style's textures. Returns true if it changed.
+static func set_style(ui_style: String) -> bool:
+	if not ui_style in STYLES or ui_style == style:
+		return false
+	style = ui_style
+	_load_items()
+	for item_name in _box_cache:
+		if _box_cache[item_name] != null:
+			_retexture(_box_cache[item_name], item_name)
+	var alive: Array = []
+	for pair in _issued:
+		var sb: StyleBoxTexture = (pair[0] as WeakRef).get_ref()
+		if sb != null:
+			_retexture(sb, String(pair[1]))
+			alive.append(pair)
+	_issued = alive
+	var live: Array = []
+	for w in _sliders:
+		var s: HSlider = (w as WeakRef).get_ref()
+		if s != null:
+			style_slider(s, false)
+			live.append(w)
+	_sliders = live
+	var shown: Array = []
+	for w in _buttons:
+		var b: Button = (w as WeakRef).get_ref()
+		if b != null:
+			var f := button_font()
+			if f != null:
+				b.add_theme_font_override("font", f)
+			shown.append(w)
+	_buttons = shown
+	return true
+
+
+## Buttons speak Rye in the classic style and Oswald SemiBold in the
+## modern one (its type guide keeps Rye for the logo and titles).
+static func button_font() -> Font:
+	if style == "modern" and FontLib.numbers != null:
+		return FontLib.numbers
+	return FontLib.display
+
+
+## Puts a button on the style's font, and keeps it in step when it changes.
+static func track_button(b: Button) -> void:
+	var f := button_font()
+	if f != null:
+		b.add_theme_font_override("font", f)
+	_buttons.append(weakref(b))
+
+
+static func _retexture(sb: StyleBoxTexture, item_name: String) -> void:
+	var t := tex(item_name)
+	if t == null:
+		return
+	sb.texture = t
+	var m: Array = _items.get(item_name, {}).get("margins", [])
+	if m.size() == 4:
+		sb.texture_margin_left = float(m[0])
+		sb.texture_margin_top = float(m[1])
+		sb.texture_margin_right = float(m[2])
+		sb.texture_margin_bottom = float(m[3])
 
 
 static func has_art() -> bool:
@@ -238,6 +328,7 @@ static func style_button(b: Button, primary := false) -> void:
 	if normal != null:
 		for state in ["normal", "hover", "pressed", "disabled"]:
 			var sb: StyleBoxTexture = box(prefix + state).duplicate()
+			_issued.append([weakref(sb), prefix + state])
 			# Buttons place text by explicit size, not content minimums;
 			# flatten the vertical margins so labels stay centered —
 			# except pressed, which sits the label 2px down.
@@ -326,7 +417,9 @@ static func knob_texture(radius: int, col: Color) -> ImageTexture:
 
 ## Dresses a stock HSlider in the house style: the kit's brass groove
 ## and ringed grabber when available, flat leather otherwise.
-static func style_slider(s: HSlider) -> void:
+static func style_slider(s: HSlider, remember := true) -> void:
+	if remember:
+		_sliders.append(weakref(s))
 	var track_art: StyleBoxTexture = box("slider_track")
 	if track_art != null:
 		s.add_theme_stylebox_override("slider", track_art)

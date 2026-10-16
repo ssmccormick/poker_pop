@@ -177,12 +177,59 @@ func set_scene(new_kind: String, new_variant := 0) -> void:
 
 # --- The kaleidoscope (trail) ----------------------------------------------
 
+## Fades from the current suit backdrop to `new_kind` over `secs`, with no
+## jump: the new one builds above the old (still under the gutters) and
+## the old leaves once it's covered. Anything that isn't a shader backdrop
+## on both ends just switches.
+func crossfade_scene(new_kind: String, secs := 1.6) -> void:
+	if new_kind == kind:
+		return
+	if _kaleido == null or not KALEIDO.has(new_kind):
+		set_scene(new_kind)
+		return
+	var old_rect: ColorRect = null
+	for c in get_children():
+		if c is ColorRect and (c as ColorRect).material == _kaleido:
+			old_rect = c
+	var mat := _kaleido_material(new_kind)
+	if old_rect == null or mat == null:
+		set_scene(new_kind)
+		return
+	kind = new_kind
+	variant = 0
+	var rect := _kaleido_rect(mat)
+	rect.modulate.a = 0.0
+	add_child(rect)
+	move_child(rect, old_rect.get_index() + 1)
+	_kaleido = mat
+	var tw := rect.create_tween()
+	tw.tween_property(rect, "modulate:a", 1.0, secs).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(old_rect.queue_free)
+
+
 func _try_kaleido(k: String) -> bool:
+	var mat := _kaleido_material(k)
+	if mat == null:
+		return false
+	add_child(_kaleido_rect(mat))
+	_kaleido = mat
+	return true
+
+
+func _kaleido_rect(mat: ShaderMaterial) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.size = VIEW
+	rect.material = mat
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect
+
+
+func _kaleido_material(k: String) -> ShaderMaterial:
 	var pal: Dictionary = KALEIDO[k]
 	var shader_path := KALEIDO_DIR + String(pal.get("shader", "kaleido_suits")) + ".gdshader"
 	var tiles := KALEIDO_DIR + String(pal.get("tiles", "suits")) + "_tile_"
 	if not ResourceLoader.exists(shader_path) or not ResourceLoader.exists(tiles + "solid.png"):
-		return false
+		return null
 	var mat := ShaderMaterial.new()
 	mat.shader = load(shader_path)
 	mat.set_shader_parameter("suits_solid", load(tiles + "solid.png"))
@@ -198,13 +245,7 @@ func _try_kaleido(k: String) -> bool:
 		if pal.has(pair[0]):
 			mat.set_shader_parameter(pair[1], pal[pair[0]])
 	mat.set_shader_parameter("t_extra", _k_extra)
-	var rect := ColorRect.new()
-	rect.size = VIEW
-	rect.material = mat
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(rect)
-	_kaleido = mat
-	return true
+	return mat
 
 
 # --- Painted scenes (round-2 art kit) -------------------------------------

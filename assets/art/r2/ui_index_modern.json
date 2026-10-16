@@ -1,0 +1,557 @@
+{
+ "theme": "modern",
+ "canvas": [
+  1920,
+  1080
+ ],
+ "note": "Drop-in alternative to the classic kit: identical item names, sizes, margins and content margins, so a theme switch only swaps the folder (ui/ -> ui_modern/). margins = [l, t, r, b] for StyleBoxTexture.",
+ "items": {
+  "panel_plate": {
+   "file": "ui_modern/panel_plate.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "Smoked-glass panel (HUD, menus, ledger). Semi-transparent so the suit background shows through. A 2x2 suit cluster sits in the top-right corner margin.",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    22,
+    18,
+    22,
+    18
+   ]
+  },
+  "panel_plate_plain": {
+   "file": "ui_modern/panel_plate_plain.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "Same glass panel without the suit pips, for small or nested panels.",
+   "margins": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    16,
+    12,
+    16,
+    12
+   ]
+  },
+  "panel_inset": {
+   "file": "ui_modern/panel_inset.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Recessed well: YOUR HAND, kit icon boxes, card slots.",
+   "margins": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    10,
+    8,
+    10,
+    8
+   ]
+  },
+  "tooltip": {
+   "file": "ui_modern/tooltip.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Hover tooltips / card stat sheets.",
+   "margins": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    14,
+    10,
+    14,
+    10
+   ]
+  },
+  "panel_shadow": {
+   "file": "ui_modern/panel_shadow.png",
+   "size": [
+    64,
+    64
+   ],
+   "group": "panel",
+   "notes": "Soft drop shadow: draw behind any panel, expanded 14px each side and offset (0, 8).",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch"
+  },
+  "poster_paper": {
+   "file": "ui_modern/poster_paper.png",
+   "size": [
+    240,
+    240
+   ],
+   "group": "panel",
+   "notes": "Notice card for the tutor popup (modern replacement for the wanted-poster paper). Fading accent line along the top edge, suit cluster in the top-left corner.",
+   "margins": [
+    48,
+    48,
+    48,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    44,
+    40,
+    44,
+    36
+   ]
+  },
+  "button_normal": {
+   "file": "ui_modern/button_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (smoked glass, brass-to-plum hairline). State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_hover": {
+   "file": "ui_modern/button_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (smoked glass, brass-to-plum hairline). State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_pressed": {
+   "file": "ui_modern/button_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (smoked glass, brass-to-plum hairline). State: pressed. Offset label +1px down when pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_disabled": {
+   "file": "ui_modern/button_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Default button (smoked glass, brass-to-plum hairline). State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_normal": {
+   "file": "ui_modern/button_primary_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood-to-plum gradient with a soft glow). State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_hover": {
+   "file": "ui_modern/button_primary_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood-to-plum gradient with a soft glow). State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_pressed": {
+   "file": "ui_modern/button_primary_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood-to-plum gradient with a soft glow). State: pressed. Offset label +1px down when pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_disabled": {
+   "file": "ui_modern/button_primary_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary call-to-action (oxblood-to-plum gradient with a soft glow). State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "shop_slot_normal": {
+   "file": "ui_modern/shop_slot_normal.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop slot. Item well at top, price row in the bottom 48px. State: normal.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_hover": {
+   "file": "ui_modern/shop_slot_hover.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop slot. Item well at top, price row in the bottom 48px. State: hover.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_selected": {
+   "file": "ui_modern/shop_slot_selected.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop slot. Item well at top, price row in the bottom 48px. State: selected.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_disabled": {
+   "file": "ui_modern/shop_slot_disabled.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Shop slot. Item well at top, price row in the bottom 48px. State: disabled.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "bar_track": {
+   "file": "ui_modern/bar_track.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Progress / timer track (thin pill).",
+   "margins": [
+    8,
+    6,
+    8,
+    6
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_gold": {
+   "file": "ui_modern/bar_fill_gold.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Gold fill (gradient pill, sits inside bar_track).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_red": {
+   "file": "ui_modern/bar_fill_red.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Red fill (gradient pill, sits inside bar_track).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_green": {
+   "file": "ui_modern/bar_fill_green.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Green fill (gradient pill, sits inside bar_track).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_track": {
+   "file": "ui_modern/slider_track.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider groove (hairline).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_fill": {
+   "file": "ui_modern/slider_fill.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider filled part.",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_grabber": {
+   "file": "ui_modern/slider_grabber.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle (spade pip in a brass ring)."
+  },
+  "slider_grabber_hover": {
+   "file": "ui_modern/slider_grabber_hover.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle (spade pip in a brass ring). Hover."
+  },
+  "divider": {
+   "file": "ui_modern/divider.png",
+   "size": [
+    240,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Hairline rule that fades at both ends (3-slice).",
+   "margins": [
+    28,
+    0,
+    28,
+    0
+   ],
+   "axis_stretch": "stretch"
+  },
+  "divider_center_diamond": {
+   "file": "ui_modern/divider_center_diamond.png",
+   "size": [
+    32,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Centre ornament: the four suits in a row."
+  },
+  "panel_grain_tile": {
+   "file": "ui_modern/panel_grain_tile.png",
+   "size": [
+    256,
+    256
+   ],
+   "group": "texture",
+   "notes": "Seamless 256px suit-outline pattern (white). Tile over large panels at 3-6% opacity."
+  },
+  "vignette": {
+   "file": "ui_modern/vignette.png",
+   "size": [
+    1920,
+    1080
+   ],
+   "group": "texture",
+   "notes": "Full-screen vignette overlay (above background, below UI)."
+  }
+ }
+}

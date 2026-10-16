@@ -121,6 +121,9 @@ var sfx_vol := 0.8
 var options_layer: ColorRect
 var fullscreen_btn: Button
 var resolution_btn: Button
+var ui_style_btn: Button
+var _vignette: TextureRect
+var _vignette_rect_tex := false   # the vignette is the kit's art (so it follows the UI style)
 var pause_layer: ColorRect
 var _pause_music_slider: HSlider
 var _pause_sfx_slider: HSlider
@@ -175,7 +178,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_audio_buses()
 	FontLib.setup()
-	UiKit.setup()  # round-2 painted chrome, when the kit is installed
+	UiKit.setup()  # round-2 painted chrome (the saved style lands in _load_settings)
 	CardArt.validate()  # warn about any index entry missing its file
 	# The brand cursor, tip at the arrow point, for every pointer shape
 	# the game uses.
@@ -1690,6 +1693,11 @@ func _load_settings() -> void:
 	fullscreen_on = cf.get_value("video", "fullscreen", true)
 	res_index = clampi(cf.get_value("video", "resolution", 2), 0, RESOLUTIONS.size() - 1)
 	music_vol = clampf(cf.get_value("audio", "music", 0.8), 0.0, 1.0)
+	# The UI style is read before any chrome is built (POKERPOP_UI for shots).
+	var ui_style := String(cf.get_value("video", "ui_style", "classic"))
+	if OS.get_environment("POKERPOP_UI") != "":
+		ui_style = OS.get_environment("POKERPOP_UI")
+	UiKit.setup(ui_style)
 	sfx_vol = clampf(cf.get_value("audio", "sfx", 0.8), 0.0, 1.0)
 	_apply_video()
 	_apply_audio()
@@ -2572,6 +2580,7 @@ func _save_settings() -> void:
 	cf.set_value("video", "resolution", res_index)
 	cf.set_value("audio", "music", music_vol)
 	cf.set_value("audio", "sfx", sfx_vol)
+	cf.set_value("video", "ui_style", UiKit.style)
 	cf.save("user://settings.cfg")
 
 
@@ -3636,6 +3645,7 @@ func _build_profiles_and_tutor() -> void:
 	# full-screen layer.
 	# The round-2 kit paints one; the gradient is the fallback.
 	var vin_tex: Texture2D = UiKit.tex("vignette")
+	_vignette_rect_tex = vin_tex != null
 	if vin_tex == null:
 		var vin_grad := Gradient.new()
 		vin_grad.set_color(0, Color(0, 0, 0, 0))
@@ -3655,6 +3665,7 @@ func _build_profiles_and_tutor() -> void:
 	vignette.size = VIEW
 	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(vignette)
+	_vignette = vignette
 	# Built after the trail screens and menus, so pin it back down.
 	ui_root.move_child(vignette, hud_root.get_index() + 1)
 
@@ -3710,19 +3721,29 @@ func _build_options() -> void:
 		var hint := _label(options_layer, "Window size applies when fullscreen is off", Vector2(0, 478), 18, DIM)
 		hint.size = Vector2(VIEW.x, 30)
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_refresh_options_buttons()
+	# Classic leather and brass, or modern smoked glass.
+	ui_style_btn = _button(options_layer, "", Vector2(700, 520 if not OS.has_feature("web") else 336),
+			Vector2(520, 60))
+	ui_style_btn.add_theme_font_size_override("font_size", 24)
+	ui_style_btn.tooltip_text = "Classic is leather and brass. Modern is smoked glass that lets the moving backdrop show through."
+	ui_style_btn.pressed.connect(func() -> void:
+		var i := UiKit.STYLES.find(UiKit.style)
+		_apply_ui_style(String(UiKit.STYLES[(i + 1) % UiKit.STYLES.size()]))
+		_save_settings()
+		_refresh_options_buttons())
+	_refresh_options_buttons()
 
-	var sh := _label(options_layer, "SOUND", Vector2(0, 560), 26, RED)
+	var sh := _label(options_layer, "SOUND", Vector2(0, 610), 26, RED)
 	sh.size = Vector2(VIEW.x, 40)
 	sh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	_label(options_layer, "MUSIC", Vector2(660, 626), 24, OFFWHITE)
+	_label(options_layer, "MUSIC", Vector2(660, 668), 24, OFFWHITE)
 	var music_slider := HSlider.new()
 	music_slider.min_value = 0.0
 	music_slider.max_value = 1.0
 	music_slider.step = 0.05
 	music_slider.value = music_vol
-	music_slider.position = Vector2(830, 626)
+	music_slider.position = Vector2(830, 668)
 	music_slider.size = Vector2(430, 36)
 	UiKit.style_slider(music_slider)
 	options_layer.add_child(music_slider)
@@ -3731,13 +3752,13 @@ func _build_options() -> void:
 		_apply_audio()
 		_save_settings())
 
-	_label(options_layer, "SFX", Vector2(660, 700), 24, OFFWHITE)
+	_label(options_layer, "SFX", Vector2(660, 736), 24, OFFWHITE)
 	var sfx_slider := HSlider.new()
 	sfx_slider.min_value = 0.0
 	sfx_slider.max_value = 1.0
 	sfx_slider.step = 0.05
 	sfx_slider.value = sfx_vol
-	sfx_slider.position = Vector2(830, 700)
+	sfx_slider.position = Vector2(830, 736)
 	sfx_slider.size = Vector2(430, 36)
 	UiKit.style_slider(sfx_slider)
 	options_layer.add_child(sfx_slider)
@@ -3746,12 +3767,23 @@ func _build_options() -> void:
 		_apply_audio()
 		_save_settings())
 
-	var back := _button(options_layer, "BACK", Vector2(835, 860), Vector2(250, 60))
+	var back := _button(options_layer, "BACK", Vector2(835, 880), Vector2(250, 60))
 	back.add_theme_font_size_override("font_size", 24)
 	back.pressed.connect(_close_options)
 
 
+## Switches the UI style live; the painted vignette follows it.
+func _apply_ui_style(ui_style: String) -> void:
+	if not UiKit.set_style(ui_style):
+		return
+	var vin := UiKit.tex("vignette")
+	if vin != null and _vignette != null and _vignette_rect_tex:
+		_vignette.texture = vin
+
+
 func _refresh_options_buttons() -> void:
+	if ui_style_btn:
+		ui_style_btn.text = "UI STYLE — %s" % String(UiKit.STYLE_NAMES[UiKit.style]).to_upper()
 	if fullscreen_btn:
 		fullscreen_btn.text = "FULLSCREEN — %s" % ("ON" if fullscreen_on else "OFF")
 	if resolution_btn:
@@ -4367,8 +4399,7 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2,
 	# leather fallback — the kit owns every state.
 	UiKit.style_button(b, primary)
 	b.add_theme_font_size_override("font_size", 17)
-	if FontLib.display != null:
-		b.add_theme_font_override("font", FontLib.display)
+	UiKit.track_button(b)
 	# A small lean-in on hover.
 	b.pivot_offset = btn_size / 2.0
 	b.mouse_entered.connect(func() -> void:
@@ -4403,10 +4434,14 @@ func _debug_seed_hazards() -> void:
 ## Debug helper: POKERPOP_SHOT=<png path> captures a frame after the deal
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
-	# POKERPOP_SCENE swaps the backdrop once the table is up (trail_dusk…).
+	# POKERPOP_SCENE swaps the backdrop once the table is up (trail_dusk…);
+	# POKERPOP_FADE starts a slow crossfade to one, to catch it halfway.
 	if OS.get_environment("POKERPOP_SCENE") != "":
 		get_tree().create_timer(1.0).timeout.connect(func() -> void:
 			parallax.set_scene(OS.get_environment("POKERPOP_SCENE")))
+	if OS.get_environment("POKERPOP_FADE") != "":
+		get_tree().create_timer(1.0).timeout.connect(func() -> void:
+			parallax.crossfade_scene(OS.get_environment("POKERPOP_FADE"), 6.4))
 	# POKERPOP_HOVER=x,y parks the mouse there (view pixels) and waits for
 	# the hover tip before the shot.
 	var hover := OS.get_environment("POKERPOP_HOVER")

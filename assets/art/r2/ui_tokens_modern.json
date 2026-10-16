@@ -1,0 +1,71 @@
+{
+ "theme": "modern",
+ "colors": {
+  "ground": "#15100C",
+  "glass": "rgba(24,18,14,0.88)",
+  "glass_hot": "rgba(34,26,20,0.92)",
+  "well": "rgba(8,6,5,0.85)",
+  "hairline": "#D9B572 -> #5F3F78 (diagonal gradient)",
+  "brass": "#B08A4A",
+  "brass_hi": "#D9B572",
+  "gold_hot": "#F0D690",
+  "bone": "#E6D5B0",
+  "bone_dim": "#9A8A68",
+  "oxblood": "#7C1F16",
+  "red_functional": "#D0533C",
+  "plum": "#5F3F78",
+  "teal": "#3F6B63",
+  "green_valid": "#7FBF9A",
+  "disabled": "#4A4440"
+ },
+ "type": {
+  "ruling": "Modern theme drops Rye from the HUD. Oswald (600, uppercase, +2-4 tracking) for titles, buttons, labels and every number; Old Standard TT stays for prose. Rye is kept only for the logo and big screen titles if you want a western accent.",
+  "roles": {
+   "screen_title": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 64,
+    "tracking": 8,
+    "color": "brass_hi"
+   },
+   "panel_headline": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 40,
+    "color": "gold_hot"
+   },
+   "button": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 24,
+    "tracking": 4,
+    "color": "bone"
+   },
+   "label": {
+    "face": "Oswald",
+    "weight": 400,
+    "size": 18,
+    "tracking": 4,
+    "color": "bone_dim"
+   },
+   "number": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 28,
+    "color": "gold_hot"
+   },
+   "body": {
+    "face": "Old Standard TT",
+    "size": 21,
+    "color": "bone"
+   }
+  }
+ },
+ "motion": {
+  "hover": "120 ms ease-out: swap to *_hover; optional scale 1.02",
+  "press": "60 ms: *_pressed + label +1px",
+  "panel_in": "180 ms fade + 8px rise",
+  "glow_pulse": "primary button glow alpha 0.6 <-> 1.0 over 1.6 s when it is the suggested action"
+ },
+ "pairs_with": "kaleido_suits / suits_parallax_* / <suit>_bg shaders. Panels are ~88% opaque so the background moves faintly behind them; raise alpha if the board needs more calm."
+}
