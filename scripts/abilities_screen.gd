@@ -297,18 +297,24 @@ func _build_collection() -> void:
 		face.faded = on != "" and _sel != i
 		holder.add_child(face)
 		if _sel == i:
-			# Picked up: the kit's held glow, a little larger than the card.
-			var held := CardArt.nine_half("ui", "ability_held", [32, 32, 32, 32])
-			if held != null:
-				var glow := Panel.new()
-				glow.add_theme_stylebox_override("panel", held)
-				glow.position = Vector2(-8, -8)
-				glow.size = Vector2(220, 212)
-				glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				glow.show_behind_parent = true
-				holder.add_child(glow)
-			else:
-				holder.modulate = Color(1.25, 1.15, 0.8)
+			# Picked up: a gold rim with a soft glow around the whole slot,
+			# drawn over it, and the card lifts a little. (The kit's
+			# ability_held glow is shaped for the short hand tiles.)
+			var rim := Panel.new()
+			var sb := StyleBoxFlat.new()
+			sb.draw_center = false
+			sb.border_color = main.GOLD
+			sb.set_border_width_all(4)
+			sb.set_corner_radius_all(10)
+			sb.shadow_color = Color(main.GOLD, 0.45)
+			sb.shadow_size = 14
+			rim.add_theme_stylebox_override("panel", sb)
+			rim.position = Vector2(-3, -3)
+			rim.size = Vector2(210, 202)
+			rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			holder.add_child(rim)
+			face.scale = Vector2(0.84, 0.84)
+			face.position = Vector2(102, 84)
 		var tag: Label = main._label(holder, ("ON " + on.to_upper()) if on != "" else "",
 				Vector2(0, 172), 13, main.GOLD)
 		tag.size = Vector2(204, 20)

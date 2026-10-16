@@ -4403,6 +4403,10 @@ func _debug_seed_hazards() -> void:
 ## Debug helper: POKERPOP_SHOT=<png path> captures a frame after the deal
 ## settles, then quits. POKERPOP_MODE picks menu/time/single/limited/zen.
 func _take_screenshot(path: String) -> void:
+	# POKERPOP_SCENE swaps the backdrop once the table is up (trail_dusk…).
+	if OS.get_environment("POKERPOP_SCENE") != "":
+		get_tree().create_timer(1.0).timeout.connect(func() -> void:
+			parallax.set_scene(OS.get_environment("POKERPOP_SCENE")))
 	# POKERPOP_HOVER=x,y parks the mouse there (view pixels) and waits for
 	# the hover tip before the shot.
 	var hover := OS.get_environment("POKERPOP_HOVER")

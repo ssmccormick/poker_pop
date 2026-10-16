@@ -23,15 +23,20 @@ var _rng := RandomNumberGenerator.new()
 var _kaleido: ShaderMaterial   # set while the trail's kaleidoscope is up
 var _k_extra := 0.0            # how far a lurch has pushed its clock
 
-# The trail plays over an animated kaleidoscope of suits (the design
-# kit's shader): its own four colours per region, six slices for a boss.
+# The trail plays over the design kit's animated suit backdrops, one
+# per region and its own four colours: the kaleidoscope in region I,
+# horizontal bands in II, falling vertical bands in III, and the
+# diagonal drift (in a storm palette) at the boss tables.
 const KALEIDO_DIR := "res://assets/art/kaleido/"
 const KALEIDO := {
-	"trail_day": {"bg": "15100c", "a": "7c1f16", "b": "b08a4a", "c": "3f6b63", "d": "5f3f78"},
-	"trail_dusk": {"bg": "140e0b", "a": "8a3b1c", "b": "c09a5b", "c": "5e7a55", "d": "7a3f4e"},
-	"trail_night": {"bg": "0c0e14", "a": "2f5143", "b": "5d6f80", "c": "3a3666", "d": "9a9ca6"},
-	"storm": {"bg": "0e1110", "a": "7c1f16", "b": "3e5a48", "c": "4a5560", "d": "8e7440",
-			"segments": 6, "spin": 0.04},
+	"trail_day": {"shader": "kaleido_suits", "bg": "15100c", "a": "7c1f16", "b": "b08a4a",
+			"c": "3f6b63", "d": "5f3f78"},
+	"trail_dusk": {"shader": "suits_parallax_horizontal", "bg": "140e0b", "a": "8a3b1c",
+			"b": "c09a5b", "c": "5e7a55", "d": "7a3f4e"},
+	"trail_night": {"shader": "suits_parallax_vertical", "bg": "0c0e14", "a": "2f5143",
+			"b": "5d6f80", "c": "3a3666", "d": "9a9ca6"},
+	"storm": {"shader": "suits_parallax_diagonal", "bg": "0e1110", "a": "7c1f16", "b": "3e5a48",
+			"c": "4a5560", "d": "8e7440", "speed": 0.08},
 }
 
 
@@ -165,7 +170,8 @@ func set_scene(new_kind: String, new_variant := 0) -> void:
 # --- The kaleidoscope (trail) ----------------------------------------------
 
 func _try_kaleido(k: String) -> bool:
-	var shader_path := KALEIDO_DIR + "kaleido_suits.gdshader"
+	var pal: Dictionary = KALEIDO[k]
+	var shader_path := KALEIDO_DIR + String(pal.get("shader", "kaleido_suits")) + ".gdshader"
 	if not ResourceLoader.exists(shader_path) \
 			or not ResourceLoader.exists(KALEIDO_DIR + "suits_tile_solid.png"):
 		return false
@@ -173,12 +179,14 @@ func _try_kaleido(k: String) -> bool:
 	mat.shader = load(shader_path)
 	mat.set_shader_parameter("suits_solid", load(KALEIDO_DIR + "suits_tile_solid.png"))
 	mat.set_shader_parameter("suits_outline", load(KALEIDO_DIR + "suits_tile_outline.png"))
-	var pal: Dictionary = KALEIDO[k]
 	mat.set_shader_parameter("bg", Color(String(pal.bg)))
 	for key in ["a", "b", "c", "d"]:
 		mat.set_shader_parameter("col_" + key, Color(String(pal[key])))
-	mat.set_shader_parameter("segments", int(pal.get("segments", 8)))
-	mat.set_shader_parameter("spin_speed", float(pal.get("spin", 0.025)))
+	# Only the uniforms this shader has (segments/spin are the kaleidoscope's,
+	# speed the bands').
+	for pair in [["segments", "segments"], ["spin", "spin_speed"], ["speed", "speed"]]:
+		if pal.has(pair[0]):
+			mat.set_shader_parameter(pair[1], pal[pair[0]])
 	mat.set_shader_parameter("t_extra", _k_extra)
 	var rect := ColorRect.new()
 	rect.size = VIEW

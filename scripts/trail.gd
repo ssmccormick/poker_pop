@@ -6307,6 +6307,8 @@ func _credit_ride(score: int, reached: int, bosses: int, tier: int,
 ## A saved ride that's being ridden over by a new one never reaches
 ## the end — credit what it earned before it's lost.
 func _credit_abandoned_ride() -> void:
+	if OS.get_environment("POKERPOP_SHOT") != "":
+		return  # a screenshot never rides over the real saved ride
 	var cf := ConfigFile.new()
 	if cf.load(main.profile_path("trail_run.cfg")) != OK \
 			or not cf.get_value("run", "active", false):
