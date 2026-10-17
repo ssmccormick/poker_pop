@@ -495,9 +495,16 @@ func _unhandled_input(event: InputEvent) -> void:
 ## smaller central hitbox per card, leaving dead corridors between cards
 ## so a diagonal drag doesn't clip an orthogonal neighbor on the way.
 const DRAG_HIT := 0.30  # half-extent of the drag hitbox, as a card fraction
+const DRAG_HIT_TOUCH := 0.42  # a fingertip needs more room than a cursor
 
 func _card_under_mouse(strict: bool) -> PlayingCard:
-	var local := to_local(get_global_mouse_position())
+	return card_at(get_global_mouse_position(), strict)
+
+
+## The card at a point on screen (global canvas coordinates).
+func card_at(global_pos: Vector2, strict: bool) -> PlayingCard:
+	var local := to_local(global_pos)
+	var hit := DRAG_HIT_TOUCH if Form.is_touch() else DRAG_HIT
 	var cx := floori(local.x / CELL_W)
 	var cy := floori(local.y / CELL_H)
 	if cx < 0 or cx >= cols or cy < 0 or cy >= rows:
@@ -507,8 +514,8 @@ func _card_under_mouse(strict: bool) -> PlayingCard:
 			return null
 	else:
 		var center := cell_center(Vector2i(cx, cy))
-		if absf(local.x - center.x) > PlayingCard.W * DRAG_HIT \
-				or absf(local.y - center.y) > PlayingCard.H * DRAG_HIT:
+		if absf(local.x - center.x) > PlayingCard.W * hit \
+				or absf(local.y - center.y) > PlayingCard.H * hit:
 			return null
 	return grid.get(Vector2i(cx, cy))
 

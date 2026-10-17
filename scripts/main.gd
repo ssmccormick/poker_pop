@@ -21,7 +21,9 @@ const ARCADE_DRAIN_STEP := 0.3
 const ARCADE_MAX_DRAIN := 7.0
 const ARCADE_METER_GAIN := 0.4    # meter % gained per point scored
 
-const VIEW := Vector2(1920, 1080)
+# The canvas every screen is laid out on: 1920×1080 on desktop, or the
+# mobile reference canvas Form picks (1080×2340 phone, 1536×2048 tablet).
+var VIEW := Vector2(1920, 1080)
 # HUD in two slim columns — main controls LEFT, payouts/hints RIGHT —
 # with the play area centered between them.
 const PANEL_X := 40.0       # left column
@@ -187,6 +189,15 @@ func _ready() -> void:
 		Input.set_custom_mouse_cursor(cursor, Input.CURSOR_ARROW, Vector2(20, 16))
 		Input.set_custom_mouse_cursor(cursor, Input.CURSOR_POINTING_HAND, Vector2(20, 16))
 	_load_settings()
+	# The form factor and its canvas, before any screen is built. Screenshots
+	# can ask for a window (POKERPOP_WINDOW=540x1170) to shoot a phone.
+	var win_env := OS.get_environment("POKERPOP_WINDOW")
+	if OS.get_environment("POKERPOP_SHOT") != "" and win_env.contains("x"):
+		get_window().size = Vector2i(int(win_env.get_slice("x", 0)), int(win_env.get_slice("x", 1)))
+	Form.setup(get_window())
+	VIEW = Form.view()
+	ParallaxScene.VIEW = VIEW
+	get_tree().root.size_changed.connect(_on_window_resized)
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
 		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
@@ -238,6 +249,9 @@ func _ready() -> void:
 	_build_callout()
 	_build_plaque()
 	_build_ui_tip()
+	_detail = DetailSheet.new()
+	_detail.setup(self)
+	ui_root.add_child(_detail)
 	# A hazard dealt in for the first time gets its poster.
 	board.card_dealt.connect(func(card: PlayingCard) -> void:
 		if card.hazard != "":
@@ -588,8 +602,13 @@ func _process(delta: float) -> void:
 	board.update_fuse_loop(game_started and not menu_open and not game_over
 			and not get_tree().paused)
 	_update_labels()
-	_update_tooltip(delta)
-	_update_ui_tip(delta)
+	if Form.is_touch():
+		# No hover on a touchscreen: a held finger opens the detail sheet.
+		if _detail != null:
+			_detail.tick(delta)
+	else:
+		_update_tooltip(delta)
+		_update_ui_tip(delta)
 	_update_callout()
 
 
@@ -1827,6 +1846,53 @@ func _refresh_profile_ui() -> void:
 
 # --- Board hover tooltip ---------------------------------------------------
 
+## Touch input passes the detail sheet first: a held finger opens it,
+## and the tap that closes it goes no further.
+func _input(event: InputEvent) -> void:
+	if _detail != null and Form.is_touch() and _detail.handle(event):
+		get_viewport().set_input_as_handled()
+
+
+## The words for whatever is under a held finger: the card's tooltip on
+## the board, else the deepest control's tip (or its "detail" meta).
+func detail_text_at(at: Vector2) -> String:
+	if game_started and not menu_open and board.visible and not board.locked:
+		var card := board.card_at(at, true)
+		if card != null:
+			return _card_tooltip_text(card)
+	var c := _tip_control_at(ui_root, at)
+	while c != null:
+		if c.has_meta("detail"):
+			return String(c.get_meta("detail"))
+		if c.tooltip_text != "":
+			return c.tooltip_text
+		c = c.get_parent() as Control
+	return ""
+
+
+## A hold that opened the detail sheet shouldn't also pick the card the
+## finger came down on: take it back out of the chain.
+func cancel_touch_select(at: Vector2) -> void:
+	if board == null:
+		return
+	var card := board.card_at(at, true)
+	board.dragging = false
+	if card != null and not board.selected.is_empty() and board.selected.back() == card:
+		board._toggle_select(card)
+
+
+## A rotation that changes the form factor rebuilds every screen for the
+## new shape: the ride is saved and picked straight back up.
+func _on_window_resized() -> void:
+	if Form.override() != "":
+		return
+	if Form.choose(Vector2(get_window().size)) == Form.current:
+		return
+	if trail != null and trail.run_active:
+		trail._save_run()
+	get_tree().reload_current_scene.call_deferred()
+
+
 func _update_tooltip(delta: float) -> void:
 	if _tooltip == null:
 		return
@@ -1872,6 +1938,7 @@ var _ui_tip_label: Label
 var _ui_tip_src: Control
 var _ui_tip_time := 0.0
 var _ui_tip_force: Control  # screenshots: the control to tip as if hovered
+var _detail: DetailSheet     # touch: the long-press stand-in for hover tips
 
 
 ## The deepest visible control with a tooltip under `at` (screenshots).
@@ -4406,8 +4473,11 @@ func _button(parent: Control, text: String, pos: Vector2, btn_size: Vector2,
 	UiKit.style_button(b, primary)
 	b.add_theme_font_size_override("font_size", 17)
 	UiKit.track_button(b)
-	# A small lean-in on hover.
+	# A small lean-in on hover (not on touch, where there is no hover).
 	b.pivot_offset = btn_size / 2.0
+	if Form.is_touch():
+		parent.add_child(b)
+		return b
 	b.mouse_entered.connect(func() -> void:
 		if not b.disabled:
 			# The faintest tick — presence, not noise.

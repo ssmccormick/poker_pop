@@ -8,7 +8,7 @@ extends Node2D
 ## the near layers hardest, like the wagon rolling forward.
 
 const TILE_W := 2400.0
-const VIEW := Vector2(1920, 1080)
+static var VIEW := Vector2(1920, 1080)   # set by main from Form
 const BASE_NEAR_SPEED := 32.0   # the speed a full lurch is scaled against
 const LURCH_DECAY := 3.0        # boost halves ~every 0.23s
 const DIM_ALPHA := 0.22         # darkening over the play area
@@ -325,6 +325,14 @@ static var _gutter_grad: GradientTexture2D
 
 
 func _add_overlays() -> void:
+	if Form.is_mobile():
+		# Portrait has no HUD columns: one even dim over the whole backdrop.
+		var full := ColorRect.new()
+		full.color = Color(0, 0, 0, DIM_ALPHA + 0.12)
+		full.size = VIEW
+		full.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(full)
+		return
 	# Hard gutters narrowed, with a soft gradient shoulder facing the
 	# play area — no more razor seam against the scenery.
 	if _gutter_grad == null:
