@@ -1923,6 +1923,8 @@ func _refresh_select() -> void:
 		var lock: Control = _select_locks[id]
 		lock.visible = not _avail("rider", id)
 		(_select_lock_labels[id] as Label).text = _lock_text("rider", id)
+	if Form.is_mobile():
+		TrailMobile.select_carousel(self)
 
 
 ## Why an item can't be had yet: the level it unlocks at, or its price
@@ -1994,6 +1996,26 @@ func _pick_gambler_ability(key: String) -> void:
 	_refresh_select()
 
 
+## On the phone the rider select is a carousel: a sideways swipe moves
+## to the next rider.
+var _swipe_from := -1.0
+
+
+func _input(event: InputEvent) -> void:
+	if not Form.is_mobile() or select_layer == null or not select_layer.visible:
+		return
+	if event is InputEventScreenTouch:
+		var t := event as InputEventScreenTouch
+		if t.pressed:
+			_swipe_from = t.position.x
+		elif _swipe_from >= 0.0:
+			var dx := t.position.x - _swipe_from
+			_swipe_from = -1.0
+			if absf(dx) > 140.0:
+				TrailMobile.select_step(self, -1 if dx > 0.0 else 1)
+				get_viewport().set_input_as_handled()
+
+
 func _pick_character(id: String) -> void:
 	if not CHARACTERS.has(id) or character == id:
 		return
@@ -2037,6 +2059,8 @@ func _open_buyin_now() -> void:
 	_buyin_saddle_btn.size = Vector2(290 if riding else 300, 66)
 	_buyin_rider_btn.position = Vector2(970, 860 + dy)
 	_buyin_rider_btn.size = Vector2(290, 66)
+	if Form.is_mobile():
+		TrailMobile.buyin_place(self, riding)
 	_render_ascension()
 	_render_wager()
 	buyin_layer.visible = true
@@ -3141,6 +3165,8 @@ func _render_tarot() -> void:
 					false, 64)
 		fool.pressed.connect(func() -> void:
 			_choose_offer(_fate_offer, true))
+	if Form.is_mobile():
+		TrailMobile.tarot_grid(self)
 
 
 func _tarot_card_button(offer: Dictionary, x: float) -> Button:
@@ -5339,6 +5365,8 @@ func _show_pick_now() -> void:
 			_take_ability(id)
 			_after_pick())
 	_pick_tip.visible = false
+	if Form.is_mobile():
+		TrailMobile.pick_cards(self)
 	pick_layer.visible = true
 
 
@@ -5811,6 +5839,8 @@ func _stepper(parent: Control, y: float, step: Callable) -> Label:
 	plus.add_theme_font_size_override("font_size", 20)
 	plus.pressed.connect(func() -> void:
 		step.call(true))
+	amount.set_meta("minus", minus)
+	amount.set_meta("plus", plus)
 	return amount
 
 
@@ -6459,11 +6489,13 @@ func build_ui() -> void:
 		var ch: Dictionary = CHARACTERS[id]
 		var ab: Label = main._label(select_layer, String(ch.ability),
 				Vector2(x, 668), 18, main.GOLD)
+		ab.name = "Ab_" + id
 		ab.size = Vector2(300, 26)
 		ab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		var line := _wrap_label(select_layer, String(ch.line),
 				Rect2(x - 10, 698, 320, 70), 15, main.DIM)
 		line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		line.name = "Line_" + id
 		if id == "the_gambler":
 			# The Gambler picks his trick: two toggles under his card.
 			_gambler_ab_label = ab
@@ -6483,6 +6515,7 @@ func build_ui() -> void:
 			Vector2(810, 860), Vector2(300, 64), true)
 	ride.add_theme_font_size_override("font_size", 24)
 	ride.pressed.connect(open_buyin)
+	ride.name = "Ride"
 	_back_button(select_layer, back_to_menu, "MENU")
 
 	buyin_layer = _layer()
@@ -6507,7 +6540,7 @@ func build_ui() -> void:
 	_asc_sub = main._label(_asc_box, "", Vector2(740, 352), 16, main.DIM)
 	_asc_sub.size = Vector2(440, 24)
 	_asc_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UiKit.plate(_asc_box, Rect2(560, 400, 800, 250))
+	UiKit.plate(_asc_box, Rect2(560, 400, 800, 250)).name = "AscPlate"
 	_asc_rule = _wrap_label(_asc_box, "", Rect2(600, 420, 720, 64), 22, main.GOLD)
 	_asc_rule.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_asc_rest = _wrap_label(_asc_box, "", Rect2(600, 490, 720, 100), 16, main.OFFWHITE)
@@ -6521,11 +6554,13 @@ func build_ui() -> void:
 	_wager_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_asc_box.add_child(_wager_box)
 	var bring_t := main._label(_wager_box, "BRING CASH", Vector2(560, 672), 22, main.GOLD) as Label
+	bring_t.name = "BringT"
 	bring_t.size = Vector2(200, 40)
 	_bring_label = _stepper(_wager_box, 672, func(up: bool) -> void:
 		buyin_bring = maxi(0, _wager_step(buyin_bring, up))
 		_render_wager())
 	var bet_t := main._label(_wager_box, "BET ON", Vector2(560, 730), 22, main.GOLD) as Label
+	bet_t.name = "BetT"
 	bet_t.size = Vector2(200, 40)
 	var targets := [["", "NO BET"], ["jack", "THE JACK"], ["queen", "THE QUEEN"], ["king", "KING COBRA"]]
 	for t in targets.size():
@@ -6542,6 +6577,7 @@ func build_ui() -> void:
 			_render_wager())
 		_bet_target_btns[key] = tb
 	var stake_t := main._label(_wager_box, "STAKE", Vector2(560, 788), 22, main.GOLD) as Label
+	stake_t.name = "StakeT"
 	stake_t.size = Vector2(200, 40)
 	_stake_label = _stepper(_wager_box, 788, func(up: bool) -> void:
 		buyin_stake = maxi(0, _wager_step(buyin_stake, up))
@@ -6711,9 +6747,10 @@ func build_ui() -> void:
 	_tarot_relics.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tarot_relics.size = Vector2(1500, 76)
 	_tarot_relics.position.x = 210
-	_center(tarot_layer, "You can't cash out partway. Reach the end of the trail, or play GOLD cards to earn cash along the way.", 850, 18, main.DIM)
+	_center(tarot_layer, "You can't cash out partway. Reach the end of the trail to bring your trail cash home.", 850, 18, main.DIM).name = "Note"
 	_back_button(tarot_layer, back_to_menu, "MENU")
 	var deck_btn: Button = main._button(tarot_layer, "VIEW DECK", Vector2(1660, 970), Vector2(200, 54))
+	deck_btn.name = "ViewDeck"
 	deck_btn.add_theme_font_size_override("font_size", 20)
 	deck_btn.pressed.connect(_show_deck)
 	_tarot_ab_btn = main._button(tarot_layer, "ABILITIES", Vector2(1440, 970), Vector2(200, 54))
@@ -6753,10 +6790,12 @@ func build_ui() -> void:
 	_pick_box.position = Vector2(0, 360)
 	pick_layer.add_child(_pick_box)
 	var skip: Button = main._button(pick_layer, "SKIP", Vector2(835, 740), Vector2(250, 60))
+	skip.name = "Skip"
 	skip.add_theme_font_size_override("font_size", 24)
 	skip.pressed.connect(func() -> void:
 		_after_pick())
 	var pick_ab: Button = main._button(pick_layer, "ABILITIES", Vector2(1660, 970), Vector2(200, 54))
+	pick_ab.name = "PickAb"
 	pick_ab.add_theme_font_size_override("font_size", 20)
 	pick_ab.tooltip_text = "See your ability cards and which hands they're on."
 	pick_ab.pressed.connect(func() -> void:
@@ -6814,6 +6853,7 @@ func build_ui() -> void:
 		sb_rect.position = Vector2(660, 250)
 		sb_rect.size = Vector2(600, 480)
 		sb_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sb_rect.name = "Strongbox"
 		relic_layer.add_child(sb_rect)
 		_relic_icon = RelicIcon.new()
 		# The prize floats in the glow above the open lid.
@@ -6831,6 +6871,7 @@ func build_ui() -> void:
 		_relic_name = _center(relic_layer, "", 560, 40, main.GOLD)
 		_relic_desc = _center(relic_layer, "", 630, 24, main.OFFWHITE)
 	var take: Button = main._button(relic_layer, "TAKE IT", Vector2(810, 850), Vector2(300, 64))
+	take.name = "Take"
 	take.add_theme_font_size_override("font_size", 26)
 	take.pressed.connect(func() -> void:
 		_pending_relic_reward = ""
@@ -6865,6 +6906,8 @@ func build_ui() -> void:
 	abilities_screen = AbilitiesScreen.new()
 	main.ui_root.add_child(abilities_screen)
 	abilities_screen.setup(self)
+	if Form.is_mobile():
+		TrailMobile.relayout(self)
 
 	end_layer = _layer()
 	_end_label = Label.new()
@@ -6911,6 +6954,8 @@ func _hide_all() -> void:
 func _screen_title(parent: Control, text: String) -> void:
 	var t := _center(parent, text, 100, 64, UiKit.BRASS_HI)
 	t.add_theme_color_override("font_color", UiKit.BRASS_HI)
+	if Form.is_mobile():
+		TrailMobile.title(t)
 
 
 func _center(parent: Control, text: String, y: float, font_size: int, color: Color) -> Label:
@@ -6926,4 +6971,6 @@ func _back_button(parent: Control, action: Callable, text := "BACK") -> Button:
 	var b: Button = main._button(parent, text, Vector2(60, 970), Vector2(200, 54))
 	b.add_theme_font_size_override("font_size", 20)
 	b.pressed.connect(action)
+	if Form.is_mobile():
+		TrailMobile.back(b)
 	return b
