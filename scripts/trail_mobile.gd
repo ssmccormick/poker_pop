@@ -85,6 +85,7 @@ static func relayout(t) -> void:
 	_camp(t)
 	_tend(t)
 	_deck(t)
+	_outfitter(t)
 
 
 # --- Rider select: a carousel ------------------------------------------------------
@@ -592,3 +593,38 @@ static func deck_grid(t) -> void:
 				c.position = cell / 2.0
 				c.scale = Vector2.ONE * 2.3
 	t._deck_tip.visible = false
+
+# --- The Outfitter: the level, the tabs two rows deep, the rows restacked ----------
+
+static func _outfitter(t) -> void:
+	var layer: Control = t.upgrades_layer
+	var ct := content_top()
+	place(t._up_cash, Rect2(vw() - M - 420.0, Form.safe_top() + 18.0, 420, 60), 40)
+	text(t._up_level, Rect2(M, ct, iw(), 50), 32)
+	var y := ct + 64.0
+	place(layer.get_node_or_null("UpTrack"), Rect2(M, y, iw(), 20))
+	place(t._up_fill, Rect2(M, y, 0, 20))
+	y += 48.0
+	var keys: Array = t._up_tab_btns.keys()
+	var bw := (iw() - 48.0) / 4.0
+	for i in keys.size():
+		var b: Button = t._up_tab_btns[keys[i]]
+		var r := Rect2(M + (i % 4) * (bw + 16.0), y + (i / 4) * 106.0, bw, 90)
+		place(b, r, 28)
+		b.set_meta("font_size", 28)
+		b.pivot_offset = r.size / 2.0
+		place(t._up_tab_pips[keys[i]], Rect2(r.end.x - 80.0, r.position.y - 14.0, 76, 26), 22)
+	y += 226.0
+	place(t._up_scroll, Rect2(M, y, iw(), Form.view().y - Form.safe_bottom() - y))
+	(t._up_list as Control).custom_minimum_size = Vector2(iw(), 0)
+
+
+## After each refresh: the tab styling resets their type, and the new rows
+## arrive desktop-sized.
+static func outfitter_rows(t) -> void:
+	for key in t._up_tab_btns:
+		var b: Button = t._up_tab_btns[key]
+		b.add_theme_font_size_override("font_size", 28)
+		UiKit.fit_button_text(b, 28, 18)
+	for row in t._up_list.get_children():
+		MenuMobile.stack_row(row, 690.0)

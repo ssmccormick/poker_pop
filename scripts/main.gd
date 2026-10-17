@@ -253,6 +253,8 @@ func _ready() -> void:
 	_build_ui()
 	trail.build_ui()  # trail screens sit above the HUD, below the menu
 	_build_menu()
+	if Form.is_mobile():
+		board.visible = false  # the menu's buttons run over where the felt sits
 	# The transition curtain rides above every screen except the splash.
 	_fade_rect = ColorRect.new()
 	_fade_rect.color = Color(0, 0, 0, 0)
@@ -315,6 +317,19 @@ func _ready() -> void:
 				_open_options()
 			"stats":
 				_open_stats()
+			"profiles":
+				_refresh_profile_ui()
+				profile_layer.visible = true
+			"tutorpop":
+				# A lesson poster over a table.
+				_start_mode("single")
+				await get_tree().create_timer(2.0).timeout
+				_tutor_queue.append("provisions")  # tutor_show skips shot runs
+				_tutor_next()
+			"peek":
+				_start_mode("single")
+				await get_tree().create_timer(2.5).timeout
+				_open_deck_peek()
 			"trail":
 				trail.open_buyin()
 			"seeds":
@@ -1001,6 +1016,16 @@ func _open_deck_peek() -> void:
 	var pool: Array = board.deck.duplicate()
 	pool.shuffle()
 	_deck_peek_count.text = "%d cards left to deal, shown in no particular order" % pool.size()
+	# Twelve to a row on the desktop; six bigger ones on a phone.
+	var cols := 12
+	var k := 0.9
+	var step := Vector2(110, 128)
+	var first := Vector2(64, 70)
+	if Form.is_mobile():
+		cols = 6
+		k = 1.8
+		step = Vector2(164, 226)
+		first = Vector2(90, 120)
 	for i in pool.size():
 		var d: Dictionary = pool[i]
 		var pc := PlayingCard.new()
@@ -1010,11 +1035,11 @@ func _open_deck_peek() -> void:
 		pc.finish = PlayingCard.finish_of(d)
 		pc.cursed = bool(d.get("cursed", false))
 		pc.material = Themes.current_material()
-		pc.scale = Vector2(0.9, 0.9)
-		pc.position = Vector2(64 + (i % 12) * 110, 70 + (i / 12) * 128)
+		pc.scale = Vector2(k, k)
+		pc.position = first + Vector2((i % cols) * step.x, (i / cols) * step.y)
 		_deck_peek_grid.add_child(pc)
-	_deck_peek_grid.custom_minimum_size = Vector2(1360,
-			70 + ceili(pool.size() / 12.0) * 128)
+	_deck_peek_grid.custom_minimum_size = Vector2(1360 if cols == 12 else TrailMobile.iw(),
+			first.y + ceili(pool.size() / float(cols)) * step.y)
 	board._play_sound(Board.SFX_SHUFFLES.pick_random(), 1.1, -10.0)
 	_deck_peek.visible = true
 
@@ -2255,7 +2280,7 @@ func _tutor_next() -> void:
 		return
 	var key: String = _tutor_queue.pop_front()
 	_tutor_title.text = TUTOR[key][0]
-	_tutor_body.text = TUTOR[key][1]
+	_tutor_body.text = touch_words(TUTOR[key][1])
 	_tutor_scroll.scroll_vertical = 0
 	tutor_layer.move_to_front()
 	help_fade_in(tutor_layer)
@@ -2311,6 +2336,24 @@ const TUT_STEPS := [
 	{"want": "", "cells": [],
 		"text": "This last one's up to you: find ANY hand, a pair or better, and play it. Click or drag across touching cards in any direction. The PAYOUTS list on the right shows what every hand is worth."},
 ]
+
+
+## Lessons are written for a mouse; on a touch screen they say tap.
+const TOUCH_WORDS := [["Misclicked?", "Picked the wrong one?"],
+		["press SPACE or PLAY HAND", "press PLAY HAND"],
+		["The PAYOUTS list on the right shows", "The PAYS button shows"],
+		["the KIT on the right", "the KIT under the table"],
+		["row at the top of your kit", "button at the end of your kit"],
+		["Hover over", "Hold a finger on"], ["hovering", "holding a finger on"],
+		["clicking", "tapping"], ["clicked", "tapped"], ["Click", "Tap"], ["click", "tap"]]
+
+
+static func touch_words(text: String) -> String:
+	if not Form.is_touch():
+		return text
+	for pair in TOUCH_WORDS:
+		text = text.replace(String(pair[0]), String(pair[1]))
+	return text
 
 
 ## A brand-new profile is asked once, before its first ride or mode:
@@ -2442,14 +2485,17 @@ func _update_callout() -> void:
 	_callout_card = card
 	card.tut_order = -1  # the gold glow, no number
 	_callout_title.text = String(TUTOR[q.key][0])
-	_callout_body.text = String(TUTOR[q.key][1])
+	_callout_body.text = touch_words(String(TUTOR[q.key][1]))
 	# Fit the poster to its text: title, the wrapped body, then GOT IT.
 	var font: Font = _callout_body.get_theme_font("font")
+	var bw := _callout_body.custom_minimum_size.x
 	var body_h := font.get_multiline_string_size(_callout_body.text,
-			HORIZONTAL_ALIGNMENT_LEFT, 388.0, 17).y
-	_callout_body.size = Vector2(388, body_h + 4.0)
-	_callout_panel.size.y = 70.0 + body_h + 92.0
-	_callout_ok.position.y = _callout_panel.size.y - 70.0
+			HORIZONTAL_ALIGNMENT_LEFT, bw, _callout_body.get_theme_font_size("font_size")).y
+	_callout_body.size = Vector2(bw, body_h + 4.0)
+	var head := _callout_body.position.y
+	var foot := _callout_ok.size.y + 42.0
+	_callout_panel.size.y = head + body_h + foot
+	_callout_ok.position.y = _callout_panel.size.y - _callout_ok.size.y - 20.0
 	_place_callout(card)
 	_callout_layer.move_to_front()
 	help_fade_in(_callout_layer)
@@ -2462,6 +2508,9 @@ func _place_callout(card: PlayingCard) -> void:
 	var at: Vector2 = xf * board.cell_center(card.grid_pos)
 	var half_w := PlayingCard.W * board.scale.x / 2.0
 	var size := _callout_panel.size
+	if Form.is_mobile():
+		_place_callout_vertical(card, at, size)
+		return
 	var right := at.x + half_w + 34.0 + size.x <= VIEW.x - 12.0
 	var x := at.x + half_w + 34.0 if right else at.x - half_w - 34.0 - size.x
 	var y := clampf(at.y - size.y / 2.0, 12.0, VIEW.y - size.y - 12.0)
@@ -2470,6 +2519,20 @@ func _place_callout(card: PlayingCard) -> void:
 	var tip := at.x + (half_w + 6.0) * (1.0 if right else -1.0)
 	_callout_pointer.polygon = PackedVector2Array([
 		Vector2(edge, at.y - 16.0), Vector2(edge, at.y + 16.0), Vector2(tip, at.y)])
+
+
+## On a phone the poster spans the width, below the card or above it.
+func _place_callout_vertical(_card: PlayingCard, at: Vector2, size: Vector2) -> void:
+	var half_h := PlayingCard.H * board.scale.y / 2.0
+	var x := (VIEW.x - size.x) / 2.0
+	var below := at.y + half_h + 34.0 + size.y <= VIEW.y - Form.safe_bottom() - 12.0
+	var y := at.y + half_h + 34.0 if below else at.y - half_h - 34.0 - size.y
+	y = clampf(y, Form.safe_top(), VIEW.y - size.y - 12.0)
+	_callout_panel.position = Vector2(x, y)
+	var edge := y if below else y + size.y
+	var tip := at.y + (half_h + 6.0) * (1.0 if below else -1.0)
+	_callout_pointer.polygon = PackedVector2Array([
+		Vector2(at.x - 18.0, edge), Vector2(at.x + 18.0, edge), Vector2(at.x, tip)])
 
 
 func _dismiss_callout() -> void:
@@ -2512,6 +2575,8 @@ func _build_callout() -> void:
 	ok.position = Vector2(130, 276)
 	ok.pressed.connect(_dismiss_callout)
 	_callout_ok = ok
+	if Form.is_mobile():
+		MenuMobile.callout(self)
 
 
 # --- The table plaque: how a table ended, dropped in at the top ------------
@@ -2640,7 +2705,7 @@ func _tut_apply_step() -> void:
 	var head := "STEP %d / %d" % [tut_step + 1, TUT_STEPS.size()]
 	if want != "":
 		head += "   ·   %s  (%d)" % [want.to_upper(), int(Poker.BASE_SCORES.get(want, 0))]
-	_tut_label.text = "%s\n%s" % [head, step.text]
+	_tut_label.text = "%s\n%s" % [head, touch_words(String(step.text))]
 
 
 func _tut_clear_marks() -> void:
@@ -3319,6 +3384,7 @@ func _build_ui() -> void:
 	var peek_title := _label(_deck_peek, "LEFT IN THE DECK", Vector2(0, 80), 48, GOLD)
 	peek_title.size = Vector2(VIEW.x, 70)
 	peek_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	peek_title.name = "PeekTitle"
 	_deck_peek_count = _label(_deck_peek, "", Vector2(0, 156), 22, DIM)
 	_deck_peek_count.size = Vector2(VIEW.x, 34)
 	_deck_peek_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3326,13 +3392,17 @@ func _build_ui() -> void:
 	peek_scroll.position = Vector2(280, 220)
 	peek_scroll.size = Vector2(1360, 690)
 	peek_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	peek_scroll.name = "PeekScroll"
 	_deck_peek.add_child(peek_scroll)
 	_deck_peek_grid = Control.new()
 	peek_scroll.add_child(_deck_peek_grid)
 	var peek_close := _button(_deck_peek, "BACK TO THE TABLE", Vector2(785, 950), Vector2(350, 60))
 	peek_close.add_theme_font_size_override("font_size", 22)
+	peek_close.name = "PeekClose"
 	peek_close.pressed.connect(func() -> void:
 		_deck_peek.visible = false)
+	if Form.is_mobile():
+		MenuMobile.peek(self)
 
 	preview_label = _label(hud_root, "", Vector2(380, 1026), 26, DIM)
 
@@ -3729,30 +3799,33 @@ func _build_menu() -> void:
 		ghost.rank = randi_range(2, 14)
 		ghost.suit = randi_range(0, 3)
 		ghost.modulate = Color(1, 1, 1, 0.13)
-		ghost.scale = Vector2(1.4, 1.4)
+		ghost.scale = Vector2.ONE * (2.2 if Form.is_mobile() else 1.4)
 		ghost.rotation = randf_range(-0.5, 0.5)
-		var gx := randf_range(180.0, 1740.0)
-		ghost.position = Vector2(gx, 1220.0)
+		var gx := randf_range(VIEW.x * 0.09, VIEW.x * 0.91)
+		ghost.position = Vector2(gx, VIEW.y + 140.0)
 		menu_layer.add_child(ghost)
 		var dur := randf_range(16.0, 30.0)
 		var gtw := create_tween().set_loops()
 		gtw.tween_property(ghost, "position:y", -240.0, dur) \
-				.from(1220.0 + i * 160.0)
+				.from(VIEW.y + 140.0 + i * 160.0)
 		gtw.parallel().tween_property(ghost, "rotation",
 				ghost.rotation + randf_range(-1.2, 1.2), dur)
 		gtw.tween_callback(func() -> void:
 			ghost.rank = randi_range(2, 14)
 			ghost.suit = randi_range(0, 3)
-			ghost.position.x = randf_range(180.0, 1740.0))
+			ghost.position.x = randf_range(VIEW.x * 0.09, VIEW.x * 0.91))
 
 	# The brand logo rides the old wordmark's gentle bob.
-	var title_logo := _logo(menu_layer, LOGO_STACKED, Rect2(735, 44, 450, 252))
+	var logo_r := Rect2(735, 44, 450, 252)
+	if Form.is_mobile():
+		logo_r = Rect2((VIEW.x - 640.0) / 2.0, Form.safe_top() + 150.0, 640, 358)
+	var title_logo := _logo(menu_layer, LOGO_STACKED, logo_r)
 	var ttw := create_tween().set_loops()
-	ttw.tween_property(title_logo, "position:y", 38.0, 2.2) \
+	ttw.tween_property(title_logo, "position:y", logo_r.position.y - 6.0, 2.2) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	ttw.tween_property(title_logo, "position:y", 50.0, 2.2) \
+	ttw.tween_property(title_logo, "position:y", logo_r.position.y + 6.0, 2.2) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_menu_center("Chain touching cards into poker hands", 280, 26, DIM)
+	_menu_center("Chain touching cards into poker hands", 280, 26, DIM).name = "Tagline"
 
 	_profile_menu_btn = _button(menu_layer, "PROFILE %d" % profile, Vector2(60, 60), Vector2(240, 54))
 	_profile_menu_btn.add_theme_font_size_override("font_size", 20)
@@ -3762,15 +3835,19 @@ func _build_menu() -> void:
 			profile_layer.visible = true))
 	var stats_btn := _button(menu_layer, "STATS", Vector2(60, 124), Vector2(240, 54))
 	stats_btn.add_theme_font_size_override("font_size", 20)
+	stats_btn.name = "Stats"
 	stats_btn.pressed.connect(_open_stats)
 	var how_btn := _button(menu_layer, "HOW TO PLAY", Vector2(1620, 60), Vector2(240, 54))
 	how_btn.add_theme_font_size_override("font_size", 20)
+	how_btn.name = "How"
 	how_btn.pressed.connect(_start_tutorial)
 	var contracts_btn := _button(menu_layer, "CONTRACTS", Vector2(1620, 124), Vector2(240, 54))
 	contracts_btn.add_theme_font_size_override("font_size", 20)
+	contracts_btn.name = "Contracts"
 	contracts_btn.pressed.connect(_open_contracts)
 	var seeds_btn := _button(menu_layer, "SEEDED PLAY", Vector2(1620, 188), Vector2(240, 54))
 	seeds_btn.add_theme_font_size_override("font_size", 20)
+	seeds_btn.name = "Seeds"
 	seeds_btn.tooltip_text = "Play a seed, which deals the same game for everyone, and chase its high score. The DAILY RIDE is in here too."
 	seeds_btn.pressed.connect(func() -> void:
 		open_seeds())
@@ -3779,62 +3856,79 @@ func _build_menu() -> void:
 
 	var trail_btn := _button(menu_layer, "THE TRAIL", Vector2(700, 336), Vector2(520, 66), true)
 	trail_btn.add_theme_font_size_override("font_size", 26)
+	trail_btn.name = "Trail"
 	trail_btn.pressed.connect(func() -> void:
 		trail.open_trail())
 	# The Outfitter: every $cash meta upgrade, right beside the ride.
 	var upgrades_btn := _button(menu_layer, "UPGRADES", Vector2(1250, 336), Vector2(210, 66))
 	upgrades_btn.add_theme_font_size_override("font_size", 20)
+	upgrades_btn.name = "Upgrades"
 	upgrades_btn.pressed.connect(func() -> void:
 		trail.open_upgrades())
 	# A gold pip: how many unlocks the Outfitter hasn't shown yet.
 	_upgrades_pip = _gold_pip(Vector2(1440, 322))
 	_refresh_level_plate()
-	_menu_center("Bet on how far you'll ride, build your deck, and bring your trail cash home.", 408, 20, DIM)
+	_menu_center("Bet on how far you'll ride, build your deck, and bring your trail cash home.", 408, 20, DIM).name = "TrailNote"
 
-	_menu_center("TIME TRIAL", 456, 24, GOLD)
+	_menu_center("TIME TRIAL", 456, 24, GOLD).name = "TimeHead"
 	var times := [60.0, 180.0, 300.0]
 	var time_names := ["1:00", "3:00", "5:00"]
 	for i in 3:
 		var b := _button(menu_layer, time_names[i], Vector2(645 + i * 220, 494), Vector2(200, 56))
 		b.add_theme_font_size_override("font_size", 22)
+		b.name = "Time%d" % i
 		var secs: float = times[i]
 		b.pressed.connect(func() -> void:
 			_start_mode("time", secs))
-	_menu_center("Unlimited hands and a deck that reshuffles. Just beat the clock.", 558, 18, DIM)
+	_menu_center("Unlimited hands and a deck that reshuffles. Just beat the clock.", 558, 18, DIM).name = "TimeNote"
 
 	var single_btn := _button(menu_layer, "SINGLE DECK", Vector2(700, 604), Vector2(520, 60))
 	single_btn.add_theme_font_size_override("font_size", 24)
+	single_btn.name = "Single"
 	single_btn.pressed.connect(func() -> void:
 		_start_mode("single"))
-	_menu_center("One 52-card deck and no timer. Play until no hands are left.", 672, 18, DIM)
+	_menu_center("One 52-card deck and no timer. Play until no hands are left.", 672, 18, DIM).name = "SingleNote"
 
 	var arcade_btn := _button(menu_layer, "ARCADE", Vector2(700, 712), Vector2(520, 60))
 	arcade_btn.add_theme_font_size_override("font_size", 24)
+	arcade_btn.name = "Arcade"
 	arcade_btn.pressed.connect(func() -> void:
 		_start_mode("arcade"))
-	_menu_center("Rising targets and an always-draining bar. Keep scoring or lose.", 780, 18, DIM)
+	_menu_center("Rising targets and an always-draining bar. Keep scoring or lose.", 780, 18, DIM).name = "ArcadeNote"
 
 	var zen_btn := _button(menu_layer, "ZEN", Vector2(700, 820), Vector2(520, 60))
 	zen_btn.add_theme_font_size_override("font_size", 24)
+	zen_btn.name = "Zen"
 	zen_btn.pressed.connect(func() -> void:
 		_start_mode("zen"))
-	_menu_center("No timer and no hand limit, and the deck never runs out.", 888, 18, DIM)
+	_menu_center("No timer and no hand limit, and the deck never runs out.", 888, 18, DIM).name = "ZenNote"
 
 	if OS.has_feature("web"):
 		var opt_btn := _button(menu_layer, "OPTIONS", Vector2(835, 972), Vector2(250, 54))
 		opt_btn.add_theme_font_size_override("font_size", 22)
+		opt_btn.name = "Options"
 		opt_btn.pressed.connect(_open_options)
 	else:
 		var opt_btn := _button(menu_layer, "OPTIONS", Vector2(700, 972), Vector2(250, 54))
 		opt_btn.add_theme_font_size_override("font_size", 22)
+		opt_btn.name = "Options"
 		opt_btn.pressed.connect(_open_options)
 		var quit_btn := _button(menu_layer, "QUIT", Vector2(970, 972), Vector2(250, 54))
 		quit_btn.add_theme_font_size_override("font_size", 22)
+		quit_btn.name = "Quit"
 		quit_btn.pressed.connect(func() -> void:
 			get_tree().quit())
 
 	_build_options()
 	_build_profiles_and_tutor()
+	if Form.is_mobile():
+		MenuMobile.menu(self)
+		MenuMobile.options(self)
+		MenuMobile.profiles(self)
+		MenuMobile.contracts(self)
+		MenuMobile.tutor(self)
+		MenuMobile.offer(self)
+		MenuMobile.tutorial(self)
 
 
 func _build_profiles_and_tutor() -> void:
@@ -3863,6 +3957,7 @@ func _build_profiles_and_tutor() -> void:
 	ui_root.add_child(profile_layer)
 	var pt := _label(profile_layer, "CHOOSE YOUR SADDLE", Vector2(0, 140), 64, GOLD)
 	pt.size = Vector2(VIEW.x, 90)
+	pt.name = "Title"
 	pt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for i in 3:
 		var n := i + 1
@@ -3873,6 +3968,7 @@ func _build_profiles_and_tutor() -> void:
 		_profile_slot_btns.append(slot)
 		var erase := _button(profile_layer, "ERASE", Vector2(460 + i * 420, 690), Vector2(180, 48))
 		erase.add_theme_font_size_override("font_size", 18)
+		erase.name = "Erase%d" % i
 		erase.pressed.connect(func() -> void:
 			if erase.text == "ERASE":
 				erase.text = "SURE?"
@@ -3881,6 +3977,7 @@ func _build_profiles_and_tutor() -> void:
 				_erase_profile(n))
 	var pback := _button(profile_layer, "BACK", Vector2(860, 880), Vector2(200, 54))
 	pback.add_theme_font_size_override("font_size", 20)
+	pback.name = "Back"
 	pback.pressed.connect(func() -> void:
 		transition(func() -> void:
 			profile_layer.visible = false))
@@ -3894,16 +3991,18 @@ func _build_profiles_and_tutor() -> void:
 	ui_root.add_child(stats_layer)
 	var st := _label(stats_layer, "THE LEDGER", Vector2(0, 110), 64, UiKit.BRASS_HI)
 	st.size = Vector2(VIEW.x, 90)
+	st.name = "Title"
 	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var headers := ["AT THE TABLES", "ON THE TRAIL", "OTHER MODES"]
 	for i in 3:
 		var hx := 150.0 + i * 580.0
 		# Each column on its own leather plate.
-		UiKit.plate(stats_layer, Rect2(hx - 26, 240, 552, 640))
+		UiKit.plate(stats_layer, Rect2(hx - 26, 240, 552, 640)).name = "Plate%d" % i
 		var h := _label(stats_layer, headers[i], Vector2(hx, 262), 28, GOLD)
 		h.size = Vector2(500, 40)
 		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		UiKit.hrule(stats_layer, Vector2(hx + 50, 308), 400)
+		h.name = "Head%d" % i
+		UiKit.hrule(stats_layer, Vector2(hx + 50, 308), 400).name = "Rule%d" % i
 		var names := _label(stats_layer, "", Vector2(hx, 330), 22, OFFWHITE)
 		names.size = Vector2(500, 560)
 		var values := _label(stats_layer, "", Vector2(hx, 330), 22, GOLD)
@@ -3912,6 +4011,7 @@ func _build_profiles_and_tutor() -> void:
 		_stats_cols.append([names, values])
 	var sback := _button(stats_layer, "BACK", Vector2(860, 950), Vector2(200, 54))
 	sback.add_theme_font_size_override("font_size", 20)
+	sback.name = "Back"
 	sback.pressed.connect(func() -> void:
 		transition(func() -> void:
 			stats_layer.visible = false))
@@ -3924,6 +4024,7 @@ func _build_profiles_and_tutor() -> void:
 	ui_root.add_child(contracts_layer)
 	var ct := _label(contracts_layer, "CONTRACTS", Vector2(0, 90), 64, UiKit.BRASS_HI)
 	ct.size = Vector2(VIEW.x, 90)
+	ct.name = "Title"
 	ct.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_contracts_sub = _label(contracts_layer, "", Vector2(0, 186), 24, GOLD)
 	_contracts_sub.size = Vector2(VIEW.x, 34)
@@ -3939,6 +4040,7 @@ func _build_profiles_and_tutor() -> void:
 	_contracts_scroll.add_child(_contracts_list)
 	var cback := _button(contracts_layer, "BACK", Vector2(860, 960), Vector2(200, 54))
 	cback.add_theme_font_size_override("font_size", 20)
+	cback.name = "Back"
 	cback.pressed.connect(func() -> void:
 		transition(func() -> void:
 			contracts_layer.visible = false
@@ -3955,6 +4057,7 @@ func _build_profiles_and_tutor() -> void:
 	var panel := Panel.new()
 	panel.position = Vector2(560, 300)
 	panel.size = Vector2(800, 440)
+	panel.name = "Panel"
 	panel.add_theme_stylebox_override("panel", UiKit.poster_box())
 	tutor_layer.add_child(panel)
 	if not UiKit.has_art():
@@ -3970,6 +4073,7 @@ func _build_profiles_and_tutor() -> void:
 		rule.color = UiKit.POSTER_EDGE
 		rule.position = Vector2(660, rule_y)
 		rule.size = Vector2(600, 2)
+		rule.name = "Rule0" if rule_y < 385.0 else "Rule1"
 		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tutor_layer.add_child(rule)
 	# The body lives in a scroll well: a long lesson scrolls instead of
@@ -3990,6 +4094,7 @@ func _build_profiles_and_tutor() -> void:
 	_tutor_scroll.add_child(_tutor_body)
 	var ok := _button(tutor_layer, "GOT IT", Vector2(810, 660), Vector2(300, 60))
 	ok.add_theme_font_size_override("font_size", 24)
+	ok.name = "Ok"
 	ok.pressed.connect(_tutor_next)
 
 	# A fresh profile's first ride asks: learn the ropes, or skip them?
@@ -4002,6 +4107,7 @@ func _build_profiles_and_tutor() -> void:
 	var offer_panel := Panel.new()
 	offer_panel.position = Vector2(560, 330)
 	offer_panel.size = Vector2(800, 400)
+	offer_panel.name = "Panel"
 	offer_panel.add_theme_stylebox_override("panel", UiKit.poster_box())
 	_offer_layer.add_child(offer_panel)
 	if not UiKit.has_art():
@@ -4010,6 +4116,7 @@ func _build_profiles_and_tutor() -> void:
 		offer_panel.add_child(offer_nails)
 	var ot := _label(_offer_layer, "NEW IN TOWN?", Vector2(560, 360), 44, RED)
 	ot.size = Vector2(800, 60)
+	ot.name = "Title"
 	ot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var ob := _label(_offer_layer, "A short tutorial shows you how to chain cards into poker hands. It takes about a minute, and you can replay it any time from HOW TO PLAY.",
 			Vector2(640, 440), 26, UiKit.POSTER_INK)
@@ -4017,14 +4124,17 @@ func _build_profiles_and_tutor() -> void:
 	ob.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ob.custom_minimum_size = Vector2(640, 0)
 	ob.size = Vector2(640, 150)
+	ob.name = "Body"
 	ob.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if FontLib.body != null:
 		ob.add_theme_font_override("font", FontLib.body)
 	var play := _button(_offer_layer, "PLAY THE TUTORIAL", Vector2(620, 620), Vector2(330, 64), true)
 	play.add_theme_font_size_override("font_size", 22)
+	play.name = "Play"
 	play.pressed.connect(_offer_take_tutorial)
 	var skip := _button(_offer_layer, "SKIP IT", Vector2(970, 620), Vector2(330, 64))
 	skip.add_theme_font_size_override("font_size", 22)
+	skip.name = "Skip"
 	skip.pressed.connect(_offer_skip_tutorial)
 
 	# Hover tooltip for board cards — above the HUD, ignores the mouse.
@@ -4099,12 +4209,14 @@ func _build_options() -> void:
 	ui_root.add_child(options_layer)
 
 	var title := _label(options_layer, "OPTIONS", Vector2(0, 110), 72, UiKit.BRASS_HI)
+	title.name = "Title"
 	title.size = Vector2(VIEW.x, 100)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	if not OS.has_feature("web"):
 		var vh := _label(options_layer, "VIDEO", Vector2(0, 280), 26, RED)
 		vh.size = Vector2(VIEW.x, 40)
+		vh.name = "VideoHead"
 		vh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		fullscreen_btn = _button(options_layer, "", Vector2(700, 336), Vector2(520, 60))
 		fullscreen_btn.add_theme_font_size_override("font_size", 24)
@@ -4122,6 +4234,7 @@ func _build_options() -> void:
 			_refresh_options_buttons())
 		var hint := _label(options_layer, "Window size applies when fullscreen is off", Vector2(0, 478), 18, DIM)
 		hint.size = Vector2(VIEW.x, 30)
+		hint.name = "Hint"
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# Classic leather and brass, or modern smoked glass.
 	ui_style_btn = _button(options_layer, "", Vector2(700, 520 if not OS.has_feature("web") else 336),
@@ -4137,9 +4250,10 @@ func _build_options() -> void:
 
 	var sh := _label(options_layer, "SOUND", Vector2(0, 610), 26, RED)
 	sh.size = Vector2(VIEW.x, 40)
+	sh.name = "SoundHead"
 	sh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	_label(options_layer, "MUSIC", Vector2(660, 668), 24, OFFWHITE)
+	_label(options_layer, "MUSIC", Vector2(660, 668), 24, OFFWHITE).name = "MusicL"
 	var music_slider := HSlider.new()
 	music_slider.min_value = 0.0
 	music_slider.max_value = 1.0
@@ -4147,6 +4261,7 @@ func _build_options() -> void:
 	music_slider.value = music_vol
 	music_slider.position = Vector2(830, 668)
 	music_slider.size = Vector2(430, 36)
+	music_slider.name = "MusicS"
 	UiKit.style_slider(music_slider)
 	options_layer.add_child(music_slider)
 	music_slider.value_changed.connect(func(v: float) -> void:
@@ -4154,7 +4269,7 @@ func _build_options() -> void:
 		_apply_audio()
 		_save_settings())
 
-	_label(options_layer, "SFX", Vector2(660, 736), 24, OFFWHITE)
+	_label(options_layer, "SFX", Vector2(660, 736), 24, OFFWHITE).name = "SfxL"
 	var sfx_slider := HSlider.new()
 	sfx_slider.min_value = 0.0
 	sfx_slider.max_value = 1.0
@@ -4162,6 +4277,7 @@ func _build_options() -> void:
 	sfx_slider.value = sfx_vol
 	sfx_slider.position = Vector2(830, 736)
 	sfx_slider.size = Vector2(430, 36)
+	sfx_slider.name = "SfxS"
 	UiKit.style_slider(sfx_slider)
 	options_layer.add_child(sfx_slider)
 	sfx_slider.value_changed.connect(func(v: float) -> void:
@@ -4171,6 +4287,7 @@ func _build_options() -> void:
 
 	var back := _button(options_layer, "BACK", Vector2(835, 880), Vector2(250, 60))
 	back.add_theme_font_size_override("font_size", 24)
+	back.name = "Back"
 	back.pressed.connect(_close_options)
 
 
@@ -4253,6 +4370,8 @@ func _open_stats_now() -> void:
 			values.append(String(row[1]))
 		(_stats_cols[i][0] as Label).text = "\n".join(names)
 		(_stats_cols[i][1] as Label).text = "\n".join(values)
+	if Form.is_mobile():
+		MenuMobile.stats(self)
 	stats_layer.visible = true
 
 
@@ -4363,6 +4482,8 @@ func _refresh_seeds() -> void:
 		var b := _button(_seed_recent_box, "", Vector2.ZERO, Vector2(520, 36))
 		b.custom_minimum_size = Vector2(520, 36)
 		b.add_theme_font_size_override("font_size", 15)
+		if Form.is_mobile():
+			b.mouse_filter = Control.MOUSE_FILTER_PASS  # a drag scrolls the page
 		var mode := String(e.mode)
 		var v := String(e.get("variant", ""))
 		var label := SeedRng.pretty(String(e.seed))
@@ -4487,12 +4608,14 @@ func _build_seeds() -> void:
 	seeds_layer.visible = false
 	ui_root.add_child(seeds_layer)
 	var title := _label(seeds_layer, "SEEDED PLAY", Vector2(0, 70), 64, UiKit.BRASS_HI)
+	title.name = "Title"
 	title.size = Vector2(VIEW.x, 90)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var sub := _label(seeds_layer, "One seed deals the same game for everyone. Share it and beat it.",
 			Vector2(0, 160), 22, DIM)
 	sub.size = Vector2(VIEW.x, 30)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.name = "Sub"
 	for i in SEED_MODES.size():
 		var key := String(SEED_MODES[i][0])
 		var mb := _button(seeds_layer, String(SEED_MODES[i][1]), Vector2(395 + i * 165, 212), Vector2(155, 50))
@@ -4507,6 +4630,7 @@ func _build_seeds() -> void:
 	# The seed itself.
 	var sl := _label(seeds_layer, "SEED", Vector2(395, 300), 26, GOLD)
 	sl.size = Vector2(100, 56)
+	sl.name = "SeedL"
 	sl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_seed_edit = LineEdit.new()
 	_seed_edit.position = Vector2(500, 300)
@@ -4523,21 +4647,25 @@ func _build_seeds() -> void:
 		_refresh_seeds())
 	seeds_layer.add_child(_seed_edit)
 	var rnd := _button(seeds_layer, "RANDOM", Vector2(880, 300), Vector2(170, 56))
+	rnd.name = "Random"
 	rnd.pressed.connect(func() -> void:
 		_seed_daily = false
 		_seed_edit.text = SeedRng.pretty(SeedRng.random_seed())
 		_refresh_seeds())
 	var paste := _button(seeds_layer, "PASTE", Vector2(1065, 300), Vector2(150, 56))
+	paste.name = "Paste"
 	paste.pressed.connect(func() -> void:
 		_seed_daily = false
 		_seed_edit.text = SeedRng.pretty(SeedRng.normalize(DisplayServer.clipboard_get()))
 		_refresh_seeds())
 	var copy := _button(seeds_layer, "COPY", Vector2(1230, 300), Vector2(130, 56))
+	copy.name = "Copy"
 	copy.pressed.connect(func() -> void:
 		DisplayServer.clipboard_set(SeedRng.pretty(_seed_text()))
 		_announce("SEED COPIED"))
 	var daily := _button(seeds_layer, "DAILY RIDE", Vector2(1375, 300), Vector2(180, 56), true)
 	daily.tooltip_text = "Today's seed: the same trail for everyone, at Ascension 0. You get one scored ride a day."
+	daily.name = "Daily"
 	daily.pressed.connect(func() -> void:
 		_seed_daily = true
 		_seed_mode = "trail"
@@ -4560,6 +4688,7 @@ func _build_seeds() -> void:
 			_refresh_seeds())
 		_seed_rider_btns[rid] = rb
 	var prev := _button(_seed_trail_box, "◀", Vector2(1075, 390), Vector2(60, 50))
+	prev.name = "Prev"
 	prev.pressed.connect(func() -> void:
 		_seed_asc -= 1
 		_refresh_seeds())
@@ -4568,23 +4697,27 @@ func _build_seeds() -> void:
 	_seed_asc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_seed_asc_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var nxt := _button(_seed_trail_box, "▶", Vector2(1395, 390), Vector2(60, 50))
+	nxt.name = "Next"
 	nxt.pressed.connect(func() -> void:
 		_seed_asc += 1
 		_refresh_seeds())
 	# Your best, the rules, the warning; recent seeds; the online board.
-	UiKit.plate(seeds_layer, Rect2(395, 470, 560, 410))
+	UiKit.plate(seeds_layer, Rect2(395, 470, 560, 410)).name = "Plate1"
 	_seed_best = _label(seeds_layer, "", Vector2(420, 490), 24, GOLD)
 	_seed_best.size = Vector2(510, 34)
+	_seed_best.name = "Best"
 	_seed_rules = _label(seeds_layer, "", Vector2(420, 534), 16, OFFWHITE)
+	_seed_rules.name = "Rules"
 	_seed_rules.size = Vector2(510, 120)
 	_seed_rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var rl := _label(seeds_layer, "RECENT SEEDS", Vector2(420, 662), 20, GOLD)
 	rl.size = Vector2(300, 28)
+	rl.name = "RecentL"
 	_seed_recent_box = VBoxContainer.new()
 	_seed_recent_box.position = Vector2(415, 694)
 	_seed_recent_box.add_theme_constant_override("separation", 6)
 	seeds_layer.add_child(_seed_recent_box)
-	UiKit.plate(seeds_layer, Rect2(965, 470, 590, 410))
+	UiKit.plate(seeds_layer, Rect2(965, 470, 590, 410)).name = "Plate2"
 	_seed_board_box = VBoxContainer.new()
 	_seed_board_box.position = Vector2(990, 490)
 	_seed_board_box.size = Vector2(540, 370)
@@ -4595,6 +4728,7 @@ func _build_seeds() -> void:
 	_seed_warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var nl := _label(seeds_layer, "NAME", Vector2(1160, 930), 22, GOLD)
 	nl.size = Vector2(90, 56)
+	nl.name = "NameL"
 	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_seed_name_edit = LineEdit.new()
 	_seed_name_edit.position = Vector2(1250, 930)
@@ -4614,10 +4748,13 @@ func _build_seeds() -> void:
 	_seed_start.pressed.connect(_start_seeded)
 	var back := _button(seeds_layer, "BACK", Vector2(60, 970), Vector2(200, 54))
 	back.add_theme_font_size_override("font_size", 20)
+	back.name = "Back"
 	back.pressed.connect(func() -> void:
 		transition(func() -> void:
 			seeds_layer.visible = false
 			_open_menu_now()))
+	if Form.is_mobile():
+		MenuMobile.seeds(self)
 
 
 func _open_contracts() -> void:
@@ -4697,6 +4834,8 @@ func _contract_row(c: Dictionary, state: String) -> Control:
 			reward.position.x = 720
 			reward.size.x = 300
 			reward.add_theme_color_override("font_color", DIM)
+	if Form.is_mobile():
+		MenuMobile.stack_row(row, 640.0)
 	return row
 
 
@@ -4727,10 +4866,13 @@ func _build_splash() -> void:
 	splash_layer.color = BG
 	splash_layer.size = VIEW
 	ui_root.add_child(splash_layer)
-	_logo(splash_layer, LOGO_STACKED, Rect2(610, 180, 700, 392))
+	_logo(splash_layer, LOGO_STACKED, Rect2(610, 180, 700, 392)).name = "Logo"
 	var prompt := _label(splash_layer, "CLICK TO START", Vector2(0, 640), 36, GOLD)
 	prompt.size = Vector2(VIEW.x, 72)
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	prompt.name = "Prompt"
+	if Form.is_mobile():
+		MenuMobile.splash(self)
 	var pulse := create_tween().set_loops()
 	pulse.tween_property(prompt, "modulate:a", 0.35, 0.8)
 	pulse.tween_property(prompt, "modulate:a", 1.0, 0.8)
@@ -4864,7 +5006,7 @@ func _take_screenshot(path: String) -> void:
 		get_tree().quit()
 		return
 	match OS.get_environment("POKERPOP_MODE"):
-		"trailhazard", "trailtwist", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial", "trailcallout":
+		"trailhazard", "trailtwist", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial", "trailcallout", "peek", "tutorpop":
 			# The last page's EXP bar and level-up banner come in last.
 			# POKERPOP_WAIT=seconds holds the shot longer (a phone's level-up banner).
 			var shot_wait := 6.2 if OS.get_environment("POKERPOP_MODE") in ["trailover", "trailcallout"] else 4.2

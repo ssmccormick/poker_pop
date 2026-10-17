@@ -1976,7 +1976,8 @@ func _style_signature_toggle(b: Button, chosen: bool) -> void:
 	var ink := Color("e6d5b0") if chosen else Color("b8a888")
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		b.add_theme_color_override(c, ink)
-	b.add_theme_font_size_override("font_size", 18)
+	# A phone layout leaves its own size on the button.
+	b.add_theme_font_size_override("font_size", int(b.get_meta("font_size", 18)))
 
 
 ## The Gambler's trick for this ride; choosing one also saddles him.
@@ -2204,7 +2205,7 @@ func _refresh_upgrades() -> void:
 	var into: Array = progress.exp_into_level()
 	_up_level.text = "LEVEL %d   ·   %d / %d EXP to level %d" % [progress.level(),
 			int(into[0]), int(into[1]), progress.level() + 1]
-	_up_fill.size.x = 600.0 * clampf(float(into[0]) / maxf(1.0, float(into[1])), 0.0, 1.0)
+	_up_fill.size.x = (upgrades_layer.get_node("UpTrack") as Control).size.x * clampf(float(into[0]) / maxf(1.0, float(into[1])), 0.0, 1.0)
 	for key in _up_tab_btns:
 		_style_signature_toggle(_up_tab_btns[key], key == _up_tab)
 		(_up_tab_pips[key] as Label).visible = _tab_news(key) > 0
@@ -2219,6 +2220,8 @@ func _refresh_upgrades() -> void:
 		for r in Progression.CATALOG:
 			if String(r.kind) in TAB_KINDS[_up_tab]:
 				_up_list.add_child(_catalog_row(r))
+	if Form.is_mobile():
+		TrailMobile.outfitter_rows(self)
 	_up_scroll.set_deferred("scroll_vertical", keep)
 
 
@@ -6623,6 +6626,7 @@ func build_ui() -> void:
 	_screen_title(upgrades_layer, "THE OUTFITTER")
 	_up_level = _center(upgrades_layer, "", 192, 24, main.GOLD)
 	var track := Panel.new()
+	track.name = "UpTrack"
 	track.position = Vector2(660, 232)
 	track.size = Vector2(600, 14)
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
