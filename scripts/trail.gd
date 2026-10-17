@@ -1902,6 +1902,8 @@ func _open_select_now() -> void:
 
 
 func _refresh_select() -> void:
+	if not select_layer.visible:
+		TrailMobile.focus = ""  # a fresh visit centers the saddled rider
 	for id in _select_cards:
 		var tr: TextureRect = _select_cards[id]
 		var suffix := "_selected" if id == character else ""
@@ -2018,7 +2020,13 @@ func _input(event: InputEvent) -> void:
 
 
 func _pick_character(id: String) -> void:
-	if not CHARACTERS.has(id) or character == id:
+	if not CHARACTERS.has(id):
+		return
+	if Form.is_mobile() and TrailMobile.focus != id:
+		# A tap on a rider peeking in from the side brings them to the middle.
+		TrailMobile.focus = id
+		TrailMobile.select_carousel(self)
+	if character == id:
 		return
 	if not _avail("rider", id):
 		main.board._play_sound(Board.SFX_ERROR, 1.0, -8.0)

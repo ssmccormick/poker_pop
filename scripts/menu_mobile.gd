@@ -38,6 +38,15 @@ static func plate(p: Control, r: Rect2) -> void:
 			(c as Node2D).queue_redraw()
 
 
+## A popup laid out on the 1080×2340 canvas, moved to the middle of a
+## bigger one.
+static func _center(layer: Control) -> void:
+	var d := Vector2(Form.center_x(), floorf((Form.view().y - Form.REF[Form.PHONE].y) / 2.0))
+	for c in layer.get_children():
+		if c is Control:
+			(c as Control).position += d
+
+
 static func _grow_font(c: Control, k: float) -> void:
 	if c is Label or c is Button:
 		c.add_theme_font_size_override("font_size",
@@ -117,7 +126,7 @@ static func splash(m) -> void:
 	var L: Control = m.splash_layer
 	var logo := _n(L, "Logo")
 	if logo != null:
-		TrailMobile.place(logo, Rect2(90, 640, 900, 504))
+		TrailMobile.place(logo, Rect2((Form.view().x - 900.0) / 2.0, 640, 900, 504))
 	var prompt := _n(L, "Prompt") as Label
 	if prompt != null:
 		prompt.text = "TAP TO START"
@@ -273,6 +282,7 @@ static func tutor(m) -> void:
 	body.custom_minimum_size = Vector2(830, 0)
 	body.add_theme_font_size_override("font_size", 36)
 	_btn(_n(L, "Ok"), Rect2(290, 1320, 500, 110), 40)
+	_center(L)
 
 
 static func offer(m) -> void:
@@ -287,6 +297,7 @@ static func offer(m) -> void:
 	TrailMobile.text(_n(L, "Body"), Rect2(120, 880, 840, 260), 36)
 	_btn(_n(L, "Play"), Rect2(100, 1166, 430, 130), 32)
 	_btn(_n(L, "Skip"), Rect2(550, 1166, 430, 130), 32)
+	_center(L)
 
 
 ## The tutorial's lesson plate covers the top bar and the stat cells (the

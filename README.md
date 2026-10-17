@@ -111,6 +111,30 @@ sliders, all saved to `user://settings.cfg`.
 | M | Back to the main menu |
 | T | Cycle visual theme |
 
+### On a phone
+
+The web build works in phone and tablet browsers. When the window is
+taller than it is wide, the game switches to its portrait layout: the
+board fills the width, with the stats above it and CLEAR, PLAY HAND and
+PAYS along the bottom. Every screen has a one-column version.
+
+| Touch | Action |
+| --- | --- |
+| Tap / drag | Chain adjacent cards |
+| Hold a finger on anything | Read what it does |
+| PAYS | Show what each hand pays |
+| II | Pause |
+| Drag a list | Scroll it |
+
+In the shop, a tap picks an item and BUY buys it. Turn the phone sideways
+and the game switches to the desktop layout, picking a ride back up where
+you left it. Short browser windows get a wider canvas, so for the
+biggest type, add the page to your home screen or go fullscreen.
+
+To force a layout for testing, add `?form=phone`, `?form=tablet_p` or
+`?form=desktop` to the page's URL, or set the `POKERPOP_FORM` environment
+variable on a desktop build.
+
 ## Payouts
 
 | Hand | Base |

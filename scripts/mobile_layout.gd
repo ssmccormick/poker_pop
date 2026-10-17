@@ -30,12 +30,22 @@ const RECTS := {
 }
 
 
-## The box for `element` on `screen` in the current form, or `fallback`.
+## Both portrait forms use the phone's boxes (see Form.canvas).
+static func _form() -> String:
+	return Form.PHONE if Form.is_mobile() else Form.current
+
+
+## The box for `element` on `screen` in the current form, or `fallback`;
+## centered when the canvas runs wider than the phone's 1080.
 static func rect(screen: String, element: String, fallback := Rect2()) -> Rect2:
-	var by_screen: Dictionary = RECTS.get(Form.current, {})
+	var by_screen: Dictionary = RECTS.get(_form(), {})
 	var els: Dictionary = by_screen.get(screen, {})
-	return els.get(element, fallback)
+	if not els.has(element):
+		return fallback
+	var r: Rect2 = els[element]
+	r.position.x += Form.center_x()
+	return r
 
 
 static func has(screen: String, element: String) -> bool:
-	return (RECTS.get(Form.current, {}) as Dictionary).get(screen, {}).has(element)
+	return (RECTS.get(_form(), {}) as Dictionary).get(screen, {}).has(element)

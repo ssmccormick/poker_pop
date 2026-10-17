@@ -18,7 +18,15 @@ func _initialize() -> void:
 			"with the switch off, phones still get the desktop layout")
 	_check(Form.REF[Form.PHONE] == Vector2(1080, 2340) and Form.REF[Form.TABLET_P] == Vector2(1536, 2048),
 			"the reference canvases match the spec")
-	# Every box sits on its canvas.
+	_check(Form.canvas(Form.TABLET_P) == Form.REF[Form.PHONE],
+			"portrait tablets lay out on the phone canvas")
+	_check(Form.expanded(Vector2(1080, 2340), Vector2(1080, 2340)) == Vector2(1080, 2340),
+			"a phone-shaped window shows the canvas as drawn")
+	_check(Form.expanded(Vector2(1080, 2340), Vector2(390, 664)) == Vector2(1374, 2340),
+			"a stubby browser window widens the canvas, keeping its height")
+	_check(Form.expanded(Vector2(1080, 2340), Vector2(360, 800)) == Vector2(1080, 2400),
+			"a tall phone gets more height")
+		# Every box sits on its canvas.
 	var inside := true
 	for f in MobileLayout.RECTS:
 		var canvas := Rect2(Vector2.ZERO, Form.REF[f])

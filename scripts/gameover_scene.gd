@@ -20,6 +20,7 @@ const SCENE := Vector2(1920, 1080)   # the painted set piece's own canvas
 # the mobile spec's boxes).
 var VIEW := Vector2(1920, 1080)
 var _phone := false
+var _ui_x := 0.0  # the page's rest x (centered on a wide phone canvas)
 # The phone's boxes, from docs/mobile_v2 (game_over), in place of the
 # manifest's layout.
 const PHONE_LAYOUT := {
@@ -391,6 +392,11 @@ func _build_scrims() -> void:
 func _build_ui() -> void:
 	_ui = Control.new()
 	_ui.size = VIEW
+	if _phone:
+		# The page is drawn for the 1080-wide phone canvas: centered on a wider one.
+		_ui.size.x = Form.REF[Form.PHONE].x
+		_ui_x = Form.center_x()
+		_ui.position.x = _ui_x
 	_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_ui)
 	var complete := String(_data.get("kind", "")) == "trail_complete"
@@ -1074,7 +1080,7 @@ func _build_banner() -> void:
 		# banner itself, so the holder carries the phone's size).
 		var holder := Control.new()
 		holder.scale = Vector2.ONE * 1.5
-		holder.position = Vector2((VIEW.x - r.size.x * 1.5) / 2.0, 560)
+		holder.position = Vector2((_ui.size.x - r.size.x * 1.5) / 2.0, 560)
 		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_ui.add_child(holder)
 		_banner.position = Vector2.ZERO
@@ -1170,8 +1176,8 @@ func _apply_intro() -> void:
 	_title_box.modulate.a = p
 	_title_box.scale = Vector2.ONE * lerpf(1.6, 1.0, _ease_out_back(p))
 	var sp := (it - T_TITLE - TITLE_DUR) / 0.16
-	_ui.position = Vector2(sin(sp * TAU * 2.0) * 6.0 * (1.0 - sp), 0) \
-			if sp > 0.0 and sp < 1.0 else Vector2.ZERO
+	_ui.position = Vector2(_ui_x + (sin(sp * TAU * 2.0) * 6.0 * (1.0 - sp)
+			if sp > 0.0 and sp < 1.0 else 0.0), 0)
 	if it >= T_TITLE + TITLE_DUR:
 		_once("slam", func() -> void:
 			_sfx(Board.SFX_POPS.pick_random(), 0.45, -4.0)

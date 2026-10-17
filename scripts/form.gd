@@ -9,11 +9,17 @@ extends RefCounted
 ## screen just gets more room. Screens ask is_mobile() / is_phone() and
 ## build their mobile layout from MobileLayout.
 ##
-## The mobile layouts stay switched off (ENABLED) until every screen has
-## one. Until then a developer can force them with the POKERPOP_FORM env
-## var, or ?form=phone / ?form=tablet_p on the web build's URL.
+## Portrait windows get the mobile layouts automatically (ENABLED). A
+## developer can still force a form with the POKERPOP_FORM env var, or
+## ?form=phone / ?form=tablet_p / ?form=desktop on the web build's URL.
+##
+## Portrait tablets lay out on the phone canvas for now: every mobile screen
+## is drawn for it, and the expand aspect just gives a tablet more width.
+## The canvas grows to the window's shape, never shrinks below the
+## reference, so view() is the real visible size: wider than 1080 on a
+## stubby browser window, taller than 2340 on a tall phone.
 
-const ENABLED := false
+const ENABLED := true
 
 const DESKTOP := "desktop"
 const PHONE := "phone"
@@ -25,6 +31,11 @@ const SAFE := {DESKTOP: {"top": 0, "bottom": 0}, PHONE: {"top": 132, "bottom": 1
 const PHONE_ASPECT := 1.6   # taller than this (height ÷ width) is a phone
 
 static var current := DESKTOP
+static var _view := Vector2(1920, 1080)
+# Set just before a rotation reloads the scene (statics outlive it): the
+# rebuilt game skips the splash, and goes straight back into the ride.
+static var rotated := false
+static var resume_ride := false
 
 
 ## The form a window of this size gets: landscape is desktop; portrait is
@@ -53,18 +64,44 @@ static func choose(window_size: Vector2) -> String:
 	return detect(window_size) if ENABLED else DESKTOP
 
 
+## The canvas a form is laid out on: the phone's for both portrait forms.
+static func canvas(form: String) -> Vector2:
+	return REF[DESKTOP] if form == DESKTOP else REF[PHONE]
+
+
+## What a window of `window_size` shows of `base` with the expand aspect:
+## the base, grown along whichever side the window has extra room.
+static func expanded(base: Vector2, window_size: Vector2) -> Vector2:
+	if window_size.x <= 0.0 or window_size.y <= 0.0:
+		return base
+	var k := minf(window_size.x / base.x, window_size.y / base.y)
+	return (window_size / k).floor().max(base)
+
+
 ## Picks the form for `window` and sets its canvas to match. Call once,
 ## before any UI is built.
 static func setup(window: Window) -> void:
 	current = choose(Vector2(window.size))
+	_view = canvas(current)
 	if current != DESKTOP:
-		window.content_scale_size = Vector2i(REF[current])
+		window.content_scale_size = Vector2i(_view)
 		window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+		_view = expanded(_view, Vector2(window.size))
+	else:
+		# Turned back to landscape after a portrait start.
+		window.content_scale_size = Vector2i(_view)
+		window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 
 
-## The reference canvas for the current form (layouts are drawn on it).
+## The visible canvas for the current form (layouts are drawn on it).
 static func view() -> Vector2:
-	return REF[current]
+	return _view
+
+
+## How far a layout drawn for the 1080-wide phone canvas shifts right to sit
+## centered on a wider one.
+static func center_x() -> float:
+	return 0.0 if current == DESKTOP else floorf((_view.x - REF[PHONE].x) / 2.0)
 
 
 static func is_mobile() -> bool:

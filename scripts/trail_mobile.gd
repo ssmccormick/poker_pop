@@ -13,6 +13,10 @@ const BTN_H := 130.0     # the pinned bottom buttons
 const CARD_K := 1.55     # tarot cards (300×380 on desktop)
 const RIDER := Vector2(680, 1020)
 
+# The rider in the middle of the carousel. Usually the one saddled, but a
+# swipe can stop on a locked rider to show what unlocks them.
+static var focus := ""
+
 
 static func vw() -> float:
 	return Form.view().x
@@ -119,11 +123,16 @@ static func _select(t) -> void:
 
 
 ## The chosen rider large in the middle, the others peeking at the edges;
-## the chosen one's signature and lore underneath.
+## the chosen one's signature and lore underneath. RIDE ON waits while
+## the middle one is still locked.
 static func select_carousel(t) -> void:
 	var layer: Control = t.select_layer
 	var ids: Array = t._select_cards.keys()
-	var at := maxi(0, ids.find(t.character))
+	var fid := focus if t._select_cards.has(focus) else String(t.character)
+	var at := maxi(0, ids.find(fid))
+	var ride := layer.get_node_or_null("Ride") as Button
+	if ride != null:
+		ride.disabled = fid != t.character
 	var x0 := (vw() - RIDER.x) / 2.0
 	for j in ids.size():
 		var id := String(ids[j])
@@ -148,17 +157,25 @@ static func select_carousel(t) -> void:
 		dots.text = "  ".join(marks)
 	for key in t._gambler_ability_btns:
 		var tb: Button = t._gambler_ability_btns[key]
-		tb.visible = t.character == "the_gambler"
+		tb.visible = t.character == "the_gambler" and fid == t.character
 		tb.add_theme_font_size_override("font_size", 34)  # restyling resets it
 
 
 ## A swipe moves the carousel one rider along.
 static func select_step(t, d: int) -> void:
 	var ids: Array = t._select_cards.keys()
-	var at := ids.find(t.character)
+	var fid := focus if t._select_cards.has(focus) else String(t.character)
+	var at := ids.find(fid)
 	var to := clampi(at + d, 0, ids.size() - 1)
-	if to != at:
-		t._pick_character(String(ids[to]))
+	if to == at:
+		return
+	var id := String(ids[to])
+	focus = id
+	if t._avail("rider", id):
+		t._pick_character(id)
+	else:
+		t.main.board._play_sound(Board.SFX_FLIP, 1.1, -8.0)
+	select_carousel(t)
 
 
 # --- The buy-in ----------------------------------------------------------------------
@@ -318,7 +335,7 @@ static func _relic(t) -> void:
 	text(t._relic_sub, Rect2(M, 340, iw(), 90), 32)
 	var sb := layer.get_node_or_null("Strongbox") as Control
 	if sb != null:
-		place(sb, Rect2(90, 470, 900, 720))
+		place(sb, Rect2((vw() - 900.0) / 2.0, 470, 900, 720))
 		t._relic_icon.position = Vector2(vw() / 2.0, 470.0 + 150.0 * 1.5)
 		t._relic_icon.scale = Vector2.ONE * 3.9
 	text(t._relic_name, Rect2(M, 1230, iw(), 80), 56)

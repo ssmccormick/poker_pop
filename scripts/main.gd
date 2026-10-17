@@ -220,6 +220,7 @@ func _ready() -> void:
 	VIEW = Form.view()
 	ParallaxScene.VIEW = VIEW
 	get_tree().root.size_changed.connect(_on_window_resized)
+	_after_rotation.call_deferred()
 	var theme_env := OS.get_environment("POKERPOP_THEME")
 	if theme_env != "":
 		Themes.index = clampi(int(theme_env), 0, Themes.LIST.size() - 1)
@@ -1978,9 +1979,23 @@ func _on_window_resized() -> void:
 		return
 	if Form.choose(Vector2(get_window().size)) == Form.current:
 		return
-	if trail != null and trail.run_active:
+	Form.rotated = true
+	Form.resume_ride = trail != null and trail.run_active
+	if Form.resume_ride:
 		trail._save_run()
 	get_tree().reload_current_scene.call_deferred()
+
+
+## After a rotation's reload: no splash (the player was mid-game), and a
+## ride in progress sits straight back down where it was.
+func _after_rotation() -> void:
+	if not Form.rotated:
+		return
+	Form.rotated = false
+	_dismiss_splash()
+	if Form.resume_ride:
+		Form.resume_ride = false
+		trail._resume_run()
 
 
 func _update_tooltip(delta: float) -> void:
