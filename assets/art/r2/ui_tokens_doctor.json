@@ -1,0 +1,58 @@
+{
+ "theme": "doctor",
+ "for_rider": "the_doctor",
+ "colors": {
+  "ground": "#0E0A1C",
+  "plate": "#1A1430",
+  "plate_hot": "#2A2044",
+  "well": "#0C0A16",
+  "brass": "#C9A24E",
+  "brass_hi": "#F2DC9C",
+  "plum": "#6A3A8A",
+  "violet_glow": "#C8A8F0",
+  "chronicle_paper": "#EFE6D0",
+  "text": "#ECE4D8",
+  "text_dim": "#A89CB8",
+  "number": "#F2DC9C",
+  "danger": "#D0533C",
+  "disabled": "#4A4652"
+ },
+ "type": {
+  "ruling": "Old Standard TT Bold UPPERCASE (+4) for titles and buttons: Victorian scientific instrument labels. Oswald 600 for numbers, Oswald for small labels, Old Standard TT for prose.",
+  "roles": {
+   "screen_title": {
+    "face": "Old Standard TT",
+    "weight": 700,
+    "size": 58,
+    "tracking": 6,
+    "color": "brass_hi"
+   },
+   "button": {
+    "face": "Old Standard TT",
+    "weight": 700,
+    "size": 22,
+    "tracking": 3,
+    "color": "text"
+   },
+   "number": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 28,
+    "color": "number"
+   },
+   "label": {
+    "face": "Oswald",
+    "weight": 400,
+    "size": 18,
+    "tracking": 4,
+    "color": "text_dim"
+   }
+  }
+ },
+ "motion": {
+  "hover": "120 ms: *_hover + violet glow",
+  "gears": "rotate the corner gears slowly (6 deg/s) while a panel is open - cheap clockwork life",
+  "rewind": "on undo / time effects, play panel_in backwards with a 0.3 s violet flash"
+ },
+ "pairs_with": "hearts_bg (plum) or the kaleidoscope with col_a/col_b set to plum and violet."
+}

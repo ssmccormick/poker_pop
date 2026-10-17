@@ -1432,14 +1432,42 @@ func _draw_art(rect: Rect2) -> void:
 	elif joker and CardArt.tex("center", "face_joker") != null:
 		# THE JOKER's own stack: harlequin skin, the jester, his JKR
 		# index (no suit), any finish, then the ×2 badge on top.
-		_art(rect, "mod_wash", "joker")
-		_art(rect, "center", "face_joker")
-		_art(rect, "mod_frame", "joker")
+		if CardArt.tex("base", "enh_joker") != null:
+			_art(rect, "base", "enh_joker")
+			_art(rect, "center", "face_joker")
+		else:
+			_art(rect, "mod_wash", "joker")
+			_art(rect, "center", "face_joker")
+			_art(rect, "mod_frame", "joker")
 		if _steel_plate():
 			_art(rect, "finish", "metal_plate")
 		_art(rect, "rank", "JKR")
 		_draw_finish(rect)
 		_art(rect, "rider", "joker_x2")
+	elif mod != "" and not joker and CardArt.tex("base", "enh_" + mod) != null:
+		# An enhanced card is one full base: its material says the family
+		# and the big centre sign says the effect. Plus, Minus and Bumper
+		# add their arrow above the sign, turned to face its way.
+		_art(rect, "base", "enh_" + mod)
+		if _steel_plate():
+			# Under the steel the sign is covered: the corner emblem keeps it.
+			_art(rect, "finish", "metal_plate")
+			if mod in ["plus", "minus", "bumper"]:
+				_art_badge(rect, "mod_emblem", mod + "_arrow_up", Vector2(0.24, 0.78), 0.52,
+						Color.WHITE, CardArt.arrow_rotation(boost_dir))
+			else:
+				_art_badge(rect, "mod_emblem", mod, Vector2(0.24, 0.78), 0.52)
+		elif mod in ["plus", "minus", "bumper"]:
+			_art(rect, "mod_dir", mod + "_up", Color.WHITE, CardArt.arrow_rotation(boost_dir))
+		if mod == "chip":
+			# The live payout under the "$" seal (the art has no number).
+			var cfont: Font = FontLib.numbers if FontLib.numbers != null \
+					else ThemeDB.fallback_font
+			draw_string(cfont, Vector2(rect.position.x, rect.position.y + rect.size.y * 0.82),
+					"+$%d" % (chip_pay_base * (1 + chip_level)),
+					HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 15, Color("2f4a3c"))
+		_draw_art_rank_suit(rect)
+		_draw_finish(rect)
 	else:
 		var mod_key := mod
 		# THE JOKER wears the lucky wash and frame as his own suit, with

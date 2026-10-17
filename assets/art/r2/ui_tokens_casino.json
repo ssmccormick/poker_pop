@@ -1,0 +1,74 @@
+{
+ "theme": "casino",
+ "colors": {
+  "ground": "#0E0B09",
+  "felt": "#1F5A3E",
+  "felt_hi": "#26684A",
+  "felt_well": "#0D2A1C",
+  "rail": "#5E1222",
+  "gold": "#D4AF5A",
+  "gold_hi": "#ECC870",
+  "black_lacquer": "#151210",
+  "red_lacquer": "#861A1E",
+  "ivory": "#F4EAD2",
+  "card_text_dark": "#2A1C12",
+  "bone": "#F0E6CC",
+  "bone_dim": "#B8AC8C",
+  "money": "#ECC870",
+  "danger": "#D04A40",
+  "valid": "#5AB07A",
+  "disabled": "#5A5450"
+ },
+ "type": {
+  "ruling": "Casino theme: Old Standard TT Bold in UPPERCASE with +3 tracking for titles and buttons (an engraved, high-roller serif); Oswald 600 for every number and label; Old Standard TT regular for body. Rye only in the logo.",
+  "roles": {
+   "screen_title": {
+    "face": "Old Standard TT",
+    "weight": 700,
+    "size": 60,
+    "tracking": 6,
+    "case": "upper",
+    "color": "gold_hi"
+   },
+   "panel_headline": {
+    "face": "Old Standard TT",
+    "weight": 700,
+    "size": 36,
+    "color": "gold_hi"
+   },
+   "button": {
+    "face": "Old Standard TT",
+    "weight": 700,
+    "size": 22,
+    "tracking": 3,
+    "case": "upper",
+    "color": "ivory"
+   },
+   "label": {
+    "face": "Oswald",
+    "weight": 400,
+    "size": 18,
+    "tracking": 4,
+    "color": "bone_dim"
+   },
+   "number": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 28,
+    "color": "money"
+   },
+   "body": {
+    "face": "Old Standard TT",
+    "size": 21,
+    "color": "bone"
+   }
+  }
+ },
+ "motion": {
+  "hover": "120 ms: *_hover (gold glow)",
+  "press": "60 ms: *_pressed + label +1px",
+  "win": "on a big hand, flash panel_plate rim with gold_hi for 300 ms",
+  "chip_slider": "rotate slider_grabber with the value (0-360\u00b0) so the chip rolls along the groove"
+ },
+ "pairs_with": "Works on any background; looks most at home on the clubs (green) or kaleidoscope shaders."
+}

@@ -1,0 +1,57 @@
+{
+ "theme": "machine",
+ "for_rider": "the_machine",
+ "colors": {
+  "ground": "#0B0E10",
+  "plate": "#1E2428",
+  "plate_hot": "#2A3238",
+  "well": "#07090A",
+  "edge_teal": "#7FD8C4",
+  "teal_deep": "#1F6A5E",
+  "steel": "#8A949A",
+  "amber_warn": "#E0A040",
+  "text": "#D8E8E4",
+  "text_dim": "#8AA4A0",
+  "number": "#C8FFF0",
+  "danger": "#FF6A50",
+  "disabled": "#3A3E42"
+ },
+ "type": {
+  "ruling": "Oswald everywhere, UPPERCASE, wide tracking (titles 600 +8, buttons 600 +4). Numbers in Oswald 600 teal-white. Old Standard TT for longer prose only.",
+  "roles": {
+   "screen_title": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 60,
+    "tracking": 10,
+    "color": "edge_teal"
+   },
+   "button": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 22,
+    "tracking": 4,
+    "color": "text"
+   },
+   "number": {
+    "face": "Oswald",
+    "weight": 600,
+    "size": 28,
+    "color": "number"
+   },
+   "label": {
+    "face": "Oswald",
+    "weight": 400,
+    "size": 18,
+    "tracking": 4,
+    "color": "text_dim"
+   }
+  }
+ },
+ "motion": {
+  "hover": "120 ms: *_hover + teal glow",
+  "flicker": "on panel open, alpha 0 -> 1 -> 0.6 -> 1 over 160 ms (power-up flicker)",
+  "scan": "optional 1-px teal line sweeping down panels every 4 s"
+ },
+ "pairs_with": "spades_bg (cool palette) or the kaleidoscope with col_c/col_d set to teal."
+}

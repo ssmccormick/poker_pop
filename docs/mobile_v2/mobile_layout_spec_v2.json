@@ -1,0 +1,305 @@
+{
+ "version": 2,
+ "replaces": "mobile_layout_spec.json (round 2). Same reference resolutions, updated for the new screens and the 5 UI themes.",
+ "global": {
+  "reference_px": {
+   "phone": [
+    1080,
+    2340
+   ],
+   "tablet_portrait": [
+    1536,
+    2048
+   ],
+   "tablet_landscape": [
+    2048,
+    1536
+   ]
+  },
+  "stretch": "canvas_items, aspect=expand. Phone: extra height goes to the board/list areas; anchor top bar to the top safe area and action bars to the bottom safe area.",
+  "safe_area_px": {
+   "phone": {
+    "top": 132,
+    "bottom": 100
+   },
+   "tablet_portrait": {
+    "top": 48,
+    "bottom": 40
+   },
+   "tablet_landscape": {
+    "top": 40,
+    "bottom": 40
+   }
+  },
+  "touch": {
+   "min_target_px": "110 on phone (\u2248 44 pt), 96 on tablet",
+   "hover_replacement": "long-press 350 ms on any card or relic opens the detail sheet (poster_paper of the active theme)",
+   "drag": "abilities can be dragged from the collection drawer, or tap ability then tap a row"
+  },
+  "themes": {
+   "classic": "ui/",
+   "modern": "ui_modern/",
+   "casino": "ui_casino/",
+   "machine": "ui_machine/",
+   "doctor": "ui_doctor/",
+   "note": "All mobile layouts are theme-agnostic: only the 9-slice folder, fonts and text colours change. Margins are the same in every kit, so StyleBoxes scale identically. On phone, draw 9-slice margins at 1.3-1.6x (texture_margin scale) so rims don't look thin."
+  },
+  "backgrounds": {
+   "classic": "kaleido_suits",
+   "modern": "kaleido_suits",
+   "casino": "clubs_bg",
+   "machine": "spades_bg",
+   "doctor": "hearts_bg",
+   "note": "Shaders adapt to any aspect; no separate mobile art needed. On low-end phones drop intensity to 0.5 or use the bg/*.jpg stills."
+  },
+  "rider_theme_default": "Gambler -> Classic, Machine -> Machine, Doctor -> Doctor (user can override in Settings)."
+ },
+ "screens_px": {
+  "phone": {
+   "rider_select": {
+    "card_focused": [
+     160,
+     272,
+     760,
+     1140
+    ],
+    "page_dots": [
+     490,
+     1442,
+     100,
+     20
+    ],
+    "signature_toggles": [
+     36,
+     1542,
+     1008,
+     120
+    ],
+    "ride": [
+     36,
+     2110,
+     1008,
+     130
+    ]
+   },
+   "game_over": {
+    "title_plate": [
+     36,
+     132,
+     1008,
+     180
+    ],
+    "portrait": [
+     36,
+     472,
+     344,
+     494
+    ],
+    "ledger": [
+     404,
+     462,
+     640,
+     520
+    ],
+    "relics_row": [
+     36,
+     1056,
+     1008,
+     112
+    ],
+    "trail_strip_3rows": [
+     70,
+     1242,
+     940,
+     444
+    ],
+    "ride_again": [
+     36,
+     1960,
+     1008,
+     130
+    ],
+    "menu": [
+     36,
+     2110,
+     1008,
+     110
+    ]
+   }
+  },
+  "tablet_p": {
+   "rider_select": {
+    "card_0": [
+     56,
+     260,
+     460,
+     690
+    ],
+    "card_1": [
+     538,
+     260,
+     460,
+     690
+    ],
+    "card_2": [
+     1020,
+     260,
+     460,
+     690
+    ],
+    "signature_toggles": [
+     56,
+     1000,
+     1144,
+     110
+    ],
+    "lore_panel": [
+     48,
+     1160,
+     1440,
+     420
+    ],
+    "ride": [
+     448,
+     1878,
+     640,
+     130
+    ]
+   },
+   "game_over": {
+    "portrait": [
+     100,
+     330,
+     344,
+     494
+    ],
+    "ledger": [
+     500,
+     320,
+     920,
+     520
+    ],
+    "trail_strip_3rows": [
+     130,
+     1060,
+     1276,
+     450
+    ],
+    "menu": [
+     100,
+     1878,
+     600,
+     120
+    ],
+    "ride_again": [
+     796,
+     1878,
+     640,
+     120
+    ]
+   }
+  },
+  "tablet_l": {
+   "rider_select": {
+    "card_0": [
+     64,
+     220,
+     600,
+     900
+    ],
+    "card_1": [
+     724,
+     220,
+     600,
+     900
+    ],
+    "card_2": [
+     1384,
+     220,
+     600,
+     900
+    ],
+    "signature_toggles": [
+     64,
+     1170,
+     1064,
+     110
+    ],
+    "ride": [
+     704,
+     1366,
+     640,
+     130
+    ]
+   },
+   "game_over": {
+    "portrait": [
+     120,
+     330,
+     344,
+     494
+    ],
+    "ledger": [
+     520,
+     320,
+     900,
+     520
+    ],
+    "trail_strip": [
+     100,
+     1030,
+     1848,
+     140
+    ],
+    "menu": [
+     1188,
+     1366,
+     380,
+     120
+    ],
+    "ride_again": [
+     1588,
+     1366,
+     400,
+     120
+    ]
+   }
+  }
+ },
+ "behaviour": {
+  "table": {
+   "phone": "5x5 board fills the middle; stats as 4 cells; payouts open as a bottom sheet from PAYS; kit row + Sleeve button above the action bar",
+   "tablet_l": "desktop structure: HUD columns either side of the board",
+   "tablet_p": "board on top, score + payouts panels side by side below"
+  },
+  "shop": {
+   "phone": "3-column scrolling grid; tapping a slot fills the detail sheet; BUY in the action bar",
+   "tablets": "single row (landscape) or 3x2 grid (portrait)"
+  },
+  "abilities": {
+   "phone": "hand rows stack label above sockets; the collection is a bottom drawer that scrolls horizontally; RIDE ON pinned",
+   "tablets": "rows left/top, collection grid right/bottom"
+  },
+  "ability_reward": {
+   "all": "3 ability cards side by side (phone 330 px wide); focused card gets reveal rays + glow; TAKE / SKIP"
+  },
+  "campfire": {
+   "phone": "scene cropped to rider + fire in the top band, 3 choice cards in a row below, confirm button pinned",
+   "tablets": "full scene with the 3 cards centred near the bottom"
+  },
+  "game_over": {
+   "phone": "title, epitaph, portrait + ledger side by side, relics row, trail strip as 3 rows (one region per row)",
+   "tablet_p": "same 3-row strip",
+   "tablet_l": "single-row strip like desktop"
+  },
+  "rider_select": {
+   "phone": "swipe carousel: focused card large, neighbours peek at the edges, page dots; signature selector below",
+   "tablets": "all three cards in a row; lore + signature icons panel on portrait"
+  },
+  "trail_map": {
+   "phone": "vertical winding path of 30 stops (21 tables + 3 outlaws + 3 shops + 3 campfires), scrolls; next-stop panel + RIDE ON pinned",
+   "tablet_l": "horizontal winding path",
+   "tablet_p": "vertical winding path"
+  }
+ }
+}

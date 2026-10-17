@@ -193,6 +193,7 @@ func _run() -> void:
 	trail._flush_backdrop({"name": "Straight", "cleared_cards": [{"suit": 2}]})
 	failures += _check(main.parallax.kind == "suit_hearts", "a plain straight leaves it alone")
 	# The UI style swaps the textures under the styleboxes already out.
+	UiKit.set_style("classic")  # start from a known style, whatever settings loaded
 	var plate: StyleBoxTexture = UiKit.box("panel_plate")
 	var classic_tex: Texture2D = plate.texture if plate != null else null
 	var swapped := UiKit.set_style("modern")
@@ -200,6 +201,18 @@ func _run() -> void:
 	UiKit.set_style("classic")
 	failures += _check(plate == null or (swapped and modern_tex != classic_tex and plate.texture == classic_tex),
 			"switching the UI style re-skins a panel in place, and back")
+	var style_art := {}
+	for st in UiKit.STYLES:
+		UiKit.set_style(String(st))
+		if plate != null:
+			style_art[plate.texture] = true
+		failures += _check(UiKit.style == String(st) and UiKit.button_font() != null,
+				"the %s style loads, with a button font" % st)
+	UiKit.set_style("classic")
+	failures += _check(plate == null or style_art.size() == UiKit.STYLES.size(),
+			"every style has its own panel art (%d)" % style_art.size())
+	failures += _check(UiKit.POSTER_TEXT.has("doctor") and UiKit.MENU_SCENES["machine"] == "suit_spades",
+			"each style has poster ink and a home backdrop")
 
 	# --- The Gambler's choice is remembered -----------------------------
 	trail._pick_gambler_ability("sleight")

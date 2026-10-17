@@ -196,7 +196,7 @@ func _ready() -> void:
 	# drift, and lurch forward whenever a hand scores.
 	parallax = ParallaxScene.new()
 	add_child(parallax)
-	parallax.set_scene("trail_dusk")
+	parallax.set_scene(UiKit.menu_scene())
 
 	board = Board.new()
 	board.process_mode = Node.PROCESS_MODE_PAUSABLE  # don't inherit ALWAYS
@@ -2368,6 +2368,7 @@ func _build_callout() -> void:
 	_callout_title.size = Vector2(460, 40)
 	_callout_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_callout_body = _label(_callout_panel, "", Vector2(36, 70), 17, UiKit.POSTER_INK)
+	UiKit.track_ink(_callout_body)
 	_callout_body.size = Vector2(388, 196)
 	_callout_body.custom_minimum_size = Vector2(388, 0)
 	_callout_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2572,8 +2573,9 @@ func _end_tutorial() -> void:
 
 
 func _save_settings() -> void:
-	if OS.get_environment("POKERPOP_PROFILE") != "":
-		return  # a test's throwaway profile must never become the saved one
+	if OS.get_environment("POKERPOP_PROFILE") != "" or OS.get_environment("POKERPOP_SHOT") != "" \
+			or DisplayServer.get_name() == "headless":
+		return  # tests and screenshots must never overwrite the player's settings
 	var cf := ConfigFile.new()
 	cf.set_value("profile", "current", profile)
 	cf.set_value("video", "fullscreen", fullscreen_on)
@@ -2641,7 +2643,7 @@ func _open_menu_now() -> void:
 	countdown_active = false
 	countdown_overlay.visible = false
 	play_music("menu")
-	parallax.set_scene("trail_dusk")
+	parallax.set_scene(UiKit.menu_scene())
 	board.visible = false  # no stale table lingering behind the menu scrim
 	if _tut_label != null:
 		_tut_panel.visible = false
@@ -3582,7 +3584,7 @@ func _build_profiles_and_tutor() -> void:
 	_tutor_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_tutor_body.custom_minimum_size = Vector2(655, 0)
 	_tutor_body.add_theme_font_size_override("font_size", 26)
-	_tutor_body.add_theme_color_override("font_color", UiKit.POSTER_INK)
+	UiKit.track_ink(_tutor_body)
 	# Poster prose in Old Standard — ink on paper.
 	if FontLib.body != null:
 		_tutor_body.add_theme_font_override("font", FontLib.body)
@@ -3612,6 +3614,7 @@ func _build_profiles_and_tutor() -> void:
 	ot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var ob := _label(_offer_layer, "A short tutorial shows you how to chain cards into poker hands. It takes about a minute, and you can replay it any time from HOW TO PLAY.",
 			Vector2(640, 440), 26, UiKit.POSTER_INK)
+	UiKit.track_ink(ob)
 	ob.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ob.custom_minimum_size = Vector2(640, 0)
 	ob.size = Vector2(640, 150)
@@ -3725,7 +3728,7 @@ func _build_options() -> void:
 	ui_style_btn = _button(options_layer, "", Vector2(700, 520 if not OS.has_feature("web") else 336),
 			Vector2(520, 60))
 	ui_style_btn.add_theme_font_size_override("font_size", 24)
-	ui_style_btn.tooltip_text = "Classic is leather and brass. Modern is smoked glass that lets the moving backdrop show through."
+	ui_style_btn.tooltip_text = "Classic is leather and brass. Modern is smoked glass. Casino is felt and lacquer. Machine is gunmetal and teal. Doctor is indigo clockwork."
 	ui_style_btn.pressed.connect(func() -> void:
 		var i := UiKit.STYLES.find(UiKit.style)
 		_apply_ui_style(String(UiKit.STYLES[(i + 1) % UiKit.STYLES.size()]))
@@ -3779,6 +3782,9 @@ func _apply_ui_style(ui_style: String) -> void:
 	var vin := UiKit.tex("vignette")
 	if vin != null and _vignette != null and _vignette_rect_tex:
 		_vignette.texture = vin
+	# Off the table, the backdrop follows the style's home scene too.
+	if mode_kind != "trail" or not trail.in_room:
+		parallax.crossfade_scene(UiKit.menu_scene())
 
 
 func _refresh_options_buttons() -> void:

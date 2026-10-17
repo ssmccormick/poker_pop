@@ -18,7 +18,16 @@
    "bomb": "cards/base/bomb.png",
    "safe": "cards/base/safe.png",
    "cobra_tail": "cards/base/cobra_tail.png",
-   "honey": "cards/base/honey.png"
+   "honey": "cards/base/honey.png",
+   "enh_mult": "cards/base/enh_mult.png",
+   "enh_chip": "cards/base/enh_chip.png",
+   "enh_plus": "cards/base/enh_plus.png",
+   "enh_minus": "cards/base/enh_minus.png",
+   "enh_bumper": "cards/base/enh_bumper.png",
+   "enh_gold": "cards/base/enh_gold.png",
+   "enh_wild": "cards/base/enh_wild.png",
+   "enh_lucky": "cards/base/enh_lucky.png",
+   "enh_joker": "cards/base/enh_joker.png"
   },
   "rank": {
    "2_black": "cards/rank/2_black.png",
@@ -385,6 +394,11 @@
    "outlaw": "cards/ability_side/outlaw.png",
    "bounty": "cards/ability_side/bounty.png",
    "drifter": "cards/ability_side/drifter.png"
+  },
+  "mod_dir": {
+   "plus_up": "cards/mod_dir/plus_up.png",
+   "minus_up": "cards/mod_dir/minus_up.png",
+   "bumper_up": "cards/mod_dir/bumper_up.png"
   }
  },
  "how_to_stack": {
@@ -922,6 +936,38 @@
    "ability_side": "128x128 round badges for the card footer, the posse line and hand tiles.",
    "ability_glyph": "256x256, draw in the ability card emblem box (140, 90, 220x220 on the 500x700 frame).",
    "campfire_choices": "440x560 rendered at 1x like the originals; replaces the three full_tend_* files. Body text now reads: 'The fire offers three brands. / Pick one, then the card it goes on.' Button: ENHANCE 1."
+  }
+ },
+ "enhancement_bases": {
+  "how_to_stack": {
+   "enhanced_card": [
+    "base/enh_<mod> (instead of card_blank, center, mod_wash, mod_frame and mod_emblem)",
+    "rank/<rank>_<color>",
+    "suit_corner/<suit>",
+    "mod_dir/<mod>_up for plus / minus / bumper (arrowhead above the centre sign; rotate 0/90/180/270 around the card centre)",
+    "finish/*",
+    "hazard/*",
+    "rider/*"
+   ],
+   "joker": [
+    "base/enh_joker",
+    "center/face_joker (JKR letters)",
+    "rank/JKR",
+    "rider/joker_x2"
+   ],
+   "file_ids": "mod ids are unchanged: enh_chip is the Cash card.",
+   "retired": "mod_wash/*, mod_frame/*, mod_emblem/* are no longer needed for enhanced cards (keep them only if any UI still shows a stand-alone emblem)."
+  },
+  "centre_signs": {
+   "mult": "×",
+   "chip": "$ seal",
+   "plus": "+",
+   "minus": "−",
+   "bumper": "padded bumper",
+   "gold": "gold bars",
+   "wild": "W",
+   "lucky": "four-leaf clover",
+   "joker": "JKR (face_joker layer)"
   }
  }
 }

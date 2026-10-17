@@ -1,0 +1,557 @@
+{
+ "theme": "doctor",
+ "canvas": [
+  1920,
+  1080
+ ],
+ "note": "Drop-in alternative kit: same item names, sizes, margins and content margins as ui/ (classic), ui_modern/ and ui_casino/. Theme switch = swap the folder to ui_doctor/.",
+ "items": {
+  "panel_plate": {
+   "file": "ui_doctor/panel_plate.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "Midnight-indigo plate in a brass clockwork rim, dotted inner bezel, gears in two corners. Add star dust by tiling panel_grain_tile over it at 6-12%.",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    22,
+    18,
+    22,
+    18
+   ]
+  },
+  "panel_plate_plain": {
+   "file": "ui_doctor/panel_plate_plain.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "Plain indigo plate (no gears) for nested panels.",
+   "margins": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    16,
+    12,
+    16,
+    12
+   ]
+  },
+  "panel_inset": {
+   "file": "ui_doctor/panel_inset.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Recessed indigo well (tile panel_grain_tile star dust over it if you want sparkle).",
+   "margins": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    10,
+    8,
+    10,
+    8
+   ]
+  },
+  "tooltip": {
+   "file": "ui_doctor/tooltip.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Plum tooltip, brass rim.",
+   "margins": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    14,
+    10,
+    14,
+    10
+   ]
+  },
+  "panel_shadow": {
+   "file": "ui_doctor/panel_shadow.png",
+   "size": [
+    64,
+    64
+   ],
+   "group": "panel",
+   "notes": "Soft drop shadow.",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch"
+  },
+  "poster_paper": {
+   "file": "ui_doctor/poster_paper.png",
+   "size": [
+    240,
+    240
+   ],
+   "group": "panel",
+   "notes": "Chronicle card (cream) with brass frame, clock-tick arcs and gears in the corners. Use indigo/dark text (#2a1f44).",
+   "margins": [
+    48,
+    48,
+    48,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    44,
+    40,
+    44,
+    36
+   ]
+  },
+  "button_normal": {
+   "file": "ui_doctor/button_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Indigo button in a brass rim, small gears at each end. State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_hover": {
+   "file": "ui_doctor/button_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Indigo button in a brass rim, small gears at each end. State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_pressed": {
+   "file": "ui_doctor/button_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Indigo button in a brass rim, small gears at each end. State: pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_disabled": {
+   "file": "ui_doctor/button_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Indigo button in a brass rim, small gears at each end. State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_normal": {
+   "file": "ui_doctor/button_primary_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: plum-to-violet with brass rim and a temporal glow. State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_hover": {
+   "file": "ui_doctor/button_primary_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: plum-to-violet with brass rim and a temporal glow. State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_pressed": {
+   "file": "ui_doctor/button_primary_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: plum-to-violet with brass rim and a temporal glow. State: pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_disabled": {
+   "file": "ui_doctor/button_primary_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: plum-to-violet with brass rim and a temporal glow. State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "shop_slot_normal": {
+   "file": "ui_doctor/shop_slot_normal.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Indigo shop slot, brass rim, corner gears. State: normal.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_hover": {
+   "file": "ui_doctor/shop_slot_hover.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Indigo shop slot, brass rim, corner gears. State: hover.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_selected": {
+   "file": "ui_doctor/shop_slot_selected.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Indigo shop slot, brass rim, corner gears. State: selected.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_disabled": {
+   "file": "ui_doctor/shop_slot_disabled.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Indigo shop slot, brass rim, corner gears. State: disabled.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "bar_track": {
+   "file": "ui_doctor/bar_track.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Brass-edged track.",
+   "margins": [
+    8,
+    6,
+    8,
+    6
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_gold": {
+   "file": "ui_doctor/bar_fill_gold.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Gold fill (score progress).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_red": {
+   "file": "ui_doctor/bar_fill_red.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Red fill (boss HP).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_green": {
+   "file": "ui_doctor/bar_fill_green.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Violet 'temporal' fill (ready / valid).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_track": {
+   "file": "ui_doctor/slider_track.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider groove.",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_fill": {
+   "file": "ui_doctor/slider_fill.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider fill.",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_grabber": {
+   "file": "ui_doctor/slider_grabber.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle: a pocket-watch face. Optionally rotate the hands with the value."
+  },
+  "slider_grabber_hover": {
+   "file": "ui_doctor/slider_grabber_hover.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle: a pocket-watch face. Optionally rotate the hands with the value. Hover."
+  },
+  "divider": {
+   "file": "ui_doctor/divider.png",
+   "size": [
+    240,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Brass rule with a dotted second-hand track and a tiny clock at each end (3-slice).",
+   "margins": [
+    28,
+    0,
+    28,
+    0
+   ],
+   "axis_stretch": "stretch"
+  },
+  "divider_center_diamond": {
+   "file": "ui_doctor/divider_center_diamond.png",
+   "size": [
+    32,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Centre ornament: a brass gear with a violet jewel."
+  },
+  "panel_grain_tile": {
+   "file": "ui_doctor/panel_grain_tile.png",
+   "size": [
+    256,
+    256
+   ],
+   "group": "texture",
+   "notes": "Star-dust tile (white). Tile over large plates at 6-12%."
+  },
+  "vignette": {
+   "file": "ui_doctor/vignette.png",
+   "size": [
+    1920,
+    1080
+   ],
+   "group": "texture",
+   "notes": "Vignette (violet-tinted)."
+  }
+ }
+}

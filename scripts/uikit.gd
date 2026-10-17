@@ -24,12 +24,22 @@ const DISABLED_TEXT := Color("6f6a62")
 
 const ART_DIR := "res://assets/art/r2/"
 
-# Two UI styles share one set of item names, sizes and margins: CLASSIC
-# (leather and brass, ui_index.json) and MODERN (smoked glass,
-# ui_index_modern.json). Switching swaps the textures under every
-# stylebox already handed out, so the screens change in place.
-const STYLES := ["classic", "modern"]
-const STYLE_NAMES := {"classic": "Classic", "modern": "Modern"}
+# Five UI styles share one set of item names, sizes and margins, each
+# with its own manifest: CLASSIC leather and brass (ui_index.json),
+# MODERN smoked glass, CASINO felt and lacquer, MACHINE gunmetal and
+# teal, and DOCTOR indigo clockwork (ui_index_<style>.json). Switching
+# swaps the textures under every stylebox already handed out, so the
+# screens change in place.
+const STYLES := ["classic", "modern", "casino", "machine", "doctor"]
+const STYLE_NAMES := {"classic": "Classic", "modern": "Modern", "casino": "Casino",
+		"machine": "Machine", "doctor": "Doctor"}
+# The poster card's text: dark ink on the paper ones (classic, casino's
+# ivory house rules, the doctor's chronicle), light on glass and steel.
+const POSTER_TEXT := {"classic": Color("3a3126"), "modern": Color("e6d5b0"),
+		"casino": Color("2a1c12"), "machine": Color("d8e8e4"), "doctor": Color("1a1430")}
+# Each style's home backdrop for the menus (the tables keep their own).
+const MENU_SCENES := {"classic": "trail_day", "modern": "trail_day", "casino": "suit_clubs",
+		"machine": "suit_spades", "doctor": "suit_hearts"}
 static var style := "classic"
 
 static var _knob_cache := {}
@@ -39,6 +49,7 @@ static var _box_cache := {}
 static var _issued: Array = []    # [WeakRef(StyleBoxTexture), item] copies handed out
 static var _sliders: Array = []   # WeakRef(HSlider) styled from the kit
 static var _buttons: Array = []   # WeakRef(Button) wearing the style's button font
+static var _inks: Array = []      # WeakRef(Label) written on the poster card
 
 
 ## Parses the UI manifest for `ui_style` (or the current style). Call once
@@ -52,13 +63,14 @@ static func setup(ui_style := "") -> void:
 	_issued = []
 	_sliders = []
 	_buttons = []
+	_inks = []
 	_load_items()
 
 
 static func _load_items() -> void:
 	_items = {}
 	_tex_cache = {}
-	var file := "ui_index_modern.json" if style == "modern" else "ui_index.json"
+	var file := "ui_index.json" if style == "classic" else "ui_index_%s.json" % style
 	if not FileAccess.file_exists(ART_DIR + file):
 		style = "classic"
 		file = "ui_index.json"
@@ -102,15 +114,44 @@ static func set_style(ui_style: String) -> bool:
 				b.add_theme_font_override("font", f)
 			shown.append(w)
 	_buttons = shown
+	var inked: Array = []
+	for w in _inks:
+		var l: Label = (w as WeakRef).get_ref()
+		if l != null:
+			l.add_theme_color_override("font_color", poster_ink())
+			inked.append(w)
+	_inks = inked
 	return true
 
 
-## Buttons speak Rye in the classic style and Oswald SemiBold in the
-## modern one (its type guide keeps Rye for the logo and titles).
+## Buttons by style, after each kit's type guide: Rye for classic, Oswald
+## SemiBold for modern and machine, Old Standard TT Bold for casino and
+## doctor. (Rye stays on the logo and the screen titles throughout.)
 static func button_font() -> Font:
-	if style == "modern" and FontLib.numbers != null:
-		return FontLib.numbers
+	match style:
+		"modern", "machine":
+			if FontLib.numbers != null:
+				return FontLib.numbers
+		"casino", "doctor":
+			if FontLib.body_bold != null:
+				return FontLib.body_bold
 	return FontLib.display
+
+
+## The text colour for words on the poster card in this style.
+static func poster_ink() -> Color:
+	return POSTER_TEXT.get(style, POSTER_INK)
+
+
+## Inks a label written on the poster card, and keeps it in step.
+static func track_ink(l: Label) -> void:
+	l.add_theme_color_override("font_color", poster_ink())
+	_inks.append(weakref(l))
+
+
+## The style's home backdrop for the menus.
+static func menu_scene() -> String:
+	return String(MENU_SCENES.get(style, "trail_day"))
 
 
 ## Puts a button on the style's font, and keeps it in step when it changes.

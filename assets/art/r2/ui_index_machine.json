@@ -1,0 +1,557 @@
+{
+ "theme": "machine",
+ "canvas": [
+  1920,
+  1080
+ ],
+ "note": "Drop-in alternative kit: same item names, sizes, margins and content margins as ui/ (classic), ui_modern/ and ui_casino/. Theme switch = swap the folder to ui_machine/.",
+ "items": {
+  "panel_plate": {
+   "file": "ui_machine/panel_plate.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "Chamfered gunmetal plate, teal edge, teal corner brackets, two bolts, faint scanlines.",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    22,
+    18,
+    22,
+    18
+   ]
+  },
+  "panel_plate_plain": {
+   "file": "ui_machine/panel_plate_plain.png",
+   "size": [
+    160,
+    160
+   ],
+   "group": "panel",
+   "notes": "Plain chamfered plate for nested panels.",
+   "margins": [
+    16,
+    16,
+    16,
+    16
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    16,
+    12,
+    16,
+    12
+   ]
+  },
+  "panel_inset": {
+   "file": "ui_machine/panel_inset.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Recessed readout well with faint grid.",
+   "margins": [
+    14,
+    14,
+    14,
+    14
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    10,
+    8,
+    10,
+    8
+   ]
+  },
+  "tooltip": {
+   "file": "ui_machine/tooltip.png",
+   "size": [
+    96,
+    96
+   ],
+   "group": "panel",
+   "notes": "Readout tooltip with an amber tick.",
+   "margins": [
+    12,
+    12,
+    12,
+    12
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    14,
+    10,
+    14,
+    10
+   ]
+  },
+  "panel_shadow": {
+   "file": "ui_machine/panel_shadow.png",
+   "size": [
+    64,
+    64
+   ],
+   "group": "panel",
+   "notes": "Soft drop shadow.",
+   "margins": [
+    24,
+    24,
+    24,
+    24
+   ],
+   "axis_stretch": "stretch"
+  },
+  "poster_paper": {
+   "file": "ui_machine/poster_paper.png",
+   "size": [
+    240,
+    240
+   ],
+   "group": "panel",
+   "notes": "Terminal notice card (replaces the wanted poster): hazard-stripe tabs in two corners.",
+   "margins": [
+    48,
+    48,
+    48,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    44,
+    40,
+    44,
+    36
+   ]
+  },
+  "button_normal": {
+   "file": "ui_machine/button_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Gunmetal button, teal edge. State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_hover": {
+   "file": "ui_machine/button_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Gunmetal button, teal edge. State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_pressed": {
+   "file": "ui_machine/button_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Gunmetal button, teal edge. State: pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_disabled": {
+   "file": "ui_machine/button_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Gunmetal button, teal edge. State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_normal": {
+   "file": "ui_machine/button_primary_normal.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: deep-teal fill, bright edge, amber chevrons. State: normal.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_hover": {
+   "file": "ui_machine/button_primary_hover.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: deep-teal fill, bright edge, amber chevrons. State: hover.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_pressed": {
+   "file": "ui_machine/button_primary_pressed.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: deep-teal fill, bright edge, amber chevrons. State: pressed.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "button_primary_disabled": {
+   "file": "ui_machine/button_primary_disabled.png",
+   "size": [
+    240,
+    64
+   ],
+   "group": "button",
+   "notes": "Primary: deep-teal fill, bright edge, amber chevrons. State: disabled.",
+   "margins": [
+    26,
+    18,
+    26,
+    18
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    28,
+    10,
+    28,
+    10
+   ]
+  },
+  "shop_slot_normal": {
+   "file": "ui_machine/shop_slot_normal.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Chamfered shop slot. State: normal.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_hover": {
+   "file": "ui_machine/shop_slot_hover.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Chamfered shop slot. State: hover.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_selected": {
+   "file": "ui_machine/shop_slot_selected.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Chamfered shop slot. State: selected.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "shop_slot_disabled": {
+   "file": "ui_machine/shop_slot_disabled.png",
+   "size": [
+    120,
+    160
+   ],
+   "group": "shop",
+   "notes": "Chamfered shop slot. State: disabled.",
+   "margins": [
+    24,
+    24,
+    24,
+    48
+   ],
+   "axis_stretch": "stretch",
+   "content_margins": [
+    18,
+    16,
+    18,
+    14
+   ]
+  },
+  "bar_track": {
+   "file": "ui_machine/bar_track.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Chamfered track.",
+   "margins": [
+    8,
+    6,
+    8,
+    6
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_gold": {
+   "file": "ui_machine/bar_fill_gold.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Amber charge fill (score progress).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_red": {
+   "file": "ui_machine/bar_fill_red.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Red alert fill (boss HP).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "bar_fill_green": {
+   "file": "ui_machine/bar_fill_green.png",
+   "size": [
+    48,
+    16
+   ],
+   "group": "bar",
+   "notes": "Teal fill (ready / valid).",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_track": {
+   "file": "ui_machine/slider_track.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider groove.",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_fill": {
+   "file": "ui_machine/slider_fill.png",
+   "size": [
+    48,
+    12
+   ],
+   "group": "slider",
+   "notes": "HSlider fill.",
+   "margins": [
+    6,
+    5,
+    6,
+    5
+   ],
+   "axis_stretch": "stretch"
+  },
+  "slider_grabber": {
+   "file": "ui_machine/slider_grabber.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle: a hex nut with a glowing teal core."
+  },
+  "slider_grabber_hover": {
+   "file": "ui_machine/slider_grabber_hover.png",
+   "size": [
+    32,
+    32
+   ],
+   "group": "slider",
+   "notes": "Slider handle: a hex nut with a glowing teal core. Hover."
+  },
+  "divider": {
+   "file": "ui_machine/divider.png",
+   "size": [
+    240,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Teal rule with chevron ends (3-slice).",
+   "margins": [
+    28,
+    0,
+    28,
+    0
+   ],
+   "axis_stretch": "stretch"
+  },
+  "divider_center_diamond": {
+   "file": "ui_machine/divider_center_diamond.png",
+   "size": [
+    32,
+    16
+   ],
+   "group": "ornament",
+   "notes": "Centre ornament: a teal diamond with an amber core."
+  },
+  "panel_grain_tile": {
+   "file": "ui_machine/panel_grain_tile.png",
+   "size": [
+    256,
+    256
+   ],
+   "group": "texture",
+   "notes": "Scanline + grid tile (white). Tile over large plates at 3-6%."
+  },
+  "vignette": {
+   "file": "ui_machine/vignette.png",
+   "size": [
+    1920,
+    1080
+   ],
+   "group": "texture",
+   "notes": "Vignette (cool)."
+  }
+ }
+}
