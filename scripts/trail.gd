@@ -5600,6 +5600,8 @@ func _show_shop() -> void:
 		pc.position = Vector2(85, 95)
 		holder.add_child(pc)
 		var price: int = _price(int(offer.base))
+		holder.set_meta("detail", _deck_stat_text(offer.data))
+		holder.set_meta("price", price)
 		var price_tag: Label = main._label(holder, "$%d" % price,
 				Vector2(0, 212), 18, main.GOLD)
 		price_tag.size = Vector2(170, 30)
@@ -5640,6 +5642,8 @@ func _show_shop() -> void:
 			_shop_tip.visible = false)
 	_render_shop_abilities()
 	_shop_tip.visible = false
+	if Form.is_mobile():
+		TrailMobile.shop_flow(self)
 	shop_layer.visible = true
 
 
@@ -5663,6 +5667,7 @@ func _render_shop_abilities() -> void:
 		face.position = Vector2(85, 104)
 		holder.add_child(face)
 		var cost := _price(int(Abilities.PRICES[Abilities.rarity(id)]))
+		holder.set_meta("price", cost)
 		var price_tag: Label = main._label(holder, "$%d" % cost, Vector2(0, 212), 18, main.GOLD)
 		price_tag.size = Vector2(170, 30)
 		price_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5723,6 +5728,8 @@ func _render_shop_relics() -> void:
 		var cost := _price(RELIC_PRICES[r.rarity])
 		var btn: Button = main._button(_shop_relic_box, "",
 				Vector2(0, 44 + i * 172), Vector2(400, 158))
+		btn.set_meta("detail", "%s\n%s" % [String(r.name), relic_desc(String(slot.id))])
+		btn.set_meta("price", cost)
 		UiKit.style_shop_slot(btn)
 		var icon := RelicIcon.new()
 		icon.relic_id = slot.id
@@ -5780,6 +5787,8 @@ func _render_shop_provisions() -> void:
 		var cost := _price(int(p.price))
 		var btn: Button = main._button(_shop_prov_box, "",
 				Vector2(0, 40 + i * 140), Vector2(210, 126))
+		btn.set_meta("detail", "%s\n%s" % [String(p.name), provision_desc(String(slot.id))])
+		btn.set_meta("price", cost)
 		UiKit.style_shop_slot(btn)
 		var picon := TextureRect.new()
 		picon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -6010,6 +6019,8 @@ func _show_tend() -> void:
 			main.board._play_sound(Board.SFX_FLIP, 1.0, -8.0)
 			tend_layer.visible = false
 			_camp_open_deck("tend"))
+	if Form.is_mobile():
+		TrailMobile.tend_rows(self)
 	tend_layer.visible = true
 
 
@@ -6080,7 +6091,8 @@ func _show_deck() -> void:
 func _show_deck_now() -> void:
 	_hide_all()
 	_deck_view_burn = false
-	_remove_info.text = "Your deck: %d cards. Hover over a card to see what it does." % deck.size()
+	_remove_info.text = ("Your deck: %d cards. Hold a finger on a card to see what it does." if Form.is_touch()
+			else "Your deck: %d cards. Hover over a card to see what it does.") % deck.size()
 	_populate_deck_view()
 
 
@@ -6103,6 +6115,7 @@ func _populate_deck_view() -> void:
 		pc.material = Themes.current_material()
 		pc.position = Vector2(50, 70)
 		holder.add_child(pc)
+		holder.set_meta("detail", _deck_stat_text(card_data))
 		var idx := i
 		holder.mouse_entered.connect(func() -> void:
 			if idx >= deck.size():
@@ -6137,6 +6150,8 @@ func _populate_deck_view() -> void:
 			_save_run()
 			_show_shop())
 		_remove_grid.add_child(holder)
+	if Form.is_mobile():
+		TrailMobile.deck_grid(self)
 	remove_layer.visible = true
 
 
@@ -6652,7 +6667,7 @@ func build_ui() -> void:
 	_camp_scene = CampScene.new()
 	camp_layer.add_child(_camp_scene)
 	_screen_title(camp_layer, "THE CAMPFIRE")
-	_center(camp_layer, "The fire's burning low. There's time for one thing before you ride on.", 200, 22, main.DIM)
+	_center(camp_layer, "The fire's burning low. There's time for one thing before you ride on.", 200, 22, main.DIM).name = "Sub"
 	_camp_hp_label = _center(camp_layer, "", 246, 30, main.GOLD)
 	var camp_art := ResourceLoader.exists(
 			"res://assets/art/campfire/choices/full_rest_normal.png")
@@ -6675,6 +6690,7 @@ func build_ui() -> void:
 			tb.position = Vector2(1012.0 + i * 300.0, 335)
 			tb.size = Vector2(272, 346)
 			tb.focus_mode = Control.FOCUS_NONE
+			tb.name = "Choice_" + id
 			camp_layer.add_child(tb)
 			match i:
 				0:
@@ -6688,6 +6704,7 @@ func build_ui() -> void:
 						_camp_open_deck("burn"))
 		var camp_leave: Button = main._button(camp_layer, "BACK ON THE TRAIL",
 				Vector2(1110, 745), Vector2(590, 86))
+		camp_leave.name = "Leave"
 		camp_leave.add_theme_font_size_override("font_size", 28)
 		camp_leave.pressed.connect(_leave_camp)
 	else:
@@ -6728,7 +6745,7 @@ func build_ui() -> void:
 	_tend_scene = CampScene.new()
 	tend_layer.add_child(_tend_scene)
 	_screen_title(tend_layer, "TEND A CARD")
-	_center(tend_layer, "The fire offers three brands. Pick one, then pick the plain card it goes on.", 200, 22, main.DIM)
+	_center(tend_layer, "The fire offers three brands. Pick one, then pick the plain card it goes on.", 200, 22, main.DIM).name = "Sub"
 	_tend_box = Control.new()
 	_tend_box.position = Vector2(0, 290)
 	tend_layer.add_child(_tend_box)
@@ -6829,11 +6846,13 @@ func build_ui() -> void:
 	_shop_burn_btn.add_theme_font_size_override("font_size", 20)
 	_shop_burn_btn.pressed.connect(_show_remove)
 	var shop_ab: Button = main._button(shop_layer, "ABILITIES", Vector2(60, 970), Vector2(200, 54))
+	shop_ab.name = "ShopAb"
 	shop_ab.add_theme_font_size_override("font_size", 20)
 	shop_ab.tooltip_text = "See your ability cards and which hands they're on."
 	shop_ab.pressed.connect(func() -> void:
 		open_abilities(_show_shop))
 	var leave: Button = main._button(shop_layer, "BACK ON THE TRAIL", Vector2(985, 850), Vector2(380, 56))
+	leave.name = "Leave"
 	leave.add_theme_font_size_override("font_size", 20)
 	leave.pressed.connect(_leave_shop)
 

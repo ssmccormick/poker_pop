@@ -81,6 +81,10 @@ static func relayout(t) -> void:
 	_bet(t)
 	_pick(t)
 	_relic(t)
+	_shop(t)
+	_camp(t)
+	_tend(t)
+	_deck(t)
 
 
 # --- Rider select: a carousel ------------------------------------------------------
@@ -319,3 +323,272 @@ static func _relic(t) -> void:
 	text(t._relic_name, Rect2(M, 1230, iw(), 80), 56)
 	text(t._relic_desc, Rect2(M, 1320, iw(), 320), 34)
 	bottom_btn(layer.get_node_or_null("Take"))
+
+
+# --- The shop: one scrolling shelf, a detail panel, then BUY -------------------------------
+
+const SHOP_CARD_K := 1.8      # card and ability slots (170×250)
+const SHOP_RELIC_K := 2.2     # relic slots (400×158)
+const SHOP_PROV_K := 2.3      # provision slots (210×126)
+
+
+static func _shop(t) -> void:
+	var layer: Control = t.shop_layer
+	var top := Form.safe_top()
+	title(t._shop_title)
+	t._shop_title.position.y = top + 20.0
+	text(t._shop_flavor, Rect2(M, top + 124.0, iw(), 90), 28)
+	text(t._shop_info, Rect2(M, top + 216.0, iw(), 56), 38)
+	var row1 := bottom() - 146.0
+	var detail_h := 300.0
+	var detail_y := row1 - 16.0 - detail_h
+	var scroll := ScrollContainer.new()
+	scroll.name = "ShopScroll"
+	scroll.position = Vector2(0, top + 286.0)
+	scroll.size = Vector2(vw(), detail_y - 16.0 - (top + 286.0))
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	layer.add_child(scroll)
+	var content := Control.new()
+	content.name = "ShopContent"
+	content.mouse_filter = Control.MOUSE_FILTER_PASS
+	scroll.add_child(content)
+	for box in [t._shop_box, t._shop_relic_box, t._shop_prov_box, t._shop_sell_box]:
+		(box as Control).reparent(content, false)
+		(box as Control).mouse_filter = Control.MOUSE_FILTER_PASS
+	# What the picked item is, on the theme's poster card.
+	var panel := Panel.new()
+	panel.add_theme_stylebox_override("panel", UiKit.poster_box())
+	panel.position = Vector2(M, detail_y)
+	panel.size = Vector2(iw(), detail_h)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(panel)
+	var detail := Label.new()
+	detail.name = "ShopDetail"
+	if FontLib.body != null:
+		detail.add_theme_font_override("font", FontLib.body)
+	UiKit.track_ink(detail)
+	detail.clip_text = true
+	panel.add_child(detail)
+	text(detail, Rect2(36, 24, iw() - 72.0, detail_h - 48.0), 30)
+	t.set_meta("shop_detail", detail)
+	# ABILITIES and the forge above; LEAVE and BUY along the bottom.
+	var ab := layer.get_node_or_null("ShopAb") as Button
+	place(ab, Rect2(M, row1, (iw() - 16.0) / 2.0, BTN_H), 36)
+	place(t._shop_burn_btn, Rect2(M + (iw() + 16.0) / 2.0, row1, (iw() - 16.0) / 2.0, BTN_H), 30)
+	t._shop_burn_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bottom_btn(layer.get_node_or_null("Leave"), 1)
+	var buy: Button = t.main._button(layer, "BUY", Vector2.ZERO, Vector2(10, 10), true)
+	buy.name = "Buy"
+	bottom_btn(buy, 2)
+	buy.pressed.connect(func() -> void:
+		shop_buy(t))
+	t.set_meta("shop_buy", buy)
+
+
+## Lays the freshly rendered shelves out down the scroll, and turns every
+## slot into "tap to look": its purchase waits for BUY.
+static func shop_flow(t) -> void:
+	var y := 16.0
+	y = _shelf(t._shop_box, y, SHOP_CARD_K, 3, "")
+	y = _shelf(t._shop_relic_box, y, SHOP_RELIC_K, 1, "RELICS")
+	y = _shelf(t._shop_prov_box, y, SHOP_PROV_K, 2, "PROVISIONS")
+	# Your kit, to sell back: one wide button each.
+	var sell: Control = t._shop_sell_box
+	sell.position = Vector2(0, y)
+	var sy := 0.0
+	for c in _live(sell):
+		if c is Label:
+			text(c, Rect2(M, 0, iw(), 60), 40, HORIZONTAL_ALIGNMENT_CENTER)
+			sy = 70.0
+	var n := 0
+	for c in _live(sell):
+		if c is Button:
+			place(c, Rect2(M, sy + n * 126.0, iw(), 110), 32)
+			(c as Button).mouse_filter = Control.MOUSE_FILTER_PASS
+			n += 1
+	if sy > 0.0 or n > 0:
+		y += sy + n * 126.0 + 24.0
+	var content := sell.get_parent() as Control
+	content.custom_minimum_size = Vector2(vw(), y)
+	content.size = content.custom_minimum_size
+	UiKit.fit_button_text(t._shop_burn_btn, 32, 20)  # each render refits it small
+	# Tap to look, BUY to buy.
+	for box in [t._shop_box, t._shop_relic_box, t._shop_prov_box]:
+		for c in _live(box):
+			if c is Button:
+				_reroute(t, c)
+	shop_select(t, null)
+
+
+## One shelf: an optional header, then its slots scaled up in a grid.
+static func _shelf(box: Control, y: float, k: float, cols: int, header: String) -> float:
+	box.position = Vector2(0, y)
+	var sy := 0.0
+	var slots: Array = []
+	for c in _live(box):
+		if c is Button:
+			slots.append(c)
+		elif c is Label and header != "":
+			text(c, Rect2(M, 0, iw(), 60), 40)
+			sy = 70.0
+	if slots.is_empty():
+		return y
+	var sw: float = (slots[0] as Button).size.x * k
+	var sh: float = (slots[0] as Button).size.y * k
+	var gap := 24.0
+	var x0 := (vw() - (cols * sw + (cols - 1) * gap)) / 2.0
+	for i in slots.size():
+		var b: Button = slots[i]
+		b.scale = Vector2.ONE * k
+		b.pivot_offset = Vector2.ZERO
+		b.position = Vector2(x0 + (i % cols) * (sw + gap), sy + (i / cols) * (sh + gap))
+	var rows := ceili(slots.size() / float(cols))
+	return y + sy + rows * (sh + gap) + 24.0
+
+
+static func _live(node: Node) -> Array:
+	var out: Array = []
+	for c in node.get_children():
+		if not c.is_queued_for_deletion():
+			out.append(c)
+	return out
+
+
+## Moves a slot's purchase off its tap: the tap picks it, BUY runs it.
+static func _reroute(t, b: Button) -> void:
+	var buy: Array = []
+	for conn in b.get_signal_connection_list("pressed"):
+		buy.append(conn.callable)
+		b.pressed.disconnect(conn.callable)
+	for sig in ["mouse_entered", "mouse_exited"]:
+		for conn in b.get_signal_connection_list(sig):
+			b.disconnect(sig, conn.callable)
+	b.set_meta("buy", buy)
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
+	b.pressed.connect(func() -> void:
+		t.main.board._play_sound(Board.SFX_CLICK, 1.1, -10.0)
+		shop_select(t, b))
+
+
+static func shop_select(t, b: Button) -> void:
+	var detail := t.get_meta("shop_detail", null) as Label
+	var buy := t.get_meta("shop_buy", null) as Button
+	if detail == null or buy == null:
+		return
+	for box in [t._shop_box, t._shop_relic_box, t._shop_prov_box]:
+		for c in _live(box):
+			if c is Button:
+				(c as Button).modulate = Color(1.3, 1.18, 0.8) if c == b else Color.WHITE
+	t.set_meta("shop_sel", weakref(b) if b != null else null)
+	if b == null:
+		detail.text = "Tap anything on the shelves to see what it does, then press BUY."
+		buy.text = "BUY"
+		buy.disabled = true
+		return
+	var words := String(b.get_meta("detail", b.tooltip_text))
+	detail.text = words
+	buy.text = "BUY  $%d" % int(b.get_meta("price", 0))
+	buy.disabled = false
+	UiKit.fit_button_text(buy, 40, 22)
+
+
+static func shop_buy(t) -> void:
+	var w: WeakRef = t.get_meta("shop_sel", null)
+	var b: Button = w.get_ref() if w != null else null
+	if b == null or b.disabled:
+		return
+	for c in b.get_meta("buy", []):
+		(c as Callable).call()
+
+
+# --- The campfire and Tend: the fire cropped into the top band ------------------------------
+
+const CAMP_K := 1.3
+
+
+static func _camp_scene(scene: Node2D) -> void:
+	scene.scale = Vector2.ONE * CAMP_K
+	scene.position = Vector2(vw() / 2.0 - 700.0 * CAMP_K, 850.0 - 760.0 * CAMP_K)
+
+
+static func _camp(t) -> void:
+	var layer: Control = t.camp_layer
+	_camp_scene(t._camp_scene)
+	var top := Form.safe_top()
+	text(layer.get_node_or_null("Sub"), Rect2(M, top + 204.0, iw(), 90), 28)
+	text(t._camp_hp_label, Rect2(M, top + 300.0, iw(), 60), 40)
+	var ids := ["rest", "tend", "cast"]
+	var tips := ["Rest: sleep off the road and get some HP back.",
+			"Tend a card: the fire offers three brands. Pick one, then the plain card it goes on.",
+			"Cast one off: throw a card in the fire. It's gone from your deck for good."]
+	var cw := 315.0
+	var gap := 18.0
+	var x0 := (vw() - (3 * cw + 2 * gap)) / 2.0
+	for i in ids.size():
+		var tb := layer.get_node_or_null("Choice_" + String(ids[i])) as Control
+		if tb != null:
+			place(tb, Rect2(x0 + i * (cw + gap), 1240, cw, cw * 346.0 / 272.0))
+			tb.tooltip_text = String(tips[i])
+	bottom_btn(layer.get_node_or_null("Leave"))
+
+
+static func _tend(t) -> void:
+	var layer: Control = t.tend_layer
+	_camp_scene(t._tend_scene)
+	text(layer.get_node_or_null("Sub"), Rect2(M, Form.safe_top() + 204.0, iw(), 100), 30)
+	t._tend_box.position = Vector2(0, Form.safe_top() + 340.0)
+
+
+## Each brand as a wide row: the sample card on the left, its name and what
+## it does beside it.
+static func tend_rows(t) -> void:
+	var i := 0
+	for b in _live(t._tend_box):
+		if not b is Button:
+			continue
+		place(b, Rect2(M, i * 350.0, iw(), 330))
+		var labels: Array = []
+		for c in b.get_children():
+			if c is PlayingCard:
+				c.position = Vector2(140, 165)
+				c.scale = Vector2.ONE * 2.0
+			elif c is Label:
+				labels.append(c)
+		if labels.size() >= 1:
+			text(labels[0], Rect2(290, 34, iw() - 320.0, 56), 40, HORIZONTAL_ALIGNMENT_LEFT)
+		if labels.size() >= 2:
+			text(labels[1], Rect2(290, 100, iw() - 320.0, 210), 30, HORIZONTAL_ALIGNMENT_LEFT)
+		i += 1
+
+
+# --- The deck view: a scrolling grid, four across ------------------------------------------------
+
+static func _deck(t) -> void:
+	var layer: Control = t.remove_layer
+	text(t._remove_info, Rect2(M, Form.safe_top() + 204.0, iw(), 110), 32)
+	for c in layer.get_children():
+		if c is ScrollContainer:
+			var top := Form.safe_top() + 330.0
+			place(c, Rect2(M, top, iw(), Form.view().y - Form.safe_bottom() - 20.0 - top))
+			(c as ScrollContainer).horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	t._remove_grid.columns = 4
+	t._remove_grid.add_theme_constant_override("h_separation", 16)
+	t._remove_grid.add_theme_constant_override("v_separation", 16)
+
+
+static func deck_grid(t) -> void:
+	var cell := Vector2((iw() - 3 * 16.0) / 4.0, 330)
+	for h in _live(t._remove_grid):
+		if not h is Button:
+			continue
+		var b := h as Button
+		b.custom_minimum_size = cell
+		b.mouse_filter = Control.MOUSE_FILTER_PASS
+		for sig in ["mouse_entered", "mouse_exited"]:
+			for conn in b.get_signal_connection_list(sig):
+				b.disconnect(sig, conn.callable)
+		for c in b.get_children():
+			if c is PlayingCard:
+				c.position = cell / 2.0
+				c.scale = Vector2.ONE * 2.3
+	t._deck_tip.visible = false

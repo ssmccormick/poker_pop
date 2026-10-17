@@ -169,6 +169,28 @@ func _run() -> void:
 	trail.abilities = []
 	trail.loadout = {}
 
+	# --- On the phone, a shop slot is tapped to look and bought with BUY ----
+	if Form.is_mobile():
+		trail.in_room = false
+		trail.trail_cash = 100
+		trail._choose_offer({"kind": "shop", "tarot": "GENERAL STORE", "merchant": 0}, false)
+		await _wait(0.6)
+		var slot: Button = null
+		for c in trail._shop_box.get_children():
+			if c is Button and not c.is_queued_for_deletion() and not (c as Button).disabled:
+				slot = c
+				break
+		failures += _check(slot != null, "the phone shop has a slot to look at")
+		if slot != null:
+			var cash_before: int = trail.trail_cash
+			slot.pressed.emit()
+			failures += _check(trail.trail_cash == cash_before
+					and not (trail.get_meta("shop_buy") as Button).disabled,
+					"tapping a phone shop slot only picks it")
+			TrailMobile.shop_buy(trail)
+			failures += _check(trail.trail_cash < cash_before, "BUY pays for the picked slot")
+		trail._hide_all()
+
 	# --- Each table picks its backdrop ------------------------------------
 	var bg_offer: Dictionary = trail.current_offer
 	var bg_room: int = trail.room_index

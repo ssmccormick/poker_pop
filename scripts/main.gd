@@ -536,6 +536,15 @@ func _ready() -> void:
 						"offers": ["keep_the_peace", "wild_bunch", "no_name"], "chest_rounds": 0,
 						"relic": "", "ledger": trail._win_rows.duplicate(true)}
 				trail._show_pick()
+			"traildeck":
+				# The deck viewer, with a few enhanced cards and a curse in it.
+				menu_layer.visible = false
+				trail._start_run(0)
+				trail.deck[0]["mod"] = "mult"
+				trail.deck[1]["mod"] = "chip"
+				trail.deck[2]["mod"] = "gold"
+				trail.deck.append(TrailMode.cursed_card())
+				trail._show_deck_now()
 			"trailrelic":
 				menu_layer.visible = false
 				trail._start_run(0)
