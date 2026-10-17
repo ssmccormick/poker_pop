@@ -1576,10 +1576,9 @@ func _draw_art(rect: Rect2) -> void:
 
 	# Job pieces, curses, and the Queen's honey.
 	match objective:
-		"key":
-			_art(rect, "special", "key")
-		"chest":
-			_art(rect, "special", "chest")
+		"key", "chest":
+			if _hazard_base() != objective:
+				_art(rect, "special", objective)  # the old overlay, when the base is missing
 		"bullet":
 			_art(rect, "special", "bullet_yours")
 		"hisbullet":
@@ -2089,6 +2088,11 @@ func _hazard_base() -> String:
 	# The Queen's honey is a full-card base too, rank and suit on top.
 	if honey and hazard == "" and CardArt.tex("base", "honey") != null:
 		return "honey"
+	# So are the Key and the Chest: the brass key in its velvet box, the
+	# whole front of the strongbox.
+	if objective in ["key", "chest"] and hazard == "" and not honey \
+			and CardArt.tex("base", objective) != null:
+		return objective
 	return ""
 
 

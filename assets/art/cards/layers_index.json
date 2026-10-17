@@ -27,7 +27,9 @@
    "enh_gold": "cards/base/enh_gold.png",
    "enh_wild": "cards/base/enh_wild.png",
    "enh_lucky": "cards/base/enh_lucky.png",
-   "enh_joker": "cards/base/enh_joker.png"
+   "enh_joker": "cards/base/enh_joker.png",
+   "key": "cards/base/key.png",
+   "chest": "cards/base/chest.png"
   },
   "rank": {
    "2_black": "cards/rank/2_black.png",
