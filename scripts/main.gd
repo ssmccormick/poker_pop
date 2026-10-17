@@ -4866,7 +4866,11 @@ func _take_screenshot(path: String) -> void:
 	match OS.get_environment("POKERPOP_MODE"):
 		"trailhazard", "trailtwist", "trailheist", "trailboss", "trailbj", "trailholdem", "trailpick", "cardgrid", "trailover", "tutorial", "trailcallout":
 			# The last page's EXP bar and level-up banner come in last.
-			await get_tree().create_timer(6.2 if OS.get_environment("POKERPOP_MODE") in ["trailover", "trailcallout"] else 4.2).timeout
+			# POKERPOP_WAIT=seconds holds the shot longer (a phone's level-up banner).
+			var shot_wait := 6.2 if OS.get_environment("POKERPOP_MODE") in ["trailover", "trailcallout"] else 4.2
+			if OS.get_environment("POKERPOP_WAIT") != "":
+				shot_wait = float(OS.get_environment("POKERPOP_WAIT"))
+			await get_tree().create_timer(shot_wait).timeout
 			get_viewport().get_texture().get_image().save_png(path)
 			get_tree().quit()
 			return

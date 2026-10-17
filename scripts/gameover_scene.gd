@@ -14,7 +14,23 @@ signal to_menu
 
 const DIR := "res://assets/art/gameover/"
 const MANIFEST := DIR + "gameover_manifest.json"
-const VIEW := Vector2(1920, 1080)
+const SCENE := Vector2(1920, 1080)   # the painted set piece's own canvas
+# The page: the set piece's 1920×1080 on desktop, the phone canvas on a
+# phone (the painting then fills it behind a wash, and the page follows
+# the mobile spec's boxes).
+var VIEW := Vector2(1920, 1080)
+var _phone := false
+# The phone's boxes, from docs/mobile_v2 (game_over), in place of the
+# manifest's layout.
+const PHONE_LAYOUT := {
+	"title_plate": [36, 132, 1008, 180], "title_text_box": [66, 150, 948, 144],
+	"epitaph": [36, 330, 1008, 120],
+	"portrait_frame": [36, 472, 344, 494], "ledger": [404, 462, 640, 520],
+	"ledger_lines_start": [454, 524], "ledger_line_h": 62,
+	"relics_label": [36, 1000], "relics_row": [43, 1040, 8, 112, 14],
+	"buttons": {"ride_again": [36, 1960, 1008, 130], "back_to_menu": [36, 2110, 1008, 110]},
+}
+const STRIP_PHONE := Rect2(36, 1180, 1008, 540)   # three rows, one per region
 
 const INK := Color("3a3126")
 const INK_DIM := Color("8a7a5e")
@@ -43,6 +59,7 @@ const T_BUTTONS := 3.60
 const T_HAND := T_TITLE + TITLE_DUR + 0.8
 const EXP_DUR := 1.4      # the EXP bar's fill, after the trail map lights
 const BANNER_DUR := 0.35
+const BANNER_HOLD := 2.8  # phone: how long the level-up banner covers the ledger
 
 const ROMAN := ["I", "II", "III", "IV", "V"]
 
@@ -119,6 +136,8 @@ var _glint_timer := 0.0
 
 
 func _ready() -> void:
+	VIEW = Form.view()
+	_phone = Form.is_mobile()
 	size = VIEW
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
@@ -134,6 +153,10 @@ func show_ending(data: Dictionary) -> bool:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return false
 	_m = parsed
+	if _phone:
+		var lay: Dictionary = (_m.get("layout", {}) as Dictionary).duplicate(true)
+		lay.merge(PHONE_LAYOUT, true)
+		_m["layout"] = lay
 	var ending: Dictionary = _m.get("endings", {}).get(String(data.get("kind", "")), {})
 	var layers: Array = ending.get("layers", [])
 	if layers.is_empty() or _tex(String(layers[0].get("file", ""))) == null:
@@ -184,9 +207,14 @@ func _reset() -> void:
 
 func _build_scene(ending: Dictionary) -> void:
 	_scene = Control.new()
-	_scene.size = VIEW
+	_scene.size = SCENE
 	_scene.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_scene)
+	if _phone:
+		# The painting covers the tall page, centred on its set piece.
+		var k := VIEW.y / SCENE.y
+		_scene.scale = Vector2.ONE * k
+		_scene.position = Vector2(VIEW.x / 2.0 - 1300.0 * k, 0)
 	var fx: Dictionary = ending.get("fx", {})
 	for layer in ending.get("layers", []):
 		var tr := _full_rect(_tex(String(layer.get("file", ""))))
@@ -194,8 +222,8 @@ func _build_scene(ending: Dictionary) -> void:
 		var drift := float(layer.get("parallax_drift_px", 0))
 		if drift > 0.0:
 			# Grown a hair so the sway never shows an edge.
-			tr.pivot_offset = VIEW / 2.0
-			tr.scale = Vector2.ONE * (VIEW.x + drift * 2.0) / VIEW.x
+			tr.pivot_offset = SCENE / 2.0
+			tr.scale = Vector2.ONE * (SCENE.x + drift * 2.0) / SCENE.x
 		_layers.append({"node": tr, "drift": drift, "phase": randf() * TAU})
 		for id in fx:
 			if String(fx[id].get("z_after", "")) == String(layer.get("id", "")):
@@ -203,7 +231,15 @@ func _build_scene(ending: Dictionary) -> void:
 	for id in fx:
 		if not fx[id].has("z_after"):
 			_build_fx(String(id), fx[id])
-	_build_scrims()
+	if _phone:
+		# One even wash over the whole painting, so the page reads.
+		var wash := ColorRect.new()
+		wash.color = Color(SCRIM, 0.66)
+		wash.size = VIEW
+		wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(wash)
+	else:
+		_build_scrims()
 
 
 func _build_fx(id: String, f: Dictionary) -> void:
@@ -236,7 +272,7 @@ func _build_fx(id: String, f: Dictionary) -> void:
 				tr.texture = t
 				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				tr.stretch_mode = TextureRect.STRETCH_SCALE
-				tr.size = Vector2(_dust_tile, VIEW.y)
+				tr.size = Vector2(_dust_tile, SCENE.y)
 				tr.modulate.a = float(f.get("alpha", 0.55))
 				tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				_scene.add_child(tr)
@@ -272,7 +308,7 @@ func _build_fx(id: String, f: Dictionary) -> void:
 			_hand_end = _vec(f.get("pos_end", [1290, 586]))
 			if _hand.texture != null:
 				# The sleeve must run off the edge, never end in mid-air.
-				_hand_end.x = maxf(_hand_end.x, VIEW.x - _hand.texture.get_width())
+				_hand_end.x = maxf(_hand_end.x, SCENE.x - _hand.texture.get_width())
 			_hand.position = _hand_end + Vector2(420, 0)
 			_scene.add_child(_hand)
 		"coin_glints":
@@ -290,7 +326,7 @@ func _build_fx(id: String, f: Dictionary) -> void:
 			if _sun.texture != null:
 				var used: Rect2i = _sun.texture.get_image().get_used_rect()
 				_sun.pivot_offset = Vector2(used.get_center()) if used.size.x > 0 \
-						else VIEW / 2.0
+						else SCENE / 2.0
 
 
 ## Lamp dust: warm motes drifting up through the lantern light.
@@ -327,8 +363,8 @@ func _build_scrims() -> void:
 	var g := Gradient.new()
 	g.set_color(0, Color(SCRIM, 0.78))
 	g.set_color(1, Color(SCRIM, 0.0))
-	g.add_point(1000.0 / VIEW.x, Color(SCRIM, 0.55))
-	g.add_point(1250.0 / VIEW.x, Color(SCRIM, 0.0))
+	g.add_point(1000.0 / SCENE.x, Color(SCRIM, 0.55))
+	g.add_point(1250.0 / SCENE.x, Color(SCRIM, 0.0))
 	left.gradient = g
 	left.width = 256
 	left.height = 4
@@ -345,8 +381,8 @@ func _build_scrims() -> void:
 	band.width = 4
 	band.height = 128
 	var br := _full_rect(band)
-	br.position = Vector2(0, VIEW.y - 290)
-	br.size = Vector2(VIEW.x, 290)
+	br.position = Vector2(0, SCENE.y - 290)
+	br.size = Vector2(SCENE.x, 290)
 	_scene.add_child(br)
 
 
@@ -374,6 +410,8 @@ func _build_ui() -> void:
 		_build_exp()
 		_build_banner()
 		_intro_end = maxf(_intro_end, _t_exp + EXP_DUR + BANNER_DUR + 0.3)
+		if _phone and _banner != null:
+			_intro_end += BANNER_HOLD + 0.5  # the banner holds, then clears the ledger
 
 
 func _build_title(complete: bool) -> void:
@@ -419,19 +457,23 @@ func _build_seed() -> void:
 	var seed_text := String(_data.get("seed", ""))
 	if seed_text == "":
 		return
-	_label(_ui, "SEED  " + SeedRng.pretty(seed_text), _spaced(FontLib.label, 3), 20, LABEL_LIT,
-			Rect2(1180, 60, 620, 30), HORIZONTAL_ALIGNMENT_RIGHT)
+	var seed_r := Rect2(36, 1786, 1008, 40) if _phone else Rect2(1180, 60, 620, 30)
+	_label(_ui, "SEED  " + SeedRng.pretty(seed_text), _spaced(FontLib.label, 3), 26 if _phone else 20,
+			LABEL_LIT, seed_r, HORIZONTAL_ALIGNMENT_LEFT if _phone else HORIZONTAL_ALIGNMENT_RIGHT)
 	var line := String(_data.get("seed_line", ""))
-	_seed_line_label = _label(_ui, line, _font(FontLib.label), 18, GOLD, Rect2(1060, 92, 740, 26),
-			HORIZONTAL_ALIGNMENT_RIGHT)
+	var line_r := Rect2(36, 1826, 1008, 36) if _phone else Rect2(1060, 92, 740, 26)
+	_seed_line_label = _label(_ui, line, _font(FontLib.label), 22 if _phone else 18, GOLD, line_r,
+			HORIZONTAL_ALIGNMENT_CENTER if _phone else HORIZONTAL_ALIGNMENT_RIGHT)
 	_seed_line_label.add_theme_color_override("font_outline_color", Color("1a1008"))
 	_seed_line_label.add_theme_constant_override("outline_size", 4)
 	if host != null:
-		var copy: Button = host._button(_ui, "COPY SEED", Vector2(1390, 126), Vector2(170, 44))
-		copy.add_theme_font_size_override("font_size", 16)
+		var copy: Button = host._button(_ui, "COPY SEED", Vector2(36, 1872) if _phone
+				else Vector2(1390, 126), Vector2(496, 76) if _phone else Vector2(170, 44))
+		copy.add_theme_font_size_override("font_size", 28 if _phone else 16)
 		copy.pressed.connect(func() -> void: seed_action.emit("copy"))
-		var play: Button = host._button(_ui, "PLAY THIS SEED", Vector2(1570, 126), Vector2(230, 44))
-		play.add_theme_font_size_override("font_size", 16)
+		var play: Button = host._button(_ui, "PLAY THIS SEED", Vector2(548, 1872) if _phone
+				else Vector2(1570, 126), Vector2(496, 76) if _phone else Vector2(230, 44))
+		play.add_theme_font_size_override("font_size", 28 if _phone else 16)
 		play.tooltip_text = "Opens SEEDED PLAY on this seed: the same trail with the standard loadout, and your score goes on its board."
 		play.pressed.connect(func() -> void: seed_action.emit("play"))
 
@@ -449,6 +491,9 @@ func _build_epitaph() -> void:
 	_epitaph.bbcode_enabled = true
 	_epitaph.scroll_active = false
 	_epitaph.autowrap_mode = TextServer.AUTOWRAP_OFF
+	if _phone:
+		fs = 30
+		_epitaph.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_epitaph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_epitaph.position = r.position
 	_epitaph.size = Vector2(r.size.x, r.size.y + 12)
@@ -457,7 +502,7 @@ func _build_epitaph() -> void:
 	_epitaph.add_theme_color_override("default_color", EPITAPH)
 	var bb := "[center]%s" % _esc(text)
 	if cause != "":
-		bb += "   [color=#%s]%s[/color]" % [CAUSE_RED.to_html(false), _esc(cause)]
+		bb += ("\n" if _phone else "   ") + "[color=#%s]%s[/color]" % [CAUSE_RED.to_html(false), _esc(cause)]
 	_epitaph.text = bb + "[/center]"
 	_ui.add_child(_epitaph)
 
@@ -680,8 +725,8 @@ func _build_tallies(row: Control, line: Dictionary, serif: Font, right: float,
 
 func _build_relics() -> void:
 	var lp := _vec(_m.get("layout", {}).get("relics_label", [120, 776]))
-	_label(_ui, "RELICS CARRIED", _spaced(FontLib.label, 4), 20, LABEL_LIT,
-			Rect2(lp.x, lp.y, 360, 30), HORIZONTAL_ALIGNMENT_LEFT)
+	_label(_ui, "RELICS CARRIED", _spaced(FontLib.label, 4), 26 if _phone else 20, LABEL_LIT,
+			Rect2(lp.x, lp.y, 400, 36), HORIZONTAL_ALIGNMENT_LEFT)
 	var rowcfg: Array = _m.get("layout", {}).get("relics_row", [500, 748, 8, 72, 10])
 	var x0 := float(rowcfg[0])
 	var y0 := float(rowcfg[1])
@@ -720,15 +765,15 @@ func _build_relics() -> void:
 				g.texture = glyph
 				g.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				g.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				g.position = box.position
-				g.size = box.size
+				g.position = box.position * (slot / 72.0)
+				g.size = box.size * (slot / 72.0)
 				g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				holder.add_child(g)
 			else:
 				var icon := RelicIcon.new()
 				icon.relic_id = id
 				icon.position = holder.size / 2.0
-				icon.scale = Vector2.ONE * (box.size.x / 72.0)
+				icon.scale = Vector2.ONE * (box.size.x / 72.0) * (slot / 72.0)
 				holder.add_child(icon)
 			var tip: Dictionary = TrailMode.RELICS.get(id, {})
 			var tip_desc := String(_data.get("relic_descs", {}).get(id, tip.get("desc", "")))
@@ -741,6 +786,9 @@ func _build_relics() -> void:
 ## the outlaw and campfire stops the rider actually took, and a flag
 ## (or the victory star) where it ended.
 func _build_strip(complete: bool) -> void:
+	if _phone:
+		_build_strip_rows(complete)
+		return
 	var lay: Dictionary = _m.get("layout", {})
 	var strip: Dictionary = _m.get("ui", {}).get("strip", {})
 	var total := int(_data.get("total", 21))
@@ -854,11 +902,116 @@ func _build_strip(complete: bool) -> void:
 		_ui.add_child(flag)
 
 
+## The phone's map: a plate with one row per region, ten stops each,
+## the boss at the end of its row.
+var _row_rails: Array = []   # phone: [lit rail, first stop, last stop]
+
+
+func _build_strip_rows(complete: bool) -> void:
+	var strip: Dictionary = _m.get("ui", {}).get("strip", {})
+	var total := int(_data.get("total", 21))
+	var reached := int(_data.get("reached", 1))
+	var rsize := int(_data.get("region_size", 10))
+	var camp_slot := int(_data.get("camp_slot", 3))
+	var shop_slots: Array = _data.get("shop_slots", [])
+	var bosses: Dictionary = _data.get("bosses", {})
+	var stops: Array = _data.get("stops", [])
+	var box := STRIP_PHONE
+	var plate := _nine("ledger_panel")
+	plate.position = box.position
+	plate.size = box.size
+	plate.modulate = Color(0.55, 0.5, 0.45)
+	_ui.add_child(plate)
+	_end_node = reached
+	var regions := int(ceil(float(total) / rsize))
+	var row_h := box.size.y / regions
+	_node_dx = (box.size.x - 140.0) / float(maxi(1, rsize - 1))
+	var margins: Array = strip.get("rail_margins", [10, 0, 10, 0])
+	var oswald := _spaced(FontLib.label, 4)
+	var mono := _font(FontLib.label)
+	_row_rails = []
+	for reg in regions:
+		var first := reg * rsize + 1
+		var last := mini(first + rsize - 1, total)
+		var ry := box.position.y + row_h * reg + row_h * 0.56
+		var x0 := box.position.x + 70.0
+		_label(_ui, "REGION %s" % ROMAN[reg % ROMAN.size()], oswald, 22,
+				LABEL_LIT if reached >= first else LABEL_AHEAD,
+				Rect2(x0 - 34.0, ry - row_h * 0.5 + 6.0, 300, 30), HORIZONTAL_ALIGNMENT_LEFT)
+		var rail := _nine_file(String(strip.get("rail", "ui/strip_rail.png")), margins)
+		rail.position = Vector2(x0 - 10, ry - 14)
+		rail.size = Vector2((last - first) * _node_dx + 20, 28)
+		_ui.add_child(rail)
+		var lit := _nine_file(String(strip.get("rail_lit", "ui/strip_rail_lit.png")), margins)
+		lit.position = rail.position
+		lit.size = Vector2(20, 28)
+		lit.visible = false
+		_ui.add_child(lit)
+		_row_rails.append([lit, first, last])
+		for t in range(first, last + 1):
+			var room := t - 1
+			var lit_key := "table_passed"
+			var ahead_key := "table_ahead"
+			if bosses.has(room):
+				lit_key = "boss_%s" % String(bosses[room])
+				ahead_key = lit_key + "_ahead"
+			else:
+				var kind := String(stops[room]) if room < stops.size() else ""
+				if room % rsize == camp_slot:
+					ahead_key = "campfire_ahead"
+				elif shop_slots.has(room % rsize):
+					ahead_key = "shop_ahead"
+				if kind == "camp":
+					lit_key = "campfire"
+				elif kind == "shop":
+					lit_key = "shop"
+				elif kind == "outlaw":
+					lit_key = "outlaw"
+				elif t == reached and not complete:
+					lit_key = "table_current"
+			var tr := TextureRect.new()
+			tr.texture = _tex(String(strip.get(ahead_key, "ui/marker_%s.png" % ahead_key)))
+			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_ui.add_child(tr)
+			var cx := x0 + (t - first) * _node_dx
+			var n := {"rect": tr, "ahead": tr.texture,
+					"lit": _tex(String(strip.get(lit_key, "ui/marker_%s.png" % lit_key))),
+					"on": false, "center": Vector2(cx, ry), "t": t}
+			_place_node(n)
+			_nodes.append(n)
+			_label(_ui, str(t), mono, 20, LABEL_LIT if t <= reached else LABEL_AHEAD,
+					Rect2(cx - 24, ry + 38, 48, 26), HORIZONTAL_ALIGNMENT_CENTER)
+	# The flag (or the victory star) on the stop where the ride ended.
+	var er := clampi((reached - 1) / rsize, 0, regions - 1)
+	var end_pos := Vector2(box.position.x + 70.0 + (reached - 1 - er * rsize) * _node_dx,
+			box.position.y + row_h * er + row_h * 0.56)
+	if complete:
+		_star = TextureRect.new()
+		_star.texture = _tex(String(strip.get("victory", "ui/marker_victory.png")))
+		_star.size = Vector2(80, 80)
+		_star.position = end_pos - Vector2(40, 104)
+		_star.pivot_offset = Vector2(40, 40)
+		_star.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ui.add_child(_star)
+	else:
+		var flag := TextureRect.new()
+		flag.texture = _tex(String(strip.get("ended_here", "ui/marker_ended.png")))
+		flag.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		flag.size = Vector2(48, 63)
+		flag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var foot := end_pos.y - (44.0 if bosses.has(reached - 1) else 12.0)
+		_flag_y = foot - flag.size.y
+		flag.position = Vector2(end_pos.x - 18, _flag_y)
+		_flag = flag
+		_ui.add_child(flag)
+	_rail_lit = _row_rails[0][0] if not _row_rails.is_empty() else null
+
+
 ## The ride's EXP: the rider's level, a bar that fills from where it
 ## stood to where the ride leaves it (rolling over at each level), and
 ## the EXP earned. Hover for the breakdown.
 func _build_exp() -> void:
-	var r := Rect2(120, 984, 960, 60)
+	var r := Rect2(60, 1726, 960, 60) if _phone else Rect2(120, 984, 960, 60)
 	_exp_box = Control.new()
 	_exp_box.position = r.position
 	_exp_box.size = r.size
@@ -902,8 +1055,10 @@ func _build_banner() -> void:
 		var text := "CONTRACT%s DONE: %s%s. Claim the cash from the menu." % [
 				"S" if names.size() > 1 else "", ", ".join(shown),
 				" +%d more" % (names.size() - 2) if names.size() > 2 else ""]
-		_contracts_l = _label(_ui, text, _font(FontLib.label), 20, GOLD,
-				Rect2(1180, 556 if lv1 > lv0 else 300, 620, 30), HORIZONTAL_ALIGNMENT_CENTER)
+		var cr := Rect2(36, 432, 1008, 30) if _phone \
+				else Rect2(1180, 556 if lv1 > lv0 else 300, 620, 30)
+		_contracts_l = _label(_ui, text, _font(FontLib.label), 22 if _phone else 20, GOLD,
+				cr, HORIZONTAL_ALIGNMENT_CENTER)
 		_contracts_l.add_theme_color_override("font_outline_color", Color("1a1008"))
 		_contracts_l.add_theme_constant_override("outline_size", 5)
 	if lv1 <= lv0:
@@ -914,7 +1069,18 @@ func _build_banner() -> void:
 	_banner.size = r.size
 	_banner.pivot_offset = r.size / 2.0
 	_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ui.add_child(_banner)
+	if _phone:
+		# Over the middle of the page, a size up (the intro scales the
+		# banner itself, so the holder carries the phone's size).
+		var holder := Control.new()
+		holder.scale = Vector2.ONE * 1.5
+		holder.position = Vector2((VIEW.x - r.size.x * 1.5) / 2.0, 560)
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ui.add_child(holder)
+		_banner.position = Vector2.ZERO
+		holder.add_child(_banner)
+	else:
+		_ui.add_child(_banner)
 	var plate := _nine("title_plate_gilded")
 	plate.size = r.size
 	_banner.add_child(plate)
@@ -959,6 +1125,8 @@ func _apply_exp(it: float) -> void:
 	if _banner != null:
 		var b := _c01((it - _t_exp - EXP_DUR) / BANNER_DUR)
 		_banner.modulate.a = _c01(b * 3.0)
+		if _phone:
+			_banner.modulate.a *= 1.0 - _c01((it - _t_exp - EXP_DUR - BANNER_DUR - BANNER_HOLD) / 0.5)
 		_banner.scale = Vector2.ONE * maxf(0.001, _ease_out_back(b))
 		if b > 0.0:
 			_once("banner", func() -> void:
@@ -985,7 +1153,7 @@ func _build_buttons() -> void:
 	for b in [back, ride]:
 		if FontLib.display != null:
 			b.add_theme_font_override("font", FontLib.display)
-		b.add_theme_font_size_override("font_size", 30)
+		b.add_theme_font_size_override("font_size", 40 if _phone else 30)
 		_buttons.append(b)
 	back.pressed.connect(func() -> void: to_menu.emit())
 	ride.pressed.connect(func() -> void: ride_again.emit())
@@ -1092,9 +1260,15 @@ func _apply_strip(it: float) -> void:
 		var age := it - (T_STRIP + k * NODE_STEP)
 		tr.scale = Vector2.ONE * (1.0 + 0.35 * (1.0 - _c01(age / 0.15))) \
 				if on and age < 0.15 else Vector2.ONE
-	_rail_lit.visible = lit > 0
-	if lit > 0:
-		_rail_lit.size.x = (lit - 1) * _node_dx + 20.0
+	if _phone:
+		for rr in _row_rails:
+			var on_row := clampi(lit - int(rr[1]) + 1, 0, int(rr[2]) - int(rr[1]) + 1)
+			(rr[0] as Control).visible = on_row > 0
+			(rr[0] as Control).size.x = maxf(20.0, (on_row - 1) * _node_dx + 20.0)
+	elif _rail_lit != null:
+		_rail_lit.visible = lit > 0
+		if lit > 0:
+			_rail_lit.size.x = (lit - 1) * _node_dx + 20.0
 	var done := T_STRIP + _end_node * NODE_STEP
 	var p := _c01((it - done) / 0.35)
 	if _flag != null:
@@ -1176,7 +1350,7 @@ func _loop_tumbleweed(delta: float) -> void:
 		_tumble_wait -= delta
 		if _tumble_wait <= 0.0:
 			_tumble.visible = true
-			_tumble.position.x = VIEW.x + 80.0
+			_tumble.position.x = SCENE.x + 80.0
 			_tumble_run = 0.0
 		return
 	var speed := float(_tumble_cfg.get("speed_px_s", 260))
@@ -1263,7 +1437,7 @@ func _full_rect(t: Texture2D) -> TextureRect:
 	tr.texture = t
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tr.stretch_mode = TextureRect.STRETCH_SCALE
-	tr.size = VIEW
+	tr.size = SCENE
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return tr
 
