@@ -33,6 +33,28 @@ const BOARD_AREA_POS := Vector2(380, 100)
 const BOARD_AREA_SIZE := Vector2(1160, 900)
 const PLAY_WIDTH := 1180.0  # width of the play area
 const BAR_W := 1154.0       # banner progress-bar fill width
+# The HUD geometry the update code reads, set per form factor in _build_ui
+# (the desktop values here; the mobile relayout replaces them).
+var _bar_w := BAR_W
+var _bar_y := 74.0
+var _bar_y_bounty := 122.0
+var _board_area := Rect2(BOARD_AREA_POS, BOARD_AREA_SIZE)
+var _community_w := 292.0
+var _plaque_rest_y := 10.0
+var _meter_top := 104.0
+var _meter_h := 892.0
+var _desk_only: Array = []      # desktop-only chrome the mobile layout hides
+var _play_btn: Button
+var _clear_btn: Button
+var _menu_btn: Button
+var _cells: Array = []          # mobile: [caption Label, value Label] × 4
+var _bet_tag: Label             # mobile: the starting bet, in the top bar
+var _pays_btn: Button
+var _pays_sheet: Control        # mobile: the payouts, as a bottom sheet
+var _kit_rects: Array = []      # mobile: sleeve rect, then one per kit slot
+var _target_fit_text := ""       # mobile: the table line last fitted to the top bar
+var _board_area_full := Rect2()   # mobile: the board with the strip below it
+var _board_area_strip := Rect2()  # mobile: the board above the strip
 
 var board: Board
 var trail: TrailMode
@@ -679,12 +701,20 @@ func _update_labels() -> void:
 	_community_label.visible = show_community
 	community_display.visible = show_community
 	_community_plate.visible = show_community
+	if Form.is_mobile() and _board_area_full.size.y > 0.0:
+		# The strip under the board is only there when the table uses it.
+		var want := _board_area_strip if show_community or outlaw.visible else _board_area_full
+		if want != _board_area and not board.busy:
+			_board_area = want
+			_apply_board_layout()
 	if show_community:
 		if board.blackjack_target > 0:
 			_community_label.text = ("DEALER SHOWS %d" if board.blackjack_hole_hidden
 					else "DEALER HAS %d") % board.blackjack_target
 		else:
 			_community_label.text = "COMMUNITY"
+	if Form.is_mobile():
+		_update_cells()
 	_style_boss_bar(0, 0)  # gold progress by default; boss rooms restyle it
 	var show_arcade := mode_kind == "arcade" and game_started and not menu_open
 	var show_trail := mode_kind == "trail" and game_started and not menu_open and trail.in_room
@@ -706,16 +736,16 @@ func _update_labels() -> void:
 	# Every table resets the banner strip; the bounty branch below
 	# claims it back with the WANTED plaque and a dropped bar.
 	_bounty_plaque.visible = false
-	target_bar_back.position.y = 74.0
-	target_bar_fill.position.y = 74.0
+	target_bar_back.position.y = _bar_y
+	target_bar_fill.position.y = _bar_y
 	if show_arcade:
-		var h := 892.0 * meter / 100.0
-		meter_fill.position.y = 104.0 + (892.0 - h)
+		var h := _meter_h * meter / 100.0
+		meter_fill.position.y = _meter_top + (_meter_h - h)
 		meter_fill.size.y = h
 		meter_fill.color = GOLD if meter > 25.0 else RED
 		var target := _arcade_target()
 		target_label.text = "LEVEL %d      %d / %d" % [level, level_score, target]
-		target_bar_fill.size.x = BAR_W * clampf(float(level_score) / float(target), 0.0, 1.0)
+		target_bar_fill.size.x = _bar_w * clampf(float(level_score) / float(target), 0.0, 1.0)
 	elif show_trail:
 		if trail.room_goal == "boss":
 			# The boss wears a segmented HEALTH bar in the banner slot.
@@ -756,26 +786,26 @@ func _update_labels() -> void:
 				digits.append(str(d))
 			target_label.text = "TABLE %d / %d      SAFE  %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, " · ".join(digits)]
-			target_bar_fill.size.x = BAR_W * trail.safe_progress() / 4.0
+			target_bar_fill.size.x = _bar_w * trail.safe_progress() / 4.0
 		elif trail.room_goal == "chest":
 			target_label.text = "TABLE %d / %d      KEY + CHEST  %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					trail.room_chests_opened, trail.room_chests_needed]
-			target_bar_fill.size.x = BAR_W * clampf(
+			target_bar_fill.size.x = _bar_w * clampf(
 					float(trail.room_chests_opened)
 					/ float(maxi(trail.room_chests_needed, 1)), 0.0, 1.0)
 		elif trail.room_goal == "mine":
 			target_label.text = "TABLE %d / %d      GOLD MINE  %d / %d STONES" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					trail.room_stones_broken, trail.room_stones_needed]
-			target_bar_fill.size.x = BAR_W * clampf(
+			target_bar_fill.size.x = _bar_w * clampf(
 					float(trail.room_stones_broken)
 					/ float(maxi(trail.room_stones_needed, 1)), 0.0, 1.0)
 		elif trail.room_goal == "blackjack":
 			target_label.text = "TABLE %d / %d      DEALER SHOWS %d  ·  WINS %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					board.blackjack_target, trail.room_wins, trail.room_wins_needed]
-			target_bar_fill.size.x = BAR_W * clampf(
+			target_bar_fill.size.x = _bar_w * clampf(
 					float(trail.room_wins) / float(maxi(trail.room_wins_needed, 1)),
 					0.0, 1.0)
 		elif trail.room_goal == "outlaw":
@@ -795,16 +825,16 @@ func _update_labels() -> void:
 			target_label.text = "TABLE %d / %d      PURGE  %d / %d CLEARED  ·  %d ON THE TABLE" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					trail.purged_count(), quota, trail.purge_left()]
-			target_bar_fill.size.x = BAR_W * clampf(
+			target_bar_fill.size.x = _bar_w * clampf(
 					float(trail.purged_count()) / float(maxi(quota, 1)), 0.0, 1.0)
 		elif trail.room_goal == "hands":
 			target_label.text = "TABLE %d / %d      PLAY  %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.require_status()]
-			target_bar_fill.size.x = BAR_W * clampf(trail.require_frac(), 0.0, 1.0)
+			target_bar_fill.size.x = _bar_w * clampf(trail.require_frac(), 0.0, 1.0)
 		elif trail.room_goal == "collect":
 			target_label.text = "TABLE %d / %d      %s" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.collect_status()]
-			target_bar_fill.size.x = BAR_W * clampf(
+			target_bar_fill.size.x = _bar_w * clampf(
 					float(trail.room_collect_done)
 					/ float(maxi(trail.room_collect_need, 1)), 0.0, 1.0)
 		elif trail.room_goal == "landrush":
@@ -812,12 +842,12 @@ func _update_labels() -> void:
 			target_label.text = "TABLE %d / %d      PLOTS CLAIMED  %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL,
 					board.landrush_marks.size(), plots]
-			target_bar_fill.size.x = BAR_W * clampf(
+			target_bar_fill.size.x = _bar_w * clampf(
 					float(board.landrush_marks.size()) / float(plots), 0.0, 1.0)
 		else:
 			target_label.text = "TABLE %d / %d      %d / %d" % \
 					[trail.room_index + 1, TrailMode.ROOMS_TOTAL, trail.room_score, trail.room_target]
-			target_bar_fill.size.x = BAR_W * clampf(
+			target_bar_fill.size.x = _bar_w * clampf(
 					float(trail.room_score) / float(maxi(trail.room_target, 1)), 0.0, 1.0)
 	_update_kit()
 	if _twist_strip != null:
@@ -843,15 +873,22 @@ func _update_labels() -> void:
 		# should look like the deck in your hand, not another slot.
 		var pile_scale: Vector2 = board.scale * DECK_PILE_FACTOR
 		board.deal_scale = DECK_PILE_FACTOR
-		for i in _deck_stack_cards.size():
-			var back: PlayingCard = _deck_stack_cards[i]
-			if back.scale != pile_scale:
-				back.scale = pile_scale
-			back.visible = show_deck and i < shown
-		if shown > 0:
-			board.deal_anchor = (_deck_stack_cards[shown - 1] as PlayingCard).position
+		if Form.is_mobile():
+			# No room for the pile on a phone: the deck is the button in
+			# the top bar, and cards are dealt from it.
+			board.deal_scale = 0.6
+			for back in _deck_stack_cards:
+				back.visible = false
+		else:
+			for i in _deck_stack_cards.size():
+				var back: PlayingCard = _deck_stack_cards[i]
+				if back.scale != pile_scale:
+					back.scale = pile_scale
+				back.visible = show_deck and i < shown
+			if shown > 0:
+				board.deal_anchor = (_deck_stack_cards[shown - 1] as PlayingCard).position
 		if show_deck:
-			_deck_count.text = "DECK  %d" % shoe
+			_deck_count.text = ("DECK\n%d" if Form.is_mobile() else "DECK  %d") % shoe
 		elif _deck_peek.visible:
 			_deck_peek.visible = false
 	_update_preview()
@@ -1002,6 +1039,10 @@ func _update_kit() -> void:
 	var bh := 56.0 if rows <= 4 else 48.0
 	_sleeve_btn.position = Vector2(PANEL_R, 574)
 	_sleeve_btn.size = Vector2(300, bh)
+	if not _kit_rects.is_empty():
+		_sleeve_btn.position = (_kit_rects[0] as Rect2).position
+		_sleeve_btn.size = (_kit_rects[0] as Rect2).size
+		bh = _sleeve_btn.size.y
 	_sleeve_btn.pivot_offset = _sleeve_btn.size / 2.0
 	match trail.character:
 		"the_machine":
@@ -1066,10 +1107,11 @@ func _update_kit() -> void:
 	_sleeve_icon.texture = CardArt.tex("icon", sig_icon)
 	_sleeve_icon.position = Vector2(8, 6)
 	_sleeve_icon.size = Vector2(bh - 12, bh - 12)
+	var kit_font := 26 if not _kit_rects.is_empty() else 19
 	if _sleeve_icon.texture != null:
-		UiKit.fit_button_text(_sleeve_btn, 19, 13, 2.0 * (_sleeve_icon.size.x + 14.0))
+		UiKit.fit_button_text(_sleeve_btn, kit_font, 13, 2.0 * (_sleeve_icon.size.x + 14.0))
 	else:
-		UiKit.fit_button_text(_sleeve_btn, 19)
+		UiKit.fit_button_text(_sleeve_btn, kit_font)
 	for i in _kit_btns.size():
 		var btn: Button = _kit_btns[i]
 		btn.position = Vector2(PANEL_R, 574 + (i + 1) * spacing)
@@ -1078,6 +1120,13 @@ func _update_kit() -> void:
 		var icon: TextureRect = _kit_icons[i]
 		icon.position = Vector2(8, 6)
 		icon.size = Vector2(bh - 12, bh - 12)
+		if i + 1 < _kit_rects.size():
+			# The phone kit: square icon buttons in a row; the name and what
+			# it does are a long-press away.
+			btn.position = (_kit_rects[i + 1] as Rect2).position
+			btn.size = (_kit_rects[i + 1] as Rect2).size
+			icon.position = Vector2(12, 12)
+			icon.size = btn.size - Vector2(24, 24)
 		icon.texture = CardArt.provision_icon(trail.provisions[i]) \
 				if i < trail.provisions.size() else null
 		if i < trail.provisions.size():
@@ -1097,6 +1146,10 @@ func _update_kit() -> void:
 			btn.tooltip_text = "An empty kit slot. You'll find provisions in shops, safes and chests."
 		# Centered text keeps clear of the icon on the left edge.
 		UiKit.fit_button_text(btn, 19, 13, 2.0 * (icon.position.x + icon.size.x + 6.0))
+		if i + 1 < _kit_rects.size():
+			var aiming := btn.text == "AIMING…"
+			btn.text = "" if not btn.disabled or icon.texture != null else "—"
+			btn.modulate = Color(1.35, 1.2, 0.75) if aiming else Color.WHITE
 
 
 ## Restyles the banner bar as a red segmented HEALTH bar (bosses and
@@ -1108,7 +1161,7 @@ func _style_boss_bar(hp: int, max_hp: int) -> void:
 			_boss_ticks.visible = false
 		return
 	target_bar_fill.add_theme_stylebox_override("panel", UiKit.bar_box("red"))
-	target_bar_fill.size.x = BAR_W * clampf(float(hp) / float(max_hp), 0.0, 1.0)
+	target_bar_fill.size.x = _bar_w * clampf(float(hp) / float(max_hp), 0.0, 1.0)
 	_boss_ticks.visible = true
 	# One notch per life — or ten even notches for a score-pool boss
 	# like the Jack, whose max runs to the thousands. The 3px gaps cut
@@ -1120,7 +1173,7 @@ func _style_boss_bar(hp: int, max_hp: int) -> void:
 		for i in range(1, seg):
 			var t := ColorRect.new()
 			t.color = Color(0, 0, 0, 0.55)
-			t.position = Vector2(BAR_W * i / seg, 3.0)
+			t.position = Vector2(_bar_w * i / seg, 3.0)
 			t.size = Vector2(3, 10)
 			t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			_boss_ticks.add_child(t)
@@ -1135,8 +1188,8 @@ func _update_bounty_plaque(posse_note: String) -> void:
 		return
 	_bounty_plaque.visible = true
 	target_label.visible = false
-	target_bar_back.position.y = 122.0
-	target_bar_fill.position.y = 122.0
+	target_bar_back.position.y = _bar_y_bounty
+	target_bar_fill.position.y = _bar_y_bounty
 	var who := trail.current_outlaw_name()
 	_plaque_line.text = "%s%s  ·  DEAD OR ALIVE  ·  SCORE %d+" % [
 			who, posse_note, trail._outlaw_bar()]
@@ -1188,10 +1241,13 @@ func show_wanted_banner(spec: Dictionary, subtitle: String, reward: int) -> void
 			Color("8a3a30"))
 	reward_l.size = Vector2(434, 72)
 	reward_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if Form.is_mobile():
+		holder.scale = Vector2.ONE * ((VIEW.x - 72.0) / 1600.0)
+		holder.position.x = 36.0
 	hud_root.add_child(holder)
 	board._play_sound(Board.SFX_REVOLVERS.pick_random(), 0.9, -12.0)
 	var tw := holder.create_tween()
-	tw.tween_property(holder, "position:y", 36.0, 0.5) \
+	tw.tween_property(holder, "position:y", Form.safe_top() + 36.0, 0.5) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_interval(1.7)
 	tw.tween_property(holder, "modulate:a", 0.0, 0.4)
@@ -2466,7 +2522,7 @@ func table_banner(text: String, color: Color = GOLD) -> void:
 	_plaque.modulate.a = 1.0
 	_plaque.visible = true
 	_plaque_tween = create_tween()
-	_plaque_tween.tween_property(_plaque, "position:y", 10.0, 0.5) \
+	_plaque_tween.tween_property(_plaque, "position:y", _plaque_rest_y, 0.5) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_plaque_tween.tween_interval(2.6)
 	_plaque_tween.tween_property(_plaque, "position:y", -130.0, 0.5) \
@@ -2478,6 +2534,8 @@ func _build_plaque() -> void:
 	_plaque = Control.new()
 	_plaque.size = Vector2(820, 112)
 	_plaque.position = Vector2(PLAY_X + (PLAY_WIDTH - 820.0) / 2.0, -130.0)
+	if Form.is_mobile():
+		_plaque.position.x = (VIEW.x - 820.0) / 2.0
 	_plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_plaque.visible = false
 	ui_root.add_child(_plaque)
@@ -2910,7 +2968,7 @@ func _refresh_community() -> void:
 	# Big cards, slightly fanned: they overlap just enough that the
 	# whole street fits the plate (each card's rank corner stays
 	# clear), and spread back out when the panel holds fewer.
-	var avail := 292.0 / community_display.scale.x
+	var avail := _community_w / community_display.scale.x
 	var pitch := 74.0
 	if cards.size() > 1:
 		pitch = minf(74.0, (avail - PlayingCard.W) / (cards.size() - 1))
@@ -2951,9 +3009,9 @@ func _apply_board_layout() -> void:
 	# Reserve room for the table rim around the card grid.
 	var margin := TableSurface.RIM_W + TableSurface.FELT_PAD
 	var px := board.board_px_size() + Vector2.ONE * margin * 2.0
-	var s: float = minf(BOARD_AREA_SIZE.x / px.x, BOARD_AREA_SIZE.y / px.y)
+	var s: float = minf(_board_area.size.x / px.x, _board_area.size.y / px.y)
 	board.scale = Vector2(s, s)
-	board.position = BOARD_AREA_POS + (BOARD_AREA_SIZE - px * s) / 2.0 \
+	board.position = _board_area.position + (_board_area.size - px * s) / 2.0 \
 			+ Vector2.ONE * margin * s
 	_board_home = board.position
 
@@ -2997,14 +3055,14 @@ func _build_ui() -> void:
 
 	# Leather plates behind the HUD columns — added FIRST so every
 	# label and button draws on top of them.
-	UiKit.plate(hud_root, Rect2(PANEL_X - 18, 118, 336, 322))
-	UiKit.plate(hud_root, Rect2(PANEL_X - 18, 450, 336, 180))
+	_desk_only.append(UiKit.plate(hud_root, Rect2(PANEL_X - 18, 118, 336, 322)))
+	_desk_only.append(UiKit.plate(hud_root, Rect2(PANEL_X - 18, 450, 336, 180)))
 	_community_plate = UiKit.plate(hud_root, Rect2(PANEL_X - 18, 636, 336, 170))
-	UiKit.plate(hud_root, Rect2(PANEL_R - 18, 126, 336, 384))
-	UiKit.plate(hud_root, Rect2(PANEL_R - 18, 840, 336, 236))
+	_desk_only.append(UiKit.plate(hud_root, Rect2(PANEL_R - 18, 126, 336, 384)))
+	_desk_only.append(UiKit.plate(hud_root, Rect2(PANEL_R - 18, 840, 336, 236)))
 
-	_logo(hud_root, LOGO_HORIZONTAL, Rect2(PANEL_X, 26, 300, 64))
-	UiKit.hrule(hud_root, Vector2(PANEL_X, 96), 300)
+	_desk_only.append(_logo(hud_root, LOGO_HORIZONTAL, Rect2(PANEL_X, 26, 300, 64)))
+	_desk_only.append(UiKit.hrule(hud_root, Vector2(PANEL_X, 96), 300))
 
 	score_label = _label(hud_root, "", Vector2(PANEL_X, 140), 40, GOLD)
 	# The rider's HP, trail only: red segment pills, the same language
@@ -3078,16 +3136,19 @@ func _build_ui() -> void:
 	hud_root.add_child(_bounty_plaque)
 
 	var play_btn := _button(hud_root, "PLAY HAND", Vector2(PANEL_X, 316), Vector2(300, 60), true)
+	_play_btn = play_btn
 	play_btn.add_theme_font_size_override("font_size", 24)
 	play_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.play_hand())
 	var clear_btn := _button(hud_root, "CLEAR", Vector2(PANEL_X, 388), Vector2(145, 48))
+	_clear_btn = clear_btn
 	clear_btn.add_theme_font_size_override("font_size", 24)
 	clear_btn.pressed.connect(func() -> void:
 		if game_started and not game_over:
 			board.player_clear())
 	var menu_btn := _button(hud_root, "MENU", Vector2(PANEL_X + 155, 388), Vector2(145, 48))
+	_menu_btn = menu_btn
 	menu_btn.add_theme_font_size_override("font_size", 18)
 	menu_btn.pressed.connect(func() -> void:
 		# Mid-game, MENU opens the pause screen (like ESC) so exiting
@@ -3098,8 +3159,8 @@ func _build_ui() -> void:
 			_open_menu())
 
 	# Selected cards, shown sorted by rank so straights are easy to read.
-	_label(hud_root, "YOUR HAND", Vector2(PANEL_X, 460), 18, DIM)
-	UiKit.hrule(hud_root, Vector2(PANEL_X, 488), 300)
+	_desk_only.append(_label(hud_root, "YOUR HAND", Vector2(PANEL_X, 460), 18, DIM))
+	_desk_only.append(UiKit.hrule(hud_root, Vector2(PANEL_X, 488), 300))
 	hand_display = Node2D.new()
 	hand_display.position = Vector2(PANEL_X + 30, 532)
 	hand_display.scale = Vector2(0.8, 0.8)
@@ -3141,8 +3202,8 @@ func _build_ui() -> void:
 	meter_fill.visible = false
 	hud_root.add_child(meter_fill)
 
-	_label(hud_root, "PAYOUTS", Vector2(PANEL_R, 140), 22, DIM)
-	UiKit.hrule(hud_root, Vector2(PANEL_R, 170), 300)
+	_desk_only.append(_label(hud_root, "PAYOUTS", Vector2(PANEL_R, 140), 22, DIM))
+	_desk_only.append(UiKit.hrule(hud_root, Vector2(PANEL_R, 170), 300))
 	# A proper two-column table: hand names left, prices right in gold.
 	var names: Array = Poker.BASE_SCORES.keys()
 	names.reverse()
@@ -3168,8 +3229,8 @@ func _build_ui() -> void:
 		pl.add_theme_constant_override("line_spacing",
 				int(row_pitch - f.get_height(20)))
 
-	_label(hud_root, "Click or drag to chain\ntouching cards. Every card\nmust be part of the hand.\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
-			Vector2(PANEL_R, 860), 16, DIM)
+	_desk_only.append(_label(hud_root, "Click or drag to chain\ntouching cards. Every card\nmust be part of the hand.\n\nEnter / Space — play\nC / Right click — clear\nEsc — pause    R — restart\nT — theme    M — menu",
+			Vector2(PANEL_R, 860), 16, DIM))
 
 	# The KIT: the sleeve on top, then three provision slots (four with
 	# Saddlebags), trail rooms only. Rows are laid out in _update_kit.
@@ -3303,7 +3364,235 @@ func _build_ui() -> void:
 	over_label.size = VIEW
 	over_layer.add_child(over_label)
 
+	if Form.is_mobile():
+		_relayout_hud_mobile()
 	_build_pause()
+
+
+## The portrait table, after the phone mockup: a top bar (the table and its
+## target, the deck, pause), the progress bar and twists, four stat cells,
+## the board as big as the room allows, a strip for the community cards or
+## the outlaw, the hand preview, the kit row, and CLEAR / PLAY HAND / PAYS.
+## It moves the desktop's own nodes, so every update keeps working.
+func _relayout_hud_mobile() -> void:
+	var w := VIEW.x
+	var h := VIEW.y
+	var m := 36.0
+	var top := Form.safe_top()
+	var inner := w - 2.0 * m
+	for n in _desk_only:
+		if n != null:
+			(n as CanvasItem).visible = false
+	for n in [hand_display, meta_label, score_label, status_label, deck_label]:
+		n.visible = false
+	score_label.position.y = -400.0  # off the canvas: the cells carry the numbers
+	status_label.position.y = -400.0
+	deck_label.position.y = -400.0
+	meta_label.position.y = -400.0
+	# Top bar.
+	var bar_plate := UiKit.plate(hud_root, Rect2(m, top, inner, 112))
+	hud_root.move_child(bar_plate, 0)
+	target_label.position = Vector2(m + 24.0, top + 12.0)
+	target_label.size = Vector2(inner - 290.0, 60)
+	target_label.add_theme_font_size_override("font_size", 38)
+	target_label.clip_text = true
+	_hp_label.position = Vector2(m + 24.0, top + 76.0)
+	for i in _hp_pips.size():
+		var pip: Panel = _hp_pips[i]
+		pip.position = Vector2(m + 66.0 + i * 30.0, top + 80.0)
+		pip.size = Vector2(24, 14)
+	_bet_tag = _label(hud_root, "", Vector2(m + 420.0, top + 72.0), 22, DIM)
+	_bet_tag.size = Vector2(inner - 710.0, 30)
+	_bet_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_deck_btn.flat = false
+	UiKit.style_button(_deck_btn)
+	_deck_btn.position = Vector2(w - m - 226.0, top + 12.0)
+	_deck_btn.size = Vector2(116, 88)
+	_deck_count.position = _deck_btn.position + Vector2(0, 12)
+	_deck_count.size = Vector2(116, 64)
+	_deck_count.add_theme_font_size_override("font_size", 22)
+	_deck_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_deck_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_deck_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_deck_count.move_to_front()
+	_menu_btn.text = "II"
+	_menu_btn.tooltip_text = "Pause: resume, restart, sound, or leave the table. A trail table waits for you."
+	_menu_btn.position = Vector2(w - m - 98.0, top + 12.0)
+	_menu_btn.size = Vector2(86, 88)
+	_menu_btn.add_theme_font_size_override("font_size", 34)
+	# The progress bar and the twists.
+	_bar_y = top + 130.0
+	_bar_y_bounty = top + 130.0
+	_bar_w = inner
+	target_bar_back.position = Vector2(m, _bar_y)
+	target_bar_back.size = Vector2(inner, 18)
+	target_bar_fill.position = Vector2(m, _bar_y)
+	target_bar_fill.size = Vector2(0, 18)
+	_twist_strip.position = Vector2(m, _bar_y + 22.0)
+	_twist_strip.size = Vector2(inner, 44)
+	_bounty_plaque.position = Vector2(m, top - 4.0)
+	_bounty_plaque.scale = Vector2.ONE * (inner / 1160.0)
+	# Four stat cells.
+	var cy := _bar_y + 72.0
+	var cw := (inner - 48.0) / 4.0
+	_cells = []
+	for i in 4:
+		var cx := m + i * (cw + 16.0)
+		UiKit.plate(hud_root, Rect2(cx, cy, cw, 124), "plain")
+		var cap := _label(hud_root, "", Vector2(cx + 18.0, cy + 12.0), 20, DIM)
+		cap.size = Vector2(cw - 36.0, 28)
+		var val := _label(hud_root, "", Vector2(cx + 18.0, cy + 44.0), 44, GOLD)
+		val.size = Vector2(cw - 36.0, 64)
+		val.clip_text = true
+		if FontLib.numbers != null:
+			val.add_theme_font_override("font", FontLib.numbers)
+			cap.add_theme_font_override("font", FontLib.label)
+		_cells.append([cap, val])
+	# The action bar along the bottom, then the kit row and the preview above it.
+	var ay := h - Form.safe_bottom() - 120.0
+	_clear_btn.position = Vector2(m, ay)
+	_clear_btn.size = Vector2(232, 120)
+	_clear_btn.add_theme_font_size_override("font_size", 30)
+	_pays_btn = _button(hud_root, "PAYS", Vector2(w - m - 232.0, ay), Vector2(232, 120))
+	_pays_btn.add_theme_font_size_override("font_size", 30)
+	_pays_btn.tooltip_text = "What each poker hand pays at this table."
+	_pays_btn.pressed.connect(_toggle_pays_sheet)
+	_play_btn.position = Vector2(m + 248.0, ay)
+	_play_btn.size = Vector2(inner - 2.0 * 248.0, 120)
+	_play_btn.add_theme_font_size_override("font_size", 38)
+	var ky := ay - 30.0 - 120.0
+	var kit_w := inner * 0.58
+	_kit_plate.position = Vector2(m, ky)
+	_kit_plate.size = Vector2(kit_w, 120)
+	for c in _kit_plate.get_children():
+		(c as Control).size = _kit_plate.size
+	_kit_title.position = Vector2(-400, -400)
+	_kit_rects = [Rect2(m + kit_w + 16.0, ky + 4.0, inner - kit_w - 16.0, 112)]
+	for i in _kit_btns.size():
+		_kit_rects.append(Rect2(m + 14.0 + i * 112.0, ky + 10.0, 100, 100))
+	var py := ky - 54.0
+	preview_label.position = Vector2(m, py)
+	preview_label.size = Vector2(inner, 44)
+	preview_label.add_theme_font_size_override("font_size", 30)
+	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	preview_label.clip_text = true
+	# A strip under the board for the community cards (hold'em, the dealer)
+	# and the outlaw's portrait.
+	var sy := py - 160.0
+	_community_plate.position = Vector2(m, sy)
+	_community_plate.size = Vector2(inner, 150)
+	for c in _community_plate.get_children():
+		(c as Control).size = _community_plate.size
+	_community_label.position = Vector2(m + 24.0, sy + 14.0)
+	_community_label.add_theme_font_size_override("font_size", 24)
+	community_display.position = Vector2(m + 210.0, sy + 75.0)
+	community_display.scale = Vector2(1.05, 1.05)
+	_community_w = inner - 420.0
+	outlaw.position = Vector2(w - m - 130.0, sy + 40.0)
+	outlaw.scale = Vector2(0.72, 0.72)
+	# The board takes whatever is left between the cells and the preview;
+	# tables with community cards or an outlaw give up the strip for them.
+	var by := cy + 124.0 + 20.0
+	_board_area_full = Rect2(m, by, inner, py - 12.0 - by)
+	_board_area_strip = Rect2(m, by, inner, sy - 12.0 - by)
+	_board_area = _board_area_full
+	_apply_board_layout()
+	meter_back.position = Vector2(w - 26.0, by)
+	meter_back.size = Vector2(18, _board_area.size.y)
+	meter_fill.position = Vector2(w - 24.0, by + 2.0)
+	_meter_top = by + 2.0
+	_meter_h = _board_area.size.y - 4.0
+	meter_fill.size = Vector2(14, _meter_h)
+	countdown_overlay.position = Vector2(0, by - 10.0)
+	countdown_overlay.size = Vector2(w, _board_area.size.y + 20.0)
+	announcer.position = Vector2(0, by)
+	announcer.size = Vector2(w, _board_area.size.y)
+	announcer.add_theme_font_size_override("font_size", 64)
+	announcer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_plaque_rest_y = top + 12.0
+	board.deal_anchor = _deck_btn.position + _deck_btn.size / 2.0
+	_build_pays_sheet(ay)
+
+
+## PAYS on the phone: the payouts table in a sheet over the board.
+func _build_pays_sheet(above_y: float) -> void:
+	_pays_sheet = ColorRect.new()
+	(_pays_sheet as ColorRect).color = Color(0, 0, 0, 0.55)
+	_pays_sheet.size = VIEW
+	_pays_sheet.mouse_filter = Control.MOUSE_FILTER_STOP
+	_pays_sheet.visible = false
+	_pays_sheet.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and (e as InputEventMouseButton).pressed:
+			_pays_sheet.visible = false)
+	ui_root.add_child(_pays_sheet)
+	var sh := 760.0
+	var rect := Rect2(36, above_y - 24.0 - sh, VIEW.x - 72.0, sh)
+	UiKit.plate(_pays_sheet, rect)
+	var title := _label(_pays_sheet, "PAYOUTS", rect.position + Vector2(40, 30), 30, DIM)
+	title.size = Vector2(rect.size.x - 80.0, 40)
+	for pl: Label in [_payout_names, _payout_values]:
+		pl.reparent(_pays_sheet, false)
+		pl.position = rect.position + Vector2(48, 96)
+		pl.add_theme_font_size_override("font_size", 34)
+		var f: Font = pl.get_theme_font("font")
+		pl.add_theme_constant_override("line_spacing", int(56.0 - f.get_height(34)))
+	_payout_values.size = Vector2(rect.size.x - 96.0, sh - 120.0)
+
+
+func _toggle_pays_sheet() -> void:
+	if _pays_sheet == null:
+		return
+	_pays_sheet.visible = not _pays_sheet.visible
+	if _pays_sheet.visible:
+		_pays_sheet.move_to_front()
+
+
+## The four stat cells: score, then hands or time, then what the mode
+## counts (trail cash and pay; arcade level and target; the deck).
+func _update_cells() -> void:
+	if _cells.size() < 4:
+		return
+	var vals := [["SCORE", str(int(_shown_score))], ["HANDS", str(hands_played)],
+			["DECK", str(board.deck.size())], ["", ""]]
+	match mode_kind:
+		"time":
+			var secs := ceili(time_left)
+			vals[1] = ["TIME", "%d:%02d" % [secs / 60, secs % 60]]
+		"arcade":
+			vals[1] = ["LEVEL", str(level)]
+			vals[3] = ["TARGET", str(_arcade_target())]
+		"trail":
+			if trail.in_room and trail.room_on_clock():
+				var tsecs := ceili(trail.room_time_left)
+				vals[1] = ["TIME", "%d:%02d" % [tsecs / 60, tsecs % 60]]
+			else:
+				vals[1] = ["HANDS", str(trail.room_hands_left)]
+			vals[2] = ["CASH", "$%d" % trail.trail_cash]
+			vals[3] = ["PAYS", "$%d" % trail._table_pay(trail.current_offer)
+					if trail.in_room and not trail.current_offer.is_empty() else "—"]
+	for i in 4:
+		(_cells[i][0] as Label).text = String(vals[i][0])
+		(_cells[i][1] as Label).text = String(vals[i][1])
+	var warn := (mode_kind == "trail" and trail.in_room and (
+			(trail.room_on_clock() and trail.room_time_left < 15.0)
+			or (not trail.room_on_clock() and trail.room_hands_left <= 2))) \
+			or (mode_kind == "time" and time_left < 15.0)
+	(_cells[1][1] as Label).add_theme_color_override("font_color", RED if warn else GOLD)
+	# The top bar's table line shrinks to fit (KING COBRA · SCORE HANDS…).
+	if target_label.text != _target_fit_text:
+		_target_fit_text = target_label.text
+		var tf: Font = target_label.get_theme_font("font")
+		var fs := 38
+		while fs > 20 and tf.get_string_size(target_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x \
+				> target_label.size.x:
+			fs -= 1
+		target_label.add_theme_font_size_override("font_size", fs)
+	if _bet_tag != null:
+		var bet_text := ""
+		if mode_kind == "trail" and not trail.bet.is_empty():
+			bet_text = "BET WON" if bool(trail.bet.get("paid", false)) \
+					else "BET: " + String(TrailMode.BET_NAMES.get(String(trail.bet.get("target", "")), "")).to_upper()
+		_bet_tag.text = bet_text
 
 
 func _build_pause() -> void:
@@ -3317,6 +3606,9 @@ func _build_pause() -> void:
 	var title := _label(pause_layer, "PAUSED", Vector2(0, 250), 84, GOLD)
 	title.size = Vector2(VIEW.x, 110)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if Form.is_mobile():
+		_build_pause_mobile(title)
+		return
 
 	var resume := _button(pause_layer, "RESUME", Vector2(810, 470), Vector2(300, 64))
 	resume.add_theme_font_size_override("font_size", 26)
@@ -3347,6 +3639,37 @@ func _build_pause() -> void:
 		quit.add_theme_font_size_override("font_size", 24)
 		quit.pressed.connect(func() -> void:
 			get_tree().quit())
+
+
+## Pause on a phone: the same choices, stacked big for a thumb.
+func _build_pause_mobile(title: Label) -> void:
+	var w := VIEW.x
+	var bw := w - 2.0 * 96.0
+	title.position.y = Form.safe_top() + 260.0
+	var y := Form.safe_top() + 520.0
+	for spec in [["RESUME", _toggle_pause], ["RESTART", func() -> void:
+				_toggle_pause()
+				_restart()], ["EXIT TO MENU", func() -> void:
+				_toggle_pause()
+				_open_menu()]]:
+		var b := _button(pause_layer, String(spec[0]), Vector2(96, y), Vector2(bw, 120), spec[0] == "RESUME")
+		b.add_theme_font_size_override("font_size", 36)
+		b.pressed.connect(spec[1])
+		y += 150.0
+	var note := _center_on(pause_layer, "It's safe to leave a trail table.\nIt'll be waiting just the way you left it.", y + 10.0, 26, DIM)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	y += 150.0
+	for spec in [["MUSIC", true], ["SFX", false]]:
+		var lbl := _label(pause_layer, String(spec[0]), Vector2(96, y), 32, OFFWHITE)
+		lbl.size = Vector2(160, 60)
+		var slider := _make_volume_slider(pause_layer, Vector2(280, y + 6.0),
+				(func(v: float) -> void: music_vol = v) if spec[1] else (func(v: float) -> void: sfx_vol = v))
+		slider.size = Vector2(w - 280.0 - 96.0, 48)
+		if spec[1]:
+			_pause_music_slider = slider
+		else:
+			_pause_sfx_slider = slider
+		y += 110.0
 
 
 func _center_on(parent: Control, text: String, y: float, font_size: int, color: Color) -> Label:
@@ -3741,9 +4064,9 @@ func _build_profiles_and_tutor() -> void:
 
 	# Dust motes drifting over the table while a game is on.
 	_dust = CPUParticles2D.new()
-	_dust.position = Vector2(960, 540)
+	_dust.position = Vector2(960, 540) if not Form.is_mobile() else VIEW / 2.0
 	_dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	_dust.emission_rect_extents = Vector2(600, 520)
+	_dust.emission_rect_extents = Vector2(600, 520) if not Form.is_mobile() else VIEW / 2.0
 	_dust.amount = 22
 	_dust.lifetime = 9.0
 	_dust.preprocess = 9.0

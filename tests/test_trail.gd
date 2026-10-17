@@ -397,7 +397,8 @@ func _run() -> void:
 	main.table_banner("TABLE CLEARED")
 	await _wait(0.8)
 	failures += _check(main._plaque.visible and main._plaque.position.y > 0.0
-			and main._plaque.position.y < 60.0 and main._plaque_label.text == "TABLE CLEARED",
+			and main._plaque.position.y < main._plaque_rest_y + 50.0
+			and main._plaque_label.text == "TABLE CLEARED",
 			"a finished table is announced on a plaque at the top of the screen")
 	trail._hide_all()
 
